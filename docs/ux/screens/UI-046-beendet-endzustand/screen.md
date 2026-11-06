@@ -29,7 +29,7 @@ Keine.
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Erneut prüfen | Button | nur `.unknown` | Server antwortet: Oberfläche lädt neu (UI-002) | „resellr antwortet noch nicht.“ | bleibt |
+| Erneut versuchen | Button | nur `.unknown` | Server antwortet: Oberfläche lädt neu (UI-002) | „resellr antwortet noch nicht.“ | bleibt |
 | Speicherort markieren | Mausmarkierung | nur `.success` | markiert, Strg+C kopiert | – | bleibt |
 
 Keine weiteren Aktionen (kein „Im Explorer öffnen“, kein „resellr starten“, X-6).

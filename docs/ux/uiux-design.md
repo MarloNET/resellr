@@ -266,6 +266,7 @@ Stand siehe `stitch-log.md`: **27 von 40** Generierungen (inkl. 1 genehmigte Neu
 | v0.1 | 06.11.2026 | Erstfassung (Entwurf): Katalog, Flüsse, Muster, Traceability, Mockups Kernscreens |
 | v0.2 | 06.11.2026 | Überarbeitung nach Struktur-Review Runde 1 (Commit 53bd6de) |
 | v0.3 | 06.11.2026 | Restpunkte Review R1 (Kennzeichnung „Design-Annahme“, Kap. 8); Mockups UI-001, 005, 007, 030, 036, 037, 040, 041, 043; Neugenerierung UI-016 (Freigeben aktiv, Fehlerliste) und UI-019 compact (480 px, „n von m“, Foto-Aktionen); Self-Review (Kap. 12) |
+| v0.4.1 | 06.11.2026 | Korrektur PO-Review R2 (MAR-143): M-3 Rest, Aktionstabelle UI-046 „Erneut versuchen“ angeglichen; keine weiteren Änderungen |
 | v0.4.1 | 06.11.2026 | Korrektur PO-Review R1 (MAR-143): F-1 Höhenrechnung und kompakte Navigation (UI-044, DESIGN.md), F-2 nächster Schritt im `.error` von UI-044, F-3 zwei Mockups (Stitch 27/40) und UI-023-Referenz gekennzeichnet (Datei `inhaltsreferenz-pdf.png`), M-1 Kopfzeilen LP, REQ-060 entfernt, M-2 P-07 eigenes Banner mit nächstem Schritt, M-3 „Erneut versuchen“ einheitlich, M-4 Annahme Launcher; Auslegung AC-REQ-104-01: wörtlich (entschieden PO) |
 | v0.4 | 06.11.2026 | Cross-Check Baseline v0.3.1 (MAR-143): Kap. 6b/6c, UI-044 bis UI-046, LP-01 bis LP-03, FLOW-10, Muster P-06/P-07, UI-023 bereinigt (Variante a), UI-019 leere Merkmalsfelder, Browser Chrome; keine Mockups, Stitch unverändert 25/40 |
 
