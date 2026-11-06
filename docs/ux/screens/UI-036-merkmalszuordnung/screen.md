@@ -19,7 +19,7 @@ Auswahl Kanal und Geräteart; Tabelle: Reihenfolge, Feldbezeichnung des Kanals, 
 |---|---|---|---|---|---|
 | Wertzuordnung bearbeiten | Link „Bearbeiten“ in der Spalte „Wertzuordnung“ einer Zeile | Zeile mit Quelle, die Werte liefert (z. B. Geräteart, Zustand) | Bereich unter der Zeile klappt auf (kein eigener Screen): Tabelle interner Wert → Kanal-Wert, je Zeile Textfeld für den Kanal-Wert (1 bis 100 Zeichen), Zeilen hinzufügen/entfernen, Button „Übernehmen“ schließt den Bereich; die Anzahl in der Spalte aktualisiert sich; gespeichert wird mit „Speichern“ der Seite. Startbelegung Kleinanzeigen: Typ ← Geräteart (AC-REQ-025-02) | Zelle rot: „Kanal-Wert: 1 bis 100 Zeichen“; doppelter interner Wert: „Interner Wert ist schon zugeordnet“ | bleibt |
 | Zeile hinzufügen, entfernen, verschieben | Buttons, Ziehen | – | Reihenfolge gilt auch im Kopier-Assistenten | – | bleibt |
-| Speichern | Primärbutton | gültig | Banner „Gespeichert“; vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach UI-043 mit den Gruppenzahlen (REQ-053) | Zellenfehler | bleibt |
+| Speichern | Primärbutton | gültig | Banner „Gespeichert“; vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach nur das Banner, kein UI-043 (REQ-053 gilt nur für UI-030/UI-031) | Zellenfehler | bleibt |
 
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |

@@ -17,7 +17,7 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
 | Abschnitt hinzufügen/entfernen/verschieben | Buttons | – | Vorschau aktualisiert | – | bleibt |
-| Speichern | Primärbutton | gültig | Banner; vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach UI-043 mit den Gruppenzahlen (REQ-053) | Fehler am Platzhalter | bleibt |
+| Speichern | Primärbutton | gültig | Banner; vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach nur das Banner, kein UI-043 (REQ-053 gilt nur für UI-030/UI-031) | Fehler am Platzhalter | bleibt |
 
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |

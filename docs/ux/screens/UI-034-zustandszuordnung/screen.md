@@ -15,7 +15,7 @@ Kanal-Auswahl; Tabelle: Zustand, Optik-Note (Zahl oder „alle Noten“), Zustan
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Zeile hinzufügen/ändern/entfernen, Speichern | Buttons | gültig | gespeichert (Zustand `UI-034.speichert` bis zur Antwort); vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach UI-043 mit den Gruppenzahlen (REQ-053, Kap. 6.0) | Zellenfehler | bleibt |
+| Zeile hinzufügen/ändern/entfernen, Speichern | Buttons | gültig | gespeichert (Zustand `UI-034.speichert` bis zur Antwort); vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach nur das bisherige Banner „Gespeichert“, kein UI-043 (REQ-053 gilt nur für UI-030/UI-031) | Zellenfehler | bleibt |
 
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |

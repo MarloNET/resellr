@@ -30,7 +30,7 @@
 | Platzhalter einfügen | Button (Auswahl nach Gruppen) | – | Zeile hinzugefügt | – | bleibt |
 | Festen Text einfügen | Button | – | Zeile hinzugefügt | – | bleibt |
 | Entfernen | Zeilenaktion | – | Zeile entfernt; Vorschau aktualisiert | – | bleibt |
-| Titelmuster speichern | Primärbutton | gültig | Banner „Titelmuster gespeichert“; wirkt nach Kap. 6.0 auf Kanal-Inhalte; vor dem Speichern nur die Angabe „gilt für n Kanal-Inhalte im Geltungsbereich“ mit Bestätigung (Ä-32, keine Gruppenzahlen); nach dem Speichern UI-043 mit den Gruppenzahlen aus der Speicherantwort (REQ-053) | Fehlerbox, Speichern abgelehnt | bleibt |
+| Titelmuster speichern | Primärbutton | gültig | Banner „Titelmuster gespeichert“; wirkt nach Kap. 6.0 auf Kanal-Inhalte; vor dem Speichern nur die Angabe „gilt für n Kanal-Inhalte im Geltungsbereich“ mit Bestätigung (Ä-32, keine Gruppenzahlen); nach dem Speichern nur das Banner, kein UI-043 (REQ-053 verlangt die Gruppenmeldung nur nach Textbausteinen und GPSR-Herstellerangaben) | Fehlerbox, Speichern abgelehnt | bleibt |
 | Verwerfen | Sekundärbutton | – | Änderungen verworfen | – | bleibt |
 
 ## Zustände
