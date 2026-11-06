@@ -1,8 +1,8 @@
 # UI-001 – Zugang
 
-> **Bedingt (Architecture Baseline v0.1, C-1):** Der Screen entfällt, wenn der Betrieb nur am Arbeitsplatzrechner gilt (ADR-002, A-35). Entscheidung Owner/PO (OP-23). Inhalt bleibt für den Netzbetrieb erhalten.
+> **Entschieden (Owner, 06.11.2026, OP-23):** Der Screen bleibt (REQ-001, REQ-067, REQ-097). Die Baseline-Annahme A-35 (kein Zugangspasswort) gilt dafür nicht; Klärung im Cross-Check.
 
-- Zweck: Im Netzbetrieb das Zugangspasswort eingeben. Im Betrieb nur am Arbeitsplatzrechner gibt es diesen Screen nicht.
+- Zweck: Im Netzbetrieb das Zugangspasswort eingeben. 
 - Flows: FLOW-07
 - Anforderungen: REQ-001, REQ-067 [v0.3.1: Geltung bis Programmende, kein Zeitablauf]; AC-REQ-001-01, -02, -04, -08, -09
 - Rollen: Nutzer (kein Konto)
