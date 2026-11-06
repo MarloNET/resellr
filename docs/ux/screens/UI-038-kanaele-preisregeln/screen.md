@@ -26,6 +26,7 @@ Je Kanal ein Block: Name, Status aktiv/inaktiv, Titel-Höchstlänge, „VB zulä
 | default | wie oben | nur Text | – |
 | loading | Platzhalter | nur Text | „Lade Einstellungen …“ |
 | empty | Hinweistext mittig im Listenbereich, darunter Button „Preisregel festlegen“ (Primärbutton) | nur Text | „Für diesen Kanal ist keine Preisregel hinterlegt. Preise werden dann nur von Hand eingegeben.“ |
+| `UI-038.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Gespeichert“ |

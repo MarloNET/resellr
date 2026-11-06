@@ -7,7 +7,7 @@
 - Artefakte: default.png (Stitch 69e6f51ff7de415ca4632aca7d171b60, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
-Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegungswerte für Geräte“ (optional). Beim Ändern Hinweis „Änderungen an Modelldaten wirken auf alle Modell-Inserate und Datenblätter dieser Modellvorlage.“ und Anzahl betroffener Modell-Inserate.
+Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegungswerte für Geräte“ (optional). Beim Ändern Hinweis „Änderungen an Modelldaten wirken auf alle Modell-Inserate und Datenblätter dieser Modellvorlage.“ und „gilt für n Kanal-Inhalte im Geltungsbereich“ (Zahl im Geltungsbereich, Baseline Ä-32; die Gruppenzahlen „aktualisiert“, „zur erneuten Freigabe“, „manuell angepasst“ gibt es erst nach dem Speichern, REQ-053; keine Vorab-Berechnung). Beim Speichern gilt der Zustand `UI-007.speichert` (Muster P-08, K-4).
 
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
@@ -36,6 +36,7 @@ Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegun
 | default | leeres bzw. gefülltes Formular | nur Text | – |
 | loading | Platzhalter | nur Text | „Lade Modellvorlage …“ |
 | empty | n/a | – | – |
+| `UI-007.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Modellvorlage konnte nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe oben |
 | success | Banner | nur Text | |

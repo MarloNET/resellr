@@ -12,12 +12,14 @@ Raster nummerierter Vorschaubilder (01, 02 …) in der Reihenfolge, die der Kopi
 | Fotodateien | Dateiauswahl (mehrere) und Ablegen per Ziehen | nein | JPEG oder PNG, je Datei ≤ 20 MB, höchstens 20 je Modell-Inserat | „<Datei>: nur JPEG oder PNG bis 20 MB“; „Höchstens 20 Fotos je Modell-Inserat“ |
 
 ## Aktionen
+**Sofort gespeichert (v0.5):** Hinzufügen, Reihenfolge ändern und Entfernen eines Fotos werden jeweils **sofort gespeichert**; es gibt keinen Speicherknopf und keinen Zustand „ungespeichert“. Während eines Vorgangs zeigt das Foto „Speichern …“ bzw. den Fortschritt (Zustand loading); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ (P-08). „Fertig“ führt nur zurück. **Folge:** Fotoänderungen bilden die Kanal-Inhalte neu (Fotos stehen in UI-016 und im Kopier-Assistenten, REQ-042); der Status der Kanal-Inhalte folgt den Regeln von REQ-045/REQ-089 wie bei anderen Änderungen an Inseratsdaten (Annahme, Product Owner bitte bestätigen; keine neue Funktion). Das Foto-Ergebnis erscheint **nicht** in UI-043 (UI-043 gilt nur nach Einstellungen);. Wirkung auf „manuell angepasste“ Texte: offen (Prüfpunkt für den Product Owner, kein REQ-Anker erkennbar; Design zeigt dazu nichts Eigenes).
+
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
 | Fotos hinzufügen | Button, Ablegen | – | Fotos angehängt, Fortschritt je Datei | Meldung je Datei | bleibt |
 | Reihenfolge ändern | Ziehen oder Buttons „nach vorn/hinten“ | – | Nummerierung aktualisiert | – | bleibt |
 | Foto entfernen | Button je Foto | – | Foto entfernt (Bestätigung P-04) | – | bleibt |
-| Fertig | Primärbutton | – | Banner „Fotos gespeichert“ | – | UI-014 |
+| Fertig | Primärbutton | – | speichert **nichts**; führt nur zurück (alle Fotoänderungen sind bereits gespeichert) | – | UI-014 |
 
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |
@@ -27,7 +29,7 @@ Raster nummerierter Vorschaubilder (01, 02 …) in der Reihenfolge, die der Kopi
 | empty | | nur Text | „Noch keine Fotos. Fotos hinzufügen oder hierher ziehen.“ |
 | error | Meldung je Datei | nur Text | „<Datei> konnte nicht hochgeladen werden. Referenz: <Nr>“ |
 | validation | siehe Eingaben | nur Text | |
-| success | Banner | nur Text | |
+| success | kein Banner „Fotos gespeichert“; die Anzeige im Raster ist die Rückmeldung | nur Text | – |
 | disabled | „Fotos hinzufügen“ deaktiviert bei 20 Fotos | nur Text | |
 
 ## Fenstergröße und Bedienung

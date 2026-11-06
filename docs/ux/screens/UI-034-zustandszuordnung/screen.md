@@ -15,7 +15,7 @@ Kanal-Auswahl; Tabelle: Zustand, Optik-Note (Zahl oder „alle Noten“), Zustan
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Zeile hinzufügen/ändern/entfernen, Speichern | Buttons | gültig | gespeichert; Hinweis „n Kanal-Inhalte betroffen“ (Kap. 6.0) | Zellenfehler | bleibt |
+| Zeile hinzufügen/ändern/entfernen, Speichern | Buttons | gültig | gespeichert (Zustand `UI-034.speichert` bis zur Antwort); vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach UI-043 mit den Gruppenzahlen (REQ-053, Kap. 6.0) | Zellenfehler | bleibt |
 
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |
@@ -23,6 +23,7 @@ Kanal-Auswahl; Tabelle: Zustand, Optik-Note (Zahl oder „alle Noten“), Zustan
 | default | wie oben | nur Text | – |
 | loading | Platzhalter | nur Text | „Lade Einstellungen …“ |
 | empty | Hinweistext mittig im Listenbereich, darunter Button „Zuordnung anlegen“ (Primärbutton) | nur Text | „Für diesen Kanal gibt es noch keine Zustandszuordnung. Ohne Zuordnung zeigt der Kanal-Inhalt „Zustandszuordnung fehlt“.“ |
+| `UI-034.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Gespeichert“ |

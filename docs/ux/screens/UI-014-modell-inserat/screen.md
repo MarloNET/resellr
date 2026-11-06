@@ -4,14 +4,14 @@
 - Flows: FLOW-01 (Schritt 4–6), FLOW-06, FLOW-09
 - Anforderungen: REQ-019, REQ-032, REQ-033, REQ-088, REQ-091, REQ-095, REQ-045, REQ-046, REQ-089, REQ-090, REQ-057 (Could)
 - Rollen: Nutzer
-- Gerät(e): PC, ab 1366 × 768
+- Gerät(e): PC, Fenster ab 1366 × 768 (nutzbar etwa 1350 × 630 px)
 - Artefakte: default.png (Stitch 1b01b1d0b1084415a8e4d917ff94cde6, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
 |---|---|---|---|
 | Kopf | ungekürzter Titel; „Geräteart · Stückzahl n · Artikelnummer <Nr>“ | Modell-Inserat | |
-| Kanal-Karte (je aktivem Kanal) | Kanalname, Status-Chip, Kennzeichnungen (Kap. 9.4), „Abgleich <Datum>“, Preis (ggf. „VB“), vorgeschlagener Preis als Hinweis „Vorschlag nach Preisregel“ | Kanal-Inhalt, Preise | Aktionen je Zustand siehe „Aktionen“ |
+| Kanal-Karte (je aktivem Kanal) | Kanalname, Status-Chip, Kennzeichnungen (Kap. 9.4, darunter „manuell angepasst“ nach einer gespeicherten Anpassung aus UI-016), „Abgleich <Datum>“, Preis (ggf. „VB“), vorgeschlagener Preis als Hinweis „Vorschlag nach Preisregel“ | Kanal-Inhalt, Preise | Aktionen je Zustand siehe „Aktionen“ |
 | Inseratswerte | Zustand, Optik-Note, Zustandsbeschreibung, übrige inserierte Gerätewerte, Lieferumfang, Artikelnummer, EAN („Original (Nr)“ oder „eigene (Nr)“) | Modell-Inserat | Modelldaten nicht hier, Hinweis auf UI-007 |
 | Fotos | Anzahl, nummerierte Vorschaubilder in Reihenfolge | REQ-042 | |
 | Geräte | WI-Nr, Bestandsstatus (verfügbar/verkauft(Kanal, Datum)/storniert), Akkukapazität, Erfassungsdatum | Geräte | storniert nur mit Filter „auch stornierte“ |
@@ -50,6 +50,7 @@
 | empty | n/a; Fotos leer: „Noch keine Fotos“ + Button „Fotos verwalten“; Lieferumfang leer: „–“ | nur Text | |
 | `abweichung-bestaetigen` | Modaler Dialog, Breite 800 px. Titel „Zugeordnete Geräte weichen ab“. Text: „Nach dieser Änderung weichen <n> zugeordnete Geräte vom Modell-Inserat ab:“. Tabelle: WI-Nr, Merkmal, „Gerät <Wert>, Modell-Inserat <Wert>“ (z. B. „Optik-Note: Gerät 2, Modell-Inserat 3“). Hinweis: „Die Bestätigung wird im Änderungsprotokoll festgehalten.“ Buttons „Änderung trotzdem speichern“ (primär), „Abbrechen“ | nur Text | siehe links (REQ-088, AC-REQ-088-03) |
 | Shop-Karte ohne Freigabe (Could) | „Importdatei erzeugen“ deaktiviert | nur Text | Tooltip „Erst Shop-Kanal-Inhalt freigeben“ |
+| `UI-014.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Das Modell-Inserat konnte nicht geladen/gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Preis gespeichert“ u. a. |

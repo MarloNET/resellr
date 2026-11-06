@@ -1,6 +1,6 @@
 # UI-040 – Zugangspasswort ändern
 
-> **Entschieden (Owner, 06.11.2026, OP-23):** Der Screen bleibt (REQ-001, REQ-067, REQ-097). Die Baseline-Annahme A-35 (kein Zugangspasswort) gilt dafür nicht; Klärung im Cross-Check.
+> **Entschieden (Owner, 06.11.2026, OP-23):** Der Screen bleibt (REQ-001, REQ-067, REQ-097). Die Startannahme A-35 der Requirements (kein Zugangspasswort) gilt dafür nicht; OD-02 (Betrieb nur am Arbeitsplatzrechner oder Netzbetrieb) bleibt offen, der Screen bleibt inhaltlich unverändert (Baseline v0.3.2, ADR-002 Option E, Kap. 13.3.1).
 
 - Zweck: Im Netzbetrieb das Zugangspasswort ändern. Nur im Netzbetrieb vorhanden.
 - Flows: FLOW-07 · Anforderungen: REQ-097, REQ-067 [v0.3.1: andere Zugänge enden]; AC-REQ-097-01 bis -05 · Rollen: Nutzer · Gerät(e): PC · Artefakte: success.png (Stitch c6973f04666c47f99c5a021d3ad2f9b0, DESKTOP, 06.11.2026)

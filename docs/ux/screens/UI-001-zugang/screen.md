@@ -1,6 +1,6 @@
 # UI-001 – Zugang
 
-> **Entschieden (Owner, 06.11.2026, OP-23):** Der Screen bleibt (REQ-001, REQ-067, REQ-097). Die Baseline-Annahme A-35 (kein Zugangspasswort) gilt dafür nicht; Klärung im Cross-Check.
+> **Entschieden (Owner, 06.11.2026, OP-23):** Der Screen bleibt (REQ-001, REQ-067, REQ-097). Die Startannahme A-35 der Requirements (kein Zugangspasswort) gilt dafür nicht; OD-02 (Betrieb nur am Arbeitsplatzrechner oder Netzbetrieb) bleibt offen, der Screen bleibt inhaltlich unverändert (Baseline v0.3.2, ADR-002 Option E, Kap. 13.3.1).
 
 - Zweck: Im Netzbetrieb das Zugangspasswort eingeben. 
 - Flows: FLOW-07

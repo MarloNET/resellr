@@ -4,7 +4,7 @@
 - Flows: FLOW-09 (und Schlusssteil von FLOW-01, 02, 03, 04, 06)
 - Anforderungen: REQ-047, REQ-048, REQ-049, REQ-037, REQ-091, REQ-045, REQ-046, REQ-090, REQ-104/105 (Hinweis im Rahmen, siehe UI-044); AC-REQ-047-01 bis -07, AC-REQ-048-01/-02, AC-REQ-049-03, AC-REQ-104-01
 - Rollen: Nutzer
-- Gerät(e): PC; **zwei Layouts**: Vollfenster ab 1366 × 768 und schmales Arbeitsfenster (ab 480 px Mindestbreite, volle Höhe, ohne Navigation) zur Nutzung neben einem anderen Programm
+- Gerät(e): PC; **zwei Layouts**: Vollfenster (Fenster ab 1366 × 768, nutzbar etwa 1350 × 630 px) und schmales Arbeitsfenster (ab 480 px Mindestbreite, volle Höhe, ohne Navigation) zur Nutzung neben einem anderen Programm
 - Artefakte: default.png (Stitch 67d2ba17a4874daeafe35e12dae4a07d, ersetzt 59004a11…), compact.png (Stitch 257305f592a548688c85f43e24e3fc77; ersetzt 149274c4a0b04b9e9dd56e5e94187906 mit 440 px, „39%“ und altem Foto-Button), DESKTOP, 06.11.2026
 
 ## Angezeigte Daten
@@ -56,8 +56,11 @@ default.png (Vollfenster, neu erzeugt in Korrekturrunde 2, Stitch 67d2ba17a4874d
 - Leere Merkmalsfelder: nicht angezeigt, zählen nicht (siehe Tabelle). Zustände, Aktionen und Mockups geprüft: Zustandstabelle und Aktionen enthalten keine Aussage zu leeren Feldern; beide Mockups zeigen kein leeres Feld und bleiben gültig (Beispiel „7 von 18“ nur Beispielzahl).
 - Sicherungshinweis: Mockups `default.png` und `compact.png` zeigen den Hinweis noch nicht (Stand v0.3); maßgeblich ist `screen.md` und UI-044.
 
+## Sicherungshinweis in jedem Fenster (X-1, Ergänzung des Architekten)
+Der Sicherungshinweis (UI-044) steht auch in der **schmalen Ansicht** (fester Streifen unten, vollständiger Text) und in **jedem Fenster bzw. Rahmen**, also auch in einem zweiten, schmalen Browserfenster, das der Nutzer neben dem Kanal-Formular öffnet. Es gibt keine Ansicht von UI-019 ohne den Hinweis. Inhalt und Position wie in UI-044; X-1 ist sonst unverändert (MAR-143).
+
 ## Annahmen und offene Fragen
-- Browser (Baseline v0.1): Zwischenablage nur auf Nutzeraktion, ein Feld als reiner Text (Fehlerfall ist gestaltet). Schmales Layout ist ein Umschalter im selben Fenster; der Nutzer kann ein zweites, schmales Browserfenster öffnen. Mindestbreite 480 px, vom Software Architect zu prüfen (C-5).
+- Browser (Baseline v0.3.2, Entwurf, Cross-Check läuft): Zwischenablage nur auf Nutzeraktion, ein Feld als reiner Text (Fehlerfall ist gestaltet). Schmales Layout ist ein Umschalter im selben Fenster (ADR-001, nicht mehr von OP-15 abhängig); der Nutzer kann ein zweites, schmales Browserfenster öffnen. Mindestbreite 480 px, vom Software Architect zu prüfen (C-5).
 - Konflikt (P-05): „Neuer Stand noch nicht freigegeben“ bzw. geänderter Stand beim Laden → Banner „Bitte neu laden“.
 - Annahme: „Kopieren“ markiert nicht automatisch „übernommen“, wenn der Systemzugriff scheitert.
 - ~~OF-19-1~~ erledigt: Die Regel „leere Merkmalsfelder zählen nicht“ ist mit Requirements v0.3.3 Anforderung (REQ-047, REQ-049), nicht mehr Design-Annahme (Bestätigung durch den Owner mit der Requirements-Freigabe).

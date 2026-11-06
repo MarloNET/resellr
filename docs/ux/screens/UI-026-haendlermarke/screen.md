@@ -24,6 +24,7 @@ Name, Logo-Vorschau (oder „Kein Logo“), Kontaktangaben. Hinweis: „Das Logo
 |---|---|---|---|
 | default | Formular | nur Text | – |
 | empty | kein Logo | nur Text | „Kein Logo. Ohne Logo kann kein Datenblatt erzeugt werden.“ |
+| `UI-026.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | loading, error, validation, success | wie üblich | nur Text | error: „Händlermarke konnte nicht gespeichert werden. Referenz: <Nr>“ |
 | disabled | n/a | – | – |
 

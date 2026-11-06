@@ -46,6 +46,7 @@
 | default | wie Mockup | default.png | – |
 | loading | Platzhalter | nur Text | „Lade Gerätearten …“ |
 | empty (Geräteart ohne Merkmale) | | nur Text | „Noch keine Merkmale. Legen Sie das erste Merkmal an.“ |
+| `UI-027.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | Mockup (Ebene) | siehe Eingaben |
 | success | Banner | nur Text | „Merkmal gespeichert“ |

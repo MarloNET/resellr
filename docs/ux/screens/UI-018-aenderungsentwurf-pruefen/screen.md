@@ -4,13 +4,13 @@
 - Flows: FLOW-04, FLOW-06 (Schritt 3)
 - Anforderungen: REQ-045, REQ-089, REQ-087, REQ-044; AC-REQ-089-01 bis -03, AC-REQ-046-04
 - Rollen: Nutzer
-- Gerät(e): PC, ab 1366 × 768
+- Gerät(e): PC, Fenster ab 1366 × 768 (nutzbar etwa 1350 × 630 px)
 - Artefakte: default.png (Stitch fd8edac267244e5cb1582dda6b85f654, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
 |---|---|---|---|
-| Kopf | „Kanal · Titel“, Status-Chip, Chip „geändert seit Freigabe“ | Kanal-Inhalt | Fall (b): Status-Chip „Entwurf“ |
+| Kopf | „Kanal · Titel“, Status-Chip, Chip „geändert seit Freigabe“, Chip „manuell angepasst“, wenn der Änderungsentwurf aus einer manuellen Anpassung in UI-016 entstand (REQ-043; Einstieg über „Änderungsentwurf angelegt“) | Kanal-Inhalt | Fall (b): Status-Chip „Entwurf“ |
 | Spalte links | „Freigegebener Stand (gilt auf dem Kanal)“, Freigabedatum | freigegebener Stand | |
 | Spalte rechts | Fall (a): „Neuer Stand (Änderungsentwurf)“; Fall (b): „Neuer Stand (Entwurf)“ | Änderungsentwurf bzw. Entwurf | |
 | Vergleichszeilen | je geändertem Feld (Titel, Preis, Kategorie, Zustandsbezeichnung, Beschreibung, Merkmalsfelder, GPSR-Angaben): Feldname, Chip „geändert“, Werte links/rechts, geänderte Textstellen hinterlegt (#FEF3C7) | Differenz der Stände | Bestandsangaben (Stückzahl, WI-Nr, Akkukapazität) werden nicht als Änderung gezeigt (REQ-045) |

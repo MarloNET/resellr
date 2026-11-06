@@ -3,8 +3,8 @@
 Legende: `[UI-nnn]` Screen, `(Aktion)` Nutzeraktion, `{Bedingung}`. Fehlerpfade je Fluss darunter. Zuordnung zu den Nutzerreisen J-01 bis J-06 der Requirements (Kap. 6.1).
 
 ## FLOW-01 Neues Modell erstmals inserieren (J-01)
-[UI-006 Modell-Bibliothek] (suchen) {kein Treffer} → [UI-007 Modellvorlage] ({Hersteller neu} → [UI-008]) (speichern) → [UI-003 Gerät einbuchen] (WI-Nr, Werte, Prüfmarkierungen bestätigen) (Speichern und zuordnen) → [UI-004] (Neues Modell-Inserat anlegen) → [UI-014 Modell-Inserat] (Preise je Kanal, [UI-015] Fotos, Lieferumfang) → [UI-016] je Kanal (prüfen, ggf. manuell anpassen, [UI-017] vergleichen; {ungeprüfter Rechtstext} → [UI-022]) (Freigeben) → [UI-019 Kopier-Assistent] (Felder kopieren, Fotos) → [UI-020] (Veröffentlicht) → [UI-010] → [UI-023 Datenblatt] (Drucken/PDF).
-Fehlerpfade: WI-Nr vergeben (Fehler am Feld in UI-003); Pflichtangaben fehlen (Feldfehler); Abbruch nach UI-003 → Gerät bleibt nicht zugeordnet, auffindbar in [UI-009]; falsch erfasst → [UI-012] Storno und Neuerfassung.
+[UI-006 Modell-Bibliothek] (suchen) {kein Treffer} → [UI-007 Modellvorlage] ({Hersteller neu} → [UI-008]) (speichern) → [UI-003 Gerät einbuchen] (WI-Nr, Werte, Prüfmarkierungen bestätigen) (Speichern und zuordnen) → [UI-004] (Neues Modell-Inserat anlegen) → [UI-014 Modell-Inserat] (Preise je Kanal, [UI-015] Fotos, Lieferumfang) → [UI-016] je Kanal (prüfen, ggf. manuell anpassen und mit „Anpassung speichern“ speichern (REQ-043; „Freigeben“ speichert nicht mit), [UI-017] vergleichen; {ungeprüfter Rechtstext} → [UI-022]) (Freigeben) → [UI-019 Kopier-Assistent] (Felder kopieren, Fotos) → [UI-020] (Veröffentlicht) → [UI-010] → [UI-023 Datenblatt] (Drucken/PDF).
+Fehlerpfade: „Freigeben“ mit ungespeicherter Anpassung → Hinweis in UI-016 (speichern oder verwerfen), keine Freigabe; Verlassen von UI-016 mit ungespeicherter Anpassung → Rückfrage „Ungespeicherte Anpassung verwerfen?“; Speichern ohne bekannten Ausgang → „Ausgang unbekannt, bitte neu laden“ (P-08); WI-Nr vergeben (Fehler am Feld in UI-003); Pflichtangaben fehlen (Feldfehler); Abbruch nach UI-003 → Gerät bleibt nicht zugeordnet, auffindbar in [UI-009]; falsch erfasst → [UI-012] Storno und Neuerfassung.
 
 ## FLOW-02 Weiteres Gerät einbuchen (J-02)
 [UI-003] (WI-Nr, Zustandscode, Werte bestätigen) → [UI-004] (bestehendes Modell-Inserat wählen) {Abweichung} → [UI-005] (trotzdem zuordnen oder neues Modell-Inserat) → Banner „Stückzahl n“ {Kanal veröffentlicht} → Hinweis „Bestand auf Kanal anpassen“ → [UI-019] → [UI-021] (Abgleich bestätigen).
@@ -17,7 +17,7 @@ Variante (REQ-014/REQ-020): Variantenangabe eines zugeordneten Geräts ändern i
 Fehlerpfad: irrtümlich verkauft → [UI-010] (Verkauf zurücknehmen).
 
 ## FLOW-04 Textbaustein oder GPSR ändern (J-04)
-[UI-030] oder [UI-031] (speichern) → [UI-043] (Anzahl je Gruppe) → [UI-002] (Filter „Geändert seit Freigabe“) → [UI-016] bzw. [UI-018] (erneut freigeben) → [UI-019] → [UI-021].
+[UI-030] oder [UI-031] (speichern; Zustand „wird gespeichert“) → [UI-043] (Zahlen je Gruppe aus der Speicherantwort; „Anzeigen“ nur bei „zur erneuten Freigabe“) → [UI-002] (Filter „Geändert seit Freigabe“) → [UI-016] bzw. [UI-018] (erneut freigeben) → [UI-019] → [UI-021].
 
 ## FLOW-05 Neue Geräteart anlegen (J-05)
 [UI-027] (Geräteart, Merkmale) → [UI-029] (Titelmuster) → [UI-035] (Kategorien) → [UI-036] (Merkmalszuordnung) → [UI-037] (Beschreibungsvorlage, falls abweichend) → [UI-039] (Datenblatt-Layout) → ab sofort FLOW-01.
@@ -34,7 +34,7 @@ Programmstart ohne Zugang → [UI-001] (Passwort) → [UI-002]. Passwort ändern
 [UI-010] → [UI-013] (WI-Nr korrigieren) | [UI-012] (Storno) | Verkauf zurücknehmen. Löschen: [UI-014]/[UI-007] → [UI-041].
 
 ## FLOW-09 Kopier-Assistent nutzen
-[UI-014] → [UI-019] (Vollfenster; „Schmale Ansicht“ → compact neben dem Kanal-Formular) → je Feld (Kopieren) im Kanal-Formular einfügen → Fotos herunterladen → [UI-020] (Veröffentlicht) bzw. [UI-021] (Abgleich).
+[UI-014] → [UI-019] (Vollfenster; „Schmale Ansicht“ → compact neben dem Kanal-Formular) → je Feld (Kopieren) im Kanal-Formular einfügen → „Foto-Ordner öffnen“ bzw. „Fotos als ZIP herunterladen“ → [UI-020] (Veröffentlicht) bzw. [UI-021] (Abgleich).
 
 ## FLOW-10 Sicherung anlegen (Hinweis „Sicherung einrichten“, E-7)
 Jeder Screen mit Anwendungsrahmen zeigt den Hinweis [UI-044] (ohne Aktion des Nutzers). Nutzer liest Hinweis → (resellr beenden) → [UI-045] Rückfrage → (resellr beenden) → Wartezustand → [UI-046] Endzustand (`success`: Speicherort) → Datenordner im Windows-Explorer kopieren (**außerhalb von resellr, nicht gestaltet**) → Neustart über Verknüpfung „resellr“ → [LP-01] bei längerem Start → [UI-002].

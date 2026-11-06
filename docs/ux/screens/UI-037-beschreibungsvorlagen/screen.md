@@ -17,7 +17,7 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
 | Abschnitt hinzufügen/entfernen/verschieben | Buttons | – | Vorschau aktualisiert | – | bleibt |
-| Speichern | Primärbutton | gültig | Banner; Hinweis „n Kanal-Inhalte betroffen“ | Fehler am Platzhalter | bleibt |
+| Speichern | Primärbutton | gültig | Banner; vor dem Speichern „gilt für n Kanal-Inhalte im Geltungsbereich“ (Ä-32, keine Gruppenzahlen); danach UI-043 mit den Gruppenzahlen (REQ-053) | Fehler am Platzhalter | bleibt |
 
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |
@@ -25,6 +25,7 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 | default | wie oben | nur Text | – |
 | loading | Platzhalter | nur Text | „Lade Einstellungen …“ |
 | empty | Hinweistext mittig im Listenbereich, darunter Button „Abschnitt hinzufügen“ (Primärbutton) | nur Text | „Für diesen Kanal gibt es noch keine Beschreibungsvorlage“ |
+| `UI-037.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Gespeichert“ |

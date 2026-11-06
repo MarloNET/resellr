@@ -25,6 +25,7 @@ Links Liste der Auswahllisten, rechts Tabelle der Werte: Reihenfolge, Wert, Stat
 | default | wie oben | nur Text | – |
 | loading | Platzhalter | nur Text | „Lade Einstellungen …“ |
 | empty | Hinweistext mittig im Listenbereich, darunter Button „Wert anlegen“ (Primärbutton) | nur Text | „Noch keine Werte in dieser Liste“ |
+| `UI-028.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Gespeichert“ |

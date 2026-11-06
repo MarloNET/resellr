@@ -13,7 +13,7 @@
 | Titel | ungekürzter Titel nach Titelmuster der Geräteart (Kap. 9.3), Zeile darunter „Geräteart · Zustand · Optik N“ sowie alle weiteren Variantenangaben nach der Vergleichsregel (Kap. 6.0, REQ-005): Werte der Variantenmerkmale (z. B. „16 GB RAM · 512 GB SSD · QWERTZ“) und die Zustandsbeschreibung (erste Zeile, gekürzt; vollständig im Tooltip). Grund: Modell-Inserate derselben Modellvorlage unterscheiden sich nur durch diese Angaben und müssen in der Liste unterscheidbar sein | Modell-Inserat | Spalte mindestens 40 % der Tabellenbreite, höchstens 3 Zeilen sichtbar, voller Text als Tooltip |
 | Stückzahl | Zahl; bei 0 zusätzlich Chip „ausverkauft“ | Bestandsangabe | |
 | Verkauft | „Shop / Kleinanzeigen / eBay“ als Zahlen | verkaufte Geräte je Kanal | |
-| Kanal-Spalten | je aktivem Kanal: Status-Chip (Entwurf, Freigegeben, Veröffentlicht, Beendet) und Kennzeichnungen als Chips; bei „Veröffentlicht“ „Abgleich TT.MM.JJJJ“ (letzter Abgleich) | Kanal-Inhalt (freigegebener Stand bei Änderungsentwurf) | Kanal-Spalten folgen der Reihenfolge der aktiven Kanäle |
+| Kanal-Spalten | je aktivem Kanal: Status-Chip (Entwurf, Freigegeben, Veröffentlicht, Beendet) und Kennzeichnungen als Chips, darunter je Zeile „Daten geändert, manuell angepassten Text prüfen“ bei manuell angepasstem Titel/Beschreibung nach einer Datenänderung (REQ-052, Kap. 9.4; es gibt dafür **keinen Filter**, Filter-Chips siehe Eingaben); bei „Veröffentlicht“ „Abgleich TT.MM.JJJJ“ (letzter Abgleich) | Kanal-Inhalt (freigegebener Stand bei Änderungsentwurf) | Kanal-Spalten folgen der Reihenfolge der aktiven Kanäle |
 | Zähler | „n Modell-Inserate“ unter der Tabelle | | |
 
 ## Eingaben und Validierung
@@ -42,7 +42,7 @@
 | validation | – | n/a | Suche mit < 2 Zeichen filtert nicht, kein Fehler |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Titelspalte nimmt Restbreite. Fokus startet im Suchfeld; Pfeil auf/ab wählt Zeile, Enter öffnet. Keine Barrierefreiheitsanforderung (E-3).
+Fenster ab 1366 px (nutzbar etwa 1350 × 630 px); Titelspalte nimmt Restbreite. Fokus startet im Suchfeld; Pfeil auf/ab wählt Zeile, Enter öffnet. Keine Barrierefreiheitsanforderung (E-3).
 
 ## Bekannte Abweichungen im Mockup
 Untertitel „Business Portal“ unter „resellr“ (von Stitch erzeugt, kein Teil des Designs); Platzhaltertext „Modell, Spezifikation…“ im Suchfeld (nicht in screen.md, entfällt); Titelspalte im Mockup zu schmal (7 Zeilen), Soll siehe „Hinweise“; Beispielzeilen 4/5 zeigen „Notebook“ als Geräteart für PC/Tablet (nur Beispieldaten); Navigationssymbole von Stitch gewählt (Symbolwahl offen, nicht verbindlich).

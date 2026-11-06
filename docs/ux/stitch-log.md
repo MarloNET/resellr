@@ -41,3 +41,5 @@ Befund Tooling: `edit_screens` meldet Erfolg und liefert DOM-Operationen, speich
 **v0.4 (MAR-143, 06.11.2026):** keine Stitch-Aufrufe; Stand unverändert **25 von 40**. Neue Screens UI-044 bis UI-046 und LP-01 bis LP-03 sind nur als `screen.md` beschrieben.
 
 **v0.4.1 (MAR-143, Korrektur nach PO-Review R1):** 2 genehmigte Generierungen (#28 UI-002 hinweis, #29 UI-019 compact-hinweis); Stand **27 von 40**, keine Erweiterung. Ergebnisse als PNG exportiert. Meldeschwelle 30 nicht erreicht.
+
+**v0.5 (MAR-147, 06.11.2026):** keine Stitch-Aufrufe; Stand unverändert **27 von 40** (Meldeschwelle 30 nicht erreicht). K-3, K-4, K-5, X-8 und die redaktionellen Punkte sind reine Textänderungen in den `screen.md`. Bestehende Mockups (UI-016 `default.png`, UI-043 `default.png`) zeigen „Anpassung speichern“ bzw. die Link-Regel nicht; die Abweichung ist in den jeweiligen `screen.md` vermerkt.

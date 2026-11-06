@@ -30,7 +30,7 @@
 | Platzhalter einfügen | Button (Auswahl nach Gruppen) | – | Zeile hinzugefügt | – | bleibt |
 | Festen Text einfügen | Button | – | Zeile hinzugefügt | – | bleibt |
 | Entfernen | Zeilenaktion | – | Zeile entfernt; Vorschau aktualisiert | – | bleibt |
-| Titelmuster speichern | Primärbutton | gültig | Banner „Titelmuster gespeichert“; wirkt nach Kap. 6.0 auf Kanal-Inhalte (Hinweis „n Kanal-Inhalte betroffen“ vor Speichern, Bestätigung) | Fehlerbox, Speichern abgelehnt | bleibt |
+| Titelmuster speichern | Primärbutton | gültig | Banner „Titelmuster gespeichert“; wirkt nach Kap. 6.0 auf Kanal-Inhalte; vor dem Speichern nur die Angabe „gilt für n Kanal-Inhalte im Geltungsbereich“ mit Bestätigung (Ä-32, keine Gruppenzahlen); nach dem Speichern UI-043 mit den Gruppenzahlen aus der Speicherantwort (REQ-053) | Fehlerbox, Speichern abgelehnt | bleibt |
 | Verwerfen | Sekundärbutton | – | Änderungen verworfen | – | bleibt |
 
 ## Zustände
@@ -39,6 +39,7 @@
 | default | wie Mockup | default.png | – |
 | loading | Platzhalter | nur Text | „Lade Titelmuster …“ |
 | empty | keine Bestandteile | nur Text | „Noch kein Titelmuster. Fügen Sie einen Platzhalter ein.“ |
+| `UI-029.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Titelmuster konnte nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Fehlerbox oben, Zeile markiert | Mockup | siehe Eingaben |
 | success | Banner | nur Text | „Titelmuster gespeichert“ |

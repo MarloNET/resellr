@@ -11,7 +11,7 @@ Der Hinweis ist Teil der **Anwendungsgrundstruktur** (App-Rahmen), nicht eines S
 - **Normale Ansicht (ab 1366 × 768):** unten in der linken Navigationsspalte (208 px), unter den Navigationseinträgen. Der Inhaltsbereich verliert dadurch **keine** Fläche. Begründung: die Navigation ist immer sichtbar (Kap. 3), die Arbeitsflächen bleiben frei.
 - **Schmale Ansicht UI-019 (ab 480 px, keine Navigation):** fester Streifen am unteren Rand des Fensters, volle Breite, vollständiger Text (siehe unten).
 - Reihenfolge der Navigationsspalte: Kopf „resellr“ (40 px) · 6 Einträge (je **28 px**, kompakt, nur in dieser Spalte; Entscheidung v0.4.1) · Hinweis. Die Spalte steht fest (Kap. 3), der Hinweis hängt unten an.
-- **Planungshöhe (F-1, v0.4.1):** Windows 1366 × 768, Taskleiste 40 px, Chrome mit Tab- und Adressleiste ergibt etwa **640 px** Seitenhöhe ohne und etwa **607 px** mit Lesezeichenleiste. Das Design plant mit **600 px** (konservativ).
+- **Planungshöhe (F-1, v0.4.1):** Windows 1366 × 768, Taskleiste 40 px, Chrome mit Tab- und Adressleiste ergibt etwa **640 px** Seitenhöhe ohne und etwa **607 px** mit Lesezeichenleiste. Das Design plant mit **600 px** (konservativ; Baseline Ä-28 nennt als nutzbare Fläche etwa 1350 × 630 px, die Planung bleibt darunter).
 - **Rechnung (Textbreite 184 px, Text 12/16, etwa 6,2 px je Zeichen, etwa 29 Zeichen je Zeile):** Kopf 40 + 6 × 28 = 168 + Abstand 8 = 216 px. Hinweis: Innenabstand 2 × 10 = 20; Überschrift 20 + 4; Text 17 Zeilen × 16 = 272 (Aussage (a)/(b) 4 Zeilen, „So geht es“ 1, Schritt 1 1, Schritt 2 3, „Der Datenordner liegt hier:“ 1, **Pfad mit 100 Zeichen 4**, „Wichtig …“ 3); Absatzabstände 3 × 4 = 12; Button 28 + Abstand 8 = 36; Randabstand unten 8. Summe Hinweis 20 + 24 + 272 + 12 + 36 + 8 = 372. **Gesamt 216 + 372 = 588 px ≤ 600 px:** der Hinweis ist bei 1366 × 768 **ohne Scrollen vollständig sichtbar**, auch bei einem Pfad mit 100 Zeichen. Beispielpfad (etwa 45 Zeichen, 2 Zeilen): etwa 556 px. Ein Pfad mit 150 Zeichen (6 Zeilen, Benutzername mit etwa 110 Zeichen, praktisch ausgeschlossen) ergäbe etwa 620 px und fiele in den Rückfall.
 - **Rückfall:** Ist das Fenster niedriger als die Planungshöhe (kleiner als 1366 × 768, größere Browserleisten, Pfad über etwa 100 Zeichen), scrollt die **ganze Navigationsspalte** (nicht der Hinweis allein); der Text bleibt vollständig und wird nie abgeschnitten oder eingeklappt.
 - **Abnahmekriterium (Test):** In Chrome bei 1366 × 768 mit Lesezeichenleiste und einem Pfad von 100 Zeichen ist der Hinweis ohne Scrollen vollständig sichtbar. Die Zeichenbreite ist eine Schätzung und im Test zu messen; weicht das Ergebnis ab, wird zuerst der Abstand (Innenabstand, Absatzabstände) verringert, der Wortlaut bleibt unverändert.
@@ -47,6 +47,9 @@ Der Hinweis blockiert nichts und verlangt keine Bestätigung (AC-REQ-104-02). Ei
 | Netzbetrieb (Variante B, nicht Standard) | derselbe Text, **ohne** Button (AC-REQ-104-06) | nur Text | – |
 | empty, success, validation | n/a | – | – |
 | `.unreachable`, `.wird-beendet` | wirken im Inhaltsbereich (Muster P-06/P-07); der Hinweis bleibt unverändert | – | – |
+
+## In jedem Fenster und Rahmen (X-1, Ergänzung des Architekten)
+Der Hinweis steht in **jedem** Fenster und Rahmen: normale Ansicht (Navigationsspalte), **schmale Ansicht von UI-019** (Streifen unten) und jedes weitere Browserfenster, das die Anwendung zeigt. Ausnahmen nur UI-001, UI-046 und LP-01 bis LP-03 (siehe uiux-design.md Kap. 3).
 
 ## Fenstergröße und Bedienung
 - Normal: Spalte 208 px, siehe Ort. Schmal (480 px bis unter 1366 px, nur UI-019): Streifen, Textbreite 456 px, vollständiger Text etwa 6 Zeilen plus Pfad, Gesamthöhe etwa 180 px mit Button (Pfad bis etwa 100 Zeichen); Feldliste von UI-019 scrollt dazwischen.
