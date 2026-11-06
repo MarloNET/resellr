@@ -63,6 +63,7 @@
 | validation | Feldfehler; Fehlerbanner mit Liste aller verletzten Bedingungen bei abgelehnter Freigabe | Mockup (Kategorie fehlt, Pflichtfeld „Farbe“ leer: zwei Einträge) | „Freigabe nicht möglich:“ + Liste |
 | success | Banner | nur Text | „Kanal-Inhalt freigegeben“; nach „Anpassung speichern“ die Ergebnismeldung je Status (siehe Aktion) |
 | disabled | „Anpassung speichern“ ohne Änderung des Textes; „Freigeben“ ist bei verletzten Bedingungen **nicht** deaktiviert (Ablehnung mit Begründung, REQ-044); bei Status ≠ Entwurf wird der Button durch „Kopier-Assistent“ ersetzt | nur Text | – |
+| ausgang-unbekannt (K-6) | „Freigeben“ und „Anpassung speichern“ ohne Antwort: beide Aktionen bleiben bis zum Neuladen gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; nach dem Neuladen prüfen, ob freigegeben bzw. gespeichert wurde. Ablehnung „resellr wird beendet“: P-07 | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
 Zwei Spalten (Inhalt 8/12, Bedingungen 4/12), Bedingungen bleiben beim Scrollen sichtbar. Der Inhalt scrollt; Kanal-Tabs und die Leiste mit „Freigeben“ bleiben bei der nutzbaren Höhe von etwa 630 px (Ä-28) fest sichtbar. Tab-Reihenfolge: Tabs → Felder → Anpassung speichern / Eingabe verwerfen → Bedingungen → Freigeben.

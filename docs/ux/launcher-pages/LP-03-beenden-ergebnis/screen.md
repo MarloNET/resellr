@@ -28,3 +28,4 @@ Wie Kopf.
 ## Annahmen und offene Fragen
 - Die Verknüpfung „resellr beenden“ ist ein Betreiber-/PC-Werkzeug außerhalb der Funktionen der Oberfläche (Baseline 13.3.1), keine Designfunktion mit eigenem REQ. Das Design beschreibt nur ihre Ergebnisseite.
 - Bei `.nicht-aktiv` wird bewusst nicht behauptet, dass der Datenordner kopierbar sei (Ende ungewiss, z. B. nach Absturz).
+- Vermerk T-5 (MAR-152, keine Änderung dieses Screens): Die Annahme, dass die Seite selbst wechselt (Seitenaktualisierung per Skript aus einer Zustandsdatei), ist ein Prüfpunkt im Windows-Spike. Rückfallweg bei Nichtbestätigung: Launcher öffnet Ziel- bzw. Ergebnisseite in einem neuen Tab, LP-01 bleibt stehen, LP-03 öffnet erst mit dem Ergebnis (höchstens etwa 12 s), `LP-03.loading` entfällt; kleine Designänderung über den Product Owner (uiux-design.md Kap. 8 Nr. 8).

@@ -31,6 +31,7 @@ Raster nummerierter Vorschaubilder (01, 02 …) in der Reihenfolge, die der Kopi
 | validation | siehe Eingaben | nur Text | |
 | success | kein Banner „Fotos gespeichert“; die Anzeige im Raster ist die Rückmeldung | nur Text | – |
 | disabled | „Fotos hinzufügen“ deaktiviert bei 20 Fotos | nur Text | |
+| ausgang-unbekannt (K-6) | Vorgang (Hinzufügen, Reihenfolge, Entfernen) ohne Antwort: Fotoverwaltung bleibt bis zum Neuladen gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5); es wird nicht von „noch nicht gespeichert“ ausgegangen, nach dem Neuladen zeigt das Raster den tatsächlichen Stand; **kein „Erneut versuchen“**. Ablehnung „resellr wird beendet“: P-07 | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
 Raster passt sich der Breite an; Tastatur: Pfeile wählen, Alt+Pfeil verschiebt.

@@ -18,7 +18,7 @@
 | Element | Inhalt |
 |---|---|
 | Titel | „Es ließ sich nicht feststellen, ob resellr beendet wurde.“ |
-| Text | „resellr antwortet nicht mehr. Kopieren Sie den Datenordner deshalb noch nicht. Starten Sie resellr über die Verknüpfung „resellr“ im Startmenü und beenden Sie es danach erneut. Läuft resellr noch, öffnet die Verknüpfung die normale Oberfläche.“ (Satz ist eine Annahme über den Launcher, siehe unten) |
+| Text | „Ausgang unbekannt. resellr antwortet nicht mehr. Kopieren Sie den Datenordner deshalb noch nicht. Starten Sie resellr über die Verknüpfung „resellr“ im Startmenü und beenden Sie es danach erneut. Läuft resellr noch, öffnet die Verknüpfung die normale Oberfläche.“ (Satz ist eine Annahme über den Launcher, siehe unten) |
 | Button | „Erneut versuchen“ (Sekundär): fragt den Server erneut; antwortet er, lädt die normale Oberfläche (resellr lief weiter oder wurde neu gestartet), sonst bleibt der Zustand mit Hinweis „resellr antwortet noch nicht.“ |
 
 Kein Speicherort in `.unknown`, damit nicht vorzeitig kopiert wird.
@@ -49,5 +49,5 @@ Karte mittig, funktioniert von 480 px (schmales Fenster) bis breit. Kein Fokus-T
 ## Annahmen und offene Fragen
 - Die beiden Zusatzzeilen sind Vorschläge für den Owner (X-6, Start-Hinweis); ohne Bestätigung entfallen sie, der Rest bleibt gültig.
 - **Annahme für den Software Architect (zu bestätigen, wie bei LP-03):** Die Verknüpfung „resellr“ öffnet bei laufendem resellr die normale Oberfläche, statt einen zweiten Start zu versuchen. Gilt dies nicht, ist der Satz in `.unknown` zu streichen.
-- Beschriftung „Erneut versuchen“ ist mit P-06 vereinheitlicht (gleiche Funktion: nur Verbindung prüfen).
+- Beschriftung „Erneut versuchen“ ist mit P-06 (Laden) vereinheitlicht (gleiche Funktion: nur Verbindung prüfen; es wird keine Aktion wiederholt, „Beenden“ wird nicht erneut ausgelöst). Der Kern „Ausgang unbekannt“ entspricht P-08 (K-6); anders als bei P-08 ist das Neuladen hier nicht der Weg, weil die Seite ohne Server aus geladenen Daten steht.
 - Der Zustand `.unknown` mit „Erneut versuchen“ ist Designvorschlag; Baseline nennt nur, dass `web-ui` den Ausgang nicht sicher kennt.

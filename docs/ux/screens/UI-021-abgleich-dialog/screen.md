@@ -22,6 +22,7 @@ Keine (Bestätigung per Button).
 | empty | keine Kennzeichnung | nur Text | „Kanal ist abgeglichen“ (Dialog ohne Aktion, nur „Schließen“) |
 | error | Banner | nur Text | „Abgleich konnte nicht gespeichert werden. Referenz: <Nr>“ |
 | loading, validation, success, disabled | n/a bzw. Banner | – | – |
+| ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.

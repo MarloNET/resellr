@@ -38,6 +38,7 @@ Keine Eingabefelder. Freigabebedingungen wie REQ-044 werden bei der Freigabe gep
 | validation | Fehlerbanner mit Liste aller verletzten Bedingungen | nur Text | „Freigabe nicht möglich:“ + Liste, z. B. „Kategorie fehlt“, „Preis fehlt“ |
 | success | Banner | nur Text | „Änderungsentwurf freigegeben“ |
 | disabled | Primärbutton nur ohne vorhandenen Entwurf nicht verfügbar (Zustand empty); sonst aktiv | nur Text | |
+| ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
 Zwei gleich breite Spalten; lange Texte brechen um (kein Abschneiden). Beschreibung zeigt Zeilen unverändert; geänderte Zeilen ganz hinterlegt.

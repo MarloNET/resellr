@@ -23,6 +23,7 @@ WI-Nr, Titel des Modell-Inserats, aktuelle Stückzahl; Hinweis „Stückzahl sin
 |---|---|---|---|
 | default, validation, error, success | wie oben; error „Verkauf konnte nicht erfasst werden. Referenz: <Nr>“ | nur Text | |
 | loading, empty, disabled | n/a | – | – |
+| ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
