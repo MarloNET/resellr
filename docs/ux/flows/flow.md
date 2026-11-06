@@ -35,3 +35,8 @@ Programmstart ohne Zugang → [UI-001] (Passwort) → [UI-002]. Passwort ändern
 
 ## FLOW-09 Kopier-Assistent nutzen
 [UI-014] → [UI-019] (Vollfenster; „Schmale Ansicht“ → compact neben dem Kanal-Formular) → je Feld (Kopieren) im Kanal-Formular einfügen → Fotos herunterladen → [UI-020] (Veröffentlicht) bzw. [UI-021] (Abgleich).
+
+## FLOW-10 Sicherung anlegen (Hinweis „Sicherung einrichten“, E-7)
+Jeder Screen mit Anwendungsrahmen zeigt den Hinweis [UI-044] (ohne Aktion des Nutzers). Nutzer liest Hinweis → (resellr beenden) → [UI-045] Rückfrage → (resellr beenden) → Wartezustand → [UI-046] Endzustand (`success`: Speicherort) → Datenordner im Windows-Explorer kopieren (**außerhalb von resellr, nicht gestaltet**) → Neustart über Verknüpfung „resellr“ → [LP-01] bei längerem Start → [UI-002].
+Fehlerpfade: Abbrechen in [UI-045] → Aufrufseite unverändert. Beenden scheitert → Banner nach REQ-073 auf der Aufrufseite, resellr läuft weiter, Hinweis bleibt. Server antwortet nicht mehr → [UI-046] `unknown` → Verknüpfung „resellr“ starten und erneut beenden. Start scheitert → [LP-02]. Beenden über Startmenü-Verknüpfung (Betreiberwerkzeug) → [LP-03].
+Der Hinweis ist kein Schritt, der abzuschließen wäre: Alle anderen Flows laufen ohne Berührung des Hinweises (AC-REQ-104-02).

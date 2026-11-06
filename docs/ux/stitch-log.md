@@ -34,3 +34,5 @@ Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. D
 | 27 | 2026-11-06 | generate_screen_from_text | UI-019 default | Neugenerierung Vollfenster nach PO-Review R2 (67d2ba17a4874daeafe35e12dae4a07d), ersetzt 59004a11… | übernommen | 25 |
 
 Befund Tooling: `edit_screens` meldet Erfolg und liefert DOM-Operationen, speichert die Änderung aber nicht in den Dateien des Screens (zweimal beobachtet, HTML und Screenshot blieben unverändert). Korrekturen erfolgten deshalb per Neugenerierung. Jeder verworfene Edit zählte gegen das Budget. Die Screens a88484966822498492facf1aab70cf6d und 149274c4a0b04b9e9dd56e5e94187906 bleiben im Stitch-Projekt, sind aber nicht Teil des Designs.
+
+**v0.4 (MAR-143, 06.11.2026):** keine Stitch-Aufrufe; Stand unverändert **25 von 40**. Neue Screens UI-044 bis UI-046 und LP-01 bis LP-03 sind nur als `screen.md` beschrieben.
