@@ -69,7 +69,7 @@ Spalte „Mockup“: Zustände mit PNG. „Text“ = nur `screen.md` (Muster P-0
 | UI-014 | Modell-Inserat | Arbeitsbereich: Kanäle, Preise, Inseratswerte, Fotos, Geräte | REQ-019, 032, 033, 088, 091, 095 | 01, 06, 09 | default | UI-014-modell-inserat |
 | UI-015 | Fotos verwalten | Fotos hinzufügen, ordnen, entfernen | REQ-042 | 01 | Text | UI-015-fotos |
 | UI-016 | Kanal-Inhalt prüfen und freigeben | Prüfen, manuell anpassen, freigeben | REQ-034–044, 086, 087 | 01, 04 | default | UI-016-kanal-inhalt-freigeben |
-| UI-017 | Kanäle vergleichen | 3 Kanal-Inhalte nebeneinander | REQ-044 (Kap. 10.6) | 01 | Text | UI-017-kanal-vergleich |
+| UI-017 | Kanäle vergleichen | 3 Kanal-Inhalte nebeneinander | REQ-044 (Kap. 10.6) | 01 | default | UI-017-kanal-vergleich |
 | UI-018 | Änderungsentwurf prüfen | freigegebener und neuer Stand | REQ-045, 089 | 04, 06 | default | UI-018-aenderungsentwurf-pruefen |
 | UI-019 | Kopier-Assistent | Felder und Fotos in Kanal-Formular übernehmen | REQ-047–049 | 09 | default, compact | UI-019-kopier-assistent |
 | UI-020 | Kanal-Status setzen (Dialog) | Veröffentlicht / Beendet melden | REQ-046 | 01, 03, 09 | Text | UI-020-kanal-status-dialog |
@@ -175,11 +175,11 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 
 ## 9. Stitch-Budget
 
-Stand siehe `stitch-log.md` (aktuell 10 von 40). Geplant: weitere Mockups für UI-001, UI-005, UI-007, UI-017, UI-030, UI-036, UI-037, UI-040, UI-041/043 und Zustände (UI-002 empty, UI-016 Entwurfsvergleich, UI-019 empty fotos).
+Stand siehe `stitch-log.md` (aktuell 11 von 40). Geplant: weitere Mockups für UI-001, UI-005, UI-007, UI-030, UI-036, UI-037, UI-040, UI-041/043 und Zustände (UI-002 empty, UI-016 Entwurfsvergleich, UI-019 empty fotos).
 
 ## 10. Lieferstand (Ehrlichkeitsvermerk)
 
-- Vorhanden: `DESIGN.md`, `stitch-log.md`, dieses Dokument, `flows/flow.md`, **43 `screen.md`** (alle Screens des Katalogs), Mockups für 10 Screens/Zustände (UI-002, 003, 014, 016, 018, 019 default+compact, 023, 027, 029).
+- Vorhanden: `DESIGN.md`, `stitch-log.md`, dieses Dokument, `flows/flow.md`, **43 `screen.md`** (alle Screens des Katalogs), Mockups für 11 Screens/Zustände (UI-002, 003, 014, 016, 017, 018, 019 default+compact, 023, 027, 029).
 - Screens ohne Mockup tragen „nur Text“ (Muster P-01 bis P-04). Dort ist `screen.md` die vollständige Beschreibung; Mockups für wichtige Screens sind geplant (Stand siehe `stitch-log.md`), kein Ersatz für die Textbeschreibung.
 - Noch **nicht** erfolgt: Self-Review nach Skill §6 (Teilprüfung im Kommentar), Cross-Check mit der Architecture Baseline (liegt nicht vor), Product Owner Review.
 - Stitch ergänzt je Screen den Untertitel „Business Portal“ in der Navigation (kein Teil des Designs, siehe `screen.md` „Bekannte Abweichungen“).

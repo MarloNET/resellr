@@ -1,7 +1,7 @@
 # UI-017 – Kanäle vergleichen
 
 - Zweck: Die Kanal-Inhalte (bis zu 3) eines Modell-Inserats vor der Freigabe nebeneinander vergleichen.
-- Flows: FLOW-01 (Schritt 6) · Anforderungen: Kap. 10.6 (Vergleich vor Freigabe), REQ-034–041, REQ-044 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant)
+- Flows: FLOW-01 (Schritt 6) · Anforderungen: Kap. 10.6 (Vergleich vor Freigabe), REQ-034–041, REQ-044 · Rollen: Nutzer · Gerät(e): PC · Artefakte: default.png (Stitch 3afa78d0dae24e0e862af3515ac8f30c, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
@@ -33,7 +33,7 @@ Keine.
 Drei Spalten ab 1366 px; erste Spalte (Feldname) fixiert.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup).
+„Business Portal“ (Stitch); Badge „UI-017“ neben dem Titel (von Stitch, entfällt); Kategorie-Werte „Computer > Notebooks/Laptops“ und Zustandswerte sind Beispieldaten je Kanal; Link „Prüfen und freigeben“ im Spaltenkopf entspricht der Aktion „Kanal prüfen und freigeben“; unter dem Spaltenkopf zeigt das Mockup farbige Kurzstatus (Text maßgeblich).
 
 ## Annahmen und offene Fragen
 - Form legt das Design fest (Kap. 10.6); Annahme „Chip unterschiedlich“ ist Gestaltung, keine neue Regel. Variante V-2 siehe uiux-design.md.

@@ -1,5 +1,5 @@
 # Stitch-Log – resellr Release 0.1
-Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 10/40 (Stand siehe Tabelle)
+Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 11/40 (Stand siehe Tabelle)
 
 Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. Der HTML-Export steht vollständig in der Tool-Antwort (ca. 7.000 Tokens je Screen) und wird bewusst nicht gesichert (Abweichung von Skill marlonet-uiux-stitch §8, dem Product Owner gemeldet). Es gibt keine Referenz auf HTML, das nur in Stitch existiert.
 
@@ -17,3 +17,4 @@ Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. D
 | 10 | 2026-11-06 | generate_screen_from_text | UI-027 default | Erstgenerierung (81e728c27f964e70b2e78954255f0725) | übernommen | 8 |
 | 11 | 2026-11-06 | generate_screen_from_text | UI-029 default | Erstgenerierung (877d32da24214ae9970d9047237ec7d6) | übernommen | 9 |
 | 12 | 2026-11-06 | generate_screen_from_text | UI-023 default | Erstgenerierung (b54e7fed073c49b1af58c3b5d24c1d0d) | übernommen | 10 |
+| 13 | 2026-11-06 | generate_screen_from_text | UI-017 default | Erstgenerierung (3afa78d0dae24e0e862af3515ac8f30c) | übernommen | 11 |
