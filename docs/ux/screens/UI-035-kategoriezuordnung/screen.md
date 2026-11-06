@@ -1,0 +1,38 @@
+# UI-035 – Kategoriezuordnung
+
+- Zweck: Je Geräteart und Kanal eine Kategorie als Vorschlag festlegen. · Flows: FLOW-05 · Anforderungen: REQ-024, REQ-038 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Muster P-02)
+
+## Angezeigte Daten
+Matrix Geräteart (Zeilen) × Kanal (Spalten); Zelle zeigt Kategoriepfad und Kennung oder „fehlt“.
+
+## Eingaben und Validierung
+| Feld | Typ | Pflicht | Regel | Fehlermeldung |
+|---|---|---|---|---|
+| Kategoriebezeichnung/-pfad | Text | ja je gepflegter Zelle | max. 255 | „Kategorie: 1 bis 255 Zeichen“ |
+| Kategorie-Kennung | Text | nein | | – |
+
+## Aktionen
+| Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
+|---|---|---|---|---|---|
+| Zelle bearbeiten, Speichern | Klick, Primärbutton | gültig | gespeichert; Kategorien der Kanäle werden von Hand gepflegt (keine Abfrage beim Kanal) | Feldfehler | bleibt |
+
+## Zustände
+| Zustand | Darstellung | Artefakt | Text |
+|---|---|---|---|
+| default | wie oben | nur Text | – |
+| loading | Platzhalter | nur Text | „Lade Einstellungen …“ |
+| empty | | nur Text | siehe „Leerzustand“ oben |
+| error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
+| validation | Feldfehler | nur Text | siehe Eingaben |
+| success | Banner | nur Text | „Gespeichert“ |
+| disabled | Speichern deaktiviert ohne Änderung | nur Text | |
+| permission | n/a (eine Rolle, E-4) | – | – |
+
+## Responsive und Barrierefreiheit
+Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+
+## Bekannte Abweichungen im Mockup
+keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).
+
+## Annahmen und offene Fragen
+- Zellen ohne Eintrag führen zu „Kategorie fehlt“ im Kanal-Inhalt.

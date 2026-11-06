@@ -1,0 +1,45 @@
+# UI-030 – Textbausteine
+
+- Zweck: Textbausteine (Akku-Hinweis, Lieferumfang, Abholung/Kontakt, Rechtliches, Sonstiges) pflegen, inkl. rechtlichem Prüfstatus.
+- Flows: FLOW-04 · Anforderungen: REQ-026, REQ-054, REQ-053, REQ-043 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant; Muster P-01)
+
+## Angezeigte Daten
+Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (nur Rechtliches/Akku-Hinweis: „rechtlich ungeprüft“ / „rechtlich geprüft am <Datum> durch <Stelle>“). Detailbereich mit Textfeld und Platzhalterliste (Kap. 9.7, ohne `{Baustein:Name}`).
+
+## Eingaben und Validierung
+| Feld | Typ | Pflicht | Regel | Fehlermeldung |
+|---|---|---|---|---|
+| Name | Text | ja | eindeutig, max. 100 | „Name ist bereits vergeben“ |
+| Art | Auswahl | ja | fünf Arten | – |
+| Text | Mehrzeilentext | ja | max. 5.000 Zeichen; nur zulässige Platzhalter | „Unbekannter Platzhalter {…}“; „{Baustein:Name} ist im Textbaustein nicht zulässig“ |
+| Geltungsbereich | Mehrfachauswahl Gerätearten, Kanäle (oder „alle“) | ja | | – |
+| Prüfstatus | Auswahl | nur Rechtliches/Akku-Hinweis | neue Bausteine „rechtlich ungeprüft“; Textänderung setzt zurück | – |
+| Prüfdatum | Datum | ja bei „rechtlich geprüft“ | nicht in der Zukunft | „Prüfdatum darf nicht in der Zukunft liegen“ |
+| Prüfende Stelle | Text | ja bei „rechtlich geprüft“ | max. 100 | „Prüfende Stelle fehlt“ |
+
+## Aktionen
+| Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
+|---|---|---|---|---|---|
+| Speichern | Primärbutton | gültig | Baustein gespeichert; bei Textänderung eines „geprüft“-Bausteins Hinweis „Prüfstatus wurde auf ‚rechtlich ungeprüft‘ zurückgesetzt“; danach UI-043 | Feldfehler | UI-043 |
+| Deaktivieren | Zeilenaktion | – | wird in neue Kanal-Inhalte nicht mehr übernommen | – | bleibt |
+
+## Zustände
+| Zustand | Darstellung | Artefakt | Text |
+|---|---|---|---|
+| default | wie oben | nur Text | – |
+| loading | Platzhalter | nur Text | „Lade Einstellungen …“ |
+| empty | | nur Text | siehe „Leerzustand“ oben |
+| error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
+| validation | Feldfehler | nur Text | siehe Eingaben |
+| success | Banner | nur Text | „Gespeichert“ |
+| disabled | Speichern deaktiviert ohne Änderung | nur Text | |
+| permission | n/a (eine Rolle, E-4) | – | – |
+
+## Responsive und Barrierefreiheit
+Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+
+## Bekannte Abweichungen im Mockup
+keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).
+
+## Annahmen und offene Fragen
+- Texte der Bausteine sind nicht Teil der Auslieferung (REQ-006).

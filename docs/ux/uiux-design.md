@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Projekt / Release | resellr (Arbeitstitel), Phase 1 / Release 0.1 |
-| Dokumentversion | v0.1 (Entwurf, **nicht vollständig**, siehe Kap. 10 „Lieferstand“) |
+| Dokumentversion | v0.1 (Entwurf, siehe Kap. 10 „Lieferstand“) |
 | Status | draft (kein Review, keine Freigabe) |
 | Klassifikation | **Material** (Owner bestätigt) |
 | Autor / Datum | UI/UX Designer, 06.11.2026 |
@@ -179,8 +179,9 @@ Stand siehe `stitch-log.md` (aktuell 10 von 40). Geplant: weitere Mockups für U
 
 ## 10. Lieferstand (Ehrlichkeitsvermerk)
 
-- Erstellt: `DESIGN.md`, `stitch-log.md`, dieses Dokument, Mockups UI-002, 003, 014, 016, 018, 019 (default + compact), 023, 027, 029, zugehörige `screen.md` (siehe Ordner).
-- **Noch nicht erstellt:** Mockups der übrigen Screens, `screen.md` der übrigen Screens soweit nicht im Ordner vorhanden, `flows/flow.md`-Feinschliff, Self-Review nach Skill §6, Cross-Check. Dieses Dokument darf nicht als abgeschlossenes Design behandelt werden.
+- Vorhanden: `DESIGN.md`, `stitch-log.md`, dieses Dokument, `flows/flow.md`, **43 `screen.md`** (alle Screens des Katalogs), Mockups für 10 Screens/Zustände (UI-002, 003, 014, 016, 018, 019 default+compact, 023, 027, 029).
+- Screens ohne Mockup tragen „nur Text“ (Muster P-01 bis P-04). Dort ist `screen.md` die vollständige Beschreibung; Mockups für wichtige Screens sind geplant (Stand siehe `stitch-log.md`), kein Ersatz für die Textbeschreibung.
+- Noch **nicht** erfolgt: Self-Review nach Skill §6 (Teilprüfung im Kommentar), Cross-Check mit der Architecture Baseline (liegt nicht vor), Product Owner Review.
 - Stitch ergänzt je Screen den Untertitel „Business Portal“ in der Navigation (kein Teil des Designs, siehe `screen.md` „Bekannte Abweichungen“).
 
 ## 11. Änderungsprotokoll
