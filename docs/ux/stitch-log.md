@@ -1,5 +1,5 @@
 # Stitch-Log – resellr Release 0.1
-Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 6/40 (Stand siehe Tabelle)
+Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 10/40 (Stand siehe Tabelle)
 
 Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. Der HTML-Export steht vollständig in der Tool-Antwort (ca. 7.000 Tokens je Screen) und wird bewusst nicht gesichert (Abweichung von Skill marlonet-uiux-stitch §8, dem Product Owner gemeldet). Es gibt keine Referenz auf HTML, das nur in Stitch existiert.
 
@@ -13,3 +13,7 @@ Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. D
 | 6 | 2026-11-06 | generate_screen_from_text | UI-019 default | Erstgenerierung Vollfenster (59004a119c70418f85d9024115185329) | übernommen | 4 |
 | 7 | 2026-11-06 | generate_screen_from_text | UI-019 compact | Erstgenerierung schmales Fenster (149274c4a0b04b9e9dd56e5e94187906) | übernommen | 5 |
 | 8 | 2026-11-06 | generate_screen_from_text | UI-018 default | Erstgenerierung (fd8edac267244e5cb1582dda6b85f654) | übernommen | 6 |
+| 9 | 2026-11-06 | generate_screen_from_text | UI-014 default | Erstgenerierung (1b01b1d0b1084415a8e4d917ff94cde6) | übernommen | 7 |
+| 10 | 2026-11-06 | generate_screen_from_text | UI-027 default | Erstgenerierung (81e728c27f964e70b2e78954255f0725) | übernommen | 8 |
+| 11 | 2026-11-06 | generate_screen_from_text | UI-029 default | Erstgenerierung (877d32da24214ae9970d9047237ec7d6) | übernommen | 9 |
+| 12 | 2026-11-06 | generate_screen_from_text | UI-023 default | Erstgenerierung (b54e7fed073c49b1af58c3b5d24c1d0d) | übernommen | 10 |
