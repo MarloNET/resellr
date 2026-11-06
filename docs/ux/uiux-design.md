@@ -217,7 +217,7 @@ Geprüft wurde mechanisch (Skript) und durch Sichtprüfung der neun neuen und zw
 
 | Kriterium | Ergebnis |
 |---|---|
-| Coverage | Alle aktiven REQ der Traceability haben Screens/Flows. Zurückgezogen: REQ-002/003/096/098. REQ-057/059 (Could) nur textlich. Bekannte Lücke: Bearbeitung der Wertzuordnung (UI-036, REQ-025) ist nur als Bereich in UI-036 beschrieben, Entscheidung des PO über einen eigenen Screen offen. Mockup-Abweichungen von der Spezifikation (UI-016 Titelzähler und Fehleranzahl, UI-019 compact Banner/Button, UI-030 „Löschen“, UI-043 Breite) sind je Screen unter „Bekannte Abweichungen“ dokumentiert. |
+| Coverage | Alle aktiven REQ der Traceability haben Screens/Flows. Zurückgezogen: REQ-002/003/096/098. REQ-057/059 (Could) nur textlich. Bearbeitung der Wertzuordnung (UI-036, REQ-025): vom PO entschieden, Bereich in UI-036 genügt; die Lücke ist geschlossen. Mockup-Abweichungen von der Spezifikation (UI-016 Titelzähler und Fehleranzahl, UI-019 compact Banner/Button, UI-030 „Löschen“, UI-043 Breite) sind je Screen unter „Bekannte Abweichungen“ dokumentiert. |
 | Spec readiness | Alle 43 `screen.md` enthalten die sieben Pflichtabschnitte (Skriptprüfung). Inhaltliche Vollständigkeit je Feld nicht erneut geprüft. |
 | States | Zustandstabelle je Screen vorhanden. Layoutverändernde Zustände ohne Mockup: UI-002 empty, UI-016 geaendert, UI-019 ohne Fotos, UI-018 entwurf-vergleich (nur Text). |
 | Consistency | UI-016 und UI-019 compact stimmen jetzt mit `screen.md` überein. UI-019 default (Vollfenster) wurde in Korrekturrunde 2 neu erzeugt und entspricht jetzt `screen.md` bis auf dokumentierte Abweichungen. 440 px nur noch als dokumentierte Abweichung. |

@@ -39,6 +39,6 @@ Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativ
 Die „Feldbezeichnung des Kanals“ ist im Mockup als Text dargestellt; maßgeblich ist ein Eingabefeld (1 bis 100 Zeichen). Auf-/Ab-Pfeile je Zeile sind die Bedienung für die Reihenfolge (Design-Entscheidung, keine Anforderung). Beim Entfernen einer Zeile: Aktion „Zeile entfernen“ ist im Mockup nicht dargestellt, steht in `screen.md`.
 
 ## Annahmen und offene Fragen
-- Lücke/Frage an PO: Die Bearbeitung der Wertzuordnung ist als Bereich innerhalb von UI-036 beschrieben, kein eigener Screen. Falls ein eigener Screen oder Dialog gewünscht ist, bitte entscheiden. Kein Mockup dazu.
+- Entschieden (PO): Bereich innerhalb von UI-036 genügt, kein eigener Screen. Kein Mockup dazu.
 - Mockup: Der Link „Bearbeiten“ hat dort keine dargestellte Folgeansicht; maßgeblich ist die Aktion oben.
 - Startbelegung Kap. 9.8; Pflichtfelder des Kanals offen bis OP-22.

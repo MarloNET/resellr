@@ -31,6 +31,6 @@ Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. D
 | 24 | 2026-11-06 | edit_screens | UI-019 compact | Korrektur 480 px, ohne Prozent, neue Foto-Buttons (149274c4a0b04b9e9dd56e5e94187906) | verworfen: Änderung wurde nicht gespeichert | 22 |
 | 25 | 2026-11-06 | generate_screen_from_text | UI-016 default | Neugenerierung statt Edit, mit allen Korrekturen (d7ec8b5e63924f6e8bfb298d11121f62) | übernommen, ersetzt a8848496… | 23 |
 | 26 | 2026-11-06 | generate_screen_from_text | UI-019 compact | Neugenerierung statt Edit, 480 px (257305f592a548688c85f43e24e3fc77) | übernommen, ersetzt 149274c4… | 24 |
+| 27 | 2026-11-06 | generate_screen_from_text | UI-019 default | Neugenerierung Vollfenster nach PO-Review R2 (67d2ba17a4874daeafe35e12dae4a07d), ersetzt 59004a11… | übernommen | 25 |
 
 Befund Tooling: `edit_screens` meldet Erfolg und liefert DOM-Operationen, speichert die Änderung aber nicht in den Dateien des Screens (zweimal beobachtet, HTML und Screenshot blieben unverändert). Korrekturen erfolgten deshalb per Neugenerierung. Jeder verworfene Edit zählte gegen das Budget. Die Screens a88484966822498492facf1aab70cf6d und 149274c4a0b04b9e9dd56e5e94187906 bleiben im Stitch-Projekt, sind aber nicht Teil des Designs.
-| 27 | 2026-11-06 | generate_screen_from_text | UI-019 default | Neugenerierung Vollfenster nach PO-Review R2 (67d2ba17a4874daeafe35e12dae4a07d), ersetzt 59004a11… | übernommen | 25 |
