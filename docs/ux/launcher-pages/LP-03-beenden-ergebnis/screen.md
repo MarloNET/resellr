@@ -2,6 +2,7 @@
 
 - Zweck: Ergebnis des Betreiberwerkzeugs „resellr beenden“ im Startmenü zeigen; zugleich sicherer Weg, den Ausgang zu klären (UI-046 `.unknown`).
 - Flows: FLOW-10 · Anforderungen: REQ-105, REQ-073; Baseline Kap. 6.1 „Aktion resellr beenden“ und „Rückmeldungen ohne Server“, Kap. 13.3.1; X-4
+- Rollen: Nutzer (Arbeitsplatzrechner; kein Server) · Gerät(e): PC, Fenster ab 480 px · Artefakte: nur Text (`screen.md`), kein Mockup
 - Art: einfache statische HTML-Seite des `resellr-launcher` (`launcher-pages`), **ohne React, ohne Serverzugriff**, ohne Navigation und ohne Hinweis UI-044 (kein resellr-Server läuft). Tokens aus `DESIGN.md`: bg #F6F7F9, Karte surface mit 1 px border und 6 px Radius, Inter (mitgeliefert, REQ-079), Text 14/20, Titel 22/28 semibold. Zentrierte Karte, Breite 560 px, funktioniert ab 480 px. Deutsch, Anrede „Sie“, keine technischen Details (REQ-073). Nur Text, kein Mockup (Seiten sind schlicht genug).
 
 ## Angezeigte Daten

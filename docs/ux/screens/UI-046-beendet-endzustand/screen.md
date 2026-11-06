@@ -18,8 +18,8 @@
 | Element | Inhalt |
 |---|---|
 | Titel | „Es ließ sich nicht feststellen, ob resellr beendet wurde.“ |
-| Text | „resellr antwortet nicht mehr. Kopieren Sie den Datenordner deshalb noch nicht. Starten Sie resellr über die Verknüpfung „resellr“ im Startmenü und beenden Sie es danach erneut. Läuft resellr noch, öffnet die Verknüpfung die normale Oberfläche.“ |
-| Button | „Erneut prüfen“ (Sekundär): fragt den Server erneut; antwortet er, lädt die normale Oberfläche (resellr lief weiter oder wurde neu gestartet), sonst bleibt der Zustand mit Hinweis „resellr antwortet noch nicht.“ |
+| Text | „resellr antwortet nicht mehr. Kopieren Sie den Datenordner deshalb noch nicht. Starten Sie resellr über die Verknüpfung „resellr“ im Startmenü und beenden Sie es danach erneut. Läuft resellr noch, öffnet die Verknüpfung die normale Oberfläche.“ (Satz ist eine Annahme über den Launcher, siehe unten) |
+| Button | „Erneut versuchen“ (Sekundär): fragt den Server erneut; antwortet er, lädt die normale Oberfläche (resellr lief weiter oder wurde neu gestartet), sonst bleibt der Zustand mit Hinweis „resellr antwortet noch nicht.“ |
 
 Kein Speicherort in `.unknown`, damit nicht vorzeitig kopiert wird.
 
@@ -44,8 +44,10 @@ Keine weiteren Aktionen (kein „Im Explorer öffnen“, kein „resellr starten
 | empty, validation, disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Karte mittig, funktioniert von 480 px (schmales Fenster) bis breit. Kein Fokus-Trap, keine Tastaturlogik außer Tab zu „Erneut prüfen“.
+Karte mittig, funktioniert von 480 px (schmales Fenster) bis breit. Kein Fokus-Trap, keine Tastaturlogik außer Tab zu „Erneut versuchen“.
 
 ## Annahmen und offene Fragen
 - Die beiden Zusatzzeilen sind Vorschläge für den Owner (X-6, Start-Hinweis); ohne Bestätigung entfallen sie, der Rest bleibt gültig.
-- Der Zustand `.unknown` mit „Erneut prüfen“ ist Designvorschlag; Baseline nennt nur, dass `web-ui` den Ausgang nicht sicher kennt.
+- **Annahme für den Software Architect (zu bestätigen, wie bei LP-03):** Die Verknüpfung „resellr“ öffnet bei laufendem resellr die normale Oberfläche, statt einen zweiten Start zu versuchen. Gilt dies nicht, ist der Satz in `.unknown` zu streichen.
+- Beschriftung „Erneut versuchen“ ist mit P-06 vereinheitlicht (gleiche Funktion: nur Verbindung prüfen).
+- Der Zustand `.unknown` mit „Erneut versuchen“ ist Designvorschlag; Baseline nennt nur, dass `web-ui` den Ausgang nicht sicher kennt.

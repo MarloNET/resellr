@@ -28,7 +28,7 @@ Status und Kennzeichnungen werden immer mit Text ausgeschrieben, nie nur durch F
 Inter für Überschriften und Text; Zahlen in Tabellen mit tabellarischen Ziffern. Skala: Seitentitel 22/28 semibold, Abschnitt 16/24 semibold, Text 14/20, Hilfstext/Label 12/16. Mindestgröße 12 px. Ausgabetexte der Kanal-Inhalte (Titel, Beschreibung, Kopierwert) in Monospace-freier Inter 14 px, Zeilenumbrüche sichtbar.
 
 ## Form und Dichte
-Eckenradius 6 px (Felder, Buttons, Karten), Chips 4 px. 8er-Raster. Dichte: kompakt (Zeilenhöhe Tabelle 36 px, Feldhöhe 36 px). Linke Navigation 208 px fest; Inhaltsbereich fluide, Mindestbreite 1366 px. Kopier-Assistent zusätzlich als schmale Variante ab 480 px Breite (Baseline C-5, vom Software Architect zu prüfen).
+Eckenradius 6 px (Felder, Buttons, Karten), Chips 4 px. 8er-Raster. Dichte: kompakt (Zeilenhöhe Tabelle 36 px, Feldhöhe 36 px). Linke Navigation 208 px fest (Kopf 40 px, Einträge 28 px hoch, damit der Hinweis UI-044 bei 1366 × 768 ohne Scrollen passt); Inhaltsbereich fluide, Mindestbreite 1366 px. Kopier-Assistent zusätzlich als schmale Variante ab 480 px Breite (Baseline C-5, vom Software Architect zu prüfen).
 
 ## Komponentenregeln
 - **Buttons:** je Bereich genau ein Primärbutton (gefüllt primary). Sekundär: Rahmen. Destruktiv (Storno, Löschen): Rahmen und Text error, Bestätigungsdialog. Button-Text beschreibt das Ergebnis („Freigeben“, „Gerät speichern“).

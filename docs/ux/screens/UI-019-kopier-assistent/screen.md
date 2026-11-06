@@ -61,3 +61,5 @@ default.png (Vollfenster, neu erzeugt in Korrekturrunde 2, Stitch 67d2ba17a4874d
 - Konflikt (P-05): „Neuer Stand noch nicht freigegeben“ bzw. geänderter Stand beim Laden → Banner „Bitte neu laden“.
 - Annahme: „Kopieren“ markiert nicht automatisch „übernommen“, wenn der Systemzugriff scheitert.
 - ~~OF-19-1~~ erledigt: Die Regel „leere Merkmalsfelder zählen nicht“ ist mit Requirements v0.3.3 Anforderung (REQ-047, REQ-049), nicht mehr Design-Annahme (Bestätigung durch den Owner mit der Requirements-Freigabe).
+
+- **Mockup `compact-hinweis.png` (v0.4.1, schmale Ansicht mit Streifen UI-044):** zeigt den festen Streifen unten mit vollständigem Hinweis. Abweichungen (Stitch-Zusätze): Fenster als Karte auf dunklem Hintergrund dargestellt (kein Bildschirmbestandteil), Chip „Kompaktmodus“ oben rechts (kein Teil des Designs, entfällt), Feldkarten statt Zeilen. Pfad in zwei Zeilen (Monospace). Verbindlich sind `screen.md` von UI-019/UI-044. Kein „×“, kein Schließen.

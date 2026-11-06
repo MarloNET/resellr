@@ -1,5 +1,5 @@
 # Stitch-Log – resellr Release 0.1
-Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 25/40 (Stand siehe Tabelle)
+Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 27/40 (Stand siehe Tabelle)
 
 Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. Der HTML-Export steht vollständig in der Tool-Antwort (ca. 7.000 Tokens je Screen) und wird bewusst nicht gesichert (Abweichung von Skill marlonet-uiux-stitch §8, dem Product Owner gemeldet). Es gibt keine Referenz auf HTML, das nur in Stitch existiert.
 
@@ -33,6 +33,11 @@ Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. D
 | 26 | 2026-11-06 | generate_screen_from_text | UI-019 compact | Neugenerierung statt Edit, 480 px (257305f592a548688c85f43e24e3fc77) | übernommen, ersetzt 149274c4… | 24 |
 | 27 | 2026-11-06 | generate_screen_from_text | UI-019 default | Neugenerierung Vollfenster nach PO-Review R2 (67d2ba17a4874daeafe35e12dae4a07d), ersetzt 59004a11… | übernommen | 25 |
 
+| 28 | 2026-11-06 | generate_screen_from_text | UI-002 hinweis | Rahmen mit Hinweis UI-044, Pfad 4 Zeilen (6e89bd89eb41461e912c151e401efb69), genehmigt PO Review R1 | übernommen mit Abweichungen (siehe UI-002 screen.md) | 26 |
+| 29 | 2026-11-06 | generate_screen_from_text | UI-019 compact-hinweis | Schmale Ansicht mit Streifen UI-044 (b1dacc3794be45ec8227dfbf56a718ff), genehmigt PO Review R1 | übernommen mit Abweichungen (siehe UI-019 screen.md) | 27 |
+
 Befund Tooling: `edit_screens` meldet Erfolg und liefert DOM-Operationen, speichert die Änderung aber nicht in den Dateien des Screens (zweimal beobachtet, HTML und Screenshot blieben unverändert). Korrekturen erfolgten deshalb per Neugenerierung. Jeder verworfene Edit zählte gegen das Budget. Die Screens a88484966822498492facf1aab70cf6d und 149274c4a0b04b9e9dd56e5e94187906 bleiben im Stitch-Projekt, sind aber nicht Teil des Designs.
 
 **v0.4 (MAR-143, 06.11.2026):** keine Stitch-Aufrufe; Stand unverändert **25 von 40**. Neue Screens UI-044 bis UI-046 und LP-01 bis LP-03 sind nur als `screen.md` beschrieben.
+
+**v0.4.1 (MAR-143, Korrektur nach PO-Review R1):** 2 genehmigte Generierungen (#28 UI-002 hinweis, #29 UI-019 compact-hinweis); Stand **27 von 40**, keine Erweiterung. Ergebnisse als PNG exportiert. Meldeschwelle 30 nicht erreicht.

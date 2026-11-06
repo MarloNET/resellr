@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Projekt / Release | resellr (Arbeitstitel), Phase 1 / Release 0.1 |
-| Dokumentversion | **v0.4 (Entwurf)**: Cross-Check Baseline v0.3.1 (Kap. 6b), neu UI-044 bis UI-046, LP-01 bis LP-03, FLOW-10; Bereinigung UI-019/UI-023. Vorgänger v0.3 (Commit `92e018e`) |
+| Dokumentversion | **v0.4.1 (Entwurf, Korrektur nach PO-Review R1)**: Cross-Check Baseline v0.3.1 (Kap. 6b), neu UI-044 bis UI-046, LP-01 bis LP-03, FLOW-10; Bereinigung UI-019/UI-023. Vorgänger v0.3 (Commit `92e018e`) |
 | Status | draft (kein Review, keine Freigabe) |
 | Klassifikation | **Material** (Owner bestätigt) |
 | Autor / Datum | UI/UX Designer, 06.11.2026 |
@@ -77,7 +77,7 @@ Spalte „Mockup“: Zustände mit PNG. „Text“ = nur `screen.md` (Muster P-0
 | UI-020 | Kanal-Status setzen (Dialog) | Veröffentlicht / Beendet melden | REQ-046 | 01, 03, 09 | Text | UI-020-kanal-status-dialog |
 | UI-021 | Abgleich bestätigen (Dialog) | Übertragung bestätigen | REQ-090 | 02, 03, 04, 06 | Text | UI-021-abgleich-dialog |
 | UI-022 | Ungeprüften Rechtstext bestätigen (Dialog) | Freigabe mit ungeprüftem Rechtstext | REQ-087 | 01, 06 | Text | UI-022-rechtstext-dialog |
-| UI-023 | Datenblatt | Vorschau, Drucken, PDF | REQ-050 | 01 | default | UI-023-datenblatt |
+| UI-023 | Datenblatt | Button „Datenblatt öffnen (PDF)“ (Erzeugungsschritt, keine Vorschau) | REQ-050 | 01 | `inhaltsreferenz-pdf.png` (Inhaltsreferenz des PDFs, **kein Bildschirm**) | UI-023-datenblatt |
 | UI-024 | Änderungsprotokoll | Protokoll filtern | REQ-055, 072 | – | Text | UI-024-aenderungsprotokoll |
 | UI-025 | Einstellungen | Einstieg, Liste der 15 Bereiche | REQ-004–031, 051, 085, 097 | 05 | Text (Teil von UI-027/029) | UI-025-einstellungen |
 | UI-026 | Händlermarke | Name, Logo, Kontakt | REQ-028 | 05 | Text | UI-026-haendlermarke |
@@ -101,7 +101,7 @@ Spalte „Mockup“: Zustände mit PNG. „Text“ = nur `screen.md` (Muster P-0
 | UI-044 | Hinweis „Sicherung einrichten“ (Rahmenkomponente) | Dauerhafter Hinweis mit Speicherort und Aktion „resellr beenden“ | REQ-104, 106 | 10 | Text | UI-044-sicherungshinweis |
 | UI-045 | „resellr beenden“ (Dialog) | Rückfrage, Warten, Fehler | REQ-105, 073 | 10 | Text | UI-045-beenden-rueckfrage |
 | UI-046 | resellr beendet (Endzustand) | Endzustand und „Ausgang unbekannt“ | REQ-105 | 10 | Text | UI-046-beendet-endzustand |
-| LP-01 | „resellr startet“ (statische Seite) | Rückmeldung bei langem Start | REQ-073, 060 | 10 | Text | launcher-pages/LP-01-resellr-startet |
+| LP-01 | „resellr startet“ (statische Seite) | Rückmeldung bei langem Start | REQ-073 (Baseline 6.1) | 10 | Text | launcher-pages/LP-01-resellr-startet |
 | LP-02 | „Start abgebrochen“ (statische Seite) | Startabbruch mit Referenznummer | REQ-073 | 10 | Text | launcher-pages/LP-02-start-abgebrochen |
 | LP-03 | Ergebnis „resellr beenden“ (statische Seite) | Ergebnis des Startmenü-Werkzeugs | REQ-105, 073 | 10 | Text | launcher-pages/LP-03-beenden-ergebnis |
 
@@ -114,8 +114,8 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 - **P-03 Muster-/Vorlagen-Editor mit Vorschau:** Bestandteile als Zeilen, Platzhalter-Auswahl nach Gruppen (Kap. 9.7), Vorschau je Kanal am Beispiel-Modell, Fehler bei unzulässigem Platzhalter inline (UI-029).
 - **P-04 Bestätigungsdialog:** Titel = Aktion, Text nennt Wirkung, Buttons: „Abbrechen“ (links), Aktion (rechts, bei Löschen/Storno destruktiv).
 - **P-05 Konflikt:** Meldet das Speichern oder Freigeben einen Konflikt (Datensatz in anderem Fenster geändert, Baseline 9.3), erscheint ein Banner „Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. Bitte neu laden und erneut prüfen.“ mit Button „Neu laden“. Es wird nichts gespeichert oder freigegeben; eingegebene Werte bleiben bis zum Neuladen sichtbar. Zustand `.conflict` gilt für alle Formulare, UI-016 und UI-018.
-- **P-06 resellr nicht erreichbar (`.unreachable`, X-3):** Antwortet der Server auf eine Aktion oder ein Laden nicht (Server beendet in anderem Fenster, Absturz bis zum automatischen Neustart, Update, abgebrochener Start), erscheint ein **dauerhaftes Banner** (flag-warn, ohne „×“) oben im Inhaltsbereich, **ohne die Seite zu ersetzen**: „resellr ist nicht erreichbar. Ihre Eingaben sind noch nicht gespeichert, bleiben aber sichtbar, solange diese Seite offen ist. Warten Sie einen Moment und versuchen Sie es erneut. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ im Startmenü.“ Button „Erneut versuchen“ prüft nur die Verbindung (führt die Aktion nicht aus); antwortet der Server, verschwindet das Banner, die Aktion muss der Nutzer neu auslösen. Keine Referenznummer (es gibt keinen Protokolleintrag). Das Banner ersetzt `.error` für Verbindungsfehler im Netz- und Einzelbetrieb. Hinweis UI-044 bleibt unverändert sichtbar.
-- **P-07 resellr wird beendet (`.wird-beendet`, X-3):** Lehnt der Server eine schreibende Aktion mit „resellr wird beendet“ ab (Beenden läuft in einem anderen Fenster, bis etwa 10 s), zeigt die Seite ein Banner nach Muster `.error`: „resellr wird gerade beendet. Ihre Eingabe wurde nicht gespeichert.“ Eingaben bleiben sichtbar; folgt der Verbindungsverlust, gilt P-06.
+- **P-06 resellr nicht erreichbar (`.unreachable`, X-3):** Antwortet der Server auf eine Aktion oder ein Laden nicht (Server beendet in anderem Fenster, Absturz bis zum automatischen Neustart, Update, abgebrochener Start), erscheint ein **dauerhaftes Banner** (flag-warn, ohne „×“) oben im Inhaltsbereich, **ohne die Seite zu ersetzen**: „resellr ist nicht erreichbar. Ihre Eingaben sind noch nicht gespeichert, bleiben aber sichtbar, solange diese Seite offen ist. Warten Sie einen Moment und versuchen Sie es erneut. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ im Startmenü.“ Button „Erneut versuchen“ (einheitliche Beschriftung, auch in UI-046 `.unknown`) prüft nur die Verbindung (führt die Aktion nicht aus); antwortet der Server, verschwindet das Banner, die Aktion muss der Nutzer neu auslösen. Keine Referenznummer (es gibt keinen Protokolleintrag). Das Banner ersetzt `.error` für Verbindungsfehler im Netz- und Einzelbetrieb. Hinweis UI-044 bleibt unverändert sichtbar.
+- **P-07 resellr wird beendet (`.wird-beendet`, X-3):** Lehnt der Server eine schreibende Aktion mit „resellr wird beendet“ ab (Beenden läuft in einem anderen Fenster, bis etwa 10 s), zeigt die Seite ein **eigenes Banner** (flag-warn, ohne „×“, **ohne Referenznummer**, da kein Protokolleintrag; kein `.error` im Sinne von Kap. 5): „resellr wird gerade beendet. Ihre Eingabe wurde nicht gespeichert. Warten Sie, bis resellr beendet ist, und starten Sie es dann über die Verknüpfung „resellr“ im Startmenü.“ Eingaben bleiben sichtbar; folgt der Verbindungsverlust, gilt P-06. Das Banner verschwindet nicht von selbst.
 - **Validierung:** Fehler am Feld, Fehlertext aus Kap. 6/9.6 im Wortlaut der Requirements; Prüfung beim Verlassen des Feldes und beim Speichern; erster Fehler erhält Fokus. Zahlen akzeptieren Dezimalkomma und -punkt (Kap. 9.6).
 - **Feedback:** Erfolg als Banner oben (z. B. „Zugangspasswort geändert“), schließt nach 5 s oder per „×“; technische Fehler als Banner mit Funktion, nächstem Schritt, Referenznummer (REQ-073).
 - **Zustände (State-IDs):** `UI-nnn.default`, `.loading` (Skeleton/„Lade …“ bis 5 s, danach Fehler), `.empty`, `.error`, `.validation`, `.success`, `.disabled`, `.conflict` (P-05). Rollenabhängige Zustände entfallen (E-4). Offline/Timeout: nicht vorgesehen (A-02). Verbindungsfehler: `.unreachable` (P-06), Ablehnung beim Beenden: `.wird-beendet` (P-07); `.error` bleibt für Fehler mit Referenznummer.
@@ -172,7 +172,7 @@ Geprüft: Baseline Kap. 6.1 vollständig, 6.2 (C-8, „neu“), 6.3 (X-1 bis X-7
 |---|---|---|
 | X-1 | Hinweis „Sicherung einrichten“ | **erledigt**: UI-044. (a) Rahmenebene, jeder Einstieg; (b) Überschrift, vier Aussagen, Speicherort ohne Aktion sichtbar; (c) nicht ausblendbar, ohne Zustand; (d) blockiert nichts. Ort: untere Navigationsspalte (normal, 1366 × 768 passt, Inhaltsbereich unverändert), Streifen unten (schmal). |
 | X-2 | „resellr beenden“ | **erledigt**: UI-045 (Rückfrage, Wartezustand bis etwa 10 s, Fehlerzustand mit Referenznummer), UI-046 (Endzustand, „Ausgang unbekannt“). Wortlaut REQ-104/-105 unverändert. |
-| X-3 | „nicht erreichbar“, „wird beendet“ | **`.error` genügt nicht**, zwei Muster: P-06 (`.unreachable`) und P-07 (`.wird-beendet`), siehe Kap. 5. Begründung: Verbindungsfehler hat keine Referenznummer und braucht einen eigenen nächsten Schritt (Startmenü, Warten), Eingaben bleiben sichtbar und die Seite darf nicht ersetzt werden; „wird beendet“ ist eine gewöhnliche Server-Ablehnung und nutzt `.error`-Darstellung mit eigenem Text. |
+| X-3 | „nicht erreichbar“, „wird beendet“ | **`.error` genügt nicht**, zwei Muster: P-06 (`.unreachable`) und P-07 (`.wird-beendet`), siehe Kap. 5. Begründung: Verbindungsfehler hat keine Referenznummer und braucht einen eigenen nächsten Schritt (Startmenü, Warten), Eingaben bleiben sichtbar und die Seite darf nicht ersetzt werden; „wird beendet“ ist eine gewöhnliche Server-Ablehnung und zeigt ein eigenes Banner ohne Referenznummer mit nächstem Schritt (siehe P-07). |
 | X-4 | Seiten ohne Server | **erledigt**: LP-01 bis LP-03 (nur Text, kein Mockup). |
 | X-5 | Befund der Startprüfung | **bewusst nicht gestaltet**, siehe Kap. 6c. |
 | X-6 | Datenordner erreichen | **nur Speicherort**, auswählbarer Text in UI-044 und UI-046; keine Verknüpfung, kein „Im Explorer öffnen“. Zusatzzeile zur Adressleiste des Explorers in UI-046 als **Vorschlag Design** gekennzeichnet. |
@@ -249,7 +249,7 @@ UI-001, UI-040 und FLOW-07 bleiben unverändert im Design. Vermerk (Owner-Entsch
 
 ## 9. Stitch-Budget
 
-Stand siehe `stitch-log.md`: **25 von 40** Generierungen (inkl. 1 genehmigte Neugenerierung UI-019 Vollfenster in Korrekturrunde 2). Davon 2 verworfene `edit_screens` (Änderung wurde von Stitch nicht gespeichert, siehe Log) und 2 Neugenerierungen als Ersatz (UI-016, UI-019 compact). Der Richtwert des Product Owners (höchstens 12 weitere ab Stand 11, also 23) ist um 1 überschritten, bedingt durch den zweiten Ersatz (UI-019 compact). Die Meldeschwelle 30 ist nicht erreicht. **v0.4 (MAR-143): keine weiteren Generierungen, Stand unverändert 25 von 40.** UI-044 bis UI-046 und LP-01 bis LP-03 sind nur als `screen.md` beschrieben.
+Stand siehe `stitch-log.md`: **27 von 40** Generierungen (inkl. 1 genehmigte Neugenerierung UI-019 Vollfenster in Korrekturrunde 2). Davon 2 verworfene `edit_screens` (Änderung wurde von Stitch nicht gespeichert, siehe Log) und 2 Neugenerierungen als Ersatz (UI-016, UI-019 compact). Der Richtwert des Product Owners (höchstens 12 weitere ab Stand 11, also 23) ist um 1 überschritten, bedingt durch den zweiten Ersatz (UI-019 compact). Die Meldeschwelle 30 ist nicht erreicht. **v0.4.1 (MAR-143): 2 vom Product Owner genehmigte Generierungen (UI-002 hinweis, UI-019 compact-hinweis), Stand 27 von 40.** UI-044 bis UI-046 und LP-01 bis LP-03 sind nur als `screen.md` beschrieben.
 
 ## 10. Lieferstand (Ehrlichkeitsvermerk)
 
@@ -257,7 +257,7 @@ Stand siehe `stitch-log.md`: **25 von 40** Generierungen (inkl. 1 genehmigte Neu
 - Screens ohne Mockup (z. B. UI-004, 006, 008 bis 013, 015, 020 bis 022, 024 bis 026, 028, 031 bis 035, 038, 039, 042): `screen.md` ist die vollständige Beschreibung (Muster P-01 bis P-05).
 - **Mockups, die der Spezifikation noch nicht voll entsprechen** (Abweichungen je Screen unter „Bekannte Abweichungen im Mockup“, `screen.md` gilt): UI-019 default (Vollfenster: alter Foto-Button, alte Zählerform), UI-030 (Tabelle rechts abgeschnitten), UI-037 (Stitch-Zusatzelemente), UI-018 und weitere ältere Mockups mit dem Untertitel „Business Portal“. Gründe: Budget und der Tooling-Befund zu `edit_screens`.
 - Tooling-Befund: `edit_screens` speichert Änderungen nicht (zweimal beobachtet); Korrekturen nur per Neugenerierung. HTML-Export entfällt weiterhin (Abweichung von Skill marlonet-uiux-stitch §8, siehe Log).
-- **v0.4:** Cross-Check mit der Baseline v0.3.1 erfolgt (Kap. 6b); **neue Screens ohne Mockup**; die Mockups UI-002 und UI-019 (default, compact) zeigen den Hinweis UI-044 noch nicht, maßgeblich ist `screen.md`. Noch nicht erfolgt: Product Owner Review, Owner-Freigabe. 46 Screens/Seiten (43 + UI-044 bis UI-046) plus 3 statische Seiten.
+- **v0.4:** Cross-Check mit der Baseline v0.3.1 erfolgt (Kap. 6b); **neue Screens ohne Mockup**; Mockups `UI-002/hinweis.png` und `UI-019/compact-hinweis.png` zeigen den Hinweis (v0.4.1); `default.png` und `compact.png` zeigen ihn nicht, maßgeblich ist `screen.md`. Noch nicht erfolgt: Product Owner Review, Owner-Freigabe. 46 Screens/Seiten (43 + UI-044 bis UI-046) plus 3 statische Seiten.
 
 ## 11. Änderungsprotokoll
 
@@ -266,6 +266,7 @@ Stand siehe `stitch-log.md`: **25 von 40** Generierungen (inkl. 1 genehmigte Neu
 | v0.1 | 06.11.2026 | Erstfassung (Entwurf): Katalog, Flüsse, Muster, Traceability, Mockups Kernscreens |
 | v0.2 | 06.11.2026 | Überarbeitung nach Struktur-Review Runde 1 (Commit 53bd6de) |
 | v0.3 | 06.11.2026 | Restpunkte Review R1 (Kennzeichnung „Design-Annahme“, Kap. 8); Mockups UI-001, 005, 007, 030, 036, 037, 040, 041, 043; Neugenerierung UI-016 (Freigeben aktiv, Fehlerliste) und UI-019 compact (480 px, „n von m“, Foto-Aktionen); Self-Review (Kap. 12) |
+| v0.4.1 | 06.11.2026 | Korrektur PO-Review R1 (MAR-143): F-1 Höhenrechnung und kompakte Navigation (UI-044, DESIGN.md), F-2 nächster Schritt im `.error` von UI-044, F-3 zwei Mockups (Stitch 27/40) und UI-023-Referenz gekennzeichnet (Datei `inhaltsreferenz-pdf.png`), M-1 Kopfzeilen LP, REQ-060 entfernt, M-2 P-07 eigenes Banner mit nächstem Schritt, M-3 „Erneut versuchen“ einheitlich, M-4 Annahme Launcher; Auslegung AC-REQ-104-01: wörtlich (entschieden PO) |
 | v0.4 | 06.11.2026 | Cross-Check Baseline v0.3.1 (MAR-143): Kap. 6b/6c, UI-044 bis UI-046, LP-01 bis LP-03, FLOW-10, Muster P-06/P-07, UI-023 bereinigt (Variante a), UI-019 leere Merkmalsfelder, Browser Chrome; keine Mockups, Stitch unverändert 25/40 |
 
 ## 12. Self-Review nach Skill marlonet-ui-ux-design §6 (Stand v0.3)
@@ -287,4 +288,3 @@ Geprüft wurde mechanisch (Skript) und durch Sichtprüfung der neun neuen und zw
 | Traceability | REQ → FLOW → UI vorhanden. |
 | Decision integrity | Bestätigte Annahmen als „Design-Annahme, keine Anforderung“ gekennzeichnet (UI-003, 006, 014, 019, 024). Offene Owner-Entscheidungen: V-1 bis V-3, OP-15, OP-23-Klärung im Cross-Check. Status bleibt draft. |
 | Repository state | Alle in `screen.md` genannten PNG existieren (Skriptprüfung). Keine Secrets. |
-

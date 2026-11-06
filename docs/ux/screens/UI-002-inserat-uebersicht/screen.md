@@ -50,3 +50,5 @@ Untertitel „Business Portal“ unter „resellr“ (von Stitch erzeugt, kein T
 ## Annahmen und offene Fragen
 - Annahme: Seiten à 50 Zeilen ab 200 Treffern (Datenvolumen A-12: bis 3.000 Modell-Inserate).
 - Annahme: Sortierung nach letzter Änderung absteigend; keine Spaltensortierung in Release 0.1.
+
+- **Mockup `hinweis.png` (v0.4.1, UI-044 im Rahmen):** zeigt den Hinweis unten in der linken Spalte. Abweichungen (Stitch-Zusätze, kein Teil des Designs): Zusatz „BUSINESS PORTAL“ am Kopf, Untertitel „Übersicht aller erfassten …“, Fußzeile „4 Datensätze geladen / Automatische Synchronisation aktiv“, Navigationseinträge höher als 28 px, Pfad in Monospace mit Zeilenumbruch mitten im Wort (4 Zeilen, entspricht dem Fall Pfad etwa 80 Zeichen), Warnzeile „Wichtig“ gelb hinterlegt (Gestaltungsvariante, nicht verbindlich). Verbindlich sind `screen.md` von UI-044 und die Rechnung dort. Kein „×“, kein Schließen, keine weiteren Elemente im Hinweis.

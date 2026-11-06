@@ -2,6 +2,7 @@
 
 - Zweck: Meldung, wenn resellr nicht starten konnte (Baseline Ablauf 4b: fehlende/neuere/beschädigte Datenbank, gescheiterte Migration).
 - Flows: FLOW-10 (Neustart) · Anforderungen: REQ-073; Baseline Kap. 6.1 „Rückmeldungen ohne Server“, Kap. 9.6; X-4
+- Rollen: Nutzer (Arbeitsplatzrechner; kein Server) · Gerät(e): PC, Fenster ab 480 px · Artefakte: nur Text (`screen.md`), kein Mockup
 - Art: einfache statische HTML-Seite des `resellr-launcher` (`launcher-pages`), **ohne React, ohne Serverzugriff**, ohne Navigation und ohne Hinweis UI-044 (kein resellr-Server läuft). Tokens aus `DESIGN.md`: bg #F6F7F9, Karte surface mit 1 px border und 6 px Radius, Inter (mitgeliefert, REQ-079), Text 14/20, Titel 22/28 semibold. Zentrierte Karte, Breite 560 px, funktioniert ab 480 px. Deutsch, Anrede „Sie“, keine technischen Details (REQ-073). Nur Text, kein Mockup (Seiten sind schlicht genug).
 
 ## Angezeigte Daten

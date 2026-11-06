@@ -1,12 +1,12 @@
 # UI-023 – Datenblatt
 
 - Zweck: Datenblatt eines Geräts als A4-Hochformat erzeugen und im PDF-Viewer des Browsers öffnen (Drucken und Speichern dort).
-- **Entscheidung v0.4 (Baseline Kap. 6.2 C-2 bestätigt, Variante (a)):** UI-023 zeigt **nur den Button „Datenblatt öffnen (PDF)“**, kein eingebettetes PDF und keine nachgebaute Blattvorschau. Das PDF öffnet im PDF-Viewer von Chrome (neuer Tab); Drucken und Speichern dort. Begründung: kleinster Umfang, der REQ-050 erfüllt; das echte PDF ist die einzige Vorschau und weicht nie vom Druck ab. Das Mockup `default.png` zeigt noch die frühere Blattvorschau und ist nur Inhaltsreferenz des PDFs (Aufbau des Blatts), nicht der Bildschirm.
+- **Entscheidung v0.4 (Baseline Kap. 6.2 C-2 bestätigt, Variante (a)):** UI-023 zeigt **nur den Button „Datenblatt öffnen (PDF)“**, kein eingebettetes PDF und keine nachgebaute Blattvorschau. Das PDF öffnet im PDF-Viewer von Chrome (neuer Tab); Drucken und Speichern dort. Begründung: kleinster Umfang, der REQ-050 erfüllt; das echte PDF ist die einzige Vorschau und weicht nie vom Druck ab. Das Mockup `inhaltsreferenz-pdf.png` (früher `default.png`) zeigt noch die frühere Blattvorschau und ist nur Inhaltsreferenz des PDFs (Aufbau des Blatts), nicht der Bildschirm.
 - Flows: FLOW-01 (Schritt 8)
 - Anforderungen: REQ-050, REQ-051, REQ-081, REQ-040
 - Rollen: Nutzer
 - Gerät(e): PC; A4-Drucker
-- Artefakte: default.png (Stitch b54e7fed073c49b1af58c3b5d24c1d0d, DESKTOP, 06.11.2026)
+- Artefakte: inhaltsreferenz-pdf.png (**Inhaltsreferenz des PDFs, kein Bildschirm; nicht bauen**; früher default.png) (Stitch b54e7fed073c49b1af58c3b5d24c1d0d, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
@@ -33,7 +33,7 @@ Keine. Voraussetzungen werden beim Öffnen geprüft:
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |
 |---|---|---|---|
-| default | Titel, Hinweis „A4 Hochformat“, Button „Datenblatt öffnen (PDF)“, Link „Zurück zum Gerät“; keine Vorschau | default.png nur als Inhaltsreferenz des PDFs | – |
+| default | Titel, Hinweis „A4 Hochformat“, Button „Datenblatt öffnen (PDF)“, Link „Zurück zum Gerät“; keine Vorschau | `inhaltsreferenz-pdf.png` nur als Inhaltsreferenz des PDFs (kein Bildschirm) | – |
 | loading | Button deaktiviert mit Text, bis das PDF bereit ist (bis 5 s, REQ-061) | nur Text | „Datenblatt wird erzeugt …“ |
 | empty | n/a | – | – |
 | error | Voraussetzungs-Meldung über dem Button (siehe Tabelle) oder technischer Fehler als Banner | nur Text | siehe oben |
