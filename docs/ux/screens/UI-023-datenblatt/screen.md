@@ -1,6 +1,7 @@
 # UI-023 – Datenblatt
 
-- Zweck: Datenblatt eines Geräts als A4-Hochformat ansehen, drucken oder als PDF speichern.
+- Zweck: Datenblatt eines Geräts als A4-Hochformat erzeugen und im PDF-Viewer des Browsers öffnen (Drucken und Speichern dort).
+- **Anpassung an Architecture Baseline v0.1 (C-2):** Die App zeigt keine eigene Blattvorschau und keinen eigenen Druckdialog. Die Tabelle „Aktionen“ ist entsprechend geändert; das Mockup `default.png` dient nur als Inhaltsreferenz des Blatts (Aufbau des PDFs).
 - Flows: FLOW-01 (Schritt 8)
 - Anforderungen: REQ-050, REQ-051, REQ-081, REQ-040
 - Rollen: Nutzer
@@ -26,8 +27,7 @@ Keine. Voraussetzungen werden beim Öffnen geprüft:
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Drucken | Primärbutton, Strg+P | Voraussetzungen erfüllt | Druckdialog des Systems; Blatt A4 Hochformat | „Datenblatt konnte nicht erzeugt werden. Referenz: <Nr>“ | bleibt |
-| Als PDF speichern | Sekundärbutton | Voraussetzungen erfüllt | PDF-Datei „Datenblatt_<WI-Nr>.pdf“ | wie oben | bleibt |
+| Datenblatt öffnen (PDF) | Primärbutton | Voraussetzungen erfüllt | PDF A4 Hochformat öffnet sich in neuem Browser-Tab; Drucken und Speichern über den PDF-Viewer | „Datenblatt konnte nicht erzeugt werden. Referenz: <Nr>“ | bleibt |
 | Zurück zum Gerät | Link | – | – | – | UI-010 |
 
 ## Zustände
@@ -37,7 +37,7 @@ Keine. Voraussetzungen werden beim Öffnen geprüft:
 | loading | Blatt als Platzhalter | nur Text | „Datenblatt wird erzeugt …“ |
 | empty | n/a | – | – |
 | error | Voraussetzungs-Meldung statt Vorschau (siehe Tabelle) oder technischer Fehler | nur Text | siehe oben |
-| success | Banner nach PDF | nur Text | „PDF gespeichert“ |
+| success | Hinweis nach dem Öffnen | nur Text | „Datenblatt in neuem Tab geöffnet“ |
 | disabled | Buttons deaktiviert bei Voraussetzungs-Meldung | nur Text | |
 | permission | n/a | – | – |
 
@@ -49,4 +49,5 @@ Vorschau skaliert auf Fensterbreite, Seitenverhältnis 210:297. Das Layout ist i
 
 ## Annahmen und offene Fragen
 - Offen (OP-01/A-10): exakte oder inhaltlich gleichwertige Nachbildung des Excel-Layouts.
-- Offen (OP-15): Druckdialog ist System-/Browser-Dialog und nicht Teil des Designs.
+- Druck- und Speicherdialog gehören dem Browser und sind nicht Teil des Designs (Baseline ADR-007).
+- Seitenzahl-Warnung („passt nicht auf eine Seite“) entsteht vor dem Öffnen als Hinweis.

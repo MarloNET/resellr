@@ -21,7 +21,7 @@
 ## 2. Nutzer, Umfang, Designziele
 
 - **Nutzer:** genau eine Person (der Owner, E-4). Keine Konten, Rollen, rollenabhängige Sichten.
-- **Plattform:** ein PC, Tastatur und Maus, ab 1366 × 768 (REQ-077). Kein Smartphone, kein Tablet (E-2). **Web oder Desktop offen (OP-15)**: Das Design legt es nicht fest.
+- **Plattform:** ein PC, Tastatur und Maus, ab 1366 × 768 (REQ-077). Kein Smartphone, kein Tablet (E-2). **Web oder Desktop (OP-15):** Die Architecture Baseline v0.1 (MAR-125, Entwurf, nicht freigegeben) schlägt eine lokale Webanwendung im Browserfenster vor (ADR-001). Das Design folgt dieser Annahme unter Vorbehalt der Baseline-Freigabe; Chromium (Edge/Chrome) Referenz, Firefox unterstützt.
 - **Barrierefreiheit:** keine Anforderung (E-3); nur gute Lesbarkeit und Bedienbarkeit.
 - **Sprache/Formate:** Deutsch, de-DE (1.234,56 €, TT.MM.JJJJ) (REQ-078).
 - **Designziele:** (1) Einbuchen in ≤ 2 Minuten (REQ-062) per Tastatur; (2) Kopier-Assistent mit einem Klick je Feld, auch neben einem anderen Fenster; (3) Status und Kennzeichnungen sofort lesbar, nie nur durch Farbe; (4) Einstellungen für Nicht-Entwickler bedienbar, mit Vorschau (REQ-076).
@@ -104,10 +104,11 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 - **P-01 Pflege-Tabelle (Einstellungen mit Listen):** Tabelle links, Detailbereich rechts oder Dialog; Zeilenaktionen „Bearbeiten“, „Deaktivieren“; Reihenfolge per Ziehen oder Hoch/Runter-Buttons (Tastatur); „Anlegen“-Button oben rechts; Primärbutton im Detail „Speichern“, daneben „Abbrechen“.
 - **P-02 Zuordnungstabelle (Kanal × Quelle/Wert):** Auswahl Kanal/Geräteart oben, Tabelle mit Dropdown-Zellen, Zeile „Zeile hinzufügen“, Validierungsfehler je Zelle.
 - **P-03 Muster-/Vorlagen-Editor mit Vorschau:** Bestandteile als Zeilen, Platzhalter-Auswahl nach Gruppen (Kap. 9.7), Vorschau je Kanal am Beispiel-Modell, Fehler bei unzulässigem Platzhalter inline (UI-029).
+- **P-05 Konflikt:** Meldet das Speichern oder Freigeben einen Konflikt (Datensatz in anderem Fenster geändert, Baseline 9.3), erscheint ein Banner „Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. Bitte neu laden und erneut prüfen.“ mit Button „Neu laden“. Es wird nichts gespeichert oder freigegeben; eingegebene Werte bleiben bis zum Neuladen sichtbar. Zustand `.conflict` gilt für alle Formulare, UI-016 und UI-018.
 - **P-04 Bestätigungsdialog:** Titel = Aktion, Text nennt Wirkung, Buttons: „Abbrechen“ (links), Aktion (rechts, bei Löschen/Storno destruktiv).
 - **Validierung:** Fehler am Feld, Fehlertext aus Kap. 6/9.6 im Wortlaut der Requirements; Prüfung beim Verlassen des Feldes und beim Speichern; erster Fehler erhält Fokus. Zahlen akzeptieren Dezimalkomma und -punkt (Kap. 9.6).
 - **Feedback:** Erfolg als Banner oben (z. B. „Zugangspasswort geändert“), schließt nach 5 s oder per „×“; technische Fehler als Banner mit Funktion, nächstem Schritt, Referenznummer (REQ-073).
-- **Zustände (State-IDs):** `UI-nnn.default`, `.loading` (Skeleton/„Lade …“ bis 5 s, danach Fehler), `.empty`, `.error`, `.validation`, `.success`, `.disabled`. Rollenabhängige Zustände entfallen (E-4). Offline/Timeout: nicht vorgesehen (A-02); Verbindungsfehler im Netzbetrieb → `.error`.
+- **Zustände (State-IDs):** `UI-nnn.default`, `.loading` (Skeleton/„Lade …“ bis 5 s, danach Fehler), `.empty`, `.error`, `.validation`, `.success`, `.disabled`, `.conflict` (P-05). Rollenabhängige Zustände entfallen (E-4). Offline/Timeout: nicht vorgesehen (A-02); Verbindungsfehler im Netzbetrieb → `.error`.
 - **Tastatur:** Tab-Reihenfolge = Leserichtung; Enter bestätigt Primäraktion eines Formulars/Dialogs; Esc schließt Dialoge und Dropdowns; im Kopier-Assistenten Pfeil auf/ab wählt Feld, Enter kopiert das gewählte Feld und springt zum nächsten offenen (als Bedienkomfort, keine Konformitätsaussage). Einbuchen: Fokus beim Öffnen von UI-003 in „WI-Nr“; Reihenfolge WI-Nr → Lieferant → Zustandscode → Modellvorlage → Gerätewerte.
 - **Fensterbreiten:** ≥ 1366 px: volle Ansicht. UI-019 zusätzlich schmale Ansicht (440 px, ohne Navigation), erreichbar über „Schmale Ansicht“/„Normale Ansicht“; ob als eigenes Fenster oder Umschalter, hängt von OP-15 ab. Unter 1366 px wird nicht gestaltet.
 - **Kennzeichnungen (Kap. 9.4):** je Kennzeichnung ein Text-Chip; Reihenfolge: Fehlt-Hinweise, „geändert seit Freigabe“, „Änderung auf Kanal übertragen“, „Bestand auf Kanal anpassen“, „manuell angepasst“, „Kategorie manuell“, „Titel gekürzt, bitte prüfen“.
@@ -121,7 +122,22 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
   4. Druck: UI-023 zeigt Vorschau mit „Drucken“ und „Als PDF speichern“; Dialoge des Betriebssystems/Browsers werden nicht gestaltet.
   5. Zugang: UI-001/UI-040 nur im Netzbetrieb.
 - Mockups sind visuelle Referenz; maßgeblich ist `screen.md`. Es wird kein HTML als Implementierungscode übergeben (HTML-Export entfällt, siehe `stitch-log.md`).
-- Cross-Check mit der Architecture Baseline: **offen**.
+- Cross-Check mit der Architecture Baseline v0.1 (Entwurf, Revision `ae51c8cc`): **Vorabprüfung durchgeführt**, siehe Kap. 6a. Der formale Cross-Check folgt nach Freigabe der Baseline.
+
+## 6a. Vorabprüfung gegen die Architecture Baseline v0.1 (ae51c8cc)
+
+| ID | Betroffen | Befund | UX-Auswirkung | Designseitige Anpassung / Alternative | Status |
+|---|---|---|---|---|---|
+| C-1 | UI-001, UI-040, FLOW-07 | Baseline: Betrieb nur am PC, **keine Anmeldung, kein Zugangspasswort** (ADR-002, A-35). Requirements v0.3.1 sehen Zugang im Netzbetrieb vor. | Beide Screens entfallen in Release 0.1, falls A-35 gilt. | Screens bleiben als **bedingt** erhalten (nur bei Netzbetrieb), kein Eingriff in andere Screens. Entscheidung Owner/PO (OP-23). | offen |
+| C-2 | UI-023 | Baseline: Datenblatt als serverseitiges PDF, Anzeige/Druck/Speichern im PDF-Viewer des Browsers (neuer Tab), **kein eigener Druckdialog, keine Vorschau im Browser-Layout**. Das Mockup zeigt eine Blattvorschau mit „Drucken“ und „Als PDF speichern“. | Vorschau und Buttons in der App entfallen. | UI-023 wird zum Erzeugungsschritt: Button „Datenblatt öffnen (PDF)“ öffnet neuen Tab; Voraussetzungs-Meldungen bleiben. Mockup bleibt nur als Inhaltsreferenz des Blatts. Angepasst in `screen.md`. | angepasst |
+| C-3 | UI-019, V-3 | Baseline: Foto-Übergabe als Ordner (wird im Dateimanager geöffnet) oder ZIP-Download; Ziehen aus der Seite in fremde Upload-Felder nicht verlässlich. | V-3 (B) entfällt; Empfehlung A bestätigt, aber mit zwei Aktionen. | Buttons „Foto-Ordner öffnen“ und „Fotos als ZIP herunterladen“; Fehler Ordner nicht beschreibbar → Hinweis auf ZIP. Angepasst in `screen.md`; Mockup zeigt noch „Fotos herunterladen“. | angepasst |
+| C-4 | alle Formulare, UI-016, UI-018 | Baseline (RI-11, 9.3): Speichern/Freigeben kann mit **Konflikt** abgelehnt werden, wenn der Datensatz in einem anderen Fenster geändert wurde. | Neuer Zustand `.conflict`. | Muster P-05 (Konflikt-Banner mit „Neu laden“), eingetragen in Kap. 5. Eingaben bleiben bis zum Neuladen sichtbar. | angepasst |
+| C-5 | UI-019 schmal | Baseline: Browserfenster, frei skalierbar, als eigenes Fenster „installierbar“. Mindestbreite von Browserfenstern kann über 440 px liegen. | Schmales Layout (440 px) evtl. nicht erreichbar. | Annahme, vom Software Architect zu prüfen: Layout funktioniert ab 480 px; Umschalter „Schmale Ansicht“ ändert nur das Layout, öffnet kein Fenster. | zu prüfen |
+| C-6 | UI-018 | Baseline: Textdifferenz in der Beschreibung im Browser berechenbar. | keine | Feldweiser Vergleich bleibt Pflicht; Wort-Hervorhebung optional. | ok |
+| C-7 | Einstellungen | Baseline: Neuberechnung synchron, Ergebnismeldung mit Anzahlen; bei langer Dauer Ladezustand. | keine | `.loading` in UI-043/Einstellungen vorhanden. | ok |
+| C-8 | – | Baseline OD-07: Hinweis in der Oberfläche bei fehlgeschlagener Sicherung nur vorgeschlagen. | Kein Screen vorhanden. | nicht gestaltet, bis Owner OD-07 entscheidet. | offen |
+| C-9 | UI-015 | Upload-Grenzen der Baseline (JPEG/PNG, 20 MB, 20 Fotos) entsprechen dem Design. | keine | – | ok |
+| C-10 | UI-003, UI-006 | Baseline: Suche nach Modellvorlage/WI-Nr serverseitig, schnell genug für Trefferliste während der Eingabe. | keine | – | ok |
 
 ## 7. Rückverfolgbarkeit (REQ → FLOW → UI)
 
@@ -164,7 +180,7 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 **Varianten mit Empfehlung (Owner entscheidet, nicht von mir entschieden):**
 - **V-1 Kopier-Assistent:** (A) ein Screen mit zwei Layouts: Vollfenster und schmal (440 px) per Umschalter — *Empfehlung*; (B) nur schmales Arbeitsfenster, Vollansicht entfällt. Grund A: Nutzer kann je nach Bildschirm wählen, geringer Mehraufwand.
 - **V-2 Prüfablauf:** (A) Freigabe je Kanal-Inhalt (UI-016) plus Vergleichsansicht (UI-017) — *Empfehlung*, entspricht REQ-044; (B) Sammelfreigabe aller Kanäle: würde „nie automatisch freigeben“ aufweichen, deshalb nicht empfohlen.
-- **V-3 Fotos (REQ-048):** (A) „Fotos herunterladen“ → Ordner/ZIP mit 01 … — *Empfehlung*; (B) Ziehen aus dem Programm in andere Anwendung, nur bei Desktop (OP-15).
+- **V-3 Fotos (REQ-048):** (A) Foto-Ordner öffnen oder ZIP herunterladen, Namen 01 … — *Empfehlung*, nach Baseline v0.1 der einzige tragfähige Weg; (B) Ziehen aus der Seite in fremde Upload-Felder: laut Baseline nicht verlässlich möglich, entfällt.
 
 **Offene Fragen an den Product Owner:**
 1. v0.3.1 als Lesestand bestätigen (Kap. 1).

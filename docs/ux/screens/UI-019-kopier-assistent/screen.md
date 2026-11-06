@@ -15,7 +15,7 @@
 | Fortschritt | „n von m Feldern übernommen · k offen“, Balken | REQ-049 | Prozentzahl entfällt (im Mockup „39%“ von Stitch ergänzt) |
 | Feldzeilen | Feldbezeichnung des Kanals, Wert (Beschreibung mehrzeilig, Zeilenumbrüche sichtbar, scrollbar), Kopieren-Button, Chip „übernommen“ | freigegebener Stand mit aktuellen Bestandsangaben (REQ-091) | Reihenfolge = Feldreihenfolge des Kanals (UI-036); Felder: Titel, Beschreibung, Kategorie, Zustand (+Zusatz), Preis (ggf. „VB“), Merkmalsfelder, GPSR-Angaben |
 | Leeres Feld | Wert „leer“, kein Kopieren-Button | REQ-037 | zählt nicht als offen |
-| Fotos | „n Fotos in Reihenfolge, Dateinamen beginnen mit 01 …“, nummerierte Vorschau, Button „Fotos herunterladen“; ohne Fotos „Keine Fotos zugeordnet“ | REQ-048 | Form der Bereitstellung (Ordner/ZIP) offen, OP-15 |
+| Fotos | „n Fotos in Reihenfolge, Dateinamen beginnen mit 01 …“, nummerierte Vorschau, Buttons „Foto-Ordner öffnen“ und „Fotos als ZIP herunterladen“; ohne Fotos „Keine Fotos zugeordnet“ | REQ-048 | Ordner oder ZIP laut Architecture Baseline v0.1 (C-3); Mockup zeigt noch „Fotos herunterladen“ |
 | Nächstes Feld | markierte Zeile „nächstes Feld“ (nur schmales Layout; im Vollfenster ebenfalls) | – | erste offene Zeile |
 
 ## Eingaben und Validierung
@@ -26,7 +26,8 @@ Keine Eingaben. Tastatur: Pfeil auf/ab wählt Zeile, Enter oder Strg+Enter kopie
 |---|---|---|---|---|---|
 | Kopieren | Button je Feld, Enter | Status Freigegeben/Veröffentlicht/Beendet | Wert zeichengenau in der Zwischenablage; Zeile „übernommen“; Toast „Kopiert: <Feld>“ (3 s); Zähler steigt | Fehlermeldung im Toast: „Kopieren nicht möglich. Bitte Wert markieren und mit Strg+C kopieren.“ | bleibt |
 | Erneut kopieren | Button bei „übernommen“ | – | wie oben | wie oben | bleibt |
-| Fotos herunterladen | Button | Fotos vorhanden | Dateien 01_…, 02_… auf dem Arbeitsplatzrechner; Hinweis „n Fotos gespeichert“ | „Fotos konnten nicht bereitgestellt werden. Referenz: <Nr>“ | bleibt |
+| Foto-Ordner öffnen | Button | Fotos vorhanden | Dateien 01_…, 02_… liegen in einem Übergabeordner; Ordner öffnet im Dateimanager; Hinweis „n Fotos bereitgestellt“ | „Foto-Ordner konnte nicht angelegt werden. Bitte stattdessen die ZIP-Datei laden. Referenz: <Nr>“ | bleibt |
+| Fotos als ZIP herunterladen | Button | Fotos vorhanden | ZIP mit Namen 01_…, 02_… wird heruntergeladen | „Fotos konnten nicht bereitgestellt werden. Referenz: <Nr>“ | bleibt |
 | Als veröffentlicht melden | Primärbutton | Status Freigegeben oder Beendet (nur ohne „geändert seit Freigabe“) | öffnet UI-020 | – | UI-020 |
 | Abgleich bestätigen | Sekundärbutton | Status Veröffentlicht; bei „Änderung auf Kanal übertragen“/„Bestand auf Kanal anpassen“ aktiv; sonst deaktiviert mit „Kanal ist abgeglichen“ | öffnet UI-021 | – | UI-021 |
 | Schmale/Normale Ansicht | Link | – | Layout wechselt | – | bleibt |
@@ -52,5 +53,6 @@ Vollfenster: Liste mit Spalten Feldname | Wert | Aktion. Schmal: eine Zeile je F
 „Business Portal“ (Stitch, default.png); im default.png: Feldbezeichner in Großbuchstaben; Sticky-Leiste; Fortschrittsprozent „39%“ im compact.png (nicht Teil des Designs); „Normale Ansicht“ mit Symbol „externes Fenster“ (Symbolwahl nicht verbindlich); compact.png zeigt nur die ersten 10 Felder (Scrollbereich), Rest gemäß Liste; Thumbnails 01–06 sind Platzhalter.
 
 ## Annahmen und offene Fragen
-- Offen (OP-15): Zwischenablage (Browser: nur auf Nutzeraktion), Form der Foto-Bereitstellung, Fensterart des schmalen Layouts.
+- Browser (Baseline v0.1): Zwischenablage nur auf Nutzeraktion, ein Feld als reiner Text (Fehlerfall ist gestaltet). Schmales Layout ist ein Umschalter im selben Fenster; der Nutzer kann ein zweites, schmales Browserfenster öffnen. Mindestbreite 480 px, vom Software Architect zu prüfen (C-5).
+- Konflikt (P-05): „Neuer Stand noch nicht freigegeben“ bzw. geänderter Stand beim Laden → Banner „Bitte neu laden“.
 - Annahme: „Kopieren“ markiert nicht automatisch „übernommen“, wenn der Systemzugriff scheitert.
