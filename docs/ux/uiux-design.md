@@ -193,7 +193,7 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 
 ## 9. Stitch-Budget
 
-Stand siehe `stitch-log.md`: **24 von 40** Generierungen. Davon 2 verworfene `edit_screens` (Änderung wurde von Stitch nicht gespeichert, siehe Log) und 2 Neugenerierungen als Ersatz (UI-016, UI-019 compact). Der Richtwert des Product Owners (höchstens 12 weitere ab Stand 11, also 23) ist um 1 überschritten, bedingt durch den zweiten Ersatz (UI-019 compact). Die Meldeschwelle 30 ist nicht erreicht. Zusätzliche Mockups sind nicht geplant.
+Stand siehe `stitch-log.md`: **25 von 40** Generierungen (inkl. 1 genehmigte Neugenerierung UI-019 Vollfenster in Korrekturrunde 2). Davon 2 verworfene `edit_screens` (Änderung wurde von Stitch nicht gespeichert, siehe Log) und 2 Neugenerierungen als Ersatz (UI-016, UI-019 compact). Der Richtwert des Product Owners (höchstens 12 weitere ab Stand 11, also 23) ist um 1 überschritten, bedingt durch den zweiten Ersatz (UI-019 compact). Die Meldeschwelle 30 ist nicht erreicht. Zusätzliche Mockups sind nicht geplant.
 
 ## 10. Lieferstand (Ehrlichkeitsvermerk)
 
@@ -217,10 +217,10 @@ Geprüft wurde mechanisch (Skript) und durch Sichtprüfung der neun neuen und zw
 
 | Kriterium | Ergebnis |
 |---|---|
-| Coverage | Alle aktiven REQ der Traceability haben Screens/Flows. Zurückgezogen: REQ-002/003/096/098. REQ-057/059 (Could) nur textlich. Lücken: keine bekannt. |
+| Coverage | Alle aktiven REQ der Traceability haben Screens/Flows. Zurückgezogen: REQ-002/003/096/098. REQ-057/059 (Could) nur textlich. Bekannte Lücke: Bearbeitung der Wertzuordnung (UI-036, REQ-025) ist nur als Bereich in UI-036 beschrieben, Entscheidung des PO über einen eigenen Screen offen. Mockup-Abweichungen von der Spezifikation (UI-016 Titelzähler und Fehleranzahl, UI-019 compact Banner/Button, UI-030 „Löschen“, UI-043 Breite) sind je Screen unter „Bekannte Abweichungen“ dokumentiert. |
 | Spec readiness | Alle 43 `screen.md` enthalten die sieben Pflichtabschnitte (Skriptprüfung). Inhaltliche Vollständigkeit je Feld nicht erneut geprüft. |
 | States | Zustandstabelle je Screen vorhanden. Layoutverändernde Zustände ohne Mockup: UI-002 empty, UI-016 geaendert, UI-019 ohne Fotos, UI-018 entwurf-vergleich (nur Text). |
-| Consistency | UI-016 und UI-019 compact stimmen jetzt mit `screen.md` überein. UI-019 default (Vollfenster) widerspricht noch (Foto-Button, Zähler), als Abweichung vermerkt. 440 px nur noch als dokumentierte Abweichung. |
+| Consistency | UI-016 und UI-019 compact stimmen jetzt mit `screen.md` überein. UI-019 default (Vollfenster) wurde in Korrekturrunde 2 neu erzeugt und entspricht jetzt `screen.md` bis auf dokumentierte Abweichungen. 440 px nur noch als dokumentierte Abweichung. |
 | No invented scope | Von Stitch ergänzte Elemente sind je Screen unter „Bekannte Abweichungen“ gelistet (am stärksten UI-037 und UI-030). Sie sind nicht Teil des Designs. Nicht entfernt, weil `edit_screens` nicht speichert und das Budget begrenzt ist. |
 | Error/edge cases | Fehler- und Ablehnungstexte stehen in den Aktionstabellen. Vollbild-Fehlerzustände sind nur Text. |
 | Accessibility/responsive | Keine Anforderung (E-2 bis E-4). Es wird keine Konformität behauptet. Kontraste siehe DESIGN.md (Skriptwerte). Mockups sind kein Nachweis. |

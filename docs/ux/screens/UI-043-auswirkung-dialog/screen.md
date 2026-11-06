@@ -32,7 +32,7 @@ Keine.
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup
-Im unscharfen Hintergrund unten links steht ein kleiner Versionstext (von Stitch erzeugt, nicht Teil des Designs). Der Hinweis „Keine Kanal-Inhalte betroffen“ (Zustand empty) ist nicht gestaltet. Die Kennzeichnung „geändert seit Freigabe“ beim zweiten Zähler ist Darstellung von Kap. 9.4.
+Der Dialog ist im Mockup breiter als die 480 px laut Spezifikation; maßgeblich sind 480 px. Im unscharfen Hintergrund unten links steht ein kleiner Versionstext (von Stitch erzeugt, nicht Teil des Designs). Der Hinweis „Keine Kanal-Inhalte betroffen“ (Zustand empty) ist nicht gestaltet. Die Kennzeichnung „geändert seit Freigabe“ beim zweiten Zähler ist Darstellung von Kap. 9.4.
 
 ## Annahmen und offene Fragen
 keine.

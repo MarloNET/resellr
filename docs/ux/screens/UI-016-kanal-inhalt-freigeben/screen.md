@@ -45,14 +45,14 @@
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |
 |---|---|---|---|
-| default (Entwurf, eine Bedingung verletzt) | siehe Mockup | default.png | – |
+| default (Entwurf, Bedingungen verletzt; im Mockup zwei) | siehe Mockup | default.png | – |
 | default (alle Bedingungen erfüllt) | Primärbutton aktiv | nur Text | „Alle Freigabebedingungen erfüllt“ |
 | default (Entwurf, geändert seit Freigabe) | wie default, zusätzlich Vergleichsbanner und Kennzeichnung „geändert seit Freigabe“ im Tab | nur Text (`UI-016.geaendert`) | Text siehe „Vergleich mit freigegebenem Stand“ |
 | default (Freigegeben/Veröffentlicht/Beendet) | Nur lesen, Button „Kopier-Assistent“ statt „Freigeben“; bei „geändert seit Freigabe“ Link zu UI-018 | nur Text | |
 | loading | Platzhalter | nur Text | „Lade Kanal-Inhalt …“ |
 | empty | n/a | – | – |
 | error | Banner | nur Text | „Kanal-Inhalt konnte nicht geladen/freigegeben werden. Referenz: <Nr>“ |
-| validation | Feldfehler; Fehlerbanner mit Liste aller verletzten Bedingungen bei abgelehnter Freigabe | Mockup (Kategorie fehlt, ein Eintrag) | „Freigabe nicht möglich:“ + Liste |
+| validation | Feldfehler; Fehlerbanner mit Liste aller verletzten Bedingungen bei abgelehnter Freigabe | Mockup (Kategorie fehlt, Pflichtfeld „Farbe“ leer: zwei Einträge) | „Freigabe nicht möglich:“ + Liste |
 | success | Banner | nur Text | „Kanal-Inhalt freigegeben“ |
 | disabled | „Freigeben“ ist bei verletzten Bedingungen **nicht** deaktiviert (Ablehnung mit Begründung, REQ-044); bei Status ≠ Entwurf wird der Button durch „Kopier-Assistent“ ersetzt | nur Text | – |
 
@@ -60,7 +60,7 @@
 Zwei Spalten (Inhalt 8/12, Bedingungen 4/12), Bedingungen bleiben beim Scrollen sichtbar. Tab-Reihenfolge: Tabs → Felder → Bedingungen → Freigeben.
 
 ## Bekannte Abweichungen im Mockup
-Das Mockup zeigt „Freigeben“ aktiv und das Fehlerbanner mit Liste und Links (Stand nach Korrektur). Abweichungen: Titel ohne Chip „Titel gekürzt, bitte prüfen“ (Beispiel bei 62/65 Zeichen, Chip erscheint nur bei Kürzung); die Bedingung „Pflichtfelder des Kanals gefüllt“ steht auf „nicht erfüllt“ (im Fehlerbanner als „Pflichtfeld „Farbe“ ist leer“ benannt); der Eintrag „Preis fehlt“ wird nicht gezeigt (Preis ist vorhanden). Die GPSR-Karte liegt hinter der Sticky-Leiste und ist im Mockup nicht sichtbar; die Fotos-Karte steht außerhalb des Bildschirmrahmens. Das Eingabefeld „Kategorie“ ist leer ohne Platzhalter. Navigationsuntertitel „Business Portal“ entfällt in diesem Mockup. Kennzeichnung „VB“ ist als Kontrollkästchen dargestellt.
+**Titelzähler (Widerspruch im Mockup):** Der Titel im Mockup hat etwa 71 Zeichen, der Zähler zeigt „62 / 65“, und die Bedingung „Titel nicht länger als 65 Zeichen“ steht auf „OK“. Das ist ein Fehler von Stitch und nicht Teil des Designs. Maßgeblich: Bei mehr als 65 Zeichen steht der Zähler auf Überschreitung, die Bedingung auf „nicht erfüllt“ und der Titel erscheint im Fehlerbanner bei Freigabe. Das Mockup ist für den Titel nicht als Beispiel für ein erfülltes Limit zu lesen. **Anzahl Fehler:** Das Mockup zeigt zwei verletzte Bedingungen (Kategorie, Pflichtfeld „Farbe“); die Zustandstabelle nennt sie als Beispiel. Das Mockup zeigt „Freigeben“ aktiv und das Fehlerbanner mit Liste und Links (Stand nach Korrektur). Abweichungen: Titel ohne Chip „Titel gekürzt, bitte prüfen“ (Beispiel bei 62/65 Zeichen, Chip erscheint nur bei Kürzung); die Bedingung „Pflichtfelder des Kanals gefüllt“ steht auf „nicht erfüllt“ (im Fehlerbanner als „Pflichtfeld „Farbe“ ist leer“ benannt); der Eintrag „Preis fehlt“ wird nicht gezeigt (Preis ist vorhanden). Die GPSR-Karte liegt hinter der Sticky-Leiste und ist im Mockup nicht sichtbar; die Fotos-Karte steht außerhalb des Bildschirmrahmens. Das Eingabefeld „Kategorie“ ist leer ohne Platzhalter. Navigationsuntertitel „Business Portal“ entfällt in diesem Mockup. Kennzeichnung „VB“ ist als Kontrollkästchen dargestellt.
 
 ## Annahmen und offene Fragen
 - Annahme: Nach Freigabe wird kein automatischer Seitenwechsel durchgeführt, nur Link zum Kopier-Assistenten.

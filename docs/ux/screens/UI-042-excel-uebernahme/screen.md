@@ -30,4 +30,5 @@ Ab 1366 px.
 keine (kein Mockup).
 
 ## Annahmen und offene Fragen
-- Could-Funktion; Einstieg über Einstellungen-Liste (nicht als 16. Bereich geführt, sondern Zusatzlink in UI-006); Platzierung offen, Entscheidung PO.
+- Could-Funktion; Einstieg über Einstellungen-Liste (nicht als 16. Bereich geführt, sondern Zusatzlink in UI-006).
+- Design-Annahme, keine Anforderung (Platzierung ist Designentscheidung, PO bestätigt): Der Einstieg liegt als Textlink „Excel-Datei übernehmen“ im Kopf der Modell-Bibliothek (UI-006), weil die Übernahme Modellvorlagen und Geräte betrifft und selten genutzt wird; sie erscheint nicht in der Hauptnavigation.

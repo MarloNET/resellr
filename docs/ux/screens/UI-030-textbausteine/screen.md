@@ -38,7 +38,7 @@ Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (n
 Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
-Von Stitch erzeugt, nicht Teil des Designs: Kartenüberschrift „Verfügbare Bausteine (5)“ links neben „Neuer Textbaustein“; Pluszeichen im Button. Die Tabelle ist rechts abgeschnitten: Spalte „Prüfstatus“ und das Ende von „Geltungsbereich“ sind im Mockup nicht lesbar; maßgeblich sind die Spalten laut „Angezeigte Daten“ (inkl. Prüfstatus-Chip). Platzhalter-Chips sind eine Darstellungsform der Platzhalterliste.
+Von Stitch erzeugt, nicht Teil des Designs: **Schaltfläche „Löschen“ je Zeile** (REQ-026 kennt nur anlegen, ändern, deaktivieren; maßgeblich ist „Deaktivieren"; Löschen wäre eine Scope-Frage für den Owner); Kartenüberschrift „Verfügbare Bausteine (5)“ links neben „Neuer Textbaustein“; Pluszeichen im Button. Die Tabelle ist rechts abgeschnitten: Spalte „Prüfstatus“ und das Ende von „Geltungsbereich“ sind im Mockup nicht lesbar; maßgeblich sind die Spalten laut „Angezeigte Daten“ (inkl. Prüfstatus-Chip). Platzhalter-Chips sind eine Darstellungsform der Platzhalterliste.
 
 ## Annahmen und offene Fragen
 - Texte der Bausteine sind nicht Teil der Auslieferung (REQ-006).

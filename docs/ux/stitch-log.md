@@ -1,5 +1,5 @@
 # Stitch-Log – resellr Release 0.1
-Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 24/40 (Stand siehe Tabelle)
+Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 25/40 (Stand siehe Tabelle)
 
 Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. Der HTML-Export steht vollständig in der Tool-Antwort (ca. 7.000 Tokens je Screen) und wird bewusst nicht gesichert (Abweichung von Skill marlonet-uiux-stitch §8, dem Product Owner gemeldet). Es gibt keine Referenz auf HTML, das nur in Stitch existiert.
 
@@ -33,3 +33,4 @@ Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. D
 | 26 | 2026-11-06 | generate_screen_from_text | UI-019 compact | Neugenerierung statt Edit, 480 px (257305f592a548688c85f43e24e3fc77) | übernommen, ersetzt 149274c4… | 24 |
 
 Befund Tooling: `edit_screens` meldet Erfolg und liefert DOM-Operationen, speichert die Änderung aber nicht in den Dateien des Screens (zweimal beobachtet, HTML und Screenshot blieben unverändert). Korrekturen erfolgten deshalb per Neugenerierung. Jeder verworfene Edit zählte gegen das Budget. Die Screens a88484966822498492facf1aab70cf6d und 149274c4a0b04b9e9dd56e5e94187906 bleiben im Stitch-Projekt, sind aber nicht Teil des Designs.
+| 27 | 2026-11-06 | generate_screen_from_text | UI-019 default | Neugenerierung Vollfenster nach PO-Review R2 (67d2ba17a4874daeafe35e12dae4a07d), ersetzt 59004a11… | übernommen | 25 |
