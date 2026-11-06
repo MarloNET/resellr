@@ -5,7 +5,7 @@
 - Anforderungen: REQ-047, REQ-048, REQ-049, REQ-091, REQ-045, REQ-046, REQ-090; AC-REQ-047-01 bis -06, AC-REQ-048-01/-02
 - Rollen: Nutzer
 - Gerät(e): PC; **zwei Layouts**: Vollfenster ab 1366 × 768 und schmales Arbeitsfenster (ab 480 px Mindestbreite, volle Höhe, ohne Navigation) zur Nutzung neben einem anderen Programm
-- Artefakte: default.png (Stitch 59004a119c70418f85d9024115185329), compact.png (Stitch 149274c4a0b04b9e9dd56e5e94187906), DESKTOP, 06.11.2026
+- Artefakte: default.png (Stitch 59004a119c70418f85d9024115185329), compact.png (Stitch 257305f592a548688c85f43e24e3fc77; ersetzt 149274c4a0b04b9e9dd56e5e94187906 mit 440 px, „39%“ und altem Foto-Button), DESKTOP, 06.11.2026
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
@@ -14,7 +14,7 @@
 | Hinweis | „Neuer Stand noch nicht freigegeben“ + Link „Änderungsentwurf prüfen“ (UI-018) bei „geändert seit Freigabe“ | REQ-047 | zeigt immer den freigegebenen Stand, nie den Entwurf |
 | Fortschritt | „n von m übernommen“ (z. B. „3 von 12 übernommen“) und „k offen“, Balken | REQ-049, AC-REQ-049-01 | Prozentzahl entfällt (im Mockup „39%“ von Stitch ergänzt) |
 | Feldzeilen | Feldbezeichnung des Kanals, Wert (Beschreibung mehrzeilig, Zeilenumbrüche sichtbar, scrollbar), Kopieren-Button, Chip „übernommen“ | freigegebener Stand mit aktuellen Bestandsangaben (REQ-091) | Reihenfolge = Feldreihenfolge des Kanals (UI-036); Felder: Titel, Beschreibung, Kategorie, Zustand (+Zusatz), Preis (ggf. „VB“), Merkmalsfelder, GPSR-Angaben |
-| Leeres Feld | Wert „leer“, kein Kopieren-Button | REQ-037 | Leere Felder sind nicht kopierbar und zählen weder in „n“ noch in „m“ (m = Felder mit Wert). Das entspricht AC-REQ-049-01 („12 Felder“), die Requirements regeln leere Felder aber nicht ausdrücklich: offene Frage OF-19-1 |
+| Leeres Feld | Wert „leer“, kein Kopieren-Button | REQ-037 | Leere Felder sind nicht kopierbar und zählen weder in „n“ noch in „m“ (m = Felder mit Wert). Das entspricht AC-REQ-049-01 („12 Felder“), die Requirements regeln leere Felder aber nicht ausdrücklich: Design-Annahme, keine Anforderung (OF-19-1 entschieden) |
 | Fotos | „n Fotos in Reihenfolge, Dateinamen beginnen mit 01 …“, nummerierte Vorschau, Buttons „Foto-Ordner öffnen“ und „Fotos als ZIP herunterladen“; ohne Fotos „Keine Fotos zugeordnet“ | REQ-048 | Ordner oder ZIP laut Architecture Baseline v0.1 (C-3); Mockup zeigt noch „Fotos herunterladen“ |
 | Nächstes Feld | Die erste offene Zeile ist hervorgehoben und trägt die Marke „nächstes Feld“, in beiden Layouts | – | Enter kopiert dieses Feld |
 
@@ -49,10 +49,10 @@ Keine Eingaben. Tastatur: Pfeil auf/ab wählt Zeile, Enter oder Strg+Enter kopie
 Vollfenster: Liste mit Spalten Feldname | Wert | Aktion. Schmal: eine Zeile je Feld, Wert einzeilig gekürzt (voller Wert per Klick auf den Wert oder Tooltip), Buttons groß (≥ 32 px Höhe), Navigation ausgeblendet. Die Markierungen „übernommen“ gelten für die laufende Nutzung und werden bei neuer Freigabe zurückgesetzt (REQ-049). Ob das schmale Layout als eigenes Fenster oder als Umschalter realisiert wird, hängt von OP-15 ab.
 
 ## Bekannte Abweichungen im Mockup
-„Business Portal“ (Stitch, default.png); im default.png: Feldbezeichner in Großbuchstaben; Sticky-Leiste; compact.png ist auf 440 px gestaltet (maßgeblich: 480 px); Fortschrittsprozent „39%“ im compact.png (nicht Teil des Designs); „Normale Ansicht“ mit Symbol „externes Fenster“ (Symbolwahl nicht verbindlich); compact.png zeigt nur die ersten 10 Felder (Scrollbereich), Rest gemäß Liste; Thumbnails 01–06 sind Platzhalter.
+default.png (Vollfenster, Stand vor Baseline-Vorprüfung): „Business Portal“ (Stitch); Feldbezeichner in Großbuchstaben; Sticky-Leiste; **Foto-Button zeigt noch „Fotos herunterladen“, maßgeblich sind „Foto-Ordner öffnen“ und „Fotos als ZIP herunterladen“**; Zähler dort noch in alter Form (maßgeblich „n von m übernommen“). Das Vollfenster-Mockup wurde aus Budgetgründen nicht neu erzeugt. compact.png (neu, 480 px): Anzeige „7 von 18 übernommen“ ohne Prozent; beide Foto-Aktionen sichtbar; Feldbezeichner in Großbuchstaben; Fotos-Karte zeigt „6 Fotos (01–06)“ statt Thumbnails; „Normale Ansicht“ ohne Symbol (Symbolwahl nicht verbindlich); Liste endet nach 8 Feldern (Rest laut Liste, Scrollbereich); die Sicht „Abgleich bestätigen“ ist im Mockup als aktiv dargestellt, in Status Freigegeben gilt der Zustand laut Aktionstabelle (deaktiviert).
 
 ## Annahmen und offene Fragen
 - Browser (Baseline v0.1): Zwischenablage nur auf Nutzeraktion, ein Feld als reiner Text (Fehlerfall ist gestaltet). Schmales Layout ist ein Umschalter im selben Fenster; der Nutzer kann ein zweites, schmales Browserfenster öffnen. Mindestbreite 480 px, vom Software Architect zu prüfen (C-5).
 - Konflikt (P-05): „Neuer Stand noch nicht freigegeben“ bzw. geänderter Stand beim Laden → Banner „Bitte neu laden“.
 - Annahme: „Kopieren“ markiert nicht automatisch „übernommen“, wenn der Systemzugriff scheitert.
-- **OF-19-1 (an Product Owner):** Sollen leere Felder in „n von m“ mitzählen? Design-Vorschlag: nein, weil sie nichts zu übernehmen haben; die Requirements (REQ-049) regeln das nicht.
+- **OF-19-1 entschieden (Product Owner):** Leere Felder zählen weder in „n“ noch in „m“. **Design-Annahme, keine Anforderung**; die Requirements (REQ-048/049) regeln das nicht, Klärungspunkt liegt beim CEOrchestrator.

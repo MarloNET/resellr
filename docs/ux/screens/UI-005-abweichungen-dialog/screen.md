@@ -5,7 +5,7 @@
 - Anforderungen: REQ-018, REQ-014, REQ-020 (Should), REQ-072; AC-REQ-014-07, AC-REQ-020-01 bis -04
 - Kontexte: **A** Zuordnen eines Geräts (aus UI-004, REQ-018); **B** Gerät ist bereits zugeordnet, eine Variantenangabe wurde geändert (aus UI-003/UI-010, REQ-014)
 - Rollen: Nutzer · Gerät(e): PC
-- Artefakte: nur Text (Mockup geplant)
+- Artefakte: default.png (Stitch 3e8680e117f941aa8112e320354fb2a7, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
@@ -38,7 +38,7 @@ Keine.
 Dialogbreite 800 px, lange Zustandsbeschreibung bricht um.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup).
+Dargestellt ist Kontext A (Zuordnen). Der Link „Umbuchen“ links im Fuß erscheint im Mockup als Textlink; maßgeblich ist `screen.md` (Sekundärbutton, nur bei bereits zugeordnetem Gerät, Kontext B). Wertangaben „4“ und „Gut“ am Gerät sind im Mockup als Kennzeichnung (warn) hervorgehoben; die Hervorhebung ist nicht verbindlich. Im Hintergrund erscheint eine abgedunkelte Skelett-Seite (von Stitch erzeugt, nicht Teil des Designs). Navigationsuntertitel entfällt.
 
 ## Annahmen und offene Fragen
 - Kontext B (REQ-014) nutzt denselben Dialog mit den Aktionen „Zuordnung behalten“, „Neues Modell-Inserat anlegen“ und „Umbuchen“ (siehe Aktionen).

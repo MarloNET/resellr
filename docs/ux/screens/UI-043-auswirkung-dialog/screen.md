@@ -1,7 +1,7 @@
 # UI-043 – Auswirkung der Änderung (Dialog)
 
 - Zweck: Nach dem Speichern eines Textbausteins oder von GPSR-Herstellerangaben melden, wie viele Kanal-Inhalte betroffen sind.
-- Flows: FLOW-04 (Schritt 2) · Anforderungen: REQ-053, REQ-043, REQ-045 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant)
+- Flows: FLOW-04 (Schritt 2) · Anforderungen: REQ-053, REQ-043, REQ-045 · Rollen: Nutzer · Gerät(e): PC · Artefakte: default.png (Stitch 98c649544899484faefeb3430e5dddca, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 | Gruppe | Anzeige | Bedeutung |
@@ -32,7 +32,7 @@ Keine.
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup).
+Im unscharfen Hintergrund unten links steht ein kleiner Versionstext (von Stitch erzeugt, nicht Teil des Designs). Der Hinweis „Keine Kanal-Inhalte betroffen“ (Zustand empty) ist nicht gestaltet. Die Kennzeichnung „geändert seit Freigabe“ beim zweiten Zähler ist Darstellung von Kap. 9.4.
 
 ## Annahmen und offene Fragen
 keine.

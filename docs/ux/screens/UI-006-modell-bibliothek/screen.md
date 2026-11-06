@@ -38,4 +38,4 @@ Ab 1366 px; Pfeil auf/ab + Enter.
 keine (kein Mockup).
 
 ## Annahmen und offene Fragen
-- Annahme: Ohne Suchbegriff zeigt die Liste die zuletzt angelegten Modellvorlagen (nicht in Requirements; sonst Leerzustand „Suchbegriff eingeben“). Entscheidung PO.
+- Annahme: Ohne Suchbegriff zeigt die Liste die zuletzt angelegten Modellvorlagen (nicht in Requirements; sonst Leerzustand „Suchbegriff eingeben“). **Design-Annahme, keine Anforderung (vom Product Owner bestätigt).**

@@ -35,4 +35,4 @@ Ab 1366 px; lange alte/neue Werte umbrechen, Details per Klick auf die Zeile.
 keine (kein Mockup).
 
 ## Annahmen und offene Fragen
-- Annahme: Standardzeitraum „letzte 30 Tage“ (nicht in Requirements).
+- **Design-Annahme, keine Anforderung (vom Product Owner bestätigt):** Standardzeitraum „letzte 30 Tage“.

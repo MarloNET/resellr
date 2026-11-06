@@ -1,7 +1,7 @@
 # UI-010 – Gerät
 
 - Zweck: Gerätewerte ansehen/ändern, Verkauf, Umbuchen, WI-Nr korrigieren, Storno, Datenblatt.
-- Flows: FLOW-03, FLOW-08 · Anforderungen: REQ-014, REQ-016, REQ-020, REQ-021, REQ-084, REQ-092, REQ-093, REQ-050 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant)
+- Flows: FLOW-03, FLOW-08 · Anforderungen: REQ-014, REQ-016, REQ-020, REQ-021, REQ-084, REQ-092, REQ-093, REQ-050 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (kein Mockup; Screen ist Text-Spezifikation)
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |

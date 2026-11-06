@@ -64,4 +64,4 @@ Drei Kanal-Karten gleich breit ab 1366 px. Tab-Reihenfolge: Kopfaktionen → Kan
 ## Annahmen und offene Fragen
 - Design-Annahme, keine Anforderung: Gerätewahl per Dialog für das Datenblatt und Hinweis „Vorschlag nach Preisregel“ (vom Product Owner bestätigt).
 - Annahme: Ein Primärbutton je Seite (nur bei Status Entwurf), sonst keiner.
-- Annahme: „Datenblatt“ im Kopf wählt, wenn mehrere Geräte vorhanden sind, per Dialog das Gerät (Datenblatt ist je Gerät, REQ-050). Offene Frage an PO, ob stattdessen nur über UI-010.
+- „Datenblatt“ im Kopf wählt, wenn mehrere Geräte vorhanden sind, per Dialog das Gerät (Datenblatt ist je Gerät, REQ-050). Per Product Owner bestätigt, zusätzlich zu UI-010.

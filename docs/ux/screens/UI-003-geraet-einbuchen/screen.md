@@ -58,5 +58,5 @@ Ab 1366 px dreispaltiges Raster, Info-Panel rechts. Fokusreihenfolge siehe uiux-
 „Business Portal“ unter „resellr“ (Stitch); Platzhalter „Modellname, Typ-Nummer oder Herstellernummer eingeben…“ im Suchfeld (entfällt); Hinweis „Stammdaten aus Bibliotheksmodell fest verknüpft“ im Info-Panel (nicht Teil des Designs); der Fehlerzustand an Akkukapazität „87“ ist nur Beispiel einer Validierungsmeldung (87 ist gültig); Zustandsliste im Mockup zeigt Beispiel-Optionen, maßgeblich Kap. 9.2; Zustandscode-Feld in Monospace (nicht Teil des Designs).
 
 ## Annahmen und offene Fragen
-- Annahme: Nach „Gerät speichern“ bleibt die Seite offen; Modellvorlage wird für das nächste Gerät behalten („Weiteres Gerät derselben Modellvorlage“ als Checkbox, standardmäßig an) – beschleunigt J-02. Ist eine Annahme, keine Anforderung.
+- Annahme: Nach „Gerät speichern“ bleibt die Seite offen; Modellvorlage wird für das nächste Gerät behalten („Weiteres Gerät derselben Modellvorlage“ als Checkbox, standardmäßig an) – beschleunigt J-02. **Design-Annahme, keine Anforderung (vom Product Owner bestätigt).**
 - Offen: Reihenfolge der Gerätewerte-Felder je Geräteart folgt der Merkmalsreihenfolge (UI-027).

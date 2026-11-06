@@ -3,7 +3,7 @@
 > **Entschieden (Owner, 06.11.2026, OP-23):** Der Screen bleibt (REQ-001, REQ-067, REQ-097). Die Baseline-Annahme A-35 (kein Zugangspasswort) gilt dafür nicht; Klärung im Cross-Check.
 
 - Zweck: Im Netzbetrieb das Zugangspasswort ändern. Nur im Netzbetrieb vorhanden.
-- Flows: FLOW-07 · Anforderungen: REQ-097, REQ-067 [v0.3.1: andere Zugänge enden]; AC-REQ-097-01 bis -05 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text
+- Flows: FLOW-07 · Anforderungen: REQ-097, REQ-067 [v0.3.1: andere Zugänge enden]; AC-REQ-097-01 bis -05 · Rollen: Nutzer · Gerät(e): PC · Artefakte: success.png (Stitch c6973f04666c47f99c5a021d3ad2f9b0, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 Felder und Hinweis „Mindestens 12 Zeichen.“ Nach Erfolg Banner „Zugangspasswort geändert“.
@@ -32,7 +32,7 @@ Felder und Hinweis „Mindestens 12 Zeichen.“ Nach Erfolg Banner „Zugangspas
 Karte 480 px; Anzeige-Umschalter „Anzeigen“ je Feld.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup).
+Gezeigt ist der Zustand success. Nach dem Speichern sind die Felder in `screen.md` leer; im Mockup stehen noch Punkte (Darstellung nur zur Illustration). Der Link „← Zurück zu Einstellungen“ ist grau statt blau.
 
 ## Annahmen und offene Fragen
 - Vergessenes Passwort: nur über den Betreiber, kein Screen (E-5).

@@ -1,6 +1,6 @@
 # UI-037 – Beschreibungsvorlagen
 
-- Zweck: Je Kanal eine Beschreibungsvorlage aus Abschnitten definieren. · Flows: FLOW-05 · Anforderungen: REQ-031, REQ-036, Kap. 9.7, 9.12 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant; Muster P-03)
+- Zweck: Je Kanal eine Beschreibungsvorlage aus Abschnitten definieren. · Flows: FLOW-05 · Anforderungen: REQ-031, REQ-036, Kap. 9.7, 9.12 · Rollen: Nutzer · Gerät(e): PC · Artefakte: default.png (Stitch 4b9652ddd3ee4bc1961b3759040137c8, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester Text, Platzhalter-Chips, Textbaustein, „alle Textbausteine der Art …“), Geltung (alle oder bestimmte Gerätearten); **Vorschau** rechts: Beschreibung am gewählten Beispiel-Modell-Inserat mit Zeilenumbrüchen; entfallende Zeilen/Abschnitte (leere Platzhalter) sind in der Vorschau erkennbar.
@@ -34,7 +34,7 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).
+Von Stitch erzeugt, nicht Teil des Designs: Untertitel „Konfiguration dynamischer Textbausteine für Marktplatz-Inserate“; Zusatzzeile „Reihenfolge und Felder der generierten Beschreibungsteile festlegen“; Kennzeichnung „3 Abschnitte aktiv“; Chip „Live synchronisiert“ mit Zusatzzeile „Echtzeit-Generierung basierend auf Referenzgerät“; Infobox „Variablen ohne hinterlegte Bestandsdaten werden …“; Abschnittsnamen („Basisdaten“, „Zustandsbeschreibung“, „Zubehör & Lieferumfang“); Ziehgriffe und Löschen-Symbole an Inhaltszeilen. Das Auswahlfeld „Textbausteine der Art“ ist im Mockup leer (maßgeblich: Wert „Akku-Hinweis“). Abschnitt 3 liegt hinter der Sticky-Leiste. Die durchgestrichene Vorschauzeile „entfällt“ ist die Darstellung für entfallende Zeilen.
 
 ## Annahmen und offene Fragen
 - Überschriften und Zeilen der Startbelegung sind [Vorschlag BA] und werden mit dem Pilotkunden abgestimmt.

@@ -1,7 +1,7 @@
 # UI-030 – Textbausteine
 
 - Zweck: Textbausteine (Akku-Hinweis, Lieferumfang, Abholung/Kontakt, Rechtliches, Sonstiges) pflegen, inkl. rechtlichem Prüfstatus.
-- Flows: FLOW-04 · Anforderungen: REQ-026, REQ-054, REQ-053, REQ-043 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant; Muster P-01)
+- Flows: FLOW-04 · Anforderungen: REQ-026, REQ-054, REQ-053, REQ-043 · Rollen: Nutzer · Gerät(e): PC · Artefakte: default.png (Stitch 17cd3cbfa6634c04bf11a6b3a6575080, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (nur Rechtliches/Akku-Hinweis: „rechtlich ungeprüft“ / „rechtlich geprüft am <Datum> durch <Stelle>“). Detailbereich mit Textfeld und Platzhalterliste (Kap. 9.7, ohne `{Baustein:Name}`).
@@ -38,7 +38,7 @@ Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (n
 Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).
+Von Stitch erzeugt, nicht Teil des Designs: Kartenüberschrift „Verfügbare Bausteine (5)“ links neben „Neuer Textbaustein“; Pluszeichen im Button. Die Tabelle ist rechts abgeschnitten: Spalte „Prüfstatus“ und das Ende von „Geltungsbereich“ sind im Mockup nicht lesbar; maßgeblich sind die Spalten laut „Angezeigte Daten“ (inkl. Prüfstatus-Chip). Platzhalter-Chips sind eine Darstellungsform der Platzhalterliste.
 
 ## Annahmen und offene Fragen
 - Texte der Bausteine sind nicht Teil der Auslieferung (REQ-006).

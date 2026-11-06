@@ -1,6 +1,6 @@
 # UI-036 – Merkmalszuordnung
 
-- Zweck: Je Kanal und Geräteart festlegen, welche Quelle unter welcher Feldbezeichnung in welcher Reihenfolge ausgegeben wird (bestimmt auch die Reihenfolge im Kopier-Assistenten). · Flows: FLOW-05 · Anforderungen: REQ-025, REQ-029, REQ-037, Kap. 9.8, 9.11 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant; Muster P-02)
+- Zweck: Je Kanal und Geräteart festlegen, welche Quelle unter welcher Feldbezeichnung in welcher Reihenfolge ausgegeben wird (bestimmt auch die Reihenfolge im Kopier-Assistenten). · Flows: FLOW-05 · Anforderungen: REQ-025, REQ-029, REQ-037, Kap. 9.8, 9.11 · Rollen: Nutzer · Gerät(e): PC · Artefakte: default.png (Stitch 26f112bbf02e48ac8e663f46655bc3fd, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 Auswahl Kanal und Geräteart; Tabelle: Reihenfolge, Feldbezeichnung des Kanals, Quelle (Q-01 bis Q-08 in Klartext: „Merkmal <Name>“, „Hersteller“, „EAN“ …), Pflichtfeld des Kanals, Wertzuordnung (Anzahl Zuordnungen).
@@ -35,7 +35,7 @@ Auswahl Kanal und Geräteart; Tabelle: Reihenfolge, Feldbezeichnung des Kanals, 
 Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).
+Die „Feldbezeichnung des Kanals“ ist im Mockup als Text dargestellt; maßgeblich ist ein Eingabefeld (1 bis 100 Zeichen). Auf-/Ab-Pfeile je Zeile sind die Bedienung für die Reihenfolge (Design-Entscheidung, keine Anforderung). Beim Entfernen einer Zeile: Aktion „Zeile entfernen“ ist im Mockup nicht dargestellt, steht in `screen.md`.
 
 ## Annahmen und offene Fragen
 - Startbelegung Kap. 9.8; Pflichtfelder des Kanals offen bis OP-22.

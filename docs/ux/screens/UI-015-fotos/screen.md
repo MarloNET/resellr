@@ -1,7 +1,7 @@
 # UI-015 – Fotos verwalten
 
 - Zweck: Fotos eines Modell-Inserats hinzufügen, ordnen, entfernen (gleich für alle Kanäle).
-- Flows: FLOW-01 (Schritt 4) · Anforderungen: REQ-042, REQ-048, A-06 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (Mockup geplant)
+- Flows: FLOW-01 (Schritt 4) · Anforderungen: REQ-042, REQ-048, A-06 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text (kein Mockup; Screen ist Text-Spezifikation)
 
 ## Angezeigte Daten
 Raster nummerierter Vorschaubilder (01, 02 …) in der Reihenfolge, die der Kopier-Assistent verwendet; Zähler „n von 20 Fotos“; Dateiname und Größe je Foto.

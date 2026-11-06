@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Projekt / Release | resellr (Arbeitstitel), Phase 1 / Release 0.1 |
-| Dokumentversion | v0.2 (Entwurf, überarbeitet nach Product-Owner-Review Runde 1; siehe Kap. 10 „Lieferstand“) |
+| Dokumentversion | v0.3 (Entwurf, Mockups Kernscreens ergänzt nach Struktur-Review Runde 1; siehe Kap. 10 „Lieferstand“) |
 | Status | draft (kein Review, keine Freigabe) |
 | Klassifikation | **Material** (Owner bestätigt) |
 | Autor / Datum | UI/UX Designer, 06.11.2026 |
@@ -53,13 +53,13 @@ Spalte „Mockup“: Zustände mit PNG. „Text“ = nur `screen.md` (Muster P-0
 
 | ID | Name | Zweck | REQ | FLOW | Mockup | Ordner |
 |---|---|---|---|---|---|---|
-| UI-001 | Zugang | Zugangspasswort eingeben (Netzbetrieb) | REQ-001 | 07 | Text | UI-001-zugang |
+| UI-001 | Zugang | Zugangspasswort eingeben (Netzbetrieb) | REQ-001 | 07 | default | UI-001-zugang |
 | UI-002 | Inserat-Übersicht | Modell-Inserate mit Status/Kennzeichnungen filtern | REQ-052, 046, 090 | 03, 06 | default | UI-002-inserat-uebersicht |
 | UI-003 | Gerät einbuchen | Gerät per WI-Nr erfassen, Werte prüfen | REQ-012–015, 062 | 01, 02 | default | UI-003-geraet-einbuchen |
 | UI-004 | Modell-Inserat wählen (Dialog) | Gerät zuordnen oder neues Modell-Inserat anlegen | REQ-017, 019 | 01, 02 | Text | UI-004-zuordnen-dialog |
-| UI-005 | Abweichungen bei Zuordnung (Dialog) | Abweichung der Variantenangaben entscheiden | REQ-018 | 02 | Text | UI-005-abweichungen-dialog |
+| UI-005 | Abweichungen bei Zuordnung (Dialog) | Abweichung der Variantenangaben entscheiden | REQ-018 | 02 | default | UI-005-abweichungen-dialog |
 | UI-006 | Modell-Bibliothek | Modellvorlagen suchen | REQ-009 | 01 | Text | UI-006-modell-bibliothek |
-| UI-007 | Modellvorlage anlegen/ändern | Modelldaten und Vorbelegungen pflegen | REQ-008, 010, 011, 058 | 01, 06 | Text | UI-007-modellvorlage |
+| UI-007 | Modellvorlage anlegen/ändern | Modelldaten und Vorbelegungen pflegen | REQ-008, 010, 011, 058 | 01, 06 | default | UI-007-modellvorlage |
 | UI-008 | Hersteller anlegen (Dialog) | neuen Hersteller anlegen | REQ-100 | 01 | Text | UI-008-hersteller-dialog |
 | UI-009 | Geräte | Geräte per WI-Nr finden, nicht zugeordnete Geräte | REQ-016, 094 | 03 | Text | UI-009-geraete |
 | UI-010 | Gerät | Gerätewerte, Verkauf, Korrektur, Datenblatt | REQ-014, 016, 020, 021, 084, 092, 093 | 03, 08 | Text | UI-010-geraet |
@@ -82,20 +82,20 @@ Spalte „Mockup“: Zustände mit PNG. „Text“ = nur `screen.md` (Muster P-0
 | UI-027 | Gerätearten und Merkmale | Geräteart, Merkmale | REQ-004, 005, 006 | 05 | default | UI-027-geraeteart-merkmale |
 | UI-028 | Auswahllisten | Listenwerte pflegen | REQ-007 | – | Text | UI-028-auswahllisten |
 | UI-029 | Titelmuster | Bestandteile, Kürzung, Vorschau | REQ-030, 034, 035 | 05 | default | UI-029-titelmuster |
-| UI-030 | Textbausteine | Texte, Geltungsbereich, Prüfstatus | REQ-026, 054 | 04 | Text | UI-030-textbausteine |
+| UI-030 | Textbausteine | Texte, Geltungsbereich, Prüfstatus | REQ-026, 054 | 04 | default | UI-030-textbausteine |
 | UI-031 | Hersteller und GPSR | Hersteller, GPSR-Angaben | REQ-027, 100, 101 | 04 | Text | UI-031-hersteller-gpsr |
 | UI-032 | Lieferanten | Lieferanten pflegen | REQ-099 | – | Text | UI-032-lieferanten |
 | UI-033 | Code-Übersetzung | Zustandscodes | REQ-022 | – | Text | UI-033-code-uebersetzung |
 | UI-034 | Zustandszuordnung | Zustand → Kanal-Bezeichnung | REQ-023 | – | Text | UI-034-zustandszuordnung |
 | UI-035 | Kategoriezuordnung | Geräteart → Kanal-Kategorie | REQ-024 | 05 | Text | UI-035-kategoriezuordnung |
-| UI-036 | Merkmalszuordnung | Felder je Kanal/Geräteart, Reihenfolge | REQ-025 | 05 | Text | UI-036-merkmalszuordnung |
-| UI-037 | Beschreibungsvorlagen | Abschnitte je Kanal | REQ-031, 036 | 05 | Text | UI-037-beschreibungsvorlagen |
+| UI-036 | Merkmalszuordnung | Felder je Kanal/Geräteart, Reihenfolge | REQ-025 | 05 | default | UI-036-merkmalszuordnung |
+| UI-037 | Beschreibungsvorlagen | Abschnitte je Kanal | REQ-031, 036 | 05 | default | UI-037-beschreibungsvorlagen |
 | UI-038 | Kanäle und Preisregeln | Kanal-Einstellungen, Preisregel | REQ-029, 033, 085 | – | Text | UI-038-kanaele-preisregeln |
 | UI-039 | Datenblatt-Layout | Kopfzeilen, Blockfolge | REQ-051 | 05 | Text | UI-039-datenblatt-layout |
-| UI-040 | Zugangspasswort ändern | Passwort ändern (Netzbetrieb) | REQ-097, 067 | 07 | Text | UI-040-zugangspasswort |
-| UI-041 | Löschen bestätigen (Dialog) | Modell-Inserat/Modellvorlage löschen | REQ-095, 103 | 08 | Text | UI-041-loeschen-dialog |
+| UI-040 | Zugangspasswort ändern | Passwort ändern (Netzbetrieb) | REQ-097, 067 | 07 | success | UI-040-zugangspasswort |
+| UI-041 | Löschen bestätigen (Dialog) | Modell-Inserat/Modellvorlage löschen | REQ-095, 103 | 08 | default | UI-041-loeschen-dialog |
 | UI-042 | Excel-Übernahme | Datenblatt-Excel einlesen (Could) | REQ-056 | – | Text | UI-042-excel-uebernahme |
-| UI-043 | Auswirkung der Änderung (Dialog) | Anzahl betroffener Kanal-Inhalte melden | REQ-053, 043 | 04 | Text | UI-043-auswirkung-dialog |
+| UI-043 | Auswirkung der Änderung (Dialog) | Anzahl betroffener Kanal-Inhalte melden | REQ-053, 043 | 04 | default | UI-043-auswirkung-dialog |
 
 Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, Benutzerverwaltung. Die Pflege-Kanalfeld-Reihenfolge des Kopier-Assistenten (REQ-029) liegt in UI-036.
 
@@ -184,26 +184,50 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 - **V-3 Fotos (REQ-048):** (A) Foto-Ordner öffnen oder ZIP herunterladen, Namen 01 … — *Empfehlung*, nach Baseline v0.1 der einzige tragfähige Weg; (B) Ziehen aus der Seite in fremde Upload-Felder: laut Baseline nicht verlässlich möglich, entfällt.
 
 **Offene Fragen an den Product Owner:**
-1. v0.3.1 als Lesestand bestätigen (Kap. 1).
+1. v0.3.1 als Lesestand: **beantwortet** (Owner und Product Owner: gilt).
 2. REQ-057 und REQ-059 (Could): vom Product Owner zur textlichen Aufnahme entschieden; eingearbeitet (erledigt).
-3a. OF-19-1: Zählen leere Felder im Kopier-Assistenten in „n von m“ mit? Vorschlag: nein (siehe UI-019).
-3. REQ-033/085: Preis-Vorschlag-Anzeige in UI-014 als Hinweis „vorgeschlagen nach Preisregel“ — in Requirements nicht textlich festgelegt; Annahme in `screen.md`.
-4. REQ-048: Form der Bereitstellung (siehe V-3) wird mit OP-15 final.
+3a. OF-19-1: Zählen leere Felder in „n von m“ mit? **Entschieden** (Product Owner): nein; Design-Annahme, keine Anforderung. Klärungspunkt an CEOrchestrator gemeldet.
+3. REQ-033/085: Hinweis „vorgeschlagen nach Preisregel“ in UI-014: **bestätigt** (Design-Annahme, keine Anforderung).
+4. REQ-048: Form der Bereitstellung (siehe V-3): wartet auf OP-15.
 5. In UI-029 zeigt die Vorschau den Titel **nach** Kürzung; die Mockup-Beispielzeile mit „zu lang“ entspricht dem Fall „Kürzung nicht möglich“ (Priorität-1-Bestandteile zu lang).
 
 ## 9. Stitch-Budget
 
-Stand siehe `stitch-log.md` (aktuell 11 von 40). Geplant: weitere Mockups für UI-001, UI-005, UI-007, UI-030, UI-036, UI-037, UI-040, UI-041/043 und Zustände (UI-002 empty, UI-016 Entwurfsvergleich, UI-019 empty fotos).
+Stand siehe `stitch-log.md`: **24 von 40** Generierungen. Davon 2 verworfene `edit_screens` (Änderung wurde von Stitch nicht gespeichert, siehe Log) und 2 Neugenerierungen als Ersatz (UI-016, UI-019 compact). Der Richtwert des Product Owners (höchstens 12 weitere ab Stand 11, also 23) ist um 1 überschritten, bedingt durch den zweiten Ersatz (UI-019 compact). Die Meldeschwelle 30 ist nicht erreicht. Zusätzliche Mockups sind nicht geplant.
 
 ## 10. Lieferstand (Ehrlichkeitsvermerk)
 
-- Vorhanden: `DESIGN.md`, `stitch-log.md`, dieses Dokument, `flows/flow.md`, **43 `screen.md`** (alle Screens des Katalogs), Mockups für 11 Screens/Zustände (UI-002, 003, 014, 016, 017, 018, 019 default+compact, 023, 027, 029).
-- Screens ohne Mockup tragen „nur Text“ (Muster P-01 bis P-04). Dort ist `screen.md` die vollständige Beschreibung; Mockups für wichtige Screens sind geplant (Stand siehe `stitch-log.md`), kein Ersatz für die Textbeschreibung.
-- Noch **nicht** erfolgt: Self-Review nach Skill §6 (Teilprüfung im Kommentar), Cross-Check mit der Architecture Baseline (liegt nicht vor), Product Owner Review.
-- Stitch ergänzt je Screen den Untertitel „Business Portal“ in der Navigation (kein Teil des Designs, siehe `screen.md` „Bekannte Abweichungen“).
+- Vorhanden: `DESIGN.md`, `stitch-log.md`, dieses Dokument, `flows/flow.md`, **43 `screen.md`**, **20 Mockup-Dateien** zu 20 Screens/Zuständen: UI-001, 002, 003, 005, 007, 014, 016 (neu), 017, 018, 019 (default und compact neu), 023, 027, 029, 030, 036, 037, 040 (success), 041, 043.
+- Screens ohne Mockup (z. B. UI-004, 006, 008 bis 013, 015, 020 bis 022, 024 bis 026, 028, 031 bis 035, 038, 039, 042): `screen.md` ist die vollständige Beschreibung (Muster P-01 bis P-05).
+- **Mockups, die der Spezifikation noch nicht voll entsprechen** (Abweichungen je Screen unter „Bekannte Abweichungen im Mockup“, `screen.md` gilt): UI-019 default (Vollfenster: alter Foto-Button, alte Zählerform), UI-030 (Tabelle rechts abgeschnitten), UI-037 (Stitch-Zusatzelemente), UI-018 und weitere ältere Mockups mit dem Untertitel „Business Portal“. Gründe: Budget und der Tooling-Befund zu `edit_screens`.
+- Tooling-Befund: `edit_screens` speichert Änderungen nicht (zweimal beobachtet); Korrekturen nur per Neugenerierung. HTML-Export entfällt weiterhin (Abweichung von Skill marlonet-uiux-stitch §8, siehe Log).
+- Noch **nicht** erfolgt: Cross-Check mit der Architecture Baseline (liegt als Entwurf v0.1 vor, Freigabe offen), Product Owner Review der Mockups, Owner-Freigabe.
 
 ## 11. Änderungsprotokoll
 
 | Version | Datum | Änderung |
 |---|---|---|
 | v0.1 | 06.11.2026 | Erstfassung (Entwurf): Katalog, Flüsse, Muster, Traceability, Mockups Kernscreens |
+| v0.2 | 06.11.2026 | Überarbeitung nach Struktur-Review Runde 1 (Commit 53bd6de) |
+| v0.3 | 06.11.2026 | Restpunkte Review R1 (Kennzeichnung „Design-Annahme“, Kap. 8); Mockups UI-001, 005, 007, 030, 036, 037, 040, 041, 043; Neugenerierung UI-016 (Freigeben aktiv, Fehlerliste) und UI-019 compact (480 px, „n von m“, Foto-Aktionen); Self-Review (Kap. 12) |
+
+## 12. Self-Review nach Skill marlonet-ui-ux-design §6 (Stand v0.3)
+
+Geprüft wurde mechanisch (Skript) und durch Sichtprüfung der neun neuen und zwei ersetzten Mockups. Eine zeilenweise Neuprüfung aller REQ gegen alle Screens fand **nicht** statt; sie stützt sich auf die Traceability und den Struktur-Review des Product Owners (Runde 1).
+
+| Kriterium | Ergebnis |
+|---|---|
+| Coverage | Alle aktiven REQ der Traceability haben Screens/Flows. Zurückgezogen: REQ-002/003/096/098. REQ-057/059 (Could) nur textlich. Lücken: keine bekannt. |
+| Spec readiness | Alle 43 `screen.md` enthalten die sieben Pflichtabschnitte (Skriptprüfung). Inhaltliche Vollständigkeit je Feld nicht erneut geprüft. |
+| States | Zustandstabelle je Screen vorhanden. Layoutverändernde Zustände ohne Mockup: UI-002 empty, UI-016 geaendert, UI-019 ohne Fotos, UI-018 entwurf-vergleich (nur Text). |
+| Consistency | UI-016 und UI-019 compact stimmen jetzt mit `screen.md` überein. UI-019 default (Vollfenster) widerspricht noch (Foto-Button, Zähler), als Abweichung vermerkt. 440 px nur noch als dokumentierte Abweichung. |
+| No invented scope | Von Stitch ergänzte Elemente sind je Screen unter „Bekannte Abweichungen“ gelistet (am stärksten UI-037 und UI-030). Sie sind nicht Teil des Designs. Nicht entfernt, weil `edit_screens` nicht speichert und das Budget begrenzt ist. |
+| Error/edge cases | Fehler- und Ablehnungstexte stehen in den Aktionstabellen. Vollbild-Fehlerzustände sind nur Text. |
+| Accessibility/responsive | Keine Anforderung (E-2 bis E-4). Es wird keine Konformität behauptet. Kontraste siehe DESIGN.md (Skriptwerte). Mockups sind kein Nachweis. |
+| Content/recovery | Texte deutsch, Formate de-DE in den Mockups geprüft (Dezimalkomma, „449,00 €“). |
+| Pragmatism | Design System proportional (`DESIGN.md`, proposed). |
+| Implementability | Baseline v0.1 nur als Vorabprüfung (Kap. 6a). Formaler Cross-Check offen. |
+| Traceability | REQ → FLOW → UI vorhanden. |
+| Decision integrity | Bestätigte Annahmen als „Design-Annahme, keine Anforderung“ gekennzeichnet (UI-003, 006, 014, 019, 024). Offene Owner-Entscheidungen: V-1 bis V-3, OP-15, OP-23-Klärung im Cross-Check. Status bleibt draft. |
+| Repository state | Alle in `screen.md` genannten PNG existieren (Skriptprüfung). Keine Secrets. |
+

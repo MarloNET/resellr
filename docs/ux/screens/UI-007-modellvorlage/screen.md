@@ -4,7 +4,7 @@
 - Flows: FLOW-01 (Schritt 1), FLOW-06 (Schritt 1)
 - Anforderungen: REQ-008, REQ-010, REQ-011, REQ-058 (Could), REQ-100
 - Rollen: Nutzer · Gerät(e): PC
-- Artefakte: nur Text (Mockup geplant)
+- Artefakte: default.png (Stitch 69e6f51ff7de415ca4632aca7d171b60, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegungswerte für Geräte“ (optional). Beim Ändern Hinweis „Änderungen an Modelldaten wirken auf alle Modell-Inserate und Datenblätter dieser Modellvorlage.“ und Anzahl betroffener Modell-Inserate.
@@ -45,7 +45,7 @@ Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegun
 Zweispaltiges Formular ab 1366 px, Modell- und Vorbelegungsbereich getrennt.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup).
+Das Mockup zeigt den Zustand „ändern“ mit gesperrter Geräteart. „Betroffene Modell-Inserate: 3“ steht im Hinweisbanner (Anzahl laut `screen.md`). Die Beispielwerte der Merkmale (Bildschirmdiagonale, Auflösung) sind fiktiv und hängen von den Merkmalsdefinitionen der Geräteart ab. Bereich unterhalb „Auflösung“ liegt hinter der Sticky-Leiste (Scrollbereich).
 
 ## Annahmen und offene Fragen
 - REQ-058 ist Could; Darstellung nur als Hinweis.

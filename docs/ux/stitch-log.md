@@ -1,5 +1,5 @@
 # Stitch-Log – resellr Release 0.1
-Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 11/40 (Stand siehe Tabelle)
+Stitch-Projekt: 7947641073263768710 · Design-System: assets/14699510063308426971 · Budget: 24/40 (Stand siehe Tabelle)
 
 Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. Der HTML-Export steht vollständig in der Tool-Antwort (ca. 7.000 Tokens je Screen) und wird bewusst nicht gesichert (Abweichung von Skill marlonet-uiux-stitch §8, dem Product Owner gemeldet). Es gibt keine Referenz auf HTML, das nur in Stitch existiert.
 
@@ -18,3 +18,18 @@ Hinweis zum Export: Es werden nur Screenshots (PNG) ins Repository exportiert. D
 | 11 | 2026-11-06 | generate_screen_from_text | UI-029 default | Erstgenerierung (877d32da24214ae9970d9047237ec7d6) | übernommen | 9 |
 | 12 | 2026-11-06 | generate_screen_from_text | UI-023 default | Erstgenerierung (b54e7fed073c49b1af58c3b5d24c1d0d) | übernommen | 10 |
 | 13 | 2026-11-06 | generate_screen_from_text | UI-017 default | Erstgenerierung (3afa78d0dae24e0e862af3515ac8f30c) | übernommen | 11 |
+| 14 | 2026-11-06 | edit_screens | UI-016 default | Korrektur „Freigeben“ aktiv und Fehlerliste (a88484966822498492facf1aab70cf6d) | verworfen: Änderung wurde nicht gespeichert (Datei-IDs und HTML unverändert) | 12 |
+| 15 | 2026-11-06 | generate_screen_from_text | UI-001 default | Erstgenerierung (4679aea61f52413193200cb3111b8062) | übernommen | 13 |
+| 16 | 2026-11-06 | generate_screen_from_text | UI-005 default | Erstgenerierung (3e8680e117f941aa8112e320354fb2a7) | übernommen | 14 |
+| 17 | 2026-11-06 | generate_screen_from_text | UI-007 default | Erstgenerierung (69e6f51ff7de415ca4632aca7d171b60) | übernommen | 15 |
+| 18 | 2026-11-06 | generate_screen_from_text | UI-030 default | Erstgenerierung (17cd3cbfa6634c04bf11a6b3a6575080) | übernommen mit Abweichungen | 16 |
+| 19 | 2026-11-06 | generate_screen_from_text | UI-036 default | Erstgenerierung (26f112bbf02e48ac8e663f46655bc3fd) | übernommen | 17 |
+| 20 | 2026-11-06 | generate_screen_from_text | UI-037 default | Erstgenerierung (4b9652ddd3ee4bc1961b3759040137c8) | übernommen mit Abweichungen (Stitch-Zusätze, in screen.md vermerkt) | 18 |
+| 21 | 2026-11-06 | generate_screen_from_text | UI-040 success | Erstgenerierung (c6973f04666c47f99c5a021d3ad2f9b0) | übernommen | 19 |
+| 22 | 2026-11-06 | generate_screen_from_text | UI-041 default | Erstgenerierung (33551ce25df94a83bdeb5a0ca4ecbe78) | übernommen | 20 |
+| 23 | 2026-11-06 | generate_screen_from_text | UI-043 default | Erstgenerierung (98c649544899484faefeb3430e5dddca) | übernommen | 21 |
+| 24 | 2026-11-06 | edit_screens | UI-019 compact | Korrektur 480 px, ohne Prozent, neue Foto-Buttons (149274c4a0b04b9e9dd56e5e94187906) | verworfen: Änderung wurde nicht gespeichert | 22 |
+| 25 | 2026-11-06 | generate_screen_from_text | UI-016 default | Neugenerierung statt Edit, mit allen Korrekturen (d7ec8b5e63924f6e8bfb298d11121f62) | übernommen, ersetzt a8848496… | 23 |
+| 26 | 2026-11-06 | generate_screen_from_text | UI-019 compact | Neugenerierung statt Edit, 480 px (257305f592a548688c85f43e24e3fc77) | übernommen, ersetzt 149274c4… | 24 |
+
+Befund Tooling: `edit_screens` meldet Erfolg und liefert DOM-Operationen, speichert die Änderung aber nicht in den Dateien des Screens (zweimal beobachtet, HTML und Screenshot blieben unverändert). Korrekturen erfolgten deshalb per Neugenerierung. Jeder verworfene Edit zählte gegen das Budget. Die Screens a88484966822498492facf1aab70cf6d und 149274c4a0b04b9e9dd56e5e94187906 bleiben im Stitch-Projekt, sind aber nicht Teil des Designs.

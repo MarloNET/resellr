@@ -5,7 +5,7 @@
 - Anforderungen: REQ-034–044, REQ-045, REQ-086, REQ-087, REQ-043, REQ-053, REQ-059 (Could); AC-REQ-044-01 bis -03, AC-REQ-045-01, AC-REQ-089-02
 - Rollen: Nutzer
 - Gerät(e): PC, ab 1366 × 768
-- Artefakte: default.png (Stitch a88484966822498492facf1aab70cf6d, DESKTOP, 06.11.2026)
+- Artefakte: default.png (Stitch d7ec8b5e63924f6e8bfb298d11121f62, DESKTOP, 06.11.2026; ersetzt Stand a88484966822498492facf1aab70cf6d, der mit der Spezifikation kollidierte)
 
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
@@ -60,7 +60,7 @@
 Zwei Spalten (Inhalt 8/12, Bedingungen 4/12), Bedingungen bleiben beim Scrollen sichtbar. Tab-Reihenfolge: Tabs → Felder → Bedingungen → Freigeben.
 
 ## Bekannte Abweichungen im Mockup
-„Business Portal“ (Stitch); Beispiel „Titel gekürzt, bitte prüfen“ bei 62/65 Zeichen (nach Regel erscheint der Chip nur bei Kürzung am Wortende, Beispiel nur zur Illustration); Platzhalter „Kategorie des Kanals eingeben“ im Eingabefeld; „Übernehmen“-Button heißt in Wirklichkeit „Kategorie übernehmen“; Preis-Link „Preis ändern“ fehlt im Mockup; Sticky-Leiste mit nur einem Button ist maßgeblich; „Freigeben“ ist im Mockup gedimmt dargestellt, maßgeblich ist der aktive Button; das Fehlerbanner zeigt im Mockup nur einen Eintrag ohne Liste und Links.
+Das Mockup zeigt „Freigeben“ aktiv und das Fehlerbanner mit Liste und Links (Stand nach Korrektur). Abweichungen: Titel ohne Chip „Titel gekürzt, bitte prüfen“ (Beispiel bei 62/65 Zeichen, Chip erscheint nur bei Kürzung); die Bedingung „Pflichtfelder des Kanals gefüllt“ steht auf „nicht erfüllt“ (im Fehlerbanner als „Pflichtfeld „Farbe“ ist leer“ benannt); der Eintrag „Preis fehlt“ wird nicht gezeigt (Preis ist vorhanden). Die GPSR-Karte liegt hinter der Sticky-Leiste und ist im Mockup nicht sichtbar; die Fotos-Karte steht außerhalb des Bildschirmrahmens. Das Eingabefeld „Kategorie“ ist leer ohne Platzhalter. Navigationsuntertitel „Business Portal“ entfällt in diesem Mockup. Kennzeichnung „VB“ ist als Kontrollkästchen dargestellt.
 
 ## Annahmen und offene Fragen
 - Annahme: Nach Freigabe wird kein automatischer Seitenwechsel durchgeführt, nur Link zum Kopier-Assistenten.

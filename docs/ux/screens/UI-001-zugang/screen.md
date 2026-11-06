@@ -7,7 +7,7 @@
 - Anforderungen: REQ-001, REQ-067 [v0.3.1: Geltung bis Programmende, kein Zeitablauf]; AC-REQ-001-01, -02, -04, -08, -09
 - Rollen: Nutzer (kein Konto)
 - Gerät(e): PC
-- Artefakte: nur Text (Mockup geplant)
+- Artefakte: default.png (Stitch 4679aea61f52413193200cb3111b8062, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 Titel „resellr“, Feld „Zugangspasswort“, Button „Öffnen“. Kein Benutzername, kein „Passwort vergessen“, keine Registrierung (AC-REQ-001-06).
@@ -38,7 +38,7 @@ Titel „resellr“, Feld „Zugangspasswort“, Button „Öffnen“. Kein Benu
 Zentrierte Karte, Fokus im Feld. Enter sendet.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup).
+Im Mockup ist das Passwortfeld mit Beispielpunkten gefüllt und fokussiert dargestellt (reine Illustration des Fokusrings). Sonst keine Abweichung.
 
 ## Annahmen und offene Fragen
 - Passwort vergessen: nur Betreiber außerhalb des Systems (E-5); kein Hinweistext im Screen (kein Zusatztext erfunden).

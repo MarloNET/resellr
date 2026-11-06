@@ -1,7 +1,7 @@
 # UI-041 – Löschen bestätigen (Dialog)
 
 - Zweck: Modell-Inserat oder Modellvorlage nach ausdrücklicher Bestätigung löschen (Geräte werden nie gelöscht).
-- Flows: FLOW-08 · Anforderungen: REQ-095 (Should), REQ-103, REQ-072 · Rollen: Nutzer · Gerät(e): PC · Artefakte: nur Text
+- Flows: FLOW-08 · Anforderungen: REQ-095 (Should), REQ-103, REQ-072 · Rollen: Nutzer · Gerät(e): PC · Artefakte: default.png (Stitch 33551ce25df94a83bdeb5a0ca4ecbe78, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
 Objekt (Titel/Modellvorlage), Wirkung: „Mit dem Modell-Inserat werden seine Kanal-Inhalte gelöscht.“ Bei Ablehnungsgrund statt Bestätigung der Grund.
@@ -29,7 +29,7 @@ Objekt (Titel/Modellvorlage), Wirkung: „Mit dem Modell-Inserat werden seine Ka
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup
-keine (kein Mockup).
+Der Hintergrund ist nur abgedunkelt (kein Seitenabbild). Sonst keine Abweichung.
 
 ## Annahmen und offene Fragen
 keine.
