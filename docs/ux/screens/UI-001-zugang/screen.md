@@ -32,9 +32,9 @@ Titel „resellr“, Feld „Zugangspasswort“, Button „Öffnen“. Kein Benu
 | validation | Fehler unter dem Feld | nur Text | siehe oben |
 | success | direkter Wechsel | – | – |
 | disabled | n/a | – | – |
-| permission | [v0.3.1] Wird in einem anderen Programm das Passwort geändert, erscheint hier beim nächsten Aufruf die Abfrage | nur Text | „Bitte Zugangspasswort eingeben“ |
+| erneute Abfrage | [v0.3.1] Wird in einem anderen Programm das Passwort geändert, erscheint hier beim nächsten Aufruf die Abfrage | nur Text | „Bitte Zugangspasswort eingeben“ |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Zentrierte Karte, Fokus im Feld. Enter sendet.
 
 ## Bekannte Abweichungen im Mockup

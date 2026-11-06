@@ -21,9 +21,9 @@ WI-Nr, Modell-Inserat; Warntext „Ein Storno kann nicht zurückgenommen werden.
 | Zustand | Darstellung | Artefakt | Text |
 |---|---|---|---|
 | default, validation, error, success | wie oben; error „Storno fehlgeschlagen. Referenz: <Nr>“ | nur Text | |
-| loading, empty, disabled, permission | n/a | – | – |
+| loading, empty, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup

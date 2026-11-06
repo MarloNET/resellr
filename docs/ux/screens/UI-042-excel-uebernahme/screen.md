@@ -21,9 +21,9 @@ Dateiauswahl; nach dem Einlesen Einlesebericht: Liste erkannter Modellvorlagen (
 | Zustand | Darstellung | Artefakt | Text |
 |---|---|---|---|
 | default, loading („Lese Datei …“), error, success („n Modellvorlagen angelegt“) | wie oben | nur Text | |
-| empty, validation, disabled, permission | n/a | – | – |
+| empty, validation, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px.
 
 ## Bekannte Abweichungen im Mockup

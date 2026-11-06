@@ -2,7 +2,7 @@
 
 - Zweck: Kanal-Inhalt (Titel, Beschreibung, Kategorie, Zustand, Preis, Merkmale, GPSR) prüfen, ggf. anpassen und freigeben.
 - Flows: FLOW-01 (Schritt 6), FLOW-04 (Schritt 3)
-- Anforderungen: REQ-034–044, REQ-086, REQ-087, REQ-043, REQ-053; AC-REQ-089-02
+- Anforderungen: REQ-034–044, REQ-045, REQ-086, REQ-087, REQ-043, REQ-053, REQ-059 (Could); AC-REQ-044-01 bis -03, AC-REQ-045-01, AC-REQ-089-02
 - Rollen: Nutzer
 - Gerät(e): PC, ab 1366 × 768
 - Artefakte: default.png (Stitch a88484966822498492facf1aab70cf6d, DESKTOP, 06.11.2026)
@@ -20,7 +20,9 @@
 | Merkmalsfelder | Tabelle Feldbezeichnung → Wert, leere Werte „leer“ | REQ-037 | Reihenfolge der Merkmalszuordnung |
 | GPSR | Herstellerangaben, Produktidentifikation; fehlend: „GPSR-Herstellerangaben fehlen“ mit Link zu UI-031 | REQ-041 | |
 | Fotos | „n Fotos zugeordnet“ | REQ-042 | |
-| Freigabebedingungen | Liste mit Status als Text („OK“/„nicht erfüllt“): Preis, Kategorie, Zustandsbezeichnung, GPSR, Titellänge, Pflichtfelder des Kanals | REQ-044 | Fehlerbanner „Freigabe nicht möglich: <Bedingungen>“ nennt jede verletzte Bedingung |
+| Freigabebedingungen | Liste mit Status als Text („OK“/„nicht erfüllt“): Preis, Kategorie, Zustandsbezeichnung, GPSR, Titellänge, Pflichtfelder des Kanals | REQ-044 | Nach abgelehnter Freigabe nennt das Fehlerbanner jede verletzte Bedingung (siehe Aktion „Freigeben“) |
+| Vergleich mit freigegebenem Stand | nur bei Status Entwurf mit Kennzeichnung „geändert seit Freigabe“ (zuvor Freigegeben): Banner „Dieser Kanal-Inhalt war freigegeben und wurde durch Änderungen wieder zum Entwurf. Der bisher freigegebene Stand bleibt zum Vergleich sichtbar.“ mit Link „Alt und neu vergleichen“ | REQ-045, AC-REQ-045-01 | Vergleich in UI-018 (Zustand `UI-018.entwurf-vergleich`) |
+| Kategorie-Warnung (Could) | Hinweis „Kategorie <Name> gehört in der Kategoriezuordnung dieses Kanals zur Geräteart <Art>, nicht zu <diese Geräteart>“, nur wenn die gewählte Kategorie einer anderen Geräteart zugeordnet ist | REQ-059 | Warnung, keine Sperre; Freigabe bleibt möglich |
 
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
@@ -32,11 +34,12 @@
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Freigeben | Primärbutton | Status Entwurf, alle Bedingungen erfüllt | Status Freigegeben, Zeitpunkt gespeichert, „geändert seit Freigabe“ entfernt, Banner „Kanal-Inhalt freigegeben“ | Button deaktiviert; Klick auf Hinweis springt zur ersten verletzten Bedingung; bei Rechtstext „rechtlich ungeprüft“ zuerst UI-022 | bleibt; Angebot „Weiter zum Kopier-Assistenten“ (Link) |
+| Freigeben | Primärbutton (immer aktiv bei Status Entwurf) | Status Entwurf | Alle Bedingungen erfüllt: Status Freigegeben, Zeitpunkt gespeichert, „geändert seit Freigabe“ entfernt, Banner „Kanal-Inhalt freigegeben“ | Freigabe wird abgelehnt: Fehlerbanner „Freigabe nicht möglich:“ mit Liste **aller** verletzten Bedingungen (z. B. „Preis fehlt“, „Kategorie fehlt“, Pflichtfeld „Farbe“ leer); jeder Listeneintrag ist ein Link, der zum betroffenen Feld springt; Status bleibt Entwurf. Bei Rechtstext „rechtlich ungeprüft“ zuerst Dialog UI-022 (REQ-087) | bleibt; Angebot „Weiter zum Kopier-Assistenten“ (Link) |
 | Titel manuell anpassen | Link | – | Titel editierbar | – | bleibt |
 | Beschreibung manuell anpassen | Link | – | Beschreibung editierbar | – | bleibt |
 | Manuelle Anpassung verwerfen | Link nach Anpassung | – | Text wird neu gebildet | – | bleibt |
 | Kategorie übernehmen / verwerfen | Button | – | Kategorie gesetzt, „Kategorie manuell“ | Feldfehler | bleibt |
+| Alt und neu vergleichen | Link im Banner (nur bei „geändert seit Freigabe“) | Entwurf mit Kennzeichnung | – | – | UI-018 |
 | Kanäle vergleichen | Link | – | – | – | UI-017 |
 
 ## Zustände
@@ -44,20 +47,21 @@
 |---|---|---|---|
 | default (Entwurf, eine Bedingung verletzt) | siehe Mockup | default.png | – |
 | default (alle Bedingungen erfüllt) | Primärbutton aktiv | nur Text | „Alle Freigabebedingungen erfüllt“ |
+| default (Entwurf, geändert seit Freigabe) | wie default, zusätzlich Vergleichsbanner und Kennzeichnung „geändert seit Freigabe“ im Tab | nur Text (`UI-016.geaendert`) | Text siehe „Vergleich mit freigegebenem Stand“ |
 | default (Freigegeben/Veröffentlicht/Beendet) | Nur lesen, Button „Kopier-Assistent“ statt „Freigeben“; bei „geändert seit Freigabe“ Link zu UI-018 | nur Text | |
 | loading | Platzhalter | nur Text | „Lade Kanal-Inhalt …“ |
 | empty | n/a | – | – |
 | error | Banner | nur Text | „Kanal-Inhalt konnte nicht geladen/freigegeben werden. Referenz: <Nr>“ |
-| validation | Feldfehler; Fehlerbanner bei abgelehnter Freigabe | Mockup (Kategorie fehlt) | siehe oben |
+| validation | Feldfehler; Fehlerbanner mit Liste aller verletzten Bedingungen bei abgelehnter Freigabe | Mockup (Kategorie fehlt, ein Eintrag) | „Freigabe nicht möglich:“ + Liste |
 | success | Banner | nur Text | „Kanal-Inhalt freigegeben“ |
-| disabled | Freigeben deaktiviert bei verletzter Bedingung oder Status ≠ Entwurf | default.png | Tooltip nennt Grund |
-| permission | n/a | – | – |
+| disabled | „Freigeben“ ist bei verletzten Bedingungen **nicht** deaktiviert (Ablehnung mit Begründung, REQ-044); bei Status ≠ Entwurf wird der Button durch „Kopier-Assistent“ ersetzt | nur Text | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Zwei Spalten (Inhalt 8/12, Bedingungen 4/12), Bedingungen bleiben beim Scrollen sichtbar. Tab-Reihenfolge: Tabs → Felder → Bedingungen → Freigeben.
 
 ## Bekannte Abweichungen im Mockup
-„Business Portal“ (Stitch); Beispiel „Titel gekürzt, bitte prüfen“ bei 62/65 Zeichen (nach Regel erscheint der Chip nur bei Kürzung am Wortende, Beispiel nur zur Illustration); Platzhalter „Kategorie des Kanals eingeben“ im Eingabefeld; „Übernehmen“-Button heißt in Wirklichkeit „Kategorie übernehmen“; Preis-Link „Preis ändern“ fehlt im Mockup; Sticky-Leiste mit nur einem Button ist maßgeblich.
+„Business Portal“ (Stitch); Beispiel „Titel gekürzt, bitte prüfen“ bei 62/65 Zeichen (nach Regel erscheint der Chip nur bei Kürzung am Wortende, Beispiel nur zur Illustration); Platzhalter „Kategorie des Kanals eingeben“ im Eingabefeld; „Übernehmen“-Button heißt in Wirklichkeit „Kategorie übernehmen“; Preis-Link „Preis ändern“ fehlt im Mockup; Sticky-Leiste mit nur einem Button ist maßgeblich; „Freigeben“ ist im Mockup gedimmt dargestellt, maßgeblich ist der aktive Button; das Fehlerbanner zeigt im Mockup nur einen Eintrag ohne Liste und Links.
 
 ## Annahmen und offene Fragen
 - Annahme: Nach Freigabe wird kein automatischer Seitenwechsel durchgeführt, nur Link zum Kopier-Assistenten.
+- Entscheidung (Review R1, Punkt 4): „Freigeben“ bleibt aktiv; Ablehnung nennt jede verletzte Bedingung (AC-REQ-044-02/-03).

@@ -40,9 +40,8 @@ Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegun
 | validation | Feldfehler | nur Text | siehe oben |
 | success | Banner | nur Text | |
 | disabled | Geräteart gesperrt | nur Text | |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Zweispaltiges Formular ab 1366 px, Modell- und Vorbelegungsbereich getrennt.
 
 ## Bekannte Abweichungen im Mockup

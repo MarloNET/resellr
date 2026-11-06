@@ -23,9 +23,9 @@ Objekt (Titel/Modellvorlage), Wirkung: „Mit dem Modell-Inserat werden seine Ka
 | default | Bestätigung | nur Text | – |
 | disabled | „Löschen“ deaktiviert ohne Häkchen oder bei Ablehnungsgrund | nur Text | |
 | error | Banner | nur Text | „Löschen fehlgeschlagen. Referenz: <Nr>“ |
-| loading, empty, validation, success, permission | n/a | – | – |
+| loading, empty, validation, success | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup

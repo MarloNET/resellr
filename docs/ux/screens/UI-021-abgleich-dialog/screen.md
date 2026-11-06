@@ -21,9 +21,9 @@ Keine (Bestätigung per Button).
 | default | Liste | nur Text | – |
 | empty | keine Kennzeichnung | nur Text | „Kanal ist abgeglichen“ (Dialog ohne Aktion, nur „Schließen“) |
 | error | Banner | nur Text | „Abgleich konnte nicht gespeichert werden. Referenz: <Nr>“ |
-| loading, validation, success, disabled, permission | n/a bzw. Banner | – | – |
+| loading, validation, success, disabled | n/a bzw. Banner | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup

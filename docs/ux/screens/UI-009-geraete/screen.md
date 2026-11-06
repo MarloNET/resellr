@@ -28,9 +28,9 @@
 | empty (Suche) | | nur Text | „Kein Gerät mit dieser WI-Nr“ |
 | empty (nicht zugeordnet) | | nur Text | „Keine nicht zugeordneten Geräte“ |
 | error | Banner | nur Text | „Suche fehlgeschlagen. Referenz: <Nr>“ |
-| validation, success, disabled, permission | n/a | – | – |
+| validation, success, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Enter öffnet die erste Zeile, wenn genau ein Treffer.
 
 ## Bekannte Abweichungen im Mockup

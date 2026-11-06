@@ -39,9 +39,8 @@ Keine. Voraussetzungen werden beim Öffnen geprüft:
 | error | Voraussetzungs-Meldung statt Vorschau (siehe Tabelle) oder technischer Fehler | nur Text | siehe oben |
 | success | Hinweis nach dem Öffnen | nur Text | „Datenblatt in neuem Tab geöffnet“ |
 | disabled | Buttons deaktiviert bei Voraussetzungs-Meldung | nur Text | |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Vorschau skaliert auf Fensterbreite, Seitenverhältnis 210:297. Das Layout ist inhaltlich gleichwertig zu `Datenblatt.xlsx` (Annahme A-10/OP-01, nicht pixelgenau).
 
 ## Bekannte Abweichungen im Mockup

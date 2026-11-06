@@ -26,9 +26,9 @@ Tabelle: Zeitpunkt (TT.MM.JJJJ HH:MM), Objekt (Art und Bezeichnung, mit Link, wo
 | empty | | nur Text | „Keine Einträge im gewählten Zeitraum“ |
 | error | Banner | nur Text | „Protokoll konnte nicht geladen werden. Referenz: <Nr>“ |
 | validation | | nur Text | siehe oben |
-| success, disabled, permission | n/a | – | – |
+| success, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; lange alte/neue Werte umbrechen, Details per Klick auf die Zeile.
 
 ## Bekannte Abweichungen im Mockup

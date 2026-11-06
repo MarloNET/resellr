@@ -25,14 +25,13 @@ Auswahl Kanal und Geräteart; Tabelle: Reihenfolge, Feldbezeichnung des Kanals, 
 |---|---|---|---|
 | default | wie oben | nur Text | – |
 | loading | Platzhalter | nur Text | „Lade Einstellungen …“ |
-| empty | | nur Text | siehe „Leerzustand“ oben |
+| empty | Hinweistext mittig im Listenbereich, darunter Button „Merkmalsfeld hinzufügen“ (Primärbutton) | nur Text | „Für diese Geräteart und diesen Kanal sind noch keine Merkmalsfelder festgelegt“ |
 | error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Gespeichert“ |
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
-| permission | n/a (eine Rolle, E-4) | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup

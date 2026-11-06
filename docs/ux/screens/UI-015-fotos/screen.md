@@ -29,9 +29,8 @@ Raster nummerierter Vorschaubilder (01, 02 …) in der Reihenfolge, die der Kopi
 | validation | siehe Eingaben | nur Text | |
 | success | Banner | nur Text | |
 | disabled | „Fotos hinzufügen“ deaktiviert bei 20 Fotos | nur Text | |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Raster passt sich der Breite an; Tastatur: Pfeile wählen, Alt+Pfeil verschiebt.
 
 ## Bekannte Abweichungen im Mockup

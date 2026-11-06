@@ -5,7 +5,7 @@
 | Feld | Wert |
 |---|---|
 | Projekt / Release | resellr (Arbeitstitel), Phase 1 / Release 0.1 |
-| Dokumentversion | v0.1 (Entwurf, siehe Kap. 10 „Lieferstand“) |
+| Dokumentversion | v0.2 (Entwurf, überarbeitet nach Product-Owner-Review Runde 1; siehe Kap. 10 „Lieferstand“) |
 | Status | draft (kein Review, keine Freigabe) |
 | Klassifikation | **Material** (Owner bestätigt) |
 | Autor / Datum | UI/UX Designer, 06.11.2026 |
@@ -104,13 +104,13 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 - **P-01 Pflege-Tabelle (Einstellungen mit Listen):** Tabelle links, Detailbereich rechts oder Dialog; Zeilenaktionen „Bearbeiten“, „Deaktivieren“; Reihenfolge per Ziehen oder Hoch/Runter-Buttons (Tastatur); „Anlegen“-Button oben rechts; Primärbutton im Detail „Speichern“, daneben „Abbrechen“.
 - **P-02 Zuordnungstabelle (Kanal × Quelle/Wert):** Auswahl Kanal/Geräteart oben, Tabelle mit Dropdown-Zellen, Zeile „Zeile hinzufügen“, Validierungsfehler je Zelle.
 - **P-03 Muster-/Vorlagen-Editor mit Vorschau:** Bestandteile als Zeilen, Platzhalter-Auswahl nach Gruppen (Kap. 9.7), Vorschau je Kanal am Beispiel-Modell, Fehler bei unzulässigem Platzhalter inline (UI-029).
-- **P-05 Konflikt:** Meldet das Speichern oder Freigeben einen Konflikt (Datensatz in anderem Fenster geändert, Baseline 9.3), erscheint ein Banner „Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. Bitte neu laden und erneut prüfen.“ mit Button „Neu laden“. Es wird nichts gespeichert oder freigegeben; eingegebene Werte bleiben bis zum Neuladen sichtbar. Zustand `.conflict` gilt für alle Formulare, UI-016 und UI-018.
 - **P-04 Bestätigungsdialog:** Titel = Aktion, Text nennt Wirkung, Buttons: „Abbrechen“ (links), Aktion (rechts, bei Löschen/Storno destruktiv).
+- **P-05 Konflikt:** Meldet das Speichern oder Freigeben einen Konflikt (Datensatz in anderem Fenster geändert, Baseline 9.3), erscheint ein Banner „Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. Bitte neu laden und erneut prüfen.“ mit Button „Neu laden“. Es wird nichts gespeichert oder freigegeben; eingegebene Werte bleiben bis zum Neuladen sichtbar. Zustand `.conflict` gilt für alle Formulare, UI-016 und UI-018.
 - **Validierung:** Fehler am Feld, Fehlertext aus Kap. 6/9.6 im Wortlaut der Requirements; Prüfung beim Verlassen des Feldes und beim Speichern; erster Fehler erhält Fokus. Zahlen akzeptieren Dezimalkomma und -punkt (Kap. 9.6).
 - **Feedback:** Erfolg als Banner oben (z. B. „Zugangspasswort geändert“), schließt nach 5 s oder per „×“; technische Fehler als Banner mit Funktion, nächstem Schritt, Referenznummer (REQ-073).
 - **Zustände (State-IDs):** `UI-nnn.default`, `.loading` (Skeleton/„Lade …“ bis 5 s, danach Fehler), `.empty`, `.error`, `.validation`, `.success`, `.disabled`, `.conflict` (P-05). Rollenabhängige Zustände entfallen (E-4). Offline/Timeout: nicht vorgesehen (A-02); Verbindungsfehler im Netzbetrieb → `.error`.
 - **Tastatur:** Tab-Reihenfolge = Leserichtung; Enter bestätigt Primäraktion eines Formulars/Dialogs; Esc schließt Dialoge und Dropdowns; im Kopier-Assistenten Pfeil auf/ab wählt Feld, Enter kopiert das gewählte Feld und springt zum nächsten offenen (als Bedienkomfort, keine Konformitätsaussage). Einbuchen: Fokus beim Öffnen von UI-003 in „WI-Nr“; Reihenfolge WI-Nr → Lieferant → Zustandscode → Modellvorlage → Gerätewerte.
-- **Fensterbreiten:** ≥ 1366 px: volle Ansicht. UI-019 zusätzlich schmale Ansicht (440 px, ohne Navigation), erreichbar über „Schmale Ansicht“/„Normale Ansicht“; ob als eigenes Fenster oder Umschalter, hängt von OP-15 ab. Unter 1366 px wird nicht gestaltet.
+- **Fensterbreiten:** ≥ 1366 px: volle Ansicht. UI-019 zusätzlich schmale Ansicht (480 px Mindestbreite, ohne Navigation), erreichbar über „Schmale Ansicht“/„Normale Ansicht“; ob als eigenes Fenster oder Umschalter, hängt von OP-15 ab. Unter 1366 px wird nicht gestaltet.
 - **Kennzeichnungen (Kap. 9.4):** je Kennzeichnung ein Text-Chip; Reihenfolge: Fehlt-Hinweise, „geändert seit Freigabe“, „Änderung auf Kanal übertragen“, „Bestand auf Kanal anpassen“, „manuell angepasst“, „Kategorie manuell“, „Titel gekürzt, bitte prüfen“.
 
 ## 6. Feasibility- und Handoff-Hinweise
@@ -119,7 +119,7 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
   1. Zwischenablage je Feld (REQ-047): im Browser nur mit Nutzeraktion; in beiden Varianten möglich.
   2. Fotos bereitstellen (REQ-048): Entwurf „Fotos herunterladen“ (Ordner oder ZIP mit Namen 01 …). Direktes Ziehen in ein anderes Programm nur bei Desktop wahrscheinlich; **nicht entworfen**.
   3. Schmales Arbeitsfenster neben anderem Programm (UI-019 compact): als eigenes Fenster nur bei Desktop oder per Pop-out; sonst Fenstergröße vom Nutzer.
-  4. Druck: UI-023 zeigt Vorschau mit „Drucken“ und „Als PDF speichern“; Dialoge des Betriebssystems/Browsers werden nicht gestaltet.
+  4. Druck: UI-023 ist ein Erzeugungsschritt mit „Datenblatt öffnen (PDF)“; Anzeige, Druck und Speichern übernimmt der PDF-Viewer des Browsers (Baseline v0.1, C-2); Dialoge des Betriebssystems/Browsers werden nicht gestaltet.
   5. Zugang: UI-001/UI-040 nur im Netzbetrieb.
 - Mockups sind visuelle Referenz; maßgeblich ist `screen.md`. Es wird kein HTML als Implementierungscode übergeben (HTML-Export entfällt, siehe `stitch-log.md`).
 - Cross-Check mit der Architecture Baseline v0.1 (Entwurf, Revision `ae51c8cc`): **Vorabprüfung durchgeführt**, siehe Kap. 6a. Der formale Cross-Check folgt nach Freigabe der Baseline.
@@ -169,7 +169,8 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 | REQ-052 | 03 | UI-002 |
 | REQ-055, 072 | – | UI-024 |
 | REQ-056 | – | UI-042 (Could) |
-| REQ-057, 059 | – | **nicht entworfen** (Could; REQ-057 Importdatei, REQ-059 Warnung): Lücke, Entscheidung PO |
+| REQ-057 (Could) | 09 | UI-014 (Aktion „Importdatei erzeugen“ in der Shop-Kanal-Karte, nur textlich, ohne Mockup) |
+| REQ-059 (Could) | 01 | UI-016 (Kategorie-Warnung, nur textlich, ohne Mockup) |
 | REQ-091 | 02, 03 | wirkt in UI-014/016/019/002 (keine eigene Oberfläche) |
 | REQ-060–066, 068–070, 073–083, 103 (NFR) | – | ohne UI; REQ-073 Fehlerbanner, REQ-078 Formate, REQ-080 Erlernbarkeit durch Muster |
 
@@ -178,13 +179,14 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 **Annahmen (Standardannahmen Owner):** OP-17, OP-18 (keine Suchbegriff-/SEO-Felder), OP-29 (Bestandsangaben ohne Neufreigabe), OP-30/REQ-090 (Abgleich-Bestätigung bleibt).
 
 **Varianten mit Empfehlung (Owner entscheidet, nicht von mir entschieden):**
-- **V-1 Kopier-Assistent:** (A) ein Screen mit zwei Layouts: Vollfenster und schmal (440 px) per Umschalter — *Empfehlung*; (B) nur schmales Arbeitsfenster, Vollansicht entfällt. Grund A: Nutzer kann je nach Bildschirm wählen, geringer Mehraufwand.
+- **V-1 Kopier-Assistent:** (A) ein Screen mit zwei Layouts: Vollfenster und schmal (480 px) per Umschalter — *Empfehlung*; (B) nur schmales Arbeitsfenster, Vollansicht entfällt. Grund A: Nutzer kann je nach Bildschirm wählen, geringer Mehraufwand.
 - **V-2 Prüfablauf:** (A) Freigabe je Kanal-Inhalt (UI-016) plus Vergleichsansicht (UI-017) — *Empfehlung*, entspricht REQ-044; (B) Sammelfreigabe aller Kanäle: würde „nie automatisch freigeben“ aufweichen, deshalb nicht empfohlen.
 - **V-3 Fotos (REQ-048):** (A) Foto-Ordner öffnen oder ZIP herunterladen, Namen 01 … — *Empfehlung*, nach Baseline v0.1 der einzige tragfähige Weg; (B) Ziehen aus der Seite in fremde Upload-Felder: laut Baseline nicht verlässlich möglich, entfällt.
 
 **Offene Fragen an den Product Owner:**
 1. v0.3.1 als Lesestand bestätigen (Kap. 1).
-2. REQ-057 (Importdatei) und REQ-059 (Kategorie-Warnung) sind Could; nicht gestaltet. Aufnehmen?
+2. REQ-057 und REQ-059 (Could): vom Product Owner zur textlichen Aufnahme entschieden; eingearbeitet (erledigt).
+3a. OF-19-1: Zählen leere Felder im Kopier-Assistenten in „n von m“ mit? Vorschlag: nein (siehe UI-019).
 3. REQ-033/085: Preis-Vorschlag-Anzeige in UI-014 als Hinweis „vorgeschlagen nach Preisregel“ — in Requirements nicht textlich festgelegt; Annahme in `screen.md`.
 4. REQ-048: Form der Bereitstellung (siehe V-3) wird mit OP-15 final.
 5. In UI-029 zeigt die Vorschau den Titel **nach** Kürzung; die Mockup-Beispielzeile mit „zu lang“ entspricht dem Fall „Kürzung nicht möglich“ (Priorität-1-Bestandteile zu lang).

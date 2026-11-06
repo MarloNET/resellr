@@ -36,9 +36,8 @@
 | validation | Feldfehler | nur Text | |
 | success | Banner in UI-003 | nur Text | |
 | disabled | „Zuordnen“ deaktiviert ohne Auswahl | nur Text | |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Dialogbreite 720 px; Pfeiltasten wählen Optionsfeld; Enter = Zuordnen.
 
 ## Bekannte Abweichungen im Mockup

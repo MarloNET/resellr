@@ -50,9 +50,8 @@
 | validation | Feldfehler | Mockup (Ebene) | siehe Eingaben |
 | success | Banner | nur Text | „Merkmal gespeichert“ |
 | disabled | Ebene/Datentyp gesperrt bei gespeicherten Werten | default.png | |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Drei Bereiche (Geräteart-Liste, Merkmal-Tabelle, Seitenpanel) ab 1366 px; Seitenpanel überlagert bei schmaler Breite die Tabelle. Hoch/Runter-Buttons als Tastaturalternative zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup

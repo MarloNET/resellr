@@ -26,9 +26,9 @@ Felder und Hinweis „Mindestens 12 Zeichen.“ Nach Erfolg Banner „Zugangspas
 |---|---|---|---|
 | default, validation, success | wie oben | nur Text | |
 | error | Banner | nur Text | „Zugangspasswort konnte nicht geändert werden. Referenz: <Nr>“ |
-| loading, empty, disabled, permission | n/a (Screen existiert nur im Netzbetrieb) | – | – |
+| loading, empty, disabled | n/a (Screen existiert nur im Netzbetrieb) | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Karte 480 px; Anzeige-Umschalter „Anzeigen“ je Feld.
 
 ## Bekannte Abweichungen im Mockup

@@ -25,9 +25,9 @@ Name, Logo-Vorschau (oder „Kein Logo“), Kontaktangaben. Hinweis: „Das Logo
 | default | Formular | nur Text | – |
 | empty | kein Logo | nur Text | „Kein Logo. Ohne Logo kann kein Datenblatt erzeugt werden.“ |
 | loading, error, validation, success | wie üblich | nur Text | error: „Händlermarke konnte nicht gespeichert werden. Referenz: <Nr>“ |
-| disabled, permission | n/a | – | – |
+| disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px.
 
 ## Bekannte Abweichungen im Mockup

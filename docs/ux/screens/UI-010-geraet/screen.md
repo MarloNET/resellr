@@ -35,9 +35,8 @@ Gerätewerte wie UI-003 (Regeln REQ-014). Ändert der Nutzer eine Variantenangab
 | validation | Feldfehler | nur Text | |
 | success | Banner | nur Text | „Gerät gespeichert“ |
 | disabled | verkauft/storniert: Werte schreibgeschützt, Aktionen je Status | nur Text | „Gerät storniert“ |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px, Aktionen oben rechts.
 
 ## Bekannte Abweichungen im Mockup

@@ -2,7 +2,7 @@
 
 - Zweck: Arbeitsbereich eines Modell-Inserats: Kanäle, Preise, Inseratswerte, Fotos, Geräte.
 - Flows: FLOW-01 (Schritt 4–6), FLOW-06, FLOW-09
-- Anforderungen: REQ-019, REQ-032, REQ-033, REQ-088, REQ-091, REQ-095, REQ-045, REQ-046, REQ-089, REQ-090
+- Anforderungen: REQ-019, REQ-032, REQ-033, REQ-088, REQ-091, REQ-095, REQ-045, REQ-046, REQ-089, REQ-090, REQ-057 (Could)
 - Rollen: Nutzer
 - Gerät(e): PC, ab 1366 × 768
 - Artefakte: default.png (Stitch 1b01b1d0b1084415a8e4d917ff94cde6, DESKTOP, 06.11.2026)
@@ -36,6 +36,9 @@
 | Bearbeiten (Inseratswerte) | Sekundärbutton | – | – | – | Bearbeitungsansicht (Teil von UI-014, Zustand `UI-014.edit`) |
 | Fotos verwalten | Sekundärbutton | – | – | – | UI-015 |
 | Datenblatt | Sekundärbutton (je Gerät über UI-010); hier: Auswahl des Geräts in Dialog „Datenblatt für Gerät“ | Gerät geprüft, zugeordnet | – | Hinweise nach REQ-050 | UI-023 |
+| Änderung trotzdem speichern | Primärbutton im Bestätigungsdialog `UI-014.abweichung-bestaetigen` (erscheint beim Speichern der Inseratswerte, wenn zugeordnete verfügbare Geräte danach abweichen, REQ-088) | Variantenangaben geändert, Abweichung vorhanden | Inseratswerte gespeichert; Bestätigung mit Zeitpunkt und abweichenden Angaben protokolliert (REQ-072); Kanal-Inhalte nach Kap. 6.0 neu gebildet bzw. gekennzeichnet; Banner „Inseratswerte gespeichert“ | Fehlerbanner „Speichern nicht möglich. Referenz: <Nr>“, Dialog bleibt, nichts gespeichert | UI-014 |
+| Speichern abbrechen | Sekundärbutton, Esc im Dialog | – | Nichts gespeichert, Formular behält Eingaben | – | UI-014 (Bearbeiten) |
+| Importdatei erzeugen (Could, REQ-057) | Sekundärbutton in der Shop-Kanal-Karte | Shop-Kanal-Inhalt Status Freigegeben, Veröffentlicht oder Beendet | Datei wird heruntergeladen (Format laut Architecture Baseline), Banner „Importdatei erzeugt“ | Banner „Importdatei konnte nicht erzeugt werden. Referenz: <Nr>“ | bleibt |
 | Gerät öffnen | Link in Zeile | – | – | – | UI-010 |
 | Löschen | Textbutton (destruktiv) | – | Bestätigung | – | UI-041 |
 
@@ -45,18 +48,20 @@
 | default | wie Mockup | default.png | – |
 | loading | Platzhalterblöcke | nur Text | „Lade Modell-Inserat …“ |
 | empty | n/a; Fotos leer: „Noch keine Fotos“ + Button „Fotos verwalten“; Lieferumfang leer: „–“ | nur Text | |
+| `abweichung-bestaetigen` | Modaler Dialog, Breite 800 px. Titel „Zugeordnete Geräte weichen ab“. Text: „Nach dieser Änderung weichen <n> zugeordnete Geräte vom Modell-Inserat ab:“. Tabelle: WI-Nr, Merkmal, „Gerät <Wert>, Modell-Inserat <Wert>“ (z. B. „Optik-Note: Gerät 2, Modell-Inserat 3“). Hinweis: „Die Bestätigung wird im Änderungsprotokoll festgehalten.“ Buttons „Änderung trotzdem speichern“ (primär), „Abbrechen“ | nur Text | siehe links (REQ-088, AC-REQ-088-03) |
+| Shop-Karte ohne Freigabe (Could) | „Importdatei erzeugen“ deaktiviert | nur Text | Tooltip „Erst Shop-Kanal-Inhalt freigeben“ |
 | error | Banner | nur Text | „Das Modell-Inserat konnte nicht geladen/gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Preis gespeichert“ u. a. |
 | disabled | „Datenblatt“-Auswahl deaktiviert, wenn kein Gerät geprüft/zugeordnet: Tooltip „Gerät noch zu prüfen“ | nur Text | |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Drei Kanal-Karten gleich breit ab 1366 px. Tab-Reihenfolge: Kopfaktionen → Kanal-Karten → Inseratswerte → Fotos → Geräte.
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Lieferumfang-Beispiel „Netzteil, Handbuch“ entspricht Textbausteinen, nur Beispiel; kleine Status-Pille „verfügbar“ in grün (Farbe nicht in DESIGN.md definiert, Text maßgeblich); Hinweis „Vorschlag nach Preisregel“ nicht im Mockup.
 
 ## Annahmen und offene Fragen
+- Design-Annahme, keine Anforderung: Gerätewahl per Dialog für das Datenblatt und Hinweis „Vorschlag nach Preisregel“ (vom Product Owner bestätigt).
 - Annahme: Ein Primärbutton je Seite (nur bei Status Entwurf), sonst keiner.
 - Annahme: „Datenblatt“ im Kopf wählt, wenn mehrere Geräte vorhanden sind, per Dialog das Gerät (Datenblatt ist je Gerät, REQ-050). Offene Frage an PO, ob stattdessen nur über UI-010.

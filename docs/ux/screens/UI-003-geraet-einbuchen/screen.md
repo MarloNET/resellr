@@ -50,9 +50,8 @@
 | validation | Feldfehler, Fehlerzusammenfassung oben bei „Speichern“ | im Mockup an Akkukapazität | siehe Eingaben |
 | success | Banner | nur Text | „Gerät <WI-Nr> gespeichert“ |
 | disabled | „Speichern und zuordnen“ deaktiviert bei offenen Prüfmarkierungen | default.png | Tooltip „Erst Werte prüfen“ |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px dreispaltiges Raster, Info-Panel rechts. Fokusreihenfolge siehe uiux-design.md Kap. 5. Beim Öffnen Fokus in WI-Nr; Enter in WI-Nr springt zu Lieferant.
 
 ## Bekannte Abweichungen im Mockup

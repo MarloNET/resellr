@@ -27,9 +27,9 @@ Keine.
 | loading | Platzhalter | nur Text | „Lade Kanal-Inhalte …“ |
 | empty | nur 1 aktiver Kanal | nur Text | „Nur ein aktiver Kanal. Kein Vergleich möglich.“ |
 | error | Banner | nur Text | „Vergleich konnte nicht geladen werden. Referenz: <Nr>“ |
-| validation, success, disabled, permission | n/a | – | – |
+| validation, success, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Drei Spalten ab 1366 px; erste Spalte (Feldname) fixiert.
 
 ## Bekannte Abweichungen im Mockup

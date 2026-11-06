@@ -20,9 +20,9 @@ Keine.
 |---|---|---|---|
 | default | Liste | nur Text | – |
 | error | Banner | nur Text | „Freigabe fehlgeschlagen. Referenz: <Nr>“ |
-| loading, empty, validation, success, disabled, permission | n/a | – | – |
+| loading, empty, validation, success, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup

@@ -43,9 +43,8 @@
 | validation | Fehlerbox oben, Zeile markiert | Mockup | siehe Eingaben |
 | success | Banner | nur Text | „Titelmuster gespeichert“ |
 | disabled | „Titelmuster speichern“ deaktiviert ohne Änderung | nur Text | |
-| permission | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Tabelle und Vorschau untereinander; Vorschau nach jeder Änderung neu berechnet (kurz verzögert).
 
 ## Bekannte Abweichungen im Mockup

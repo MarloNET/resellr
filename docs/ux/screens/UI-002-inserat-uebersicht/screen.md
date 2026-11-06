@@ -10,7 +10,7 @@
 ## Angezeigte Daten
 | Element | Inhalt | Quelle (fachlich) | Hinweise |
 |---|---|---|---|
-| Titel | ungekürzter Titel nach Titelmuster der Geräteart (Kap. 9.3), Zeile darunter „Geräteart · Zustand · Optik N“ | Modell-Inserat | Spalte mindestens 40 % der Tabellenbreite, höchstens 3 Zeilen sichtbar, voller Text als Tooltip |
+| Titel | ungekürzter Titel nach Titelmuster der Geräteart (Kap. 9.3), Zeile darunter „Geräteart · Zustand · Optik N“ sowie alle weiteren Variantenangaben nach der Vergleichsregel (Kap. 6.0, REQ-005): Werte der Variantenmerkmale (z. B. „16 GB RAM · 512 GB SSD · QWERTZ“) und die Zustandsbeschreibung (erste Zeile, gekürzt; vollständig im Tooltip). Grund: Modell-Inserate derselben Modellvorlage unterscheiden sich nur durch diese Angaben und müssen in der Liste unterscheidbar sein | Modell-Inserat | Spalte mindestens 40 % der Tabellenbreite, höchstens 3 Zeilen sichtbar, voller Text als Tooltip |
 | Stückzahl | Zahl; bei 0 zusätzlich Chip „ausverkauft“ | Bestandsangabe | |
 | Verkauft | „Shop / Kleinanzeigen / eBay“ als Zahlen | verkaufte Geräte je Kanal | |
 | Kanal-Spalten | je aktivem Kanal: Status-Chip (Entwurf, Freigegeben, Veröffentlicht, Beendet) und Kennzeichnungen als Chips; bei „Veröffentlicht“ „Abgleich TT.MM.JJJJ“ (letzter Abgleich) | Kanal-Inhalt (freigegebener Stand bei Änderungsentwurf) | Kanal-Spalten folgen der Reihenfolge der aktiven Kanäle |
@@ -40,9 +40,8 @@
 | empty (Filter) | keine Treffer | nur Text | „Keine Treffer“ und Link „Filter zurücksetzen“ |
 | error | Banner | nur Text | „Inserate konnten nicht geladen werden. Bitte erneut versuchen. Referenz: <Nr>“ (REQ-073) |
 | validation | – | n/a | Suche mit < 2 Zeichen filtert nicht, kein Fehler |
-| permission | n/a | – | Es gibt nur eine Rolle (E-4) |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Titelspalte nimmt Restbreite. Fokus startet im Suchfeld; Pfeil auf/ab wählt Zeile, Enter öffnet. Keine Barrierefreiheitsanforderung (E-3).
 
 ## Bekannte Abweichungen im Mockup

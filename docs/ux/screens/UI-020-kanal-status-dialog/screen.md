@@ -22,9 +22,9 @@ Kanal, Titel, aktueller Status. Erlaubte Aktionen je Status: Freigegeben → „
 | Zustand | Darstellung | Artefakt | Text |
 |---|---|---|---|
 | default, validation, error, success | wie oben; error „Status konnte nicht geändert werden. Referenz: <Nr>“ | nur Text | |
-| loading, empty, disabled, permission | n/a; unzulässige Übergänge werden nicht angeboten | – | – |
+| loading, empty, disabled | n/a; unzulässige Übergänge werden nicht angeboten | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup

@@ -21,9 +21,9 @@ Feld „Name des Herstellers“. Hinweis nach Anlegen: „Hersteller angelegt. G
 | Zustand | Darstellung | Artefakt | Text |
 |---|---|---|---|
 | default, validation, error, success | wie Eingaben/Aktionen | nur Text | error: „Hersteller konnte nicht angelegt werden. Referenz: <Nr>“ |
-| loading, empty, disabled, permission | n/a | – | – |
+| loading, empty, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Dialogbreite 480 px, Fokus im Feld.
 
 ## Bekannte Abweichungen im Mockup

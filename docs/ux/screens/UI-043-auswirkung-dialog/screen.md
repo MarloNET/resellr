@@ -26,9 +26,9 @@ Keine.
 | default | drei Zähler | nur Text | – |
 | empty | alle Zähler 0 | nur Text | „Keine Kanal-Inhalte betroffen“ |
 | error | Banner | nur Text | „Auswirkung konnte nicht ermittelt werden. Referenz: <Nr>“ |
-| loading, validation, success, disabled, permission | n/a | – | – |
+| loading, validation, success, disabled | n/a | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup

@@ -17,7 +17,7 @@ Keine.
 ## Zustände
 default: Beim Aufruf von „Einstellungen“ wird der zuletzt genutzte Bereich geöffnet, beim ersten Mal „Händlermarke“. Alle anderen Zustände: n/a (reine Navigation).
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Pfeil auf/ab in der Liste, Enter öffnet.
 
 ## Bekannte Abweichungen im Mockup

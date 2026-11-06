@@ -9,6 +9,8 @@ Fehlerpfade: WI-Nr vergeben (Fehler am Feld in UI-003); Pflichtangaben fehlen (F
 ## FLOW-02 Weiteres Gerät einbuchen (J-02)
 [UI-003] (WI-Nr, Zustandscode, Werte bestätigen) → [UI-004] (bestehendes Modell-Inserat wählen) {Abweichung} → [UI-005] (trotzdem zuordnen oder neues Modell-Inserat) → Banner „Stückzahl n“ {Kanal veröffentlicht} → Hinweis „Bestand auf Kanal anpassen“ → [UI-019] → [UI-021] (Abgleich bestätigen).
 Fehlerpfade: andere Modellvorlage → Ablehnung; Prüfmarkierung offen → „Erst Werte prüfen“.
+Variante (REQ-088): Inseratswerte ändern in [UI-014] (Bearbeiten) → {zugeordnete Geräte weichen danach ab} → Bestätigungsdialog `UI-014.abweichung-bestaetigen` (Änderung trotzdem speichern, protokolliert) | Abbrechen → [UI-014].
+Variante (REQ-014/REQ-020): Variantenangabe eines zugeordneten Geräts ändern in [UI-010]/[UI-003] → [UI-005] im Kontext „Gerät bereits zugeordnet“ (Zuordnung behalten | Neues Modell-Inserat anlegen | Umbuchen).
 
 ## FLOW-03 Verkauf erfassen (J-03)
 [UI-009] (WI-Nr suchen) → [UI-010] → [UI-011] (Kanal, Datum) → [UI-002] (Kennzeichnung „Bestand auf Kanal anpassen“) → anderen Kanal anpassen → [UI-021] {Stückzahl 0 „ausverkauft“} → [UI-020] (Beendet je veröffentlichtem Kanal).
@@ -22,7 +24,8 @@ Fehlerpfad: irrtümlich verkauft → [UI-010] (Verkauf zurücknehmen).
 
 ## FLOW-06 Veröffentlichtes Modell-Inserat ändern (J-06)
 [UI-014] (Inseratswerte bearbeiten) oder [UI-007] oder Preis → Kanal-Inhalt „Veröffentlicht“ erhält „geändert seit Freigabe“ → [UI-018] (alt/neu) (Änderungsentwurf freigeben) → „Änderung auf Kanal übertragen“ → [UI-019] (neuen Stand kopieren) → [UI-021].
-Fehlerpfad: Freigabebedingung verletzt → Ablehnung mit Nennung, freigegebener Stand bleibt im Kopier-Assistenten.
+Fehlerpfad: Freigabebedingung verletzt → Ablehnung mit Liste aller verletzten Bedingungen, freigegebener Stand bleibt im Kopier-Assistenten.
+Variante (Kanal-Inhalt Freigegeben, REQ-045, AC-REQ-045-01): Änderung → Kanal-Inhalt wird Entwurf mit „geändert seit Freigabe“ → [UI-016] (Banner, Link „Alt und neu vergleichen“) → [UI-018] (Zustand `entwurf-vergleich`) (Kanal-Inhalt freigeben) → Status Freigegeben.
 
 ## FLOW-07 Zugang (nur Netzbetrieb)
 Programmstart ohne Zugang → [UI-001] (Passwort) → [UI-002]. Passwort ändern: [UI-040]; andere Programme erhalten bei nächstem Aufruf [UI-001]. Kein Zeitablauf [v0.3.1].

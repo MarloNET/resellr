@@ -29,9 +29,9 @@ Trefferliste: Geräteart, Hersteller, Modellbezeichnung, Typbezeichnung, Herstel
 | empty (Treffer) | | nur Text | „Keine Modellvorlage gefunden“ + Button „Modellvorlage anlegen“ |
 | empty (Bibliothek) | | nur Text | „Noch keine Modellvorlagen“ + Button „Modellvorlage anlegen“ |
 | error | Banner | nur Text | „Suche fehlgeschlagen. Referenz: <Nr>“ |
-| validation, success, disabled, permission | n/a bzw. wie oben | – | – |
+| validation, success, disabled | n/a bzw. wie oben | – | – |
 
-## Responsive und Barrierefreiheit
+## Fenstergröße und Bedienung
 Ab 1366 px; Pfeil auf/ab + Enter.
 
 ## Bekannte Abweichungen im Mockup
