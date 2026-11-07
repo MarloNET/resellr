@@ -60,7 +60,7 @@ default.png (Vollfenster, neu erzeugt in Korrekturrunde 2, Stitch 67d2ba17a4874d
 Der Sicherungshinweis (UI-044) steht auch in der **schmalen Ansicht** (fester Streifen unten, vollständiger Text) und in **jedem Fenster bzw. Rahmen**, also auch in einem zweiten, schmalen Browserfenster, das der Nutzer neben dem Kanal-Formular öffnet. Es gibt keine Ansicht von UI-019 ohne den Hinweis. Inhalt und Position wie in UI-044; X-1 ist sonst unverändert (MAR-143).
 
 ## Annahmen und offene Fragen
-- Browser (Baseline v0.3.2, Entwurf, Cross-Check läuft): Zwischenablage nur auf Nutzeraktion, ein Feld als reiner Text (Fehlerfall ist gestaltet). Schmales Layout ist ein Umschalter im selben Fenster (ADR-001, nicht mehr von OP-15 abhängig); der Nutzer kann ein zweites, schmales Browserfenster öffnen. Mindestbreite 480 px, vom Software Architect zu prüfen (C-5).
+- Browser (Baseline v0.3.2, freigegeben): Zwischenablage nur auf Nutzeraktion, ein Feld als reiner Text (Fehlerfall ist gestaltet). Schmales Layout ist ein Umschalter im selben Fenster (ADR-001, nicht mehr von OP-15 abhängig); der Nutzer kann ein zweites, schmales Browserfenster öffnen. Mindestbreite 480 px, vom Software Architect zu prüfen (C-5).
 - Konflikt (P-05): „Neuer Stand noch nicht freigegeben“ bzw. geänderter Stand beim Laden → Banner „Bitte neu laden“.
 - Annahme: „Kopieren“ markiert nicht automatisch „übernommen“, wenn der Systemzugriff scheitert.
 - ~~OF-19-1~~ erledigt: Die Regel „leere Merkmalsfelder zählen nicht“ ist mit Requirements v0.3.3 Anforderung (REQ-047, REQ-049), nicht mehr Design-Annahme (Bestätigung durch den Owner mit der Requirements-Freigabe).

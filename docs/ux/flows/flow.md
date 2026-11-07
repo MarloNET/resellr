@@ -27,7 +27,7 @@ Fehlerpfad: irrtümlich verkauft → [UI-010] (Verkauf zurücknehmen).
 Fehlerpfad: Freigabebedingung verletzt → Ablehnung mit Liste aller verletzten Bedingungen, freigegebener Stand bleibt im Kopier-Assistenten.
 Variante (Kanal-Inhalt Freigegeben, REQ-045, AC-REQ-045-01): Änderung → Kanal-Inhalt wird Entwurf mit „geändert seit Freigabe“ → [UI-016] (Banner, Link „Alt und neu vergleichen“) → [UI-018] (Zustand `entwurf-vergleich`) (Kanal-Inhalt freigeben) → Status Freigegeben.
 
-## FLOW-07 Zugang (nur Netzbetrieb)
+## FLOW-07 Zugang (nur Netzbetrieb) – in Release 0.1 nicht umgesetzt (OD-02 Variante A, Owner 07.11.2026; Reserve für Variante B)
 Programmstart ohne Zugang → [UI-001] (Passwort) → [UI-002]. Passwort ändern: [UI-040]; andere Programme erhalten bei nächstem Aufruf [UI-001]. Kein Zeitablauf [v0.3.1].
 
 ## FLOW-08 Fehlerkorrektur und Löschen

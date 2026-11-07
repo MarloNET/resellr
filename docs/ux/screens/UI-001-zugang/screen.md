@@ -1,6 +1,6 @@
 # UI-001 – Zugang
 
-> **Entschieden (Owner, 06.11.2026, OP-23):** Der Screen bleibt (REQ-001, REQ-067, REQ-097). Die Startannahme A-35 der Requirements (kein Zugangspasswort) gilt dafür nicht; OD-02 (Betrieb nur am Arbeitsplatzrechner oder Netzbetrieb) bleibt offen, der Screen bleibt inhaltlich unverändert (Baseline v0.3.2, ADR-002 Option E, Kap. 13.3.1).
+> **In Release 0.1 nicht umgesetzt (Owner, 07.11.2026, OD-02 Variante A: Betrieb nur am Arbeitsplatzrechner, kein Zugangspasswort; Baseline v0.3.2, ADR-002, Kap. 13.3.1).** Diese Beschreibung und das Mockup bleiben unverändert als Reserve für Variante B (Netzbetrieb, REQ-001, REQ-067, REQ-097) erhalten und sind nicht Teil des Umfangs von Release 0.1. Früherer Vermerk (06.11.2026, OP-23): Der Screen blieb zunächst im Design.
 
 - Zweck: Im Netzbetrieb das Zugangspasswort eingeben. 
 - Flows: FLOW-07

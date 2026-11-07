@@ -10,7 +10,7 @@
 ## Angezeigte Daten
 | Element | Inhalt | Quelle | Hinweise |
 |---|---|---|---|
-| Einstellungs-Liste | 15 Bereiche (Händlermarke, Gerätearten und Merkmale, Auswahllisten, Titelmuster, Textbausteine, Hersteller und GPSR, Lieferanten, Code-Übersetzung, Zustandszuordnung, Kategoriezuordnung, Merkmalszuordnung, Beschreibungsvorlagen, Kanäle und Preisregeln, Datenblatt-Layout, Zugangspasswort [nur Netzbetrieb]) | Kap. 9.5 | zweite Navigationsspalte, 240 px |
+| Einstellungs-Liste | 14 Bereiche (Händlermarke, Gerätearten und Merkmale, Auswahllisten, Titelmuster, Textbausteine, Hersteller und GPSR, Lieferanten, Code-Übersetzung, Zustandszuordnung, Kategoriezuordnung, Merkmalszuordnung, Beschreibungsvorlagen, Kanäle und Preisregeln, Datenblatt-Layout; „Zugangspasswort“ entfällt in Release 0.1, OD-02 Variante A) | Kap. 9.5 | zweite Navigationsspalte, 240 px |
 | Geräteart-Liste | Name, Status „aktiv“/„deaktiviert“ | REQ-004 | |
 | Merkmal-Tabelle | Reihenfolge, Bezeichnung, Datentyp, Einheit, Ebene (Modell/Gerät), variantenbildend (Ja/Nein/–), Pflicht, Datenblatt-Block, Status | REQ-005 | Reihenfolge per Ziehen oder Buttons „nach oben/unten“ |
 | Merkmal-Formular | Seitenpanel „Merkmal bearbeiten“ | | |
