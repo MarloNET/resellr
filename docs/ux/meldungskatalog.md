@@ -39,7 +39,7 @@ Der Katalog enthält 23 Meldungen (M-01 bis M-22 und M-24; M-23 entfallen, siehe
 
 ## 3. M-23: entfallen
 
-Der Sammeltext „Bitte die markierten Felder prüfen.“ entfällt (v0.6.1, Owner-Entscheidung MAR-176 / MAR-179). Es gibt keine Fehlerzusammenfassung oben im Formular; Feldfehler stehen am Feld, der erste markierte Fehler erhält den Fokus (Kap. 5 „Validierung“). Die Nummer M-23 bleibt unbesetzt. Der Katalog enthält 23 Meldungen: M-01 bis M-22 und M-24.
+Der Sammeltext „Bitte die markierten Felder prüfen.“ entfällt (v0.6.1, Owner-Entscheidung MAR-176 / MAR-179). Es gibt keinen eigenen Sammeltext; Feldfehler stehen am Feld, der erste markierte Fehler erhält den Fokus (Kap. 5 „Validierung“). Eine Fehlerzusammenfassung, wo das freigegebene Design sie bereits beschreibt (UI-003 „Speichern“, DESIGN.md Formulare, UI-016 „Freigabe nicht möglich:“ mit Liste), bleibt unverändert und ist nicht Teil von M-23. Die Nummer M-23 bleibt unbesetzt. Der Katalog enthält 23 Meldungen: M-01 bis M-22 und M-24.
 
 ## 4. Plausibilitätsprüfung der Grenzen
 
