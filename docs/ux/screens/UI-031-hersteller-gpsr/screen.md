@@ -35,7 +35,7 @@ Liste: Name, Status, Chip „GPSR vollständig“ oder „GPSR unvollständig“
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts (unter 1366 CSS-px: Liste über dem Inhalt, Regel R-1); Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).

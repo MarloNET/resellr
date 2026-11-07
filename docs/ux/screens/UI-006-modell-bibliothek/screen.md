@@ -32,7 +32,7 @@ Trefferliste: Geräteart, Hersteller, Modellbezeichnung, Typbezeichnung, Herstel
 | validation, success, disabled | n/a bzw. wie oben | – | – |
 
 ## Fenstergröße und Bedienung
-Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Pfeil auf/ab + Enter.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Pfeil auf/ab + Enter. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

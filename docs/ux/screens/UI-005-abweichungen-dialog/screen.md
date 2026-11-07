@@ -62,7 +62,7 @@ Konflikt (P-05), Verbindungsverlust (P-08), „resellr wird beendet“ (P-07) un
 **Mockup-Hinweis:** Für Schritt 2 gibt es kein eigenes Mockup (Stitch-Budget unverändert, `stitch-log.md`). Maßgeblich ist diese Beschreibung. Als Layoutmuster dient `default.png` (Tabelle Merkmal | Wert am Gerät | Wert am Modell-Inserat, Primärbutton rechts im Fuß); abweichend gilt: Spalte „Wert am Ziel-Modell-Inserat“, Zeile „Ziel: …“, Dialogtitel „Umbuchen: Ziel weicht ab“, Buttons wie in der Tabelle (kein Button „Neues Modell-Inserat anlegen“ in Schritt 2).
 
 ## Fenstergröße und Bedienung
-Dialogbreite 800 px, lange Zustandsbeschreibung bricht um.
+Dialogbreite 800 px (bei schmalerem Fenster Fensterbreite abzüglich 16 px Rand), Dialoghöhe nie größer als das Fenster: Titel und Aktionsleiste bleiben sichtbar, der Inhalt scrollt. Seit v0.6 wächst UI-005 durch die Zielliste (Umbuchen) und Schritt 2 in der Höhe; der Inhalt scrollt dann im Dialog. Weitere Bedienung: lange Zustandsbeschreibung bricht um.
 
 ## Bekannte Abweichungen im Mockup
 Dargestellt ist Kontext A (Zuordnen). Der Link „Umbuchen“ links im Fuß erscheint im Mockup als Textlink; maßgeblich ist `screen.md` (Sekundärbutton, nur bei bereits zugeordnetem Gerät, Kontext B). Wertangaben „4“ und „Gut“ am Gerät sind im Mockup als Kennzeichnung (warn) hervorgehoben; die Hervorhebung ist nicht verbindlich. Im Hintergrund erscheint eine abgedunkelte Skelett-Seite (von Stitch erzeugt, nicht Teil des Designs). Navigationsuntertitel entfällt.

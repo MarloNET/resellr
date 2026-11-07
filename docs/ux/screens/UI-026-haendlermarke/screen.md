@@ -29,7 +29,7 @@ Name, Logo-Vorschau (oder „Kein Logo“), Kontaktangaben. Hinweis: „Das Logo
 | disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Fenster frei in der Größe, Untergrenze 1366 px (REQ-077).
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077). Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

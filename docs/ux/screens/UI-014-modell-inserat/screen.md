@@ -57,7 +57,7 @@
 | disabled | „Datenblatt“-Auswahl deaktiviert, wenn kein Gerät geprüft/zugeordnet: Tooltip „Gerät noch zu prüfen“ | nur Text | |
 
 ## Fenstergröße und Bedienung
-Drei Kanal-Karten gleich breit ab Fensterbreite 1366 px. Höhe frei: Kopfaktionen und Aktionsleiste bleiben sichtbar, der Inhalt scrollt; der Dialog `abweichung-bestaetigen` (Breite 800 px, bei schmalerem Fenster Fensterbreite abzüglich 16 px) ist nie höher als das Fenster, Titel und Aktionen bleiben sichtbar, die Tabelle scrollt. Tab-Reihenfolge: Kopfaktionen → Kanal-Karten → Inseratswerte → Fotos → Geräte.
+Drei Kanal-Karten gleich breit ab Fensterbreite 1366 px. Höhe frei: Kopfaktionen und Aktionsleiste bleiben sichtbar, der Inhalt scrollt; der Dialog `abweichung-bestaetigen` (Breite 800 px, bei schmalerem Fenster Fensterbreite abzüglich 16 px) ist nie höher als das Fenster, Titel und Aktionen bleiben sichtbar, die Tabelle scrollt. Tab-Reihenfolge: Kopfaktionen → Kanal-Karten → Inseratswerte → Fotos → Geräte. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Lieferumfang-Beispiel „Netzteil, Handbuch“ entspricht Textbausteinen, nur Beispiel; kleine Status-Pille „verfügbar“ in grün (Farbe nicht in DESIGN.md definiert, Text maßgeblich); Hinweis „Vorschlag nach Preisregel“ nicht im Mockup.

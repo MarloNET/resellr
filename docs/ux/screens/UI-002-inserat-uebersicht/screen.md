@@ -42,7 +42,7 @@
 | validation | – | n/a | Suche mit < 2 Zeichen filtert nicht, kein Fehler |
 
 ## Fenstergröße und Bedienung
-Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077, keine feste Planungsgröße); Titelspalte nimmt Restbreite. Fokus startet im Suchfeld; Pfeil auf/ab wählt Zeile, Enter öffnet. Keine Barrierefreiheitsanforderung (E-3).
+Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077, keine feste Planungsgröße); Titelspalte nimmt Restbreite. Fokus startet im Suchfeld; Pfeil auf/ab wählt Zeile, Enter öffnet. Keine Barrierefreiheitsanforderung (E-3). Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 Untertitel „Business Portal“ unter „resellr“ (von Stitch erzeugt, kein Teil des Designs); Platzhaltertext „Modell, Spezifikation…“ im Suchfeld (nicht in screen.md, entfällt); Titelspalte im Mockup zu schmal (7 Zeilen), Soll siehe „Hinweise“; Beispielzeilen 4/5 zeigen „Notebook“ als Geräteart für PC/Tablet (nur Beispieldaten); Navigationssymbole von Stitch gewählt (Symbolwahl offen, nicht verbindlich).

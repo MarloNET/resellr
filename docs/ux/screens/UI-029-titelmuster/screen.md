@@ -46,7 +46,7 @@
 | disabled | „Titelmuster speichern“ deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Tabelle und Vorschau untereinander; Vorschau nach jeder Änderung neu berechnet (kurz verzögert).
+Tabelle und Vorschau untereinander; Vorschau nach jeder Änderung neu berechnet (kurz verzögert). Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Seiten-ID „UI-029“ und Untertitel „Regelbasierte Zusammensetzung und automatische Zeichenkürzung für Verkaufsplattformen“ (von Stitch, entfällt); Vorschau Kleinanzeigen zeigt „72 / 65“ in Rot mit „zu lang …“ — nach Regel kürzt das System; maßgeblich: gekürzter Titel ≤ Höchstlänge, Chip „Titel gekürzt, bitte prüfen“ nur bei Kürzung am Wortende; das Mockup illustriert nur eine Fehlerdarstellung.

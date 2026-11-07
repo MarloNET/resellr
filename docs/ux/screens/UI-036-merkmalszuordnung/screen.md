@@ -34,7 +34,7 @@ Auswahl Kanal und Geräteart; Tabelle: Reihenfolge, Feldbezeichnung des Kanals, 
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts (unter 1366 CSS-px: Liste über dem Inhalt, Regel R-1); Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
 Die „Feldbezeichnung des Kanals“ ist im Mockup als Text dargestellt; maßgeblich ist ein Eingabefeld (1 bis 100 Zeichen). Auf-/Ab-Pfeile je Zeile sind die Bedienung für die Reihenfolge (Design-Entscheidung, keine Anforderung). Beim Entfernen einer Zeile: Aktion „Zeile entfernen“ ist im Mockup nicht dargestellt, steht in `screen.md`.
