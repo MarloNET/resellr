@@ -14,7 +14,7 @@ Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (n
 | Text | Mehrzeilentext | ja | max. 5.000 Zeichen; nur zulässige Platzhalter | „Unbekannter Platzhalter {…}“; „{Baustein:Name} ist im Textbaustein nicht zulässig“ |
 | Geltungsbereich | Mehrfachauswahl Gerätearten, Kanäle (oder „alle“) | ja | | – |
 | Prüfstatus | Auswahl | nur Rechtliches/Akku-Hinweis | neue Bausteine „rechtlich ungeprüft“; Textänderung setzt zurück | – |
-| Prüfdatum | Datum | ja bei „rechtlich geprüft“ | nicht in der Zukunft | „Prüfdatum darf nicht in der Zukunft liegen“ |
+| Prüfdatum | Datum | ja bei „rechtlich geprüft“ | nicht in der Zukunft | „Prüfdatum fehlt“ (v0.6, M-24, AC-REQ-054-03); „Prüfdatum darf nicht in der Zukunft liegen“ |
 | Prüfende Stelle | Text | ja bei „rechtlich geprüft“ | max. 100 | „Prüfende Stelle fehlt“ |
 
 ## Aktionen

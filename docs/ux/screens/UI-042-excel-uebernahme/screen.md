@@ -9,7 +9,7 @@ Dateiauswahl; nach dem Einlesen Einlesebericht: Liste erkannter Modellvorlagen (
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
-| Excel-Datei | Datei | ja | Excel (.xlsx) im Format Datenblatt | „Nur Excel-Dateien (.xlsx) im Format des Datenblatts“ |
+| Excel-Datei | Datei | ja | Excel (.xlsx) im Format Datenblatt, höchstens 10 MB | „Nur Excel-Dateien (.xlsx) im Format des Datenblatts“; „Excel-Datei: höchstens 10 MB“ (v0.6, M-22) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |

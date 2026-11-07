@@ -13,6 +13,7 @@
 | Tabelle | je abweichender Variantenangabe: Merkmal, Wert am Gerät, Wert am Modell-Inserat | REQ-018 | nur Variantenmerkmale (Zustand, Optik-Note, Zustandsbeschreibung, Variantenmerkmale) |
 | Zustandsbeschreibung | beide Texte vollständig, nebeneinander | REQ-018 | |
 | Hinweis | „Das Gerät weicht vom Modell-Inserat ab.“ | | Zeilenformat z. B. „Optik-Note: Gerät 4, Modell-Inserat 2“ |
+| **Schritt 2 „Ziel weicht ab“ (v0.6, MAR-167, nur beim Umbuchen)** | siehe Abschnitt „Umbuchen: Ziel weicht ab“ unten | REQ-014, REQ-020, AC-REQ-020-04 | Erscheint nur, wenn das gewählte Ziel-Modell-Inserat von den Variantenangaben des Geräts abweicht |
 
 ## Eingaben und Validierung
 Keine.
@@ -22,7 +23,7 @@ Keine.
 |---|---|---|---|---|---|
 | Trotzdem zuordnen | Primärbutton, nur Kontext A | – | Zuordnung, Inseratswerte unverändert, Protokolleintrag mit Zeitpunkt und abweichenden Angaben | Fehlerbanner | UI-003 |
 | Zuordnung behalten | Primärbutton, nur Kontext B | Gerät bleibt dem Modell-Inserat zugeordnet | Zuordnung unverändert, Modell-Inserat unverändert, Protokolleintrag wie „trotzdem zuordnen“ (Zeitpunkt, abweichende Angaben) | Fehlerbanner „Speichern nicht möglich. Referenz: <Nr>“ | Ausgangsscreen (UI-003/UI-010) |
-| Umbuchen (Should, REQ-020) | Sekundärbutton, Kontext B und Kontext A bei bereits zugeordnetem Gerät; öffnet im Dialog die Auswahl „Anderes Modell-Inserat derselben Modellvorlage“ (Liste: Titel, Variantenangaben, Stückzahl) und Button „Umbuchen“ | Gerät verfügbar und zugeordnet; mindestens ein anderes Modell-Inserat derselben Modellvorlage | Stückzahl des bisherigen Modell-Inserats −1, des neuen +1, Bestandsangaben beider aktualisiert (REQ-091), Banner „Gerät umgebucht“; bisheriges Modell-Inserat bleibt bei Stückzahl 0 bestehen | Verkauftes oder storniertes Gerät: Button nicht verfügbar, Hinweis „Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden“; kein anderes Modell-Inserat: „Kein anderes Modell-Inserat dieser Modellvorlage“ | UI-014 des neuen Modell-Inserats |
+| Umbuchen (Should, REQ-020) | Sekundärbutton, Kontext B und Kontext A bei bereits zugeordnetem Gerät; öffnet im Dialog die Auswahl „Anderes Modell-Inserat derselben Modellvorlage“ (Liste: Titel, Variantenangaben, Stückzahl) und Button „Umbuchen“ | Gerät verfügbar und zugeordnet; mindestens ein anderes Modell-Inserat derselben Modellvorlage | Stückzahl des bisherigen Modell-Inserats −1, des neuen +1, Bestandsangaben beider aktualisiert (REQ-091), Banner „Gerät umgebucht“; bisheriges Modell-Inserat bleibt bei Stückzahl 0 bestehen | Verkauftes oder storniertes Gerät: Button nicht verfügbar, Hinweis „Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden“; kein anderes Modell-Inserat: „Kein anderes Modell-Inserat dieser Modellvorlage“ | UI-014 des neuen Modell-Inserats (weicht das Ziel ab: erst Schritt 2, siehe unten) |
 | Neues Modell-Inserat anlegen | Sekundärbutton | Variantenangaben unterscheiden sich | wie UI-004 | Ablehnung wie UI-004 | UI-014 |
 | Abbrechen | Button, Esc | – | zurück zu UI-004 | – | UI-004 |
 
@@ -31,9 +32,34 @@ Keine.
 |---|---|---|---|
 | default | Abweichungstabelle | nur Text | – |
 | loading/error | wie UI-004 | nur Text | |
+| `UI-005.ziel-abweichung` (v0.6) | Schritt 2 des Umbuchens: Abweichungstabelle gegen das **Ziel**-Modell-Inserat, siehe Abschnitt „Umbuchen: Ziel weicht ab“ | nur Text (Muster: `default.png`) | „Das Gerät weicht vom Ziel-Modell-Inserat ab.“ |
+| `UI-005.ziel-abweichung.speichert` | „Trotzdem umbuchen“, „Anderes Ziel wählen“, „Abbrechen“ und Auswahl gesperrt bis zur Antwort, Beschriftung des Primärbuttons „Umbuchen …“, kein festes Timeout (P-08) | nur Text | „Umbuchen …“ |
 | empty | n/a (Dialog erscheint nur bei Abweichung) | – | – |
 | validation, success, disabled | n/a | – | – |
 | ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
+
+## Umbuchen: Ziel weicht ab (v0.6, MAR-167, Entscheidung PO an MAR-163, FIND-208)
+Gilt nur für die Aktion „Umbuchen“ (Kontext A bei bereits zugeordnetem Gerät und Kontext B). Gleicher Dialog, **zweiter Schritt**; kein neuer Screen. Das Muster der Abweichungsanzeige (Tabelle, Hinweis, Aktionen) bleibt gleich.
+
+**Wann:** Der Nutzer wählt im Dialog ein anderes Modell-Inserat derselben Modellvorlage und klickt „Umbuchen“. Stimmen die Variantenangaben des Geräts (in Kontext B die soeben geänderten, noch nicht gespeicherten) nach der Vergleichsregel (Requirements Kap. 6.0) mit dem Ziel überein, wird sofort umgebucht, wie im Fall von AC-REQ-020-04. Weichen sie ab, zeigt der Dialog Schritt 2; **es wird noch nichts gespeichert**. (Fachlich: die Spec fragt hier ein zweites Mal nach, `confirmTargetDeviation`.)
+
+| Element | Inhalt |
+|---|---|
+| Dialogtitel | „Umbuchen: Ziel weicht ab“ |
+| Ziel | Zeile „Ziel: <Titel des Ziel-Modell-Inserats>“ (wie in der Auswahlliste von Schritt 1) |
+| Hinweis | „Das Gerät weicht vom Ziel-Modell-Inserat ab.“ |
+| Tabelle | wie oben je abweichender Variantenangabe: Merkmal, Wert am Gerät, Wert am **Ziel-Modell-Inserat**; Zustandsbeschreibung beide Texte vollständig nebeneinander; Zeilenformat „Optik-Note: Gerät 4, Ziel-Modell-Inserat 2“ |
+| Folge | Satz unter der Tabelle: „Beim Umbuchen ändern sich die Angaben des Ziel-Modell-Inserats nicht.“ |
+
+| Aktion | Auslöser | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
+|---|---|---|---|---|
+| Trotzdem umbuchen | Primärbutton, Enter | Gerät umgebucht wie „Umbuchen“ (Stückzahl bisheriges −1, Ziel +1, Bestandsangaben aktualisiert, REQ-091); Inseratswerte des Ziels unverändert; Protokolleintrag mit Zeitpunkt und den abweichenden Angaben (wie „trotzdem zuordnen“); Banner „Gerät umgebucht“; in Kontext B wird die geänderte Variantenangabe des Geräts mitgespeichert | Fehlerbanner „Speichern nicht möglich. Referenz: <Nr>“; „Gerät ist bereits einem Modell-Inserat zugeordnet“ ist hier nicht möglich; ist das Gerät inzwischen verkauft oder storniert: Hinweis „Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden“ | UI-014 des Ziel-Modell-Inserats |
+| Anderes Ziel wählen | Sekundärbutton | zurück zu Schritt 1 (Auswahlliste), bisherige Auswahl markiert; nichts gespeichert | – | bleibt im Dialog |
+| Abbrechen | Button, Esc | Dialog schließt, nichts gespeichert (wie Abbrechen in Schritt 1) | – | wie „Abbrechen“ oben |
+
+Konflikt (P-05), Verbindungsverlust (P-08), „resellr wird beendet“ (P-07) und Ladefehler (P-06) gelten wie in Schritt 1. Tastatur: Fokus beim Öffnen von Schritt 2 auf „Anderes Ziel wählen“ (die ungefährlichere Wahl), Tab-Reihenfolge Tabelle → „Anderes Ziel wählen“ → „Abbrechen“ → „Trotzdem umbuchen“.
+
+**Mockup-Hinweis:** Für Schritt 2 gibt es kein eigenes Mockup (Stitch-Budget unverändert, `stitch-log.md`). Maßgeblich ist diese Beschreibung. Als Layoutmuster dient `default.png` (Tabelle Merkmal | Wert am Gerät | Wert am Modell-Inserat, Primärbutton rechts im Fuß); abweichend gilt: Spalte „Wert am Ziel-Modell-Inserat“, Zeile „Ziel: …“, Dialogtitel „Umbuchen: Ziel weicht ab“, Buttons wie in der Tabelle (kein Button „Neues Modell-Inserat anlegen“ in Schritt 2).
 
 ## Fenstergröße und Bedienung
 Dialogbreite 800 px, lange Zustandsbeschreibung bricht um.

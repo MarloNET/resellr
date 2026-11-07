@@ -10,10 +10,10 @@ Liste: Name, Status, Chip „GPSR vollständig“ oder „GPSR unvollständig“
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
 | Name | Text | ja | 1–50 Zeichen, eindeutig ohne Groß-/Kleinschreibung | wie UI-008 |
-| Herstellername (rechtlich) | Text | ja für „GPSR vollständig“ | | „Herstellername fehlt“ |
-| Postanschrift | Straße und Hausnummer, PLZ, Ort, Land | ja | | „<Teil> fehlt“ |
-| Elektronische Kontaktadresse | E-Mail oder Internetadresse | ja | gültiges Format | „E-Mail-Adresse oder Internetadresse ungültig“ |
-| Verantwortliche Person in der EU | Name, Postanschrift, Kontakt | nein | | – |
+| Herstellername (rechtlich) | Text | ja für „GPSR vollständig“ | höchstens 200 Zeichen | „Herstellername fehlt“; „Herstellername: höchstens 200 Zeichen“ |
+| Postanschrift | Straße und Hausnummer, PLZ, Ort, Land | ja | Straße und Hausnummer höchstens 200, PLZ 20, Ort 100, Land 100 Zeichen | „<Teil> fehlt“; „Straße und Hausnummer: höchstens 200 Zeichen“; „Postleitzahl: höchstens 20 Zeichen“; „Ort: höchstens 100 Zeichen“; „Land: höchstens 100 Zeichen“ |
+| Elektronische Kontaktadresse | E-Mail oder Internetadresse | ja | gültiges Format, höchstens 254 Zeichen | „E-Mail-Adresse oder Internetadresse ungültig“; „Elektronische Kontaktadresse: höchstens 254 Zeichen“ |
+| Verantwortliche Person in der EU | Name, Postanschrift, Kontakt | nein | Name höchstens 200, Postanschrift 500, Kontakt 254 Zeichen | „Name der verantwortlichen Person: höchstens 200 Zeichen“; „Postanschrift der verantwortlichen Person: höchstens 500 Zeichen“; „Kontaktadresse der verantwortlichen Person: höchstens 254 Zeichen“ (v0.6, M-05 bis M-13) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |

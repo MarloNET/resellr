@@ -19,8 +19,8 @@
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
 | Platzhalter | Auswahl nach Gruppen (Modelldaten, Inseratswerte; ohne Bestand, Kanal, Händler, Zusammenstellungen) | ja | muss Hersteller und Modellbezeichnung enthalten, beide Priorität 1 | „Das Titelmuster muss {Hersteller} und {Modellbezeichnung} mit Kürzungspriorität 1 enthalten“ |
-| Fester Text | Text | ja bei Festtext-Bestandteil | | – |
-| Präfix, Suffix | Text | nein | Leerzeichen erlaubt, werden sichtbar als „␣“ | – |
+| Fester Text | Text | ja bei Festtext-Bestandteil | 1–100 Zeichen | „Fester Text: 1 bis 100 Zeichen“ (v0.6, M-19) |
+| Präfix, Suffix | Text | nein | je 0–50 Zeichen; Leerzeichen erlaubt, werden sichtbar als „␣“ | „Präfix: höchstens 50 Zeichen“; „Suffix: höchstens 50 Zeichen“ (v0.6, M-17/M-18) |
 | Kürzungspriorität | Ganzzahl ≥ 1 | ja | | „Kürzungspriorität: ganze Zahl ab 1“ |
 | Platzhalter-Gültigkeit | – | – | Bestandsplatzhalter und unbekannte Platzhalter unzulässig | „Platzhalter {Stückzahl} ist im Titelmuster nicht zulässig.“ |
 

@@ -22,7 +22,7 @@
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Zuordnen | Primärbutton | Modell-Inserat gewählt, Gerät geprüft | ohne Abweichung: Stückzahl +1, Banner „Gerät <WI-Nr> zugeordnet (Stückzahl n)“; mit Abweichung zuerst UI-005 | „Erst Werte prüfen“ mit Nennung der markierten Werte; „Gerät gehört zu anderer Modellvorlage“ | Banner in UI-003, Formular für nächstes Gerät; bei veröffentlichtem Kanal Hinweis „Bestand auf Kanal anpassen“ mit Link UI-021 |
+| Zuordnen | Primärbutton | Modell-Inserat gewählt, Gerät geprüft | ohne Abweichung: Stückzahl +1, Banner „Gerät <WI-Nr> zugeordnet (Stückzahl n)“; mit Abweichung zuerst UI-005 | „Erst Werte prüfen“ mit Nennung der markierten Werte; „Gerät gehört zu anderer Modellvorlage“; „Gerät ist bereits einem Modell-Inserat zugeordnet“ (v0.6, M-01) | Banner in UI-003, Formular für nächstes Gerät; bei veröffentlichtem Kanal Hinweis „Bestand auf Kanal anpassen“ mit Link UI-021 |
 | Neues Modell-Inserat anlegen | Sekundärbutton | Variantenangaben unterscheiden sich von allen bestehenden | Modell-Inserat mit Stückzahl 1, Kanal-Inhalte im Status Entwurf | „Gleiche Variantenangaben wie Modell-Inserat <Titel>; bitte dort zuordnen“ | UI-014 |
 | Abbrechen | Button, Esc | – | Gerät bleibt nicht zugeordnet | – | UI-003 |
 

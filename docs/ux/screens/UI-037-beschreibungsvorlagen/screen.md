@@ -8,8 +8,8 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
-| Überschrift | Text | nein | | – |
-| Inhalt | Zeilen aus Text und Platzhaltern | ja | alle Platzhalter zulässig; Zeile mit nur leeren Platzhaltern entfällt samt festem Text; Abschnitt mit nur leeren Platzhaltern/Bausteinen entfällt samt Überschrift | „Unbekannter Platzhalter {…}“ |
+| Überschrift | Text | nein | höchstens 100 Zeichen | „Überschrift: höchstens 100 Zeichen“ (v0.6, M-20) |
+| Inhalt | Zeilen aus Text und Platzhaltern | ja | je Zeile höchstens 1.000 Zeichen („Zeile: höchstens 1.000 Zeichen“, v0.6, M-21); alle Platzhalter zulässig; Zeile mit nur leeren Platzhaltern entfällt samt festem Text; Abschnitt mit nur leeren Platzhaltern/Bausteinen entfällt samt Überschrift | „Unbekannter Platzhalter {…}“ |
 | Textbaustein-Element | Auswahl | nein | aktive Textbausteine | – |
 | Geltung | Mehrfachauswahl | nein | | – |
 

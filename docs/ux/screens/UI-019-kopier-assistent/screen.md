@@ -12,12 +12,40 @@
 |---|---|---|---|
 | Kopf | Titel des Modell-Inserats, Kanal-Wahl (Shop/Kleinanzeigen/eBay) mit Status-Chip | Kanal-Inhalt | Wechsel behält Übernommen-Markierungen je Kanal |
 | Hinweis | „Neuer Stand noch nicht freigegeben“ + Link „Änderungsentwurf prüfen“ (UI-018) bei „geändert seit Freigabe“ | REQ-047 | zeigt immer den freigegebenen Stand, nie den Entwurf |
-| Fortschritt | „n von m übernommen“ (z. B. „3 von 11 übernommen“) und „k offen“, Balken | REQ-049, AC-REQ-049-01, AC-REQ-049-03 | m zählt nur angezeigte Felder (Merkmalsfelder ohne Wert fehlen in n und m). Prozentzahl entfällt (im Mockup „39%“ von Stitch ergänzt) |
+| Fortschritt | „n von m übernommen“ (z. B. „3 von 18 übernommen“) und „k offen“, Balken | REQ-049, AC-REQ-049-01, AC-REQ-049-03 | **m zählt jedes angezeigte Kopierfeld einzeln**, auch jede GPSR-Angabe (siehe „Feste Kopierfelder“ unten); Merkmalsfelder ohne Wert und optionale GPSR-Angaben ohne Wert fehlen in n und m. Prozentzahl entfällt (im Mockup „39%“ von Stitch ergänzt). Zahlen sind Beispiele (v0.6: vorher „3 von 11“) |
 | Sicherungshinweis | im Anwendungsrahmen, **auch in der schmalen Ansicht** (dort fest am unteren Rand, vollständig, siehe UI-044) | REQ-104 | nicht ausblendbar |
-| Feldzeilen | Feldbezeichnung des Kanals, Wert (Beschreibung mehrzeilig, Zeilenumbrüche sichtbar, scrollbar), Kopieren-Button, Chip „übernommen“ | freigegebener Stand mit aktuellen Bestandsangaben (REQ-091) | Reihenfolge = Feldreihenfolge des Kanals (UI-036); Felder: Titel, Beschreibung, Kategorie, Zustand (+Zusatz), Preis (ggf. „VB“), Merkmalsfelder, GPSR-Angaben |
+| Feldzeilen | Feldbezeichnung (feste Felder: siehe unten; Merkmalsfelder: laut Kanal), Wert (Beschreibung mehrzeilig, Zeilenumbrüche sichtbar, scrollbar), Kopieren-Button, Chip „übernommen“ | freigegebener Stand mit aktuellen Bestandsangaben (REQ-091) | Reihenfolge = Feldreihenfolge des Kanals (UI-036); Felder: Titel, Beschreibung, Kategorie, Zustand (+Zusatz), Preis (ggf. „VB“), Merkmalsfelder, GPSR-Angaben |
+| Feste Kopierfelder (v0.6, MAR-167, DG-01, DG-02) | Jedes Feld ist **ein eigenes Kopierfeld** mit eigener Zeile, Kopieren-Button und Marke „übernommen“. Bezeichnungen und Reihenfolge siehe Tabelle unten. | Requirements (REQ-047), Spec DG-01 | Die Bezeichnungen der festen Felder sind fest (nicht über UI-036 einstellbar); UI-036 stellt nur die Bezeichnung der Merkmalsfelder ein |
 | Merkmalsfeld ohne Wert | **wird nicht angezeigt** (keine Zeile, kein „leer“, kein Button) | REQ-037, REQ-047, AC-REQ-047-07 | Gilt nur für Merkmalsfelder. Titel, Beschreibung, Kategorie, Zustand, Preis und GPSR-Angaben sind im freigegebenen Stand stets vorhanden. Ein Feld erscheint bzw. entfällt nach dem aktuellen Stand (REQ-091). Geändert in Design v0.4 (Requirements v0.3.3: Regeländerung gegenüber v0.3); vorher Design-Annahme „Wert leer“ |
 | Fotos | „n Fotos in Reihenfolge, Dateinamen beginnen mit 01 …“, nummerierte Vorschau, Buttons „Foto-Ordner öffnen“ und „Fotos als ZIP herunterladen“; ohne Fotos „Keine Fotos zugeordnet“ | REQ-048 | Foto-Ordner öffnen bzw. ZIP herunterladen laut Architecture Baseline v0.3.2 (C-3, ADR-001; wie FLOW-09) |
 | Nächstes Feld | Die erste offene Zeile ist hervorgehoben und trägt die Marke „nächstes Feld“, in beiden Layouts | – | Enter kopiert dieses Feld |
+
+### Feste Kopierfelder und Bezeichnungen (v0.6)
+| Nr | Feldbezeichnung | Erscheint | Wert |
+|---|---|---|---|
+| 1 | Titel | immer | Titel des freigegebenen Stands |
+| 2 | Beschreibung | immer | Beschreibung, mehrzeilig |
+| 3 | Kategorie | immer | Kategoriepfad des Kanals |
+| 4 | Zustand | immer | Zustandsbezeichnung |
+| 5 | Zustand – Zusatz | **nur wenn eine Zusatzangabe besteht** | Zusatzangabe |
+| 6 | Preis | immer | Preis (ggf. „VB“) |
+| – | (Merkmalsfelder) | nur mit Wert | Bezeichnung und Reihenfolge laut UI-036 |
+| 7 | Herstellername | immer | GPSR |
+| 8 | Postanschrift | immer | GPSR |
+| 9 | Elektronische Kontaktadresse | immer | GPSR |
+| 10 | Verantwortliche Person in der EU | **nur wenn angegeben** | GPSR, optional |
+| 11 | Postanschrift der verantwortlichen Person | **nur wenn angegeben** | GPSR, optional |
+| 12 | Kontaktadresse der verantwortlichen Person | **nur wenn angegeben** | GPSR, optional |
+| 13 | Produktidentifikation | immer | GPSR |
+
+Optionale GPSR-Angaben ohne Wert erscheinen **nicht** (keine Zeile, kein „leer“) und zählen weder in n noch in m. Die Reihenfolge der Tabelle ist die feste Reihenfolge der Spec; **REQ-029 (Feldreihenfolge) ist offen** und wird hier nicht entschieden. Beispiel: Ohne Zusatzangabe und ohne Angaben der verantwortlichen Person sind es 5 feste Felder (Titel, Beschreibung, Kategorie, Zustand, Preis) + 4 GPSR-Felder + die Merkmalsfelder; bei 9 Merkmalsfeldern „n von 18“. (Die Mockups zeigen „7 von 18“ als Beispiel; die Zahl ist nur ein Beispiel, kein Sollwert.)
+
+### Markierungen „übernommen“ (v0.6, DG-03, REQ-049)
+- Sie gelten **je Fenster** (Browserfenster bzw. Registerkarte). Ein zweites Fenster mit demselben Kopier-Assistenten beginnt bei 0 von m.
+- Sie **überstehen das Neuladen** im selben Fenster (auch nach dem Banner „Bitte neu laden“, P-05), nicht aber das Schließen des Fensters.
+- Der Wechsel zwischen „Schmale Ansicht“ und „Normale Ansicht“ im selben Fenster und der Kanalwechsel behalten sie.
+- Bei **reiner Änderung von Bestandsangaben** (Stückzahl, WI-Nr, Akkukapazität) bleiben sie stehen (REQ-049 setzt nur bei neuer Freigabe zurück, AC-REQ-049-02); die Kennzeichnung „Bestand auf Kanal anpassen“ weist auf den geänderten Wert hin. Eine Anzeige „Wert seit Übernahme geändert“ gibt es in Release 0.1 nicht.
+- Eine neue Freigabe setzt alle zurück (unverändert).
 
 ## Eingaben und Validierung
 Keine Eingaben. Tastatur: Pfeil auf/ab wählt Zeile, Enter oder Strg+Enter kopiert das gewählte Feld und wählt das nächste offene Feld.
@@ -47,7 +75,7 @@ Keine Eingaben. Tastatur: Pfeil auf/ab wählt Zeile, Enter oder Strg+Enter kopie
 | disabled | „Abgleich bestätigen“ deaktiviert wenn nichts abzugleichen | compact.png | „Kanal ist abgeglichen“ |
 
 ## Fenstergröße und Bedienung
-Vollfenster: Liste mit Spalten Feldname | Wert | Aktion. Schmal: Kopf, Kanal-Wahl und Fortschritt stehen fest oben, der **Sicherungshinweis (UI-044, vollständiger Text, etwa 256 px hoch bei Pfad bis 100 Zeichen, etwa 240 px bei Beispielpfad; Rechnung in UI-044) fest unten**, nur die Feldliste dazwischen scrollt (bei 630 px nutzbarer Höhe bleiben etwa 374 px für Kopf, Kanal-Wahl, Fortschritt und Feldliste, bei Planungshöhe 600 px etwa 344 px); die Aktionen „Als veröffentlicht melden“ und „Abgleich bestätigen“ stehen am Ende der Feldliste. Eine Zeile je Feld, Wert einzeilig gekürzt (voller Wert per Klick auf den Wert oder Tooltip), Buttons groß (≥ 32 px Höhe), Navigation ausgeblendet. Die Markierungen „übernommen“ gelten für die laufende Nutzung und werden bei neuer Freigabe zurückgesetzt (REQ-049). Das schmale Layout ist ein Umschalter im selben Fenster („Schmale Ansicht“/„Normale Ansicht“, ADR-001; siehe „Annahmen und offene Fragen“).
+Vollfenster: Liste mit Spalten Feldname | Wert | Aktion. Schmal: Kopf, Kanal-Wahl und Fortschritt stehen fest oben, der **Sicherungshinweis (UI-044, vollständiger Text, etwa 256 px hoch bei Pfad bis 100 Zeichen, etwa 240 px bei Beispielpfad; Rechnung in UI-044) fest unten**, nur die Feldliste dazwischen scrollt (bei 630 px nutzbarer Höhe bleiben etwa 374 px für Kopf, Kanal-Wahl, Fortschritt und Feldliste, bei Planungshöhe 600 px etwa 344 px); die Aktionen „Als veröffentlicht melden“ und „Abgleich bestätigen“ stehen am Ende der Feldliste. Eine Zeile je Feld, Wert einzeilig gekürzt (voller Wert per Klick auf den Wert oder Tooltip), Buttons groß (≥ 32 px Höhe), Navigation ausgeblendet. Die Markierungen „übernommen“ gelten je Fenster, überstehen das Neuladen im selben Fenster und werden bei neuer Freigabe zurückgesetzt (REQ-049, siehe „Markierungen“). Das schmale Layout ist ein Umschalter im selben Fenster („Schmale Ansicht“/„Normale Ansicht“, ADR-001; siehe „Annahmen und offene Fragen“).
 
 ## Bekannte Abweichungen im Mockup
 default.png (Vollfenster, neu erzeugt in Korrekturrunde 2, Stitch 67d2ba17a4874daeafe35e12dae4a07d): zeigt „7 von 18 übernommen“ ohne Prozent, „Foto-Ordner öffnen“ und „Fotos als ZIP herunterladen“. Abweichungen: Stitch ergänzt die Beschriftung „Übertragungsfortschritt“; Buttons bei übernommenen Zeilen heißen „Erneut kopieren“ (entspricht der Aktion „Erneut kopieren“), die Beschreibung steht in Festbreitenschrift; die Hinweisfläche „Kanal ist abgeglichen“ steht links in der Fußleiste; das Banner „Neuer Stand noch nicht freigegeben“ ist nicht dargestellt (Zustand „geändert seit Freigabe"); Schaltfläche „Abgleich bestätigen“ ist deaktiviert dargestellt. compact.png (neu, 480 px; **Banner/Button:** zeigt das Banner „Neuer Stand noch nicht freigegeben“ ohne den Link „Änderungsentwurf prüfen“ neben einem aktiven „Als veröffentlicht melden“; das widerspricht der Aktionstabelle, maßgeblich ist `screen.md`): Anzeige „7 von 18 übernommen“ ohne Prozent; beide Foto-Aktionen sichtbar; Feldbezeichner in Großbuchstaben; Fotos-Karte zeigt „6 Fotos (01–06)“ statt Thumbnails; „Normale Ansicht“ ohne Symbol (Symbolwahl nicht verbindlich); Liste endet nach 8 Feldern (Rest laut Liste, Scrollbereich); die Sicht „Abgleich bestätigen“ ist im Mockup als aktiv dargestellt, in Status Freigegeben gilt der Zustand laut Aktionstabelle (deaktiviert).

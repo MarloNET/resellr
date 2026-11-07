@@ -9,7 +9,7 @@ Matrix Geräteart (Zeilen) × Kanal (Spalten); Zelle zeigt Kategoriepfad und Ken
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
 | Kategoriebezeichnung/-pfad | Text | ja je gepflegter Zelle | max. 255 | „Kategorie: 1 bis 255 Zeichen“ |
-| Kategorie-Kennung | Text | nein | | – |
+| Kategorie-Kennung | Text | nein | höchstens 100 Zeichen | „Kategorie-Kennung: höchstens 100 Zeichen“ (v0.6, M-14) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |

@@ -29,7 +29,7 @@
 |---|---|---|---|---|
 | Kategorie (überschreiben) | Text | nein | 1–255 Zeichen; „Verwerfen“ stellt Vorschlag wieder her | „Kategorie: 1 bis 255 Zeichen“ |
 | Titel (manuell) | Text | nein | höchstens Höchstlänge des Kanals; „Anpassung speichern“ ist erst aktiv, wenn sich der Text vom gespeicherten Stand unterscheidet | „Titel zu lang: höchstens <n> Zeichen“ |
-| Beschreibung (manuell) | Mehrzeilentext | nein | Bestandsplatzhalter bleiben als Platzhalter erhalten; „Anpassung speichern“ erst aktiv, wenn der Text vom gespeicherten Stand abweicht | „Unbekannter Platzhalter {…}“ |
+| Beschreibung (manuell) | Mehrzeilentext | nein | Bestandsplatzhalter bleiben als Platzhalter erhalten; „Anpassung speichern“ erst aktiv, wenn der Text vom gespeicherten Stand abweicht | „Beschreibung: 1 bis 20.000 Zeichen“; „Unbekannter Platzhalter {…}“ (v0.6, M-16) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
