@@ -32,7 +32,7 @@ Trefferliste: Geräteart, Hersteller, Modellbezeichnung, Typbezeichnung, Herstel
 | validation, success, disabled | n/a bzw. wie oben | – | – |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Pfeil auf/ab + Enter.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Pfeil auf/ab + Enter.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

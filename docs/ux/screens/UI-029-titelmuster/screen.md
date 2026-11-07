@@ -4,7 +4,7 @@
 - Flows: FLOW-05
 - Anforderungen: REQ-030, REQ-034, REQ-035; Kap. 9.7
 - Rollen: Nutzer
-- Gerät(e): PC, ab 1366 × 768
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077)
 - Artefakte: default.png (Stitch 877d32da24214ae9970d9047237ec7d6, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten

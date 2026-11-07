@@ -4,7 +4,7 @@
 - Flows: FLOW-01 (Schritt 4–6), FLOW-06, FLOW-09
 - Anforderungen: REQ-019, REQ-032, REQ-033, REQ-088, REQ-091, REQ-095, REQ-045, REQ-046, REQ-089, REQ-090, REQ-057 (Could)
 - Rollen: Nutzer
-- Gerät(e): PC, Fenster ab 1366 × 768 (nutzbar etwa 1350 × 630 px)
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077)
 - Artefakte: default.png (Stitch 1b01b1d0b1084415a8e4d917ff94cde6, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
@@ -57,7 +57,7 @@
 | disabled | „Datenblatt“-Auswahl deaktiviert, wenn kein Gerät geprüft/zugeordnet: Tooltip „Gerät noch zu prüfen“ | nur Text | |
 
 ## Fenstergröße und Bedienung
-Drei Kanal-Karten gleich breit ab 1366 px. Tab-Reihenfolge: Kopfaktionen → Kanal-Karten → Inseratswerte → Fotos → Geräte.
+Drei Kanal-Karten gleich breit ab Fensterbreite 1366 px. Höhe frei: Kopfaktionen und Aktionsleiste bleiben sichtbar, der Inhalt scrollt; der Dialog `abweichung-bestaetigen` (Breite 800 px, bei schmalerem Fenster Fensterbreite abzüglich 16 px) ist nie höher als das Fenster, Titel und Aktionen bleiben sichtbar, die Tabelle scrollt. Tab-Reihenfolge: Kopfaktionen → Kanal-Karten → Inseratswerte → Fotos → Geräte.
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Lieferumfang-Beispiel „Netzteil, Handbuch“ entspricht Textbausteinen, nur Beispiel; kleine Status-Pille „verfügbar“ in grün (Farbe nicht in DESIGN.md definiert, Text maßgeblich); Hinweis „Vorschlag nach Preisregel“ nicht im Mockup.

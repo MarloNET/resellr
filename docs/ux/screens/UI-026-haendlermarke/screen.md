@@ -29,7 +29,7 @@ Name, Logo-Vorschau (oder „Kein Logo“), Kontaktangaben. Hinweis: „Das Logo
 | disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077).
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

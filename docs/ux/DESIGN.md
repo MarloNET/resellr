@@ -3,7 +3,7 @@
 Status: **vorgeschlagen** (kein vorhandenes Designsystem, Requirements 10.4). Wird mit der Owner-Freigabe des Designs verbindlich.
 Keine Markenbindung an notebookers.de (REQ-074). Keine Barrierefreiheitsvorgabe (E-3); die Kontraste unten sind Lesbarkeitsziele, keine Konformitätsaussage.
 
-Charakter: ruhiges, dichtes Arbeitswerkzeug für einen PC (Tastatur und Maus, Fenster ab 1366 × 768, nutzbar etwa 1350 × 630 px). Helles Theme, wenig Dekoration, Informationen vor Optik.
+Charakter: ruhiges, dichtes Arbeitswerkzeug für einen PC (Tastatur und Maus, Fenstergröße frei, Untergrenze 1366 × 768 nach REQ-077; die Oberfläche passt sich an). Helles Theme, wenig Dekoration, Informationen vor Optik.
 
 ## Farben
 | Token | Hex | Rolle |
@@ -28,7 +28,7 @@ Status und Kennzeichnungen werden immer mit Text ausgeschrieben, nie nur durch F
 Inter für Überschriften und Text; Zahlen in Tabellen mit tabellarischen Ziffern. Skala: Seitentitel 22/28 semibold, Abschnitt 16/24 semibold, Text 14/20, Hilfstext/Label 12/16. Mindestgröße 12 px. Ausgabetexte der Kanal-Inhalte (Titel, Beschreibung, Kopierwert) in Monospace-freier Inter 14 px, Zeilenumbrüche sichtbar.
 
 ## Form und Dichte
-Eckenradius 6 px (Felder, Buttons, Karten), Chips 4 px. 8er-Raster. Dichte: kompakt (Zeilenhöhe Tabelle 36 px, Feldhöhe 36 px). Linke Navigation 208 px fest (Kopf 40 px, Einträge 28 px hoch, damit der Hinweis UI-044 bei 1366 × 768 ohne Scrollen passt; Hinweis-Maße v0.5.2: Rand 8 px, Innenabstand 8 px, Rahmen 1 px, Balken 4 px, Absatzabstand 2 px, Abstand zu den Einträgen 4 px, Button 32 px; Pfad mit 100 Zeichen = 588 px ≤ 600 px, siehe UI-044); Inhaltsbereich fluide, Breite fluide. **Maß (Ä-28):** Gemeint ist die Mindestgröße des **Fensters** (1366 × 768); nutzbar sind davon etwa **1350 × 630 px** (Seitenleiste, Titel- und Adressleiste des Browsers abgezogen). Lange Formulare und Dialoge planen mit 630 px Höhe: Inhalt scrollt, Titel und Aktionsleiste (Speichern, Freigeben, Dialog-Buttons) bleiben fest sichtbar. Kopier-Assistent zusätzlich als schmale Variante ab 480 px Breite (Umschalter im selben Fenster, ADR-001; Mindestbreite 480 px bleibt Abnahmepunkt des Architekten, Baseline C-5).
+Eckenradius 6 px (Felder, Buttons, Karten), Chips 4 px. 8er-Raster. Dichte: kompakt (Zeilenhöhe Tabelle 36 px, Feldhöhe 36 px). Linke Navigation 208 px breit, Höhe folgt dem Fenster (Kopf „resellr“ 40 px **fest**, darunter ein Bereich mit den Einträgen (je 28 px, kompakte Dichte) und dem Hinweis UI-044; bei wenig Höhe scrollt dieser Bereich senkrecht, bei viel Höhe steht der Hinweis am unteren Spaltenrand; Variante A, kein Einklappen). Hinweis-Maße: Rand 8 px, Innenabstand 8 px, Rahmen 1 px, Balken 4 px, Absatzabstand 2 px, Abstand zu den Einträgen 4 px, Button 32 px, Text mindestens 12 px; Pixelrechnungen sind keine Abnahmegrundlage. Inhaltsbereich fluide, Breite fluide. **Fenstergröße (Ä-28, v0.6):** Gemeint ist die Mindestgröße des Fensters (REQ-077, 1366 × 768) als Untergrenze; Höhe und Breite sind frei, das Layout passt sich an, nichts ist auf einen Bildschirm zugeschnitten (kein festes Maß 1350 × 630 px). Seitenzoom bis 150 % ist zu unterstützen. Lange Formulare und Dialoge: Inhalt scrollt, Titel und Aktionsleiste (Speichern, Freigeben, Dialog-Buttons) bleiben fest sichtbar. Kopier-Assistent zusätzlich als schmale Variante ab 480 px Breite (Umschalter im selben Fenster, ADR-001; Mindestbreite 480 px bleibt Abnahmepunkt des Architekten, Baseline C-5). **Abnahmegrundlage für Rahmen und Hinweis:** „Kein Inhalt und keine Aktion ist unerreichbar“ (siehe UI-044).
 
 ## Komponentenregeln
 - **Buttons:** je Bereich genau ein Primärbutton (gefüllt primary). Sekundär: Rahmen. Destruktiv (Storno, Löschen): Rahmen und Text error, Bestätigungsdialog. Button-Text beschreibt das Ergebnis („Freigeben“, „Gerät speichern“).
@@ -38,7 +38,7 @@ Eckenradius 6 px (Felder, Buttons, Karten), Chips 4 px. 8er-Raster. Dichte: komp
 - **Chips/Badges:** Kanal-Status und Kennzeichnungen als Text-Chips (Status Kap. 9.4), ein Chip je Kennzeichnung.
 - **Feedback:** Inline-Fehler am Feld; Banner oben im Inhaltsbereich für Seitenmeldungen (Erfolg, Fehler); Toast nur für „Ziel kopiert“ im Kopier-Assistenten (3 s). Technische Fehler: Banner mit Funktion, nächstem Schritt und Referenznummer (REQ-073).
 - **Speichern mit Neuberechnung (K-4):** Speicherknopf und Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, kein festes Timeout (Muster P-08, `uiux-design.md`). Die 5-Sekunden-Regel gilt nur für Laden.
-- **Dialoge:** modal, maximale Höhe 630 px (Inhalt scrollt), Titel, Inhalt, Aktionen rechts unten (primär ganz rechts), Esc schließt (ohne Speichern).
+- **Dialoge:** modal, Höhe nie größer als die Fensterhöhe abzüglich Rand (Inhalt scrollt; Titel und Aktionsleiste bleiben sichtbar), Titel, Inhalt, Aktionen rechts unten (primär ganz rechts), Esc schließt (ohne Speichern).
 - **Leerzustände:** ein Satz Erklärung und eine Aktion (aus `screen.md`).
 - **Fokus:** sichtbarer 2-px-Ring primary mit 2 px Abstand.
 

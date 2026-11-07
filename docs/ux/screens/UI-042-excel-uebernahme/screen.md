@@ -24,7 +24,7 @@ Dateiauswahl; nach dem Einlesen Einlesebericht: Liste erkannter Modellvorlagen (
 | empty, validation, disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077).
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

@@ -32,7 +32,7 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
 Von Stitch erzeugt, nicht Teil des Designs: Untertitel „Konfiguration dynamischer Textbausteine für Marktplatz-Inserate“; Zusatzzeile „Reihenfolge und Felder der generierten Beschreibungsteile festlegen“; Kennzeichnung „3 Abschnitte aktiv“; Chip „Live synchronisiert“ mit Zusatzzeile „Echtzeit-Generierung basierend auf Referenzgerät“; Infobox „Variablen ohne hinterlegte Bestandsdaten werden …“; Abschnittsnamen („Basisdaten“, „Zustandsbeschreibung“, „Zubehör & Lieferumfang“); Ziehgriffe und Löschen-Symbole an Inhaltszeilen. Das Auswahlfeld „Textbausteine der Art“ ist im Mockup leer (maßgeblich: Wert „Akku-Hinweis“). Abschnitt 3 liegt hinter der Sticky-Leiste. Die durchgestrichene Vorschauzeile „entfällt“ ist die Darstellung für entfallende Zeilen.

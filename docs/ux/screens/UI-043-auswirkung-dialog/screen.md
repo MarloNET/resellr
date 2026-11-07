@@ -29,10 +29,10 @@ Keine.
 | loading, error, validation, success, disabled | n/a. **Kein `.error`** (K-5): Der Dialog zeigt nur die Zahlen der Speicherantwort; Fehler beim Speichern (Ablehnung, Verbindungsverlust, „Ausgang unbekannt, bitte neu laden“) gehören zum aufrufenden Screen (Zustand „wird gespeichert“, Muster P-08). Technische Fehler stehen für den Betreiber im Protokoll (REQ-073), der Dialog zeigt keine Referenznummer. | – | – |
 
 ## Fenstergröße und Bedienung
-Fenster ab 1366 px (nutzbar etwa 1350 × 630 px); Dialogbreite 480 px, Esc schließt, Enter löst die Primäraktion aus.
+Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077); Dialogbreite 480 px (bei schmalerem Fenster Fensterbreite abzüglich 16 px Rand), Dialoghöhe nie größer als die Fensterhöhe (Titel und Aktionsleiste bleiben sichtbar, der Inhalt scrollt), Esc schließt, Enter löst die Primäraktion aus.
 
 ## Bekannte Abweichungen im Mockup
-Der Dialog ist im Mockup breiter als die 480 px laut Spezifikation; maßgeblich sind 480 px. Im unscharfen Hintergrund unten links steht ein kleiner Versionstext (von Stitch erzeugt, nicht Teil des Designs). Der Hinweis „Keine Kanal-Inhalte betroffen“ (Zustand empty) ist nicht gestaltet. Die Kennzeichnung „geändert seit Freigabe“ beim zweiten Zähler ist Darstellung von Kap. 9.4.
+Der Dialog ist im Mockup breiter als die 480 px laut Spezifikation; maßgeblich sind 480 px Breite und die Begrenzung der Höhe auf die Fensterhöhe (v0.6); die festen Maße des Mockups sind nicht verbindlich. Im unscharfen Hintergrund unten links steht ein kleiner Versionstext (von Stitch erzeugt, nicht Teil des Designs). Der Hinweis „Keine Kanal-Inhalte betroffen“ (Zustand empty) ist nicht gestaltet. Die Kennzeichnung „geändert seit Freigabe“ beim zweiten Zähler ist Darstellung von Kap. 9.4.
 
 **Nach K-5 (v0.5):** Das Mockup zeigt „Anzeigen“ bei jeder Gruppe; verbindlich ist nur der Link bei „zur erneuten Freigabe“ (siehe Angezeigte Daten). Das Mockup wurde nicht neu erzeugt (Stitch-Budget).
 

@@ -31,7 +31,7 @@
 | validation, success, disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Enter öffnet die erste Zeile, wenn genau ein Treffer.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Enter öffnet die erste Zeile, wenn genau ein Treffer.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

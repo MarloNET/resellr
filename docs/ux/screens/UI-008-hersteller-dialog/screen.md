@@ -25,7 +25,7 @@ Feld „Name des Herstellers“. Hinweis nach Anlegen: „Hersteller angelegt. G
 | ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
-Dialogbreite 480 px, Fokus im Feld.
+Dialogbreite 480 px (bei schmalerem Fenster Fensterbreite abzüglich 16 px Rand), Dialoghöhe nie größer als die Fensterhöhe (Titel und Aktionsleiste sichtbar, Inhalt scrollt), Fokus im Feld.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

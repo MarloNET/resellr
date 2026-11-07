@@ -28,7 +28,7 @@ Kopfzeilentexte (Startbelegung „Shop:“, „eBay:“, „Kleinanzeigen:“), 
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).

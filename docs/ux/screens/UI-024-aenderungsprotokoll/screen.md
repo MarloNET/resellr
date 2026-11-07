@@ -29,7 +29,7 @@ Tabelle: Zeitpunkt (TT.MM.JJJJ HH:MM), Objekt (Art und Bezeichnung, mit Link, wo
 | success, disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; lange alte/neue Werte umbrechen, Details per Klick auf die Zeile.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); lange alte/neue Werte umbrechen, Details per Klick auf die Zeile.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).
