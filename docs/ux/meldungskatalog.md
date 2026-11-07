@@ -1,6 +1,6 @@
-# Meldungskatalog – Ergänzungen (Design v0.6, MAR-167, Spec DG-08)
+# Meldungskatalog – Ergänzungen (Design v0.6.1, MAR-167, Spec DG-08)
 
-Wortlaut für Fälle, die im Design bisher keinen Text hatten. Muster wie im Design: Feldfehler „<Feld>: 1 bis n Zeichen“ bzw. „<Feld>: höchstens n Zeichen“, Anrede „Sie“, keine Codes oder technischen Begriffe (REQ-073), Zahlen de-DE (20.000). Gezählt werden Zeichen (nicht Bytes). Grenzen aus der Technical Specification (MAR-153, Kap. 2 und 3, DG-08), vom Design auf Plausibilität geprüft (siehe unten). Der Katalog ergänzt das Design; die Regeln selbst (REQ) sind unverändert.
+Der Katalog enthält 23 Meldungen (M-01 bis M-22 und M-24; M-23 entfallen, siehe Abschnitt 3). Wortlaut für Fälle, die im Design bisher keinen Text hatten. Muster wie im Design: Feldfehler „<Feld>: 1 bis n Zeichen“ bzw. „<Feld>: höchstens n Zeichen“, Anrede „Sie“, keine Codes oder technischen Begriffe (REQ-073), Zahlen de-DE (20.000). Gezählt werden Zeichen (nicht Bytes). Grenzen aus der Technical Specification (MAR-153, Kap. 2 und 3, DG-08), vom Design auf Plausibilität geprüft (siehe unten). Der Katalog ergänzt das Design; die Regeln selbst (REQ) sind unverändert.
 
 ## 1. Texte
 
@@ -28,8 +28,8 @@ Wortlaut für Fälle, die im Design bisher keinen Text hatten. Muster wie im Des
 | M-20 | Beschreibungsvorlage: Überschrift zu lang | UI-037 | „Überschrift: höchstens 100 Zeichen“ | Feldfehler am Abschnitt |
 | M-21 | Beschreibungsvorlage: Zeile zu lang | UI-037 | „Zeile: höchstens 1.000 Zeichen“ | Feldfehler an der Zeile |
 | M-22 | Excel-Datei zu groß | UI-042 | „Excel-Datei: höchstens 10 MB“ | Feldfehler am Feld „Excel-Datei“; vor dem Einlesen, nichts angelegt |
-| M-23 | Allgemeiner Hinweis, wenn mehrere Felder fehlerhaft sind | alle Formulare | „Bitte die markierten Felder prüfen.“ | siehe Abschnitt 3 |
-| M-24 | Prüfdatum fehlt bei „rechtlich geprüft“ (AC-REQ-054-03) | UI-030 | „Prüfdatum fehlt“ | Feldfehler; „Prüfende Stelle fehlt“ besteht schon; fehlen beide, erscheinen beide Fehler |
+| M-23 | **entfallen** (v0.6.1, Owner-Entscheidung MAR-176): kein Sammeltext; die Nummer bleibt unbesetzt und wird nicht neu vergeben (Schlüssel der Specification) | – | – | – |
+| M-24 | Prüfdatum und/oder prüfende Stelle fehlt bei „rechtlich geprüft“ (AC-REQ-054-03) | UI-030 | „Prüfdatum und prüfende Stelle erforderlich“ | **ein** Text, wenn Prüfdatum, prüfende Stelle oder beides fehlt; erscheint einmal, beide betroffenen Felder sind markiert; kein zweiter Text „Prüfende Stelle fehlt“ |
 
 ## 2. `not_found` (M-15)
 
@@ -37,9 +37,9 @@ Wortlaut für Fälle, die im Design bisher keinen Text hatten. Muster wie im Des
 - Beim Laden steht der Banner anstelle des Inhalts. Ein Dialog zeigt ihn im Dialog mit „Abbrechen“ als einziger Aktion.
 - Das ist ein Text und keine neue Seite; es gibt keinen zusätzlichen Button und keinen eigenen Zustand je Screen. Die Spec bildet ihn über `not_found` ab. Er ersetzt weder `.error` mit Referenznummer noch P-05 (Konflikt).
 
-## 3. „Bitte die markierten Felder prüfen.“ (M-23)
+## 3. M-23: entfallen
 
-Steht als Fehlerzusammenfassung oben im Formular, wenn beim Speichern mindestens ein Feld fehlerhaft ist und der Server mehrere oder keine einzelne Meldung liefert. Der erste markierte Fehler erhält den Fokus (Kap. 5 „Validierung“). Die Feldfehler (M-02 bis M-24 usw.) stehen zusätzlich am Feld. Ersetzt nicht den Text „Freigabe nicht möglich:“ mit Liste in UI-016.
+Der Sammeltext „Bitte die markierten Felder prüfen.“ entfällt (v0.6.1, Owner-Entscheidung MAR-176 / MAR-179). Es gibt keine Fehlerzusammenfassung oben im Formular; Feldfehler stehen am Feld, der erste markierte Fehler erhält den Fokus (Kap. 5 „Validierung“). Die Nummer M-23 bleibt unbesetzt. Der Katalog enthält 23 Meldungen: M-01 bis M-22 und M-24.
 
 ## 4. Plausibilitätsprüfung der Grenzen
 

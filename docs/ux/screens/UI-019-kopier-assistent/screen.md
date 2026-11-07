@@ -44,8 +44,8 @@ Optionale GPSR-Angaben ohne Wert erscheinen **nicht** (keine Zeile, kein „leer
 - Sie gelten **je Fenster** (Browserfenster bzw. Registerkarte). Ein zweites Fenster mit demselben Kopier-Assistenten beginnt bei 0 von m.
 - Sie **überstehen das Neuladen** im selben Fenster (auch nach dem Banner „Bitte neu laden“, P-05), nicht aber das Schließen des Fensters.
 - Der Wechsel zwischen „Schmale Ansicht“ und „Normale Ansicht“ im selben Fenster und der Kanalwechsel behalten sie.
-- Bei **reiner Änderung von Bestandsangaben** (Stückzahl, WI-Nr, Akkukapazität) bleiben sie stehen (REQ-049 setzt nur bei neuer Freigabe zurück, AC-REQ-049-02); die Kennzeichnung „Bestand auf Kanal anpassen“ weist auf den geänderten Wert hin. Eine Anzeige „Wert seit Übernahme geändert“ gibt es in Release 0.1 nicht.
-- Eine neue Freigabe setzt alle zurück (unverändert).
+- **Die Markierung gilt für das Feld mit seinem angezeigten Wert (v0.6.1, K-06, Auslegung von REQ-049).** Ändert sich der angezeigte Wert, etwa die Stückzahl nach einem Verkauf (2 kopiert, Verkauf, Stückzahl jetzt 1), ist das Feld wieder offen (Marke „übernommen“ weg, Kopieren-Button wie bei einem offenen Feld) und zählt in „n von m übernommen“ und „k offen“ wieder als offen; „n von m“ rechnet neu. Das gilt auch für WI-Nr und Akkukapazität. Die Kennzeichnung „Bestand auf Kanal anpassen“ bleibt daneben bestehen. Eine zusätzliche Anzeige „Wert seit Übernahme geändert“ gibt es in Release 0.1 nicht.
+- Eine neue Freigabe setzt weiterhin alle zurück (AC-REQ-049-02).
 
 ## Eingaben und Validierung
 Keine Eingaben. Tastatur: Pfeil auf/ab wählt Zeile, Enter oder Strg+Enter kopiert das gewählte Feld und wählt das nächste offene Feld.
