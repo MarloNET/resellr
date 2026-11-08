@@ -32,10 +32,17 @@ if (Test-Path $p51Dir) {
 if ($p51.Count) {
     $node26 = $p51['node26']
     $node24 = $p51['node24']
-    $statusCode = if ($node26 -and $node26.passed) { 'passed' } elseif ($node24 -and $node24.passed) { 'passed' } else { 'failed' }
+    $statusCode = if ($node26 -and $node26.passed) { 'passed' } elseif ($node24 -and $node24.passed) { 'passed' }
+        elseif (($node26 -and $node26.inconclusive) -or ($node24 -and $node24.inconclusive)) { 'inconclusive' } else { 'failed' }
     $parts = @()
-    foreach ($k in @('node26', 'node24')) { if ($p51[$k]) { $parts += "$($p51[$k].node): $(if($p51[$k].passed){'vorkompiliert'}else{'nicht vorkompiliert'})" } }
-    $checks['P5.1'] = [ordered]@{ id = 'P5.1'; statusCode = $statusCode; status = (De $statusCode); summary = ($parts -join '; '); reason = ''; durationMs = ($node26.durationMs) }
+    foreach ($k in @('node26', 'node24')) {
+        if ($p51[$k]) {
+            $state = if ($p51[$k].passed) { 'vorkompiliert' } elseif ($p51[$k].inconclusive) { 'Download des vorkompilierten Pakets nicht erreichbar' } else { 'nicht vorkompiliert' }
+            $parts += "$($p51[$k].node): $state ($(@($p51[$k].attempts).Count) Versuch(e))"
+        }
+    }
+    $reason = if ($statusCode -eq 'inconclusive') { 'GitHub-Release-Download aus dem Runner nach allen Versuchen nicht erreichbar (Zeitüberschreitung/5xx); Voraussetzung im Runner nicht gegeben.' } else { '' }
+    $checks['P5.1'] = [ordered]@{ id = 'P5.1'; statusCode = $statusCode; status = (De $statusCode); summary = ($parts -join '; '); reason = $reason; durationMs = ($node26.durationMs) }
 }
 
 # Z-1

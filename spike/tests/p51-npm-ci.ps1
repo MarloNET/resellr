@@ -9,17 +9,29 @@ $outDir = Join-Path $ResultsDir 'p51'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $log = Join-Path $outDir "npm-ci-$Label.log"
 
-if (Test-Path (Join-Path $appDir 'node_modules')) { Remove-Item -Recurse -Force (Join-Path $appDir 'node_modules') }
-
 $nodeVersion = (& node --version).Trim()
 $npmVersion = (& npm --version).Trim()
+# The prebuilt download from GitHub releases timed out (runs 1 and 2) although the assets exist.
+# A failed download is a runner network condition, not a missing prebuild: retry a clean npm ci.
+$networkPattern = 'prebuild-install (warn install Request timed out|http 5\d\d)'
+$maxAttempts = 2
+$attempts = @()
 $sw = [Diagnostics.Stopwatch]::StartNew()
-Push-Location $appDir
-try {
-    cmd.exe /d /s /c "npm ci --foreground-scripts --loglevel verbose > `"$log`" 2>&1"
-    $exitCode = $LASTEXITCODE
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    if (Test-Path (Join-Path $appDir 'node_modules')) { Remove-Item -Recurse -Force (Join-Path $appDir 'node_modules') }
+    $attemptSw = [Diagnostics.Stopwatch]::StartNew()
+    Push-Location $appDir
+    try {
+        cmd.exe /d /s /c "npm ci --foreground-scripts --loglevel verbose > `"$log`" 2>&1"
+        $exitCode = $LASTEXITCODE
+    }
+    finally { Pop-Location }
+    $networkLines = @(Get-Content -Path $log | Where-Object { $_ -match $networkPattern })
+    $attempts += [ordered]@{ attempt = $attempt; exitCode = $exitCode; durationMs = $attemptSw.ElapsedMilliseconds; networkFailure = ($networkLines | Select-Object -First 1) }
+    if ($networkLines.Count -eq 0) { break }
+    if ($attempt -lt $maxAttempts) { Copy-Item $log (Join-Path $outDir "npm-ci-$Label-attempt$attempt.log") -Force }
 }
-finally { Pop-Location }
+$networkFailure = ($networkLines.Count -gt 0)
 $durationMs = $sw.ElapsedMilliseconds
 
 $lines = Get-Content -Path $log
@@ -37,6 +49,8 @@ function Get-PkgVersion([string]$name) {
 
 $passed = ($exitCode -eq 0) -and ($gypLines.Count -eq 0) -and ($rebuildLines.Count -eq 0) -and
     ($prebuiltLines.Count -ge 1) -and (Test-Path $bsBinary) -and (Test-Path $sharpWin)
+# Not passed only because the prebuilt could not be downloaded after all attempts: inconclusive.
+$inconclusive = (-not $passed) -and $networkFailure
 
 $result = [ordered]@{
     label                 = $Label
@@ -55,6 +69,8 @@ $result = [ordered]@{
         '@img/sharp-win32-x64' = Get-PkgVersion '@img/sharp-win32-x64'
     }
     passed                = $passed
+    inconclusive          = $inconclusive
+    attempts              = $attempts
     log                   = "p51/npm-ci-$Label.log"
 }
 $result | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $outDir "p51-$Label.json") -Encoding utf8

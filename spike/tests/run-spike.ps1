@@ -248,11 +248,13 @@ function Check-P13 {
 # Resolves a shortcut as spikeuser: links under a profile may store environment-relative targets
 # (%LOCALAPPDATA%), which would expand to the runner account's profile if read as admin.
 function Resolve-Shortcut([string]$Path) {
-    $ps = "`$l = (New-Object -ComObject WScript.Shell).CreateShortcut('$Path'); " +
+    # Progress records ("Preparing modules for first use") go to stderr as CLIXML and broke parsing in run 3.
+    $ps = "`$ProgressPreference = 'SilentlyContinue'; `$l = (New-Object -ComObject WScript.Shell).CreateShortcut('$Path'); " +
         "[pscustomobject]@{ Target = `$l.TargetPath; Arguments = `$l.Arguments; WorkingDirectory = `$l.WorkingDirectory } | ConvertTo-Json -Compress"
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($ps))
     $r = Invoke-SpikeCapture "powershell.exe -NoProfile -NonInteractive -EncodedCommand $enc" 60000
-    $json = ([string]$r.Out).Trim()
+    $json = [string](([string]$r.Out) -split "`r?`n" | Where-Object { $_.Trim().StartsWith('{') } | Select-Object -First 1)
+    $json = $json.Trim()
     if ($r.Code -ne 0 -or -not $json.StartsWith('{')) { throw "Resolve-Shortcut as spikeuser failed (code $($r.Code)): $json" }
     $o = $json | ConvertFrom-Json
     [pscustomobject]@{ Target = [string]$o.Target; Arguments = [string]$o.Arguments; WorkingDirectory = [string]$o.WorkingDirectory }

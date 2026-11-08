@@ -60,6 +60,7 @@ jobs:
         run: ./spike/tests/p51-npm-ci.ps1 -Label node24 -ResultsDir $env:SPIKE_RESULTS
 
       - name: Build prototype
+        id: build
         shell: pwsh
         run: ./spike/tests/build.ps1 -BuildDir $env:SPIKE_BUILD -ResultsDir $env:SPIKE_RESULTS
 
@@ -68,11 +69,14 @@ jobs:
         run: ./spike/tests/run-spike.ps1 -BuildDir $env:SPIKE_BUILD -ResultsDir $env:SPIKE_RESULTS
 
       - name: Z-1 install
+        # Z-1 is independent of the P1-P3 outcome; run it whenever the prototype was built.
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: pwsh
         working-directory: spike/tests/z1
         run: npm ci
 
       - name: Z-1 Playwright (launcher pages)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: pwsh
         working-directory: spike/tests/z1
         env:
