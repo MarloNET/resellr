@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>resellr-spike LP-01</title>
+</head>
+<body>
+<p>resellr-spike startet: <span id="phase">-</span></p>
+<script>
+  // Z-1 (S-7): reloads launcher-state.js once per second as a classic script with a changing
+  // query, because file:// pages cannot fetch() local files. Throwaway spike page, not product code.
+  var current = null;
+  function apply(state) {
+    if (!state) return;
+    document.getElementById('phase').textContent = state.phase;
+    if (state.phase === 'ready' && state.url) {
+      location.replace(state.url);
+    } else if (state.phase === 'aborted') {
+      location.replace('lp-02.html?ref=' + encodeURIComponent(state.refNo || ''));
+    }
+  }
+  function poll() {
+    if (current) current.remove();
+    window.launcherState = undefined;
+    var script = document.createElement('script');
+    script.src = 'launcher-state.js?t=' + Date.now();
+    script.onload = function () { apply(window.launcherState); };
+    current = script;
+    document.head.appendChild(script);
+  }
+  poll();
+  setInterval(poll, 1000);
+</script>
+</body>
+</html>

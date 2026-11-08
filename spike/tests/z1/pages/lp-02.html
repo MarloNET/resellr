@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>resellr-spike LP-02</title>
+</head>
+<body>
+<p>resellr-spike konnte nicht starten. Referenznummer: <span id="ref"></span></p>
+<script>
+  document.getElementById('ref').textContent = new URLSearchParams(location.search).get('ref') || '';
+</script>
+</body>
+</html>

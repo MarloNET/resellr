@@ -1,0 +1,93 @@
+name: windows-spike
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [spike/windows-hosting]
+
+concurrency:
+  group: windows-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 26
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: |
+            spike/proto/app/package-lock.json
+            spike/tests/z1/package-lock.json
+
+      - name: Prepare result directories
+        shell: pwsh
+        run: |
+          $results = Join-Path $env:GITHUB_WORKSPACE 'spike-results'
+          $build = Join-Path $env:GITHUB_WORKSPACE 'spike-build'
+          New-Item -ItemType Directory -Force -Path $results, $build | Out-Null
+          "SPIKE_RESULTS=$results" | Add-Content -Path $env:GITHUB_ENV
+          "SPIKE_BUILD=$build" | Add-Content -Path $env:GITHUB_ENV
+
+      - name: P5.1 npm ci (Node 26)
+        id: p51_26
+        continue-on-error: true
+        shell: pwsh
+        run: ./spike/tests/p51-npm-ci.ps1 -Label node26 -ResultsDir $env:SPIKE_RESULTS
+
+      - name: Setup Node 24 (fallback)
+        if: steps.p51_26.outputs.passed != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            spike/proto/app/package-lock.json
+            spike/tests/z1/package-lock.json
+
+      - name: P5.1 npm ci (Node 24 fallback)
+        if: steps.p51_26.outputs.passed != 'true'
+        continue-on-error: true
+        shell: pwsh
+        run: ./spike/tests/p51-npm-ci.ps1 -Label node24 -ResultsDir $env:SPIKE_RESULTS
+
+      - name: Build prototype
+        shell: pwsh
+        run: ./spike/tests/build.ps1 -BuildDir $env:SPIKE_BUILD -ResultsDir $env:SPIKE_RESULTS
+
+      - name: Run spike checks (P1.x, P2.x, P3.x, P5.2)
+        shell: pwsh
+        run: ./spike/tests/run-spike.ps1 -BuildDir $env:SPIKE_BUILD -ResultsDir $env:SPIKE_RESULTS
+
+      - name: Z-1 install
+        shell: pwsh
+        working-directory: spike/tests/z1
+        run: npm ci
+
+      - name: Z-1 Playwright (launcher pages)
+        shell: pwsh
+        working-directory: spike/tests/z1
+        env:
+          Z1_RESULTS_DIR: ${{ env.SPIKE_RESULTS }}\z1-results
+        run: npx playwright test
+
+      - name: Finalize results
+        if: always()
+        shell: pwsh
+        run: ./spike/tests/finalize.ps1 -ResultsDir $env:SPIKE_RESULTS
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-spike-results
+          path: ${{ env.SPIKE_RESULTS }}
+          retention-days: 30

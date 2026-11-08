@@ -1,0 +1,14 @@
+{
+  "name": "resellr-spike-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Throwaway prototype for the Windows spike (Schnitt 0). Not product code.",
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "sharp": "~0.34.5"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "sharp@0.34.5": true
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "resellr-spike-z1",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Z-1 launcher page check for the Windows spike (Schnitt 0). Test tooling only.",
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
+  }
+}
