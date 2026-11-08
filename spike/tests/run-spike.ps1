@@ -245,10 +245,17 @@ function Check-P13 {
     New-Result $passed "ready in $healthMs ms; 1 Überwachung + 1 Server, Besitzer spikeuser, Server Kind der Überwachung" $values
 }
 
+# Resolves a shortcut as spikeuser: links under a profile may store environment-relative targets
+# (%LOCALAPPDATA%), which would expand to the runner account's profile if read as admin.
 function Resolve-Shortcut([string]$Path) {
-    $sh = New-Object -ComObject WScript.Shell
-    $lnk = $sh.CreateShortcut($Path)
-    [pscustomobject]@{ Target = $lnk.TargetPath; Arguments = $lnk.Arguments; WorkingDirectory = $lnk.WorkingDirectory }
+    $ps = "`$l = (New-Object -ComObject WScript.Shell).CreateShortcut('$Path'); " +
+        "[pscustomobject]@{ Target = `$l.TargetPath; Arguments = `$l.Arguments; WorkingDirectory = `$l.WorkingDirectory } | ConvertTo-Json -Compress"
+    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($ps))
+    $r = Invoke-SpikeCapture "powershell.exe -NoProfile -NonInteractive -EncodedCommand $enc" 60000
+    $json = ([string]$r.Out).Trim()
+    if ($r.Code -ne 0 -or -not $json.StartsWith('{')) { throw "Resolve-Shortcut as spikeuser failed (code $($r.Code)): $json" }
+    $o = $json | ConvertFrom-Json
+    [pscustomobject]@{ Target = [string]$o.Target; Arguments = [string]$o.Arguments; WorkingDirectory = [string]$o.WorkingDirectory }
 }
 
 function Check-P14 {
@@ -259,6 +266,9 @@ function Check-P14 {
     $stop = Resolve-Shortcut $stopLnk
     $targetsOk = ($open.Target -ieq $script:InstalledNode) -and ($stop.Target -ieq $script:InstalledNode)
     $argsOk = ($open.Arguments -match '\bopen\b') -and ($stop.Arguments -match '\bstop\b')
+    if (-not ($targetsOk -and $argsOk)) {
+        return (New-Result $false "Verknüpfungen Ziel/Argumente fehlerhaft" ([ordered]@{ openTarget = $open.Target; openArgs = $open.Arguments; stopTarget = $stop.Target; stopArgs = $stop.Arguments }))
+    }
     $t0 = Get-NowMs
     # Using the resolved stop shortcut (its target and arguments) as spikeuser.
     $p = Start-AsSpike -CommandLine "`"$($stop.Target)`" $($stop.Arguments)"
@@ -293,11 +303,10 @@ function Check-P21 {
     $cs = [SpikeNative]::MapFileAndCheckSum($script:InstalledNode)
     $csOk = ($cs[0] -eq 0) -and ([uint32]$cs[2] -eq $res.CheckSum)
     # e) byte-equality except the 14 patched bytes
-    $excluded = [long[]]@(
-        $res.SubsystemOffset, $res.SubsystemOffset + 1,
-        $res.CheckSumOffset, $res.CheckSumOffset + 1, $res.CheckSumOffset + 2, $res.CheckSumOffset + 3,
-        $res.SecurityEntryOffset, $res.SecurityEntryOffset + 1, $res.SecurityEntryOffset + 2, $res.SecurityEntryOffset + 3,
-        $res.SecurityEntryOffset + 4, $res.SecurityEntryOffset + 5, $res.SecurityEntryOffset + 6, $res.SecurityEntryOffset + 7)
+    # Ranges in parentheses: in PowerShell the comma binds tighter than '+'.
+    $excluded = [long[]](@($res.SubsystemOffset..($res.SubsystemOffset + 1)) +
+        @($res.CheckSumOffset..($res.CheckSumOffset + 3)) +
+        @($res.SecurityEntryOffset..($res.SecurityEntryOffset + 7)))
     $diffs = [SpikeNative]::DiffExcept($node.Bytes, $res.Bytes, $excluded, 32)
     $byteOk = ($diffs.Length -eq 0)
     $values = [ordered]@{
@@ -393,7 +402,7 @@ function Check-P32 {
     $restartDelayMs = if ($newStartEv) { [long]$newStartEv.ts - $killMs } else { $null }
     Add-Interval 'restart' ($killMs - 1000) ($readyMs + 10000)
     Stop-SpikeCleanly | Out-Null
-    $exitCode = if ($exitEv) { [int]$exitEv.code } else { $null }
+    $exitCode = if ($exitEv) { [long]$exitEv.code } else { $null }
     $codeOk = ($null -ne $exitCode) -and ($exitCode -notin @(0, 10, 11))
     $delayOk = ($null -ne $restartDelayMs) -and ($restartDelayMs -ge 5000) -and ($restartDelayMs -le 8000)
     $values = [ordered]@{ oldServerExitCode = $exitCode; crashRefNo = $crash.refNo; restartDelayMs = $restartDelayMs; healthReady = $newReady.status; newServerCount = $newSrv.Count }
@@ -701,7 +710,11 @@ function Check-P2R {
     Copy-Item $script:RuntimeNode (Join-Path $stubDir 'node.exe') -Force
     Copy-Item (Join-Path (Split-Path $PSScriptRoot -Parent) 'stub\resellr-start.c') $stubDir -Force
     Push-Location $stubDir
-    try { & $cl /nologo /O2 resellr-start.c /link /SUBSYSTEM:WINDOWS | Out-Host } finally { Pop-Location }
+    # cl.exe needs the INCLUDE/LIB environment from vcvars64.bat; a batch file keeps the quoting simple.
+    $vcvars = Join-Path $inst 'VC\Auxiliary\Build\vcvars64.bat'
+    $buildBat = Join-Path $stubDir 'build-stub.cmd'
+    Set-Content -Path $buildBat -Encoding ascii -Value "@echo off`r`ncall `"$vcvars`" >nul || exit /b 1`r`n`"$cl`" /nologo /O2 resellr-start.c /link /SUBSYSTEM:WINDOWS`r`nexit /b %ERRORLEVEL%"
+    try { & cmd.exe /d /c $buildBat | Out-Host } finally { Pop-Location }
     $startExe = Join-Path $stubDir 'resellr-start.exe'
     if (-not (Test-Path $startExe)) { return (New-Inconclusive 'resellr-start.exe nicht gebaut' @{} 'Kompilat fehlt.') }
     $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'

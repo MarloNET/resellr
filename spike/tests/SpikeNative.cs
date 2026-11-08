@@ -154,7 +154,7 @@ public static class SpikeNative
     public static long SessionOf(int pid)
     {
         uint session;
-        return ProcessIdToSessionId((uint)pid, out session) ? session : -1;
+        return ProcessIdToSessionId((uint)pid, out session) ? (long)session : -1L;
     }
 
     // Returns { status, headerSum, computedSum }; status 0 = CHECKSUM_SUCCESS.
