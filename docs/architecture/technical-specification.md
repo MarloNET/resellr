@@ -1,0 +1,3925 @@
+# Technical Specification – resellr Phase 1 (Inserat-Generator), Release 0.1
+
+## Dokument-Metadaten
+
+| Feld | Wert |
+| --- | --- |
+| Projekt | resellr (Arbeitstitel), Pilotkunde notebookers.de |
+| Dokumenttyp | Technical Specification (Prozessschritt 10), Paperclip-Dokument `technical-specification` an [MAR-153](/MAR/issues/MAR-153#document-technical-specification) |
+| Version | 0.5.1 (redaktionelle Korrektur nach Architecture Review v0.5 ([MAR-192](/MAR/issues/MAR-192#document-architecture-review-techspec-v05-r1), `pass`): FIND-238 im Freigabe-Briefing, FIND-239 in Kap. 9.2; Basis v0.5 Revision 8 `ac547307`. v0.5: Spike-Delta: Ergebnis des Windows-Spikes, GitHub-Issue #2, maßgeblicher Lauf 42475377911, in Kap. 9.2, 6.4, TR-05 und ADR-008 eingearbeitet; Hinweise 5.1 und 5.3 aus dem Delta-Review v0.4.1 (MAR-189); Basis v0.4.1 Revision 7 `a3e7016b`. v0.4.1: kleine Revision nach Architecture Review v0.4 Runde 1 (MAR-183): FIND-236, FIND-237, Defender-Scan bei der Abnahme in Kap. 6.4 und Verweis auf Spike-Prüfung P2.4 in Kap. 9.2 (Backlog-Review MAR-184, Hinweis B). v0.4: Einarbeitung der verbindlichen Entscheidungen K-01 bis K-07 des Product Owners (MAR-176), der Findings FIND-234 und FIND-235 aus Architecture Review Runde 3 und der Hinweise 5.1 bis 5.3. Änderungsliste in Kap. 10.2) |
+| Status | approved (Owner-Freigabe 2026-11-08, Revision `d94988cb-76ee-4d24-a7bc-e9ee6d21fe8d`, Karte `433b109d-d77d-4bfa-9f69-9cf01385f49b` an [MAR-111](/MAR/issues/MAR-111), Freigabeanfrage [MAR-111](/MAR/issues/MAR-111#document-owner-freigabeanfrage-spec-v051), mit Bestätigung der Annahmen 1 bis 4 und E-1 Option A). Vorheriger Status: draft |
+| Autor | Software Architect (MarloNET) |
+| Datum | 08.11.2026 |
+| Bindende Requirements | Requirements Specification v0.3.3, Revision `ce76d962-cc37-46e1-9086-b2be8e08e752`, veröffentlicht als `docs/product/requirements.md` (Repository `MarloNET/resellr`, Branch `main`, Commit `6f34e2a`). Freigabenachweis: Owner-Freigabe 07.11.2026, Freigabeanfrage [MAR-142](/MAR/issues/MAR-142#document-owner-freigabeanfrage), mit Bestätigung von REQ-104 bis REQ-106 |
+| UI/UX-Klassifikation | **Material** (vom Owner bestätigt) |
+| Bindende Architecture Baseline | v0.3.2, Revision `2876806d-48b2-4ec3-b961-2f4d370d9b2e`, veröffentlicht als `docs/architecture/architecture-baseline.md` (Commit `6f34e2a`); ADR-001 bis ADR-007 unter `docs/architecture/adr/`, Status approved. Freigabenachweis: Owner-Freigabe 07.11.2026 (MAR-142) |
+| Bindendes UI/UX-Design | v0.5.2, Repository `MarloNET/resellr`, **Commit `a9356c1e6e3d528cf7d2af16b85ae3aac10393a3`** (Branch `design/MAR-126`). PR #1 ist gemergt; auf `main` liegt v0.5.3 (`7e3593c`), eine reine Doku-Korrektur ohne inhaltliche Änderung (Diff geprüft). Freigabenachweis: Owner-Freigabe 07.11.2026 (MAR-142). Gelesen: `docs/ux/uiux-design.md`, `docs/ux/DESIGN.md`, `docs/ux/flows/flow.md`, alle 46 `docs/ux/screens/*/screen.md` und die 3 `docs/ux/launcher-pages/*/screen.md` |
+| Design-Entwurf v0.6.1 (Owner-Bestätigung ausstehend) | Branch `design/MAR-167`, **Commit `894d49e`** (Draft-PR #3), v0.6.1 einschließlich MAR-182: v0.6 (`4fee15c`, Review des Product Owners MAR-169) mit der Textkorrektur nach MAR-176 (MAR-181: K-05, K-06, Sammeltext M-23 entfallen) und der Klarstellung aus dem PO-Review MAR-182 (FIND-1): Es entfällt nur der Sammeltext M-23, die Fehlerzusammenfassung des freigegebenen Designs bleibt. Zwei Teile: **(A) anpassendes Fenster** nach Owner-Entscheid MAR-168 (UI-044 Variante A, UI-019 mit Hinweis am Ende der scrollenden Fläche, Dialogregel, Reflow-Regel R-1, Abnahme „kein Inhalt und keine Aktion unerreichbar“); **(B)** Umbuchungsziel in UI-005, Zeitüberschreitung in LP-02, Meldungskatalog (M-01 bis M-22 und M-24), Kopierfelder und Markierungen in UI-019, Text in UI-030. **Teil A ist für Fenstergröße, Rahmen und Dialoge Grundlage dieser Specification** (Kap. 2.0.10, 2.17, 6.3), weil der Owner die Richtung entschieden hat (CEOrchestrator-Kommentar `dc349316`). **Teil B ist Grundlage, soweit die Entscheidung MAR-176 ihn bestätigt** (Kap. 8.2). Bestätigt der Owner v0.6.1 mit Änderungen, folgt ein Delta |
+| Eingaben dieser Revision | **v0.5.1:** Architecture Review v0.5 Runde 1 [MAR-192](/MAR/issues/MAR-192#document-architecture-review-techspec-v05-r1) (Rev. `c2f0ca05`, `pass`, FIND-238, FIND-239); Auftrag [MAR-193](/MAR/issues/MAR-193). **v0.5:** Spike-Ergebnis `spike/ERGEBNIS.md` (Repository `MarloNET/resellr`, Branch `spike/windows-hosting`, Commit `ad17ab2`; Wegwerf-Prototyp, kein Merge nach `main`), maßgeblicher CI-Lauf [42475377911](https://github.com/MarloNET/resellr/actions/runs/42475377911) auf Commit `9428f22` mit Artefakt `windows-spike-results`, Meldung im [Issue #2](https://github.com/MarloNET/resellr/issues/2#issuecomment-6720918499); geprüft gegen Spike-Auftrag v1.2 (Rev. `636316e8`); Delta-Review v0.4.1 [MAR-189](/MAR/issues/MAR-189#document-architecture-review-techspec-v041-r2) (Rev. `fc901cae`, `pass`, Hinweise in Abschnitt 5); Auftrag [MAR-191](/MAR/issues/MAR-191). **v0.4.1:** Architecture Review v0.4 Runde 1 [MAR-183](/MAR/issues/MAR-183#document-architecture-review-techspec-v04-r1) (Rev. `aa3a061a`, `changes_requested`, FIND-236, FIND-237); Backlog-Review [MAR-184](/MAR/issues/MAR-184#document-backlog-review-spike-2-r2) (Rev. `3c22abee`, Hinweis B); Spike-Auftrag `windows-spike-auftrag` v1.2 an [MAR-158](/MAR/issues/MAR-158#document-windows-spike-auftrag) (Rev. `636316e8`, Prüfung P2.4); Auftrag [MAR-187](/MAR/issues/MAR-187). **v0.4:** Entscheidung des Product Owners `k-entscheidung` an [MAR-176](/MAR/issues/MAR-176#document-k-entscheidung) (Rev. `004e2a12`, K-01 bis K-07 verbindlich, E-1 als Owner-Frage); Architecture Review Runde 3 [MAR-174](/MAR/issues/MAR-174#document-architecture-review-techspec-v01-r3) (Rev. `11d6d784`, `pass`, FIND-234, FIND-235, Hinweise 5.1 bis 5.3); Auftrag [MAR-178](/MAR/issues/MAR-178). Weiter gültig: Architecture Review Runde 2 [MAR-170](/MAR/issues/MAR-170#document-architecture-review-techspec-v01-r2) (Rev. `da549bb0`); Architecture Review Runde 1 [MAR-157](/MAR/issues/MAR-157#document-architecture-review-techspec-v01-r1) (Rev. `f54d5195`, FIND-201 bis FIND-225); Klärungen des Product Owners: `dg-klaerung` an [MAR-159](/MAR/issues/MAR-159#document-dg-klaerung) (Rev. `b993f9da`), `decisions` an [MAR-163](/MAR/issues/MAR-163#document-decisions) (Rev. `16a017e2`), `ts-klaerung-r1` an [MAR-164](/MAR/issues/MAR-164#document-ts-klaerung-r1) (Rev. `a168ec15`). Ihre sieben Widersprüche K-01 bis K-07 sind durch MAR-176 verbindlich entschieden (Kap. 8.2) |
+| Owner-Entscheidungen, die hier bindend gelten | **OD-02: Variante A** (nur Arbeitsplatzrechner, keine Zugangsabfrage; UI-001, UI-040 und FLOW-07 werden nicht umgesetzt). **OD-09: Aus** (keine Code-Signierung). **X-8: Nein** (Betriebshinweise nur im Protokoll). OD-01 (a), OD-05 (a), OD-08 und A-37 wie in Baseline Kap. 13.3. Designvorschläge ohne Requirement (Zeile zum Erreichen des Datenordners in UI-046, Startmenü-Zeile in UI-046, Beschriftung „Erneut versuchen“ in `UI-046.unknown`) sind **nicht verbindlich** und werden nicht gebaut (Owner-Kommentar `97d46083` an MAR-142, Auftrag MAR-153). Owner-Kommentar `bdc2d18b` an MAR-153 vom 07.11.2026: keine Container auf dem Arbeitsplatzrechner |
+| Weitere Eingaben | Hinweise T-1 bis T-10 aus der Machbarkeitsprüfung [MAR-150](/MAR/issues/MAR-150) (Kommentar `a132fe23`); FIND-112, FIND-113 und Hinweise H-12 bis H-17 aus dem Delta-Review [MAR-146](/MAR/issues/MAR-146) (Dokument `architecture-review-v032-delta-r1`, Rev. `9d6e1d8c`); H-2 und H-11 aus den Architecture Reviews der Baseline |
+| Neue ADRs | ADR-008 (Installationspaket und unsichtbarer Start unter Windows), Status **approved** (Owner-Freigabe 2026-11-08 mit dieser Specification), Kap. 11 |
+| Architecture Review | Runde 1 (v0.1, Rev. `ae7beee9`): `changes_requested`, 15 major, 10 minor ([MAR-157](/MAR/issues/MAR-157)). Runde 2 (v0.2, Rev. `63122564`): `changes_requested`, 0 blocker, 1 major, 7 minor ([MAR-170](/MAR/issues/MAR-170)). Runde 3 (v0.3, Rev. `108083b3`, letzte Runde, Delta-Review): **`pass`**, 0 blocker, 0 major, 2 minor (FIND-234, FIND-235; [MAR-174](/MAR/issues/MAR-174)). v0.4 (Rev. `a1afb9c3`, Delta-Review, Runde 1 eines neuen Zyklus): `changes_requested`, 0 blocker, 1 major (FIND-236), 1 minor (FIND-237) ([MAR-183](/MAR/issues/MAR-183)). v0.4.1 (Rev. `a3e7016b`, Delta-Review, Runde 2 des Zyklus): **`pass`**, 0 blocker, 0 major, 0 minor ([MAR-189](/MAR/issues/MAR-189)). v0.5 (Rev. `ac547307`, Delta-Review, Runde 1 eines neuen Zyklus): **`pass`**, 0 blocker, 0 major, 2 minor (FIND-238, FIND-239) ([MAR-192](/MAR/issues/MAR-192)). v0.5.1: redaktionelle Korrektur dieser beiden Findings; Sichtprüfung des Text-Diffs durch den Architecture Reviewer pending |
+| Human Approval | approved (Owner-Freigabe 2026-11-08, Revision `d94988cb-76ee-4d24-a7bc-e9ee6d21fe8d`, Karte `433b109d-d77d-4bfa-9f69-9cf01385f49b` an [MAR-111](/MAR/issues/MAR-111), Freigabeanfrage [MAR-111](/MAR/issues/MAR-111#document-owner-freigabeanfrage-spec-v051), mit Bestätigung der Annahmen 1 bis 4 und E-1 Option A) |
+| Windows-Spike | **Ergebnis liegt vor, alle Prüfungen bestanden** (GitHub-Issue #2, [MAR-188](/MAR/issues/MAR-188), Lauf 42475377911; eingearbeitet in v0.5). **S-1, S-2, S-3, S-5 und S-7 sind bestätigt**, kein Rückfallweg ausgelöst. Grenzen: Prüfumgebung Windows Server 2025 im CI-Runner, nicht Windows 11; nicht geprüft sind S-4, S-8, `stop` über die Pipe, SmartScreen, Smart App Control und der Start durch eine echte Anmeldung. Diese Punkte belegt die Abnahme am Arbeitsplatzrechner (Kap. 6.4) bzw. die Windows-CI (S-8). Einzelheiten Kap. 9.2. **Die Messung am PC des Owners entfällt** (Owner-Entscheid, [MAR-162](/MAR/issues/MAR-162) storniert; CEOrchestrator-Kommentar `dc349316` an MAR-161): Die Oberfläche soll auf jedem PC ab 1366 × 768 funktionieren und sich anpassen, statt auf einen gemessenen PC zugeschnitten zu sein. S-6 entfällt; an ihre Stelle tritt die Fenstergrößen-Matrix FM-1 bis FM-7 (Kap. 6.3). |
+| Mermaid-Prüfung | siehe Kap. 10.3 |
+
+**Lesehilfe.** Diese Specification wiederholt nicht, was Requirements, Baseline und Design schon festlegen; sie verweist darauf. Bezeichner: REQ-xxx, AC-REQ-xxx, A-xx, OP-xx, E-x stammen aus den Requirements; Ä-xx, AR-xx, OD-xx, K-x, X-x, TH-xx aus der Baseline; FLOW-xx, UI-xxx, LP-xx, P-xx aus dem Design; T-x aus MAR-150; FIND-1xx und H-xx aus den Architecture Reviews. Neu in diesem Dokument sind **F-xx** (Feature-Abschnitte in Kap. 2), **S-x** (Spike-Annahmen), **DG-xx** (Lücken und Klärungsbedarf am Design), **K-xx** (Entscheidungen des Product Owners zu früher widersprüchlichen Klärungen, Kap. 8.2), **FM-x** (Fenstergrößen-Matrix, Kap. 6.3), **RQ-xx** (Auslegungen der Requirements), **TR-xx** (technische Risiken) und die Fehlercodes in Kap. 2.0.6. M-xx und R-1 verweisen auf den Meldungskatalog bzw. die Reflow-Regel des Design-Entwurfs v0.6.1. Komponenten-, Code- und Feldnamen sind englisch, alle Beschreibungen deutsch.
+
+---
+
+## Freigabe-Briefing
+
+### Kurzfassung
+
+Diese Specification legt fest, wie resellr gebaut wird: Schnittstelle, Datenfelder, Zustände jedes Screens und 307 benannte Code-Bausteine. Sie übernimmt die verbindlichen Antworten des Product Owners auf sieben vorher widersprüchlich beantwortete Punkte; keine ändert die Requirements oder das freigegebene Design, vier sind Auslegungen (unten mit Beispiel). Neu gegenüber Requirements, Baseline und Design ist nur **eine** Architekturentscheidung (ADR-008: Installationspaket mit Inno Setup, Start ohne Konsolenfenster). Offen ist deine Entscheidung zur Feldreihenfolge im Kopier-Assistenten. Die Windows-Prüfung bestätigte alle geprüften Hauptwege, auf Windows Server statt Windows 11; den Rest prüfst du bei der Abnahme. Grundlage für Fenstergröße, Umbuchen, Startseite und Meldungstexte ist der Design-Entwurf v0.6.1, den du noch bestätigst.
+
+### So haben wir dich verstanden
+
+| Deine Vorgabe (Quelle) | Unsere Auslegung | Beispiel |
+| --- | --- | --- |
+| Kopier-Assistent: Zustandsbezeichnung „und ggf. Zusatzangabe“ (REQ-047) | Zustand und Zusatz sind **zwei** Kopierfelder, weil die Kanal-Formulare sie getrennt haben. Optionale GPSR-Angaben ohne Wert erscheinen nicht. | Shop: „Zustand“ = „gebraucht“, „Zustand – Zusatz“ = „Optisch 3“. Ohne verantwortliche Person in der EU fehlen deren drei Felder, „n von m“ zählt sie nicht. |
+| Markierung „übernommen“ im Kopier-Assistenten (REQ-049) | Sie gilt je Browserfenster und für das Feld **mit seinem angezeigten Wert**. Ändert sich der Wert, ist das Feld wieder offen. Grenzfall: Der Wortlaut nennt nur die Freigabe als Rücksetzgrund; widersprichst du, ist die Änderung klein. | Du kopierst die Stückzahl „2“, dann wird ein Gerät verkauft. Nach „Neu laden“ zeigt das Feld „1“ ohne Haken, aus „9 von 9 übernommen“ wird „8 von 9“. |
+| Titel nie mitten im Wort kürzen (REQ-035) | Auch wenn schon das erste Wort länger ist als erlaubt, bleibt es ganz. Der Titel trägt „Titel gekürzt, bitte prüfen“, und die Freigabe wird abgelehnt, bis du ihn von Hand anpasst. | eBay erlaubt 80 Zeichen, das erste Wort ist eine 85 Zeichen lange Modellkennung. resellr schneidet nichts ab; „Freigeben“ meldet „Titel zu lang: höchstens 80 Zeichen“. |
+| Umbuchen, wenn das Ziel abweicht (REQ-020 mit REQ-018) | Weicht das gewählte Ziel-Modell-Inserat ab, fragt der Dialog in einem zweiten Schritt nach; erst „Trotzdem umbuchen“ speichert. Ohne Abweichung gibt es den Schritt nicht. | Gerät 626198 (Optik-Note 4) soll zu einem Inserat mit Optik-Note 2. Der Dialog zeigt „Umbuchen: Ziel weicht ab“ mit „Optik-Note: Gerät 4, Ziel-Modell-Inserat 2“. |
+| Rückmeldung mit Funktion, nächstem Schritt und Referenznummer (REQ-073), hier bei langem Start | Nach 2 Minuten ohne Ergebnis zeigt die Startseite „resellr startet länger als erwartet“ mit Referenznummer und öffnet resellr selbst, sobald es bereit ist. Nach 10 Minuten gilt der Start als hängend: resellr bricht ihn ab und zeigt „Start abgebrochen“ mit einer eigenen Nummer. | Die Datenbank-Umstellung nach einem Update dauert 3 Minuten: nach 2 Minuten der Hinweis, eine Minute später öffnet sich resellr selbst. |
+| Meldungstexte, die das Design nicht vorgab (REQ-073) | Texte nach dem Meldungskatalog des Designs. Kein eigener Sammeltext; die Fehlerzusammenfassung beim Gerät-Einbuchen aus dem Design bleibt. | Ein Merkmal soll „Hersteller“ heißen: „Bezeichnung ist für einen festen Platzhalter vergeben: Hersteller“. Gerät mit WI-Nr „62-61“ und Akkukapazität 101: beide Fehler am Feld und oben zusammengefasst. |
+| Gerätewerte ändern (REQ-014) | Verkaufte und stornierte Geräte sind nicht mehr änderbar. | Nach dem Verkauf fällt dir ein Tippfehler im Akkuwert auf. Du kannst ihn nicht mehr korrigieren; das Datenblatt dieses Geräts bleibt so. |
+
+### Kritische Annahmen – bitte einzeln bestätigen
+
+1. **Annahme:** resellr lässt sich auf deinem PC ohne Adminrechte und Virenschutz-Befund installieren, startet bei der Anmeldung **ohne sichtbares Fenster**, wird nach einem Absturz von selbst neu gestartet, und ein von resellr geöffnetes Chrome bleibt offen, wenn resellr endet. Die Windows-Prüfung hat das Meiste mit einem Testprogramm bestätigt, aber auf **Windows Server 2025**, nicht Windows 11. Nicht geprüft: echte Anmeldung, SmartScreen, Smart App Control, Abmelden und Herunterfahren, „resellr beenden“ über das Startmenü, offenes Chrome. Das prüfst du bei der Abnahme.
+   *Beispiel:* Im Test liefen über 100 Starts ohne ein einziges Fenster, Defender fand nichts, nach einem erzwungenen Absturz lief es nach 5 Sekunden wieder. Ob bei deiner Anmeldung kein schwarzes Fenster aufblitzt, zeigt erst dein PC.
+   **Wenn falsch:** Meist greift ein vorbereiteter Rückfallweg (z. B. Verknüpfung im Autostart-Ordner, kleines Startprogramm). Er ändert nur Installationspaket und Starter, nicht die Anwendung, verzögert aber den letzten Bauschritt vor dem Pilotstart. Ausnahme: Steht Smart App Control nicht auf „Aus“, blockiert Windows resellr, und kein Rückfallweg hilft; dann ist eine kostenpflichtige Code-Signierung nötig. (Kap. 2.18, 6.4, 9.2, ADR-008, Baseline AR-13)
+2. **Annahme:** Die Oberfläche ist auf jedem PC ab 1366 × 768 und bei Vergrößerung bis 150 % ohne Funktionsverlust bedienbar, nicht nur auf einem gemessenen. Unter 1366 Punkten Breite stehen Spalten untereinander, Dialoge sind nie höher als das Fenster, und bei wenig Höhe scrollt die Navigationsspalte samt Hinweis „Sicherung einrichten“. Tests prüfen sieben Fenstergrößen; bestanden heißt: Kein Inhalt und keine Aktion ist unerreichbar.
+   *Beispiel:* Bei 150 % Vergrößerung hat die Seite nur etwa 910 × 400 Punkte. Die Kanal-Karten eines Modell-Inserats stehen dann untereinander, und jeder Button ist erreichbar, notfalls durch Scrollen.
+   **Wenn falsch:** Der Test schlägt vor dem Pilotstart fehl, nicht erst bei dir. Ob der Hinweis „Sicherung einrichten“ bei wenig Höhe erst nach Scrollen sichtbar sein darf, bestätigst du mit dem Design (dort kritische Annahme 1). Verlangst du „immer ohne Scrollen sichtbar“, ändern sich der Rahmen und ein Testkriterium, sonst nichts. (Kap. 2.0.10, 2.17, 6.3)
+3. **Annahme:** Ein Preis, den die Preisregel vorschlägt, darf gespeichert und Teil des Kanal-Inhalts werden, bevor du ihn ansiehst. Deine Prüfung ist die Freigabe.
+   *Beispiel:* Regel „Kleinanzeigen = Shop + 10 €“. Du gibst nur den Shop-Preis 289 € ein; der Kleinanzeigen-Inhalt hat sofort 299 €. Setzt du dort von Hand 290 €, bleibt es dabei.
+   **Wenn falsch:** Der Vorschlag würde nur angezeigt und je Kanal übernommen. Nach dem Bau ändert das die Bedienung der Preisseite. (Kap. 2.7)
+4. **Annahme:** Benennst du ein Merkmal um, schreibt resellr die kanalweiten Texte (Beschreibungsvorlagen, Zusatzangaben, Textbausteine) nicht um, und es gibt keine Warnung.
+   *Beispiel:* Du benennst „RAM“ in „Arbeitsspeicher“ um. `{RAM}` in der Beschreibungsvorlage löst sich nicht mehr auf, die Zeile fehlt in allen Kanal-Inhalten, freigegebene fallen auf *Entwurf*.
+   **Wenn falsch:** Eine Warnung beim Umbenennen wäre eine kleine Design-Erweiterung; ein automatisches Umschreiben aller Texte wäre deutlich aufwendiger. (Kap. 2.1, 9.5)
+
+### Weitere Annahmen
+
+- **Zahlenwerte ohne Requirement** sind großzügige technische Obergrenzen von mir, z. B. Kategorie-Kennung 100 Zeichen, manuelle Beschreibung 20.000, Titelmuster-Präfix 50, Excel-Datei 10 MB. (Kap. 8.2)
+- Abmelden und Herunterfahren gelten als „ohne geordnetes Beenden“, nicht als Absturz. (Kap. 9.2)
+- Mit dem Windows-Schnellstart zählt die Zeit eines ausgeschalteten PCs oft als „ohne Messung“; die Verfügbarkeit ändert das nicht. (Kap. 2.18)
+- Ändert sich nur „Pflichtfeld“ in einer Merkmalszuordnung, entsteht kein Änderungsentwurf, weil sich am Kanal nichts ändert. (Kap. 9.3)
+- Passt ein Datenblatt nicht auf eine Seite, verkleinert resellr zweimal die Schrift und warnt erst danach. (Kap. 2.13)
+
+### Entscheidungen der Agenten
+
+| Entscheidung | Verworfene Alternative | Warum | Umkehrbar |
+| --- | --- | --- | --- |
+| Installationspaket mit **Inno Setup**, Installation ohne Adminrechte (ADR-008) | NSIS, MSIX, WiX | einfach, kostenlos, kann Autostart, Verknüpfungen und „vor dem Update beenden“ | mittel |
+| Start ohne Konsolenfenster über eine **umgestellte Kopie von `node.exe`**, Rückfall kleines Startprogramm (ADR-008) | VBScript (abgekündigt), Aufgabenplanung | kein zusätzlicher kompilierter Code | leicht |
+| resellr öffnet als **normaler Chrome-Tab** | App-Fenster | Lesezeichen und Zurück wie im Design | leicht |
+| **Eine** Datenbank-Migration für das ganze Datenmodell, ausgeführt in **einer** Transaktion; vor jedem Versionswechsel eine Kopie | eine Migration je Bauschritt; Migrationswerkzeug von Kysely (ohne Transaktion unter SQLite) | ein misslungenes Update hinterlässt keine halb umgebaute Datenbank | mittel |
+| Code-Aufteilung in **307 benannte Bausteine** mit Reihenfolge der Bauschritte ohne Vorgriff (Kap. 4.4) | Benennung durch die Entwickler | zwei Entwickler arbeiten parallel ohne doppelte Bausteine | schwer (nach Implementierungsbeginn) |
+| Aufräumen löscht verwaiste Fotos, die resellr selbst entkoppelt hat, frühestens 24 h nach dem ersten Fund; die Schutzgrenze gilt nur für unbekannte Dateien (Kap. 2.19) | Grenze für alle Dateien (Baseline-Vorschlag) | sonst blockierte schon das Löschen eines Inserats mit 11 Fotos das Aufräumen dauerhaft | leicht |
+| Oberflächentests mit **sieben Fenstergrößen**, Kriterium „nichts unerreichbar“, alle verbindlich (Kap. 6.3) | ein einzelner gemessener Wert (Baseline 11.2) | dein Entscheid: kein Zuschnitt auf einen PC | leicht |
+| **Startgrenze 10 Minuten**, danach Abbruch mit eigener Referenznummer (Kap. 2.18) | unbegrenzt warten; Abbruch schon nach 2 Minuten | sonst würde ein hängender Start nie gemeldet oder eine lange Datenbank-Umstellung nach einem Update abgebrochen | leicht |
+
+### Bewusst nicht enthalten
+
+- **Zugang im Netz** (Entscheid „nur Arbeitsplatzrechner“): nicht gebaut. *Beispiel:* Vom Laptop im selben WLAN kommt keine Verbindung zustande.
+- **Neue Auswahllisten** in Release 0.1. *Beispiel:* Eine Geräteart „Monitor“ bekommt „Paneltyp“ als Textmerkmal, nicht als neue Auswahlliste. (Kap. 9.3)
+- **Warnungen des Betriebsstatus in der Oberfläche**, Befunde der Startprüfung, „Datenordner öffnen“. *Beispiel:* Sind weniger als 10 GB frei, steht das nur im Protokoll.
+- **Designvorschläge ohne Requirement** im Endbildschirm nach dem Beenden: nicht gebaut.
+- **Could-Funktionen** (REQ-056 bis REQ-059) sind spezifiziert, aber optional.
+- Keine Code-Signierung: SmartScreen warnt bei der Installation und bei **jedem** Update; du bestätigst die Warnung.
+
+### Was sich geändert hat
+
+Erstfassung für dich. Wichtige Änderungen aus Reviews, Antworten des Product Owners und deinen Entscheiden:
+- **Sieben Antworten des Product Owners sind verbindlich.** Vier stehen oben als Auslegung. Drei folgen einfach dem Wortlaut der Requirements: Änderst du einen Preis 279 € → 289 € → 279 €, gibst du den Inhalt einmal frei. Bei „Rechtlich geprüft“ ohne Datum oder prüfende Stelle heißt die Meldung „Prüfdatum und prüfende Stelle erforderlich“. Ein Merkmal lässt sich immer deaktivieren. *Folge:* Nach „RAM deaktivieren“ hat ein neues MacBook keinen RAM-Wert und erscheint gegen ein Inserat mit „16GB“ als abweichend. Das Design ist an drei Textstellen angepasst (Entwurf v0.6.1). (Kap. 8.2)
+- **Kennzeichnungen bleiben stehen, bis das Ereignis aus den Requirements eintritt.** *Beispiel:* Nimmst du einen Verkauf zurück, bleibt „Bestand auf Kanal anpassen“, bis du den Abgleich bestätigst.
+- **Betrieb:** Migrationen in einer Transaktion, die auch bei späteren Umbauten keine Daten still löschen; Kopie vor jedem Update; „resellr beenden“ wirkt auch kurz nach einem Absturz oder doppelt gewählt (in resellr und im Startmenü).
+- **Aufräumen:** Deine eigenen Dateien im Übergabeordner, z. B. `urlaub-fotos.zip`, fasst resellr nie an.
+- **Keine Messung an deinem PC (dein Entscheid).** Statt eines gemessenen Werts prüfen die Tests sieben Fenstergrößen (oben kritische Annahme 2). Das weicht von der Baseline ab (10.2 Punkt 6, 11.2); geprüft wird mehr, nicht weniger. (Kap. 6.3)
+- **Anpassendes Fenster nach dem Design (dein Entscheid).** Im schmalen Kopier-Assistenten steht der Hinweis am Ende der scrollenden Fläche, bei viel Platz am unteren Fensterrand. *Beispiel:* Bei 150 % steht in „Gerät einbuchen“ das Info-Panel unter dem Formular. (Kap. 2.0.10, 2.17, 6.3)
+- **Windows-Prüfung:** alles bestanden, kein Rückfallweg, keine Änderung am Aufbau; die Abnahme nennt jetzt, was der Test nicht zeigen konnte. (Kap. 6.4, 9.2)
+
+### Deine Entscheidungen
+
+1. **Feldreihenfolge im Kopier-Assistenten (REQ-029).** REQ-029 nennt die „Feldreihenfolge des Kopier-Assistenten“ als Kanal-Einstellung; das freigegebene Design macht nur die Reihenfolge der Merkmalsfelder einstellbar.
+   - **A (Empfehlung):** Einstellbar je Kanal ist die Reihenfolge der Merkmalsfelder; Titel, Beschreibung, Kategorie, Zustand, Preis und GPSR-Angaben stehen fest. *Beispiel:* In jedem Kanal kopierst du zuerst den Titel, dann die Beschreibung; nur Felder wie Prozessor und RAM ordnest du je Kanal selbst. Kein Mehraufwand.
+   - **B:** Alle Felder je Kanal verschiebbar. *Beispiel:* Bei eBay kopierst du zuerst den Preis, bei Kleinanzeigen zuerst den Titel. Aufwand mittel: zwei Screens neu gestalten, Design erneut bestätigen, Specification ändern und erneut prüfen. Später ohne Datenverlust nachrüstbar.
+   - **Ohne Einwand gilt A.** (Kap. 8.3)
+2. **Nur falls REQ-057 gebaut wird:** Erwartet dein Shop beim Import Brutto- oder Nettopreise? Empfehlung: nach dem Pilotstart entscheiden.
+
+### Lesetipps
+
+- **Kap. 8.2 und 8.3:** die verbindlichen Antworten des Product Owners und deine Entscheidung zur Feldreihenfolge.
+- **Kap. 9.2 und 6.4:** was die Windows-Prüfung belegt hat und was erst an deinem PC geprüft wird.
+- **Kap. 2.0.10 und 6.3:** wie sich die Oberfläche an die Fenstergröße anpasst und womit das geprüft wird.
+- **Kap. 2.17 bis 2.19 und ADR-008 (Kap. 11):** Installation, Start, Beenden, Update und Aufräumen, wie du sie erleben wirst.
+- **Kap. 4.4.0:** in welcher Reihenfolge gebaut wird.
+
+---
+
+## 1. Überblick und Basis
+
+### 1.1 Zweck und Umfang
+
+Diese Specification macht die freigegebene Baseline implementierbar. Sie legt für Release 0.1 fest:
+
+- die HTTP-Schnittstelle zwischen `web-ui` und `resellr-server` mit Anfragen, Antworten und Fehlercodes,
+- die Datenfelder, Typen und Prüfregeln aller Entitäten,
+- das Verhalten jedes Screens und jedes gestalteten Zustands (`UI-NNN.<state>`),
+- den Betrieb unter Windows (Installation, Start, Überwachung, Beenden, Update),
+- die Code-Struktur mit allen benannten Code-Einheiten und den Umfang des Walking Skeleton.
+
+**Im Umfang:** alle aktiven Must- und Should-Requirements; die Could-Requirements REQ-056 bis REQ-059 als optionale Einheiten (Kap. 2.21). **Nicht im Umfang:** REQ-001 Netzbetriebsteil, REQ-067 Netzbetriebsteil und REQ-097 (OD-02 A, Baseline 13.3.1); umgesetzt wird nur „nicht erreichbar von einem anderen Gerät“ (AC-REQ-001-05, AC-REQ-001-07).
+
+### 1.2 Eingaben (exakte Versionen)
+
+| Eingabe | Version / Stand | Verwendung |
+| --- | --- | --- |
+| Requirements | v0.3.3, Rev. `ce76d962`, `docs/product/requirements.md` @ `6f34e2a` | fachliche Regeln, ACs, Validierung (Kap. 6.0, 9) |
+| Architecture Baseline | v0.3.2, Rev. `2876806d`, `docs/architecture/architecture-baseline.md` @ `6f34e2a` | Komponenten, Datenmodell, Betrieb, Strategien |
+| ADR-001 bis ADR-007 | approved, `docs/architecture/adr/` @ `6f34e2a` | Entscheidungen |
+| UI/UX-Design | v0.5.2, Commit `a9356c1` (gemergt; `main` v0.5.3 `7e3593c` ohne inhaltliche Änderung) | Screens, Zustände, Flows, Texte, Design-Tokens |
+| Design-Entwurf v0.6.1 | Commit `894d49e`, v0.6.1 einschließlich MAR-182 (v0.6 `4fee15c` plus Textkorrektur MAR-181 und Klarstellung MAR-182 zu M-23), Owner-Bestätigung ausstehend | Teil A (Fenstergröße, Rahmen, Dialoge, R-1): Kap. 2.0.10, 2.17, 6.3; Teil B nach Kap. 8.2: UI-005 Schritt 2 (Kap. 2.6), LP-02 Zeitüberschreitung (Kap. 2.18), Meldungstexte M-xx, UI-019 Kopierfelder und Markierungen (Kap. 2.12), UI-030 (Kap. 2.2) |
+| Klärungen Product Owner | MAR-159 (r3), MAR-163, MAR-164; verbindliche Entscheidung MAR-176 (`004e2a12`) | Kap. 8, 9.3 |
+| Product Brief | v1.0 | nur Hintergrund |
+
+Das exportierte Stitch-HTML und die Mockups sind nicht Grundlage dieser Specification (Design Kap. 6). Wiederverwendet werden nur die Design-Tokens aus `DESIGN.md` (Kap. 4.6).
+
+### 1.3 Release-Umfang je Bauschritt
+
+Die Bauschritte folgen Baseline Kap. 12.2. Die Zuordnung der Code-Einheiten zu den Schritten steht in Kap. 4.4.
+
+| Schritt | Inhalt | Features (Kap. 2) |
+| --- | --- | --- |
+| S0 | Windows-Spike (Wegwerf-Prototyp, Branch `spike/windows-hosting`) | Kap. 9.2 |
+| S1 | Walking Skeleton: Repository, Build, CI, `npm run demo`, `local-guard`, Datenbank mit vollständigem Schema, Fehlerbehandlung, `audit`, Rahmen von `web-ui` mit Platz für UI-044 | Kap. 4.6 |
+| S2 | Grundeinstellungen mit Startbelegung | F-01, F-02 |
+| S3 | Modell-Bibliothek | F-04 |
+| S4 | Bestand: Erfassung, Zuordnung, Modell-Inserat | F-05, F-06, F-07 |
+| S5 | Kanal-Einstellungen und Kanal-Engine, Lasttest Neuberechnung | F-03, F-08 |
+| S6 | Freigabe-Workflow | F-09, F-10 |
+| S7 | Fotos und Kopier-Assistent | F-11, F-12 |
+| S8 | Datenblatt | F-13 |
+| S9 | Übersicht und Korrekturen, Protokollansicht | F-14, F-15, F-16 |
+| S10 | Betrieb: Installer, Launcher, Beenden, Startprüfung, Housekeeping, Verfügbarkeit | F-17, F-18, F-19 |
+| S11 | Could (optional) | F-21 |
+
+F-17 (Hinweis und „resellr beenden“) darf nach S1 vorgezogen werden (Baseline 12.2). Welche Schritte voneinander abhängen und was bis zu einem späteren Schritt gilt, steht in Kap. 4.4.0.
+
+---
+
+## 2. Feature-Spezifikationen
+
+Kap. 2.0 legt Regeln fest, die für alle Features gelten. Die Features F-01 bis F-21 verweisen darauf und nennen nur Abweichungen und Besonderheiten. Felder, Typen und Grenzen der Entitäten stehen in Kap. 3; hier stehen die Regeln, die an der Schnittstelle sichtbar werden.
+
+**Autorisierung (gilt für jedes Feature).** Es gibt genau eine Rolle, den Nutzer; er darf jede Aktion (E-4, Requirements Kap. 10.3). Es gibt keine Anmeldung (OD-02 A, AC-REQ-001-05). Der Schutz besteht aus der Bindung an `127.0.0.1` und `local-guard` (Kap. 2.0.2). Je Feature steht deshalb nur noch, welche Endpunkte zusätzlich ohne Browser erreichbar sind; das ist allein `POST /api/ops/shutdown` (Kap. 2.17).
+
+### 2.0 Querschnitt: Schnittstelle, Fehler, Zustände
+
+#### 2.0.1 Adressen und Formate
+
+| Thema | Festlegung |
+| --- | --- |
+| Basisadresse | `http://127.0.0.1:<port>`, Port aus `config.json` im Datenordner, Standard `4310` (Baseline 10.1). Die Bindeadresse `127.0.0.1` steht fest im Code (`apps/server/src/http/listen-address.ts`), sie ist kein Konfigurationswert (ADR-002). |
+| Pfade | JSON-API unter `/api/…`. Statische Oberfläche: `/assets/*` (gebündelte Dateien), jeder andere `GET`-Pfad ohne `/api`, `/media`, `/datasheets` oder `/downloads` liefert `index.html` (clientseitiges Routing, Baseline 6.1). Bilder: `/media/photos/{hash}`, `/media/thumbs/{hash}`, `/media/logo/{hash}`; `{hash}` muss `^[0-9a-f]{64}$` entsprechen, sonst `404` **vor** jedem Dateizugriff. Datenblatt: `/datasheets/{token}.pdf`. Foto-ZIP: `/downloads/{token}.zip`. Welche Code-Einheit welchen Pfad bedient, steht bei den Routen-Einheiten in Kap. 4.4 (Regel „ein Pfad, eine Routen-Einheit“ in Kap. 4.1). |
+| Kodierung | UTF-8, `Content-Type: application/json` für Anfragen und Antworten; Uploads `multipart/form-data` mit genau einer Datei je Anfrage. |
+| Feldnamen | camelCase, englisch. |
+| Kennungen | Ganzzahlen (SQLite `INTEGER PRIMARY KEY`). Fotos und Logo zusätzlich über den SHA-256-Hash (64 Hex-Zeichen, klein). |
+| Zeitpunkte | ISO 8601 in UTC mit Millisekunden, z. B. `2026-11-07T16:05:12.345Z`. Die Oberfläche zeigt sie in Europe/Berlin, Format `TT.MM.JJJJ HH:MM` (REQ-078). |
+| Kalenderdaten | `YYYY-MM-DD` (Verkaufs-, Veröffentlichungs-, Prüf- und Erfassungsdatum). „Heute“ und „nicht in der Zukunft“ beziehen sich auf das Datum in Europe/Berlin nach der Server-Uhr (`shared/clock.ts`). |
+| Geld | `…Cents` als Ganzzahl (z. B. `amountCents: 27900`). Anzeige „279,00 €“. |
+| Dezimalwerte von Merkmalen | kanonische Zeichenkette mit Punkt, ohne führende oder abschließende Nullen nach dem Komma (`"14.01"`, `"13.3"`). Eingaben mit Komma oder Punkt werden in `packages/domain` umgewandelt (Kap. 2.0.5); es gibt keine Umwandlung in ein Datum (REQ-005, AC-REQ-005-02). |
+| Listen | Antwort `{ "items": [...], "total": n }`. Parameter `limit` (Standard 50, höchstens 200) und `offset`. |
+| Erfolg | `200` mit dem geänderten oder gelesenen Objekt, `201` bei Neuanlage. Schreibende Antworten enthalten das vollständige Objekt mit neuer `version`, damit `web-ui` ohne Nachladen den neuen Stand zeigt (Baseline 6.1 „Echtzeit“). |
+
+#### 2.0.2 `local-guard` (Baseline 8.1, TH-02)
+
+`apps/server/src/http/local-guard.ts` prüft jede Anfrage in dieser Reihenfolge; eine Ablehnung hat keinen Seiteneffekt und wird im Fehlerprotokoll als Warnung ohne Anfrageinhalt vermerkt.
+
+| Nr. | Regel | Ablehnung |
+| --- | --- | --- |
+| G-1 | `Host` muss genau `127.0.0.1:<port>` sein (nicht `localhost`, keine andere Adresse). | `403 forbidden_host` |
+| G-2 | Ändernde Methoden (`POST`, `PUT`, `PATCH`, `DELETE`) brauchen `Origin: http://127.0.0.1:<port>`. Ist `Sec-Fetch-Site` vorhanden, muss es `same-origin` sein. | `403 forbidden_origin` |
+| G-3 | Ausnahme von G-2 nur für `POST /api/ops/shutdown`: Fehlen **sowohl** `Origin` **als auch** `Sec-Fetch-Site`, kommt die Anfrage nicht aus einem Browser (`resellr-launcher`, Startmenü „resellr beenden“, Installationspaket). Chrome setzt beide Kopfzeilen bei jeder ändernden Anfrage selbst; eine fremde Website kann sie nicht weglassen. | – |
+| G-4 | Ändernde Anfragen außer Uploads brauchen `Content-Type: application/json`; Uploads `multipart/form-data`. | `415 unsupported_media_type` |
+| G-5 | `GET` auf `/api/*`, `/media/*`, `/datasheets/*` und `/downloads/*` mit `Sec-Fetch-Site: cross-site` wird abgelehnt. | `403 forbidden_origin` |
+| G-6 | Es gibt keine CORS-Kopfzeilen, und `OPTIONS` wird mit `405` beantwortet. Lesende Anfragen ändern nichts. | – |
+
+**Sicherheitskopfzeilen** (`apps/server/src/http/security-headers.ts`) auf allen Antworten: `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` für `/api/*`. **Entscheidung zu H-2:** `style-src` erlaubt `'unsafe-inline'`, weil der Dialog-Baustein der Komponentenbibliothek (Radix über `react-remove-scroll`) zur Laufzeit ein `<style>`-Element einfügt. Eingeschleuste Styles können keinen Code ausführen; Inline-Skripte bleiben ausgeschlossen (`script-src 'self'`). Bilder unter `/media/*` werden mit festem Inhaltstyp (`image/jpeg`, `image/png`) ausgeliefert (TH-04).
+
+#### 2.0.3 Versionen und Konflikte (Baseline 9.3, RI-11, Ä-31)
+
+- Jede bearbeitbare Entität hat `version` (Ganzzahl, beginnt bei 1). Jede Änderung über die API sendet die zuletzt gelesene `version` mit. Weicht sie ab, antwortet der Server `409 version_conflict` und ändert nichts.
+- Die Freigabe sendet den Inhalts-Hash des gesehenen Stands (`seenContentHash`); weicht der gespeicherte aktuelle Stand ab: `409 stale_content` (Ablauf 2).
+- „Abgleich bestätigen“ sendet den Hash der gesehenen Bestandsangaben (`seenStockHash`); weicht der aktuelle Bestand ab: `409 stale_stock` (Ä-31).
+- Tabellen, die als Ganzes gespeichert werden (Zustandszuordnung je Kanal, Merkmalszuordnung, Beschreibungsvorlage, Titelmuster, Reihenfolgen), haben **eine** Version für die ganze Tabelle.
+- **Ausnahme ohne Versionsprüfung:** Foto hinzufügen (T-2) hängt an; die Prüfung „höchstens 20“ läuft in der Transaktion.
+- Ein Doppelklick erzeugt keine Doppel: Der zweite Auftrag scheitert an der Version oder ist fachlich wirkungslos (Baseline 9.3).
+
+#### 2.0.4 Schreibende Aktionen
+
+- **Eine Aktion, eine Transaktion** (`db/unit-of-work.ts`): Änderung, ausgelöste Neuberechnung der Kanal-Inhalte (Kap. 2.8), Kennzeichnungen und Protokolleinträge werden gemeinsam gespeichert oder gar nicht (Baseline 9.3). Fachkomponenten melden Änderungen über `UnitOfWork.emit(event)`; `listing-content` verarbeitet die Ereignisse vor dem Commit in derselben Transaktion (Baseline 2.4, Abhängigkeitsregeln).
+- **Zwei Arten von Ereignissen** (Kap. 4.5, Hotspot CU-034). *Änderungsereignisse* (`emit`) werden gesammelt und vor dem Commit verarbeitet; ihre Handler liefern einen **Bericht** zurück, den der auslösende Dienst in seine Antwort übernimmt (`impact` nach REQ-053, `adjustStockChannels`). *Prüfereignisse* (`check`) werden sofort verarbeitet; ein Handler lehnt mit einer Fachregel ab, dann rollt die Transaktion zurück. So prüft eine Komponente Regeln, deren Daten einer anderen Komponente gehören, ohne sie direkt aufzurufen: Variantenmenge geändert (`settings` → `inventory`), Geräteart einer Modellvorlage geändert und Modellvorlage löschen (`catalog` → `inventory`), Modell-Inserat löschen (`inventory` → `listing-content`). Ist für ein Ereignis noch kein Handler registriert (ein späterer Bauschritt), ist der Bericht leer bzw. die Prüfung bestanden; das ist richtig, weil die Daten des späteren Schritts dann noch nicht existieren (Kap. 4.4.0).
+- **Protokoll (REQ-072):** Jede protokollpflichtige Änderung schreibt in derselben Transaktion einen Eintrag über `audit/audit-writer.ts` (Kap. 2.16). Ohne Protokolleintrag wird nicht gespeichert.
+- **Schreibsperre beim Beenden (`apps/server/src/http/write-gate.ts`):** Im Zustand `stopping` lehnt der Server jede neue ändernde Anfrage mit `503 shutting_down` ab (P-07). Laufende Anfragen zählt die Sperre; das Beenden wartet höchstens 10 s auf ihr Ende (Kap. 2.17).
+- **Keine Wiederholung, keine Zeitgrenze im Server.** Datenbankzugriffe warten bei einer kurzen Sperre bis 5 s (`busy_timeout`, Baseline 9.6).
+
+#### 2.0.5 Fehlerformat und Statuscodes
+
+Jede Ablehnung hat dieses Format (`packages/domain/src/errors/error-response.ts`):
+
+```json
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "",
+    "fields": [
+      { "path": "wiNr", "code": "wi_nr_format", "message": "WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)" }
+    ],
+    "details": {},
+    "referenceNumber": null
+  }
+}
+```
+
+- `message` und `fields[].message` sind deutscher Text aus dem Meldungskatalog `packages/domain/src/messages/messages.de.ts`; `web-ui` zeigt sie unverändert. Fehlercodes werden nicht angezeigt (REQ-073, Baseline 9.1).
+- **Meldungsschlüssel je Verwendung (FIND-209):** Der Katalog ist nach `<code>.<verwendung>` geordnet (z. B. `name_taken.attribute`, `variant_duplicate.listing_values`). Der Dienst setzt die Verwendung, `error-mapper` wählt den Text. So steht jeder Text im Wortlaut des Screens, der ihn zeigt; Kap. 2.0.6 nennt die Verwendungen.
+- **Kein Sammeltext bei `validation_failed` (K-07, MAR-176):** `message` ist bei `validation_failed` leer (`""`), und der Meldungskatalog hat dafür keinen Eintrag; `web-ui` zeigt die Feldfehler am Feld. Der Schlüssel M-23 ist entfallen und wird nicht neu vergeben.
+- **Fehlerzusammenfassung, wo das freigegebene Design sie vorsieht (FIND-236; UI-003 `screen.md`, Zustand `validation`; Meldungskatalog v0.6.1 Abschnitt 3):** K-07 streicht nur den Sammeltext M-23, nicht die Zusammenfassung. In UI-003 zeigt `web-ui` bei „Gerät speichern“ und „Speichern und zuordnen“ zusätzlich oben die Fehlerzusammenfassung. Sie entsteht nur aus den Feldfehlern, die im Zustand `UI-003.validation` am Feld stehen: aus der Prüfung im Browser oder aus `fields[].message` bei `422 validation_failed`, dazu `wi_nr_taken` an der WI-Nr. Sie hat keinen eigenen Text aus dem Meldungskatalog; ihre Gestaltung folgt dem Design. Umgesetzt in CU-132 ohne neue Verantwortung. Die Zusammenfassung bei Freigabe-Ablehnung (`DESIGN.md` Formulare, UI-016 „Freigabe nicht möglich:“) bildet `release_conditions_violated` ab (Kap. 2.0.6, 2.9) und ist davon nicht berührt. Verbindlicher Wortlaut aller Meldungen mit Schlüssel M-xx: Tabelle „Meldungstexte“ in Kap. 8.2; die M-Nummern sind nur Schlüssel (FIND-230).
+- `referenceNumber` gibt es nur bei `500 internal_error` und bei Fehlern, die das Fehlerprotokoll erzeugen.
+- **Referenznummer (H-11):** Format `R-XXXX-XXXX` aus 8 Zeichen des Crockford-Base32-Alphabets (`0-9`, `A-Z` ohne `I`, `L`, `O`, `U`), zufällig erzeugt, z. B. `R-7K2M-9QX4`. Prüfmuster `^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$` (`packages/runtime-shared/src/reference-number.ts`). **Jede angezeigte Referenznummer steht im Fehlerprotokoll**, auch die des Launchers (`start_aborted`, `start_timeout`, `crash`, `gave_up`; zusätzlich zum Betriebsprotokoll, Kap. 2.19).
+- Zahlen- und Datumseingaben: `packages/domain/src/format/parse-decimal.ts` akzeptiert `14,01` und `14.01` (genau ein Dezimaltrennzeichen, Komma oder Punkt). Tausendertrennzeichen werden nicht akzeptiert, weil `1.234` sonst mehrdeutig wäre; die Eingabe wird mit der Regel des Felds abgelehnt. Datumsfelder akzeptieren `TT.MM.JJJJ` in der Oberfläche und senden `YYYY-MM-DD`.
+
+| HTTP | Code | Bedeutung | Zustand in `web-ui` |
+| --- | --- | --- | --- |
+| 400 | `bad_request` | Anfrage passt nicht zum Schema (Programmfehler der Oberfläche) | `.error` ohne Referenznummer → als `500` behandelt und protokolliert |
+| 403 | `forbidden_host`, `forbidden_origin` | `local-guard` | tritt bei eigener Oberfläche nicht auf |
+| 404 | `not_found` | Datensatz fehlt (z. B. in anderem Fenster gelöscht) | Banner „Dieser Eintrag ist nicht mehr vorhanden.“ (DG-08, Schlüssel M-15, Wortlaut nach MAR-159), ohne Referenznummer; beim Laden anstelle des Inhalts, im Dialog mit „Abbrechen“ |
+| 409 | `version_conflict`, `stale_content`, `stale_stock` | Konflikt | `.conflict` (P-05) |
+| 413 | `file_too_large` | Datei über der Grenze | `.validation` am Feld bzw. je Datei |
+| 415 | `unsupported_media_type` | falscher Dateityp oder Inhaltstyp | `.validation` |
+| 422 | `validation_failed` | Feldregeln verletzt, `fields` gefüllt | `.validation` |
+| 422 | fachlicher Code (Kap. 2.0.6) | Fachregel verletzt | fachliche Meldung, je Feature |
+| 422 | `confirmation_required` | Rückfrage nötig; `details.kind` sagt welche | Rückfragedialog, je Feature |
+| 503 | `shutting_down` | resellr wird beendet | `.wird-beendet` (P-07) bei schreibenden, `.unreachable` (P-06) bei lesenden Anfragen |
+| 500 | `internal_error` | technischer Fehler, Rollback, Eintrag im Fehlerprotokoll | `.error` mit Referenznummer (REQ-073) |
+
+#### 2.0.6 Fehlercode-Katalog (Auswahl der fachlichen Codes)
+
+Der vollständige Katalog liegt in `packages/domain/src/errors/error-codes.ts` und `messages.de.ts`. Die Texte übernehmen den Wortlaut von Requirements und Design; wo das freigegebene Design keinen Text hat, gilt Kap. 8 (DG-08). Diese Tabelle nennt die Codes mit eigenem Verhalten und je Verwendung den Text; Feldfehler (`validation_failed`) stehen bei den Features.
+
+| Code | HTTP | Text je Verwendung (Auszug) | Quelle |
+| --- | --- | --- | --- |
+| `name_taken` | 422 | `.device_type`: „Name ist bereits vergeben“; `.attribute`: „Bezeichnung ist bei dieser Geräteart bereits vergeben“; `.supplier`, `.text_block`: „Name ist bereits vergeben“; `.pick_list_value`: „Wert gibt es in dieser Liste bereits“; `.condition_code`: „Diesen Code gibt es für diesen Lieferanten bereits“ | REQ-004, REQ-005, REQ-007, REQ-022, REQ-099; UI-027, UI-028, UI-030, UI-032, UI-033 |
+| `attribute_has_values` | 422 | „Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.“ bzw. „Ebene …“ | REQ-005, UI-027 |
+| `variant_flag_would_merge_listings` | 422 | „Änderung nicht möglich: Modell-Inserate <Liste> würden gleiche Variantenangaben haben“ (`details.groups`); einzige Verwendung `.flag` (Kennzeichen „variantenbildend“ entfernen). Das Deaktivieren eines Merkmals löst den Code nie aus (K-03, MAR-176) | REQ-005, AC-REQ-005-09, UI-027 |
+| `device_type_in_use` | 422 | „Geräteart kann nicht geändert werden, weil Geräte erfasst sind“ | REQ-010, AC-REQ-010-02 |
+| `manufacturer_deactivated` | 422 | „Hersteller <Name> ist deaktiviert“ | REQ-100 |
+| `wi_nr_taken` | 422 | „WI-Nr bereits vergeben: Gerät <WI-Nr> in <Modell-Inserat>“ (`details.deviceId`, `details.listingId`) | REQ-012, AC-REQ-012-02 |
+| `review_pending` | 422 | „Erst Werte prüfen“ (`details.keys`) | REQ-013, REQ-017, REQ-019 |
+| `other_model_template` | 422 | „Gerät gehört zu anderer Modellvorlage“ | REQ-017 |
+| `already_assigned` | 422 | „Gerät ist bereits einem Modell-Inserat zugeordnet“ | AC-REQ-017-04 |
+| `variant_duplicate` | 422 | `.new_listing` (UI-004): „Gleiche Variantenangaben wie Modell-Inserat <Titel>; bitte dort zuordnen“; `.listing_values` (UI-014): „Variantenangaben stimmen mit Modell-Inserat <Titel> überein“ (`details.listingId`) | REQ-019, REQ-088; UI-004, UI-014 |
+| `article_number_taken` | 422 | „Artikelnummer bereits vergeben“ | REQ-019, REQ-088 |
+| `mapping_exists` | 422 | „Für diese Kombination gibt es bereits einen Eintrag“ mit `details.existing` (Kategoriepfad des vorhandenen Eintrags), den UI-035 an der Zelle nennt | REQ-024, AC-REQ-024-02 |
+| `device_not_available` | 422 | „Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden“ und Varianten je Aktion | REQ-020, REQ-021, REQ-093 |
+| `device_not_assigned` | 422 | „Gerät keinem Modell-Inserat zugeordnet“ | REQ-021, REQ-050 |
+| `device_not_sold` | 422 | „Gerät ist nicht als verkauft markiert“ | REQ-084 |
+| `release_conditions_violated` | 422 | „Freigabe nicht möglich:“ + `details.violations[]` | REQ-044, REQ-089 |
+| `invalid_status_transition` | 422 | „Erst freigeben“, „Erst Änderung freigeben“, „Freigegeben kann nicht beendet werden“ | REQ-046 |
+| `nothing_to_reconcile` | 422 | „Kanal ist abgeglichen“ | REQ-090 |
+| `copy_assistant_unavailable` | 422 | „Erst freigeben“ | REQ-047 |
+| `photo_limit_reached` | 422 | „Höchstens 20 Fotos je Modell-Inserat“ | REQ-042 |
+| `datasheet_precondition` | 422 | „Werte noch zu prüfen“, „Gerät keinem Modell-Inserat zugeordnet“, „Gerät storniert“, „Logo der Händlermarke fehlt“ | REQ-050 |
+| `delete_not_allowed` | 422 | „Löschen nicht möglich: …“ mit Grund | REQ-095 |
+| `price_rule_cycle` | 422 | „Die Preisregeln dürfen keinen Kreis bilden“ | REQ-085 |
+| `placeholder_not_allowed` | 422 | `.unknown` (alle): „Unbekannter Platzhalter {…}“; `.title_pattern` (UI-029): „Platzhalter {…} ist im Titelmuster nicht zulässig.“; `.condition_extra` (UI-034): „Platzhalter {…} ist in der Zusatzangabe nicht zulässig“; `.text_block` (UI-030): „{Baustein:Name} ist im Textbaustein nicht zulässig“ | REQ-023, REQ-026, REQ-030, REQ-031; UI-029, UI-030, UI-034 |
+| `confirmation_required` | 422 | `details.kind` ∈ `possible_duplicate`, `mpn_in_use` (Could), `variant_deviation`, `target_deviation`, `assigned_devices_deviate`, `unchecked_legal_text` | REQ-011, REQ-058, REQ-018, REQ-014, REQ-020, REQ-088, REQ-087 |
+
+#### 2.0.7 Gestaltete Zustände und ihr technischer Auslöser
+
+Diese Regeln gelten für jeden Screen, der den Zustand nennt. Kap. 7.3 ordnet jedem Screen seine Zustände zu und nennt nur noch Besonderheiten. Umgesetzt werden sie zentral in `apps/web/src/api/api-client.ts` (Klassifizierung der Antwort) und `apps/web/src/components/patterns/*` (Darstellung).
+
+| Zustand | Auslöser (technisch) | Verhalten |
+| --- | --- | --- |
+| `.default` | Daten geladen | – |
+| `.loading` | lesende Anfrage läuft (TanStack Query `isPending`) | Platzhalter mit dem Text des Screens; Zeitgrenze 5 s, außer beim Datenblatt (Kap. 2.0.8) |
+| `.empty` | Antwort mit leerer Liste bzw. Bedingung des Screens | Text und Aktion aus `screen.md` |
+| `.error` | `500 internal_error` (lesend oder schreibend) | Banner mit dem Text des Screens, Funktion, nächstem Schritt und `referenceNumber` (REQ-073); bei schreibenden Aktionen bleiben die Eingaben erhalten |
+| `.validation` | `422 validation_failed` oder `413`/`415` | Fehler am Feld (`fields[].path` = Feldname), erster Fehler erhält den Fokus (Design Kap. 5); dieselben Zod-Schemas prüfen schon beim Verlassen des Felds im Browser |
+| fachliche Ablehnung | `422` mit fachlichem Code | Meldung am Feld bzw. im Banner, je Feature |
+| `.success` | `2xx` auf eine schreibende Aktion | Banner mit dem Text des Screens, schließt nach 5 s (Design Kap. 5) |
+| `.disabled` | aus geladenen Daten berechnet (z. B. Status, Prüfmarkierungen) | Button deaktiviert, Begründung als Tooltip |
+| `.conflict` (P-05) | `409 version_conflict`, `stale_content`, `stale_stock` | Banner P-05 mit „Neu laden“; „Neu laden“ holt nur die Daten neu (`queryClient.invalidateQueries`), die Seite bleibt, Eingaben bleiben bis dahin sichtbar (T-1) |
+| `.speichert` (P-08) | schreibende Anfrage läuft (`useMutation` `isPending`) | ein **Speicherknopf** zeigt „Speichern …“; andere Auslöser („Freigeben“, „Als verkauft markieren“ u. a.) behalten ihre Beschriftung und sind gesperrt (P-08, FIND-208); alle Eingaben der Seite gesperrt, **keine Zeitgrenze** (Ä-29) |
+| `.ausgang-unbekannt` (P-08, K-6) | schreibende Anfrage endet **ohne HTTP-Antwort** (`fetch` wirft `TypeError`, Verbindung abgebrochen) | dauerhaftes Banner „Ausgang unbekannt, bitte neu laden.“ mit Zusatztext aus Design Kap. 5; `apps/web/src/api/write-outcome-store.ts` setzt die Seite in den Zustand „gesperrt bis Neuladen“, jede weitere schreibende Aktion ist deaktiviert, es gibt keine Wiederholung |
+| `.wird-beendet` (P-07) | `503 shutting_down` auf eine schreibende Anfrage | Banner P-07 ohne Referenznummer, Eingaben bleiben sichtbar |
+| `.unreachable` (P-06) | lesende Anfrage ohne HTTP-Antwort, Zeitgrenze überschritten oder `503 shutting_down` auf eine lesende Anfrage | dauerhaftes Banner P-06 mit „Erneut versuchen“ (prüft `GET /api/ops/health` und lädt bei Erfolg die Daten der Seite und den Speicherort von UI-044 neu, DG-06); die Seite wird nicht ersetzt; UI-044 bleibt sichtbar |
+
+**Wartezustand bei Folgeanfragen.** Schreibende Antworten enthalten das geänderte Objekt; `web-ui` übernimmt es direkt in den Cache (`setQueryData`) und lädt betroffene Listen im Hintergrund neu. Ein Fehler beim Nachladen einer Liste nach erfolgreichem Speichern zeigt `.unreachable` bzw. `.error` an der Liste, nicht am Formular.
+
+#### 2.0.8 Zeitgrenzen im Browser
+
+| Anfrageart | Zeitgrenze | Folge |
+| --- | --- | --- |
+| lesend (`GET`, Vorschau, Anzahl im Geltungsbereich) | 5 s (Design Kap. 5, REQ-060) | `.unreachable` (P-06); der Server bricht nichts ab. Das gilt auch für Vorschau und Anzahl im Geltungsbereich: Sie haben keine eigene Fehlerregel (FIND-208) |
+| Datenblatt erzeugen (UI-023) | **keine** (DG-04, MAR-159): REQ-061 erlaubt bis 5 % der Aufrufe über 5 s | `.loading` „Datenblatt wird erzeugt …“ bis zur Antwort; nur ein Verbindungsabbruch ohne Antwort führt zu P-06 |
+| schreibend | **keine** (Ä-29) | Ende nur durch Antwort oder Verbindungsabbruch |
+| `POST /api/ops/shutdown` aus UI-045 | 30 s (T-3, `UI-045.unknown`) | Wechsel zu `UI-046.unknown` |
+
+Begründung für die 30 s beim Beenden: höchstens 10 s Warten auf eine laufende Aktion plus Checkpoint, Schließen und Ende-Markierung, mit Reserve (MAR-150, T-3). Nach Ablauf ist der Ausgang unbekannt, nicht fehlgeschlagen; deshalb widerspricht die Grenze Ä-29 nicht.
+
+#### 2.0.9 Protokolleinträge (REQ-072)
+
+Ein Eintrag hat: `occurredAt`, `objectType`, `objectId`, `objectLabel` (z. B. „Gerät 626198“, „Textbaustein Abholung“), `action`, `oldValue`, `newValue` (JSON, nur die geänderten Felder, lesbar formatiert). Kein Nutzer, keine Passwörter (E-4, E-5). Die Aktionen je Objektart stehen in Kap. 3.6. Bestandsangaben, Neuberechnungen und Kennzeichnungen, die das System selbst setzt, werden nicht einzeln protokolliert; protokolliert wird die auslösende Änderung.
+
+#### 2.0.10 Fenstergröße, Reflow und Dialoge (REQ-077; Design-Entwurf v0.6 Teil A, Owner-Entscheid MAR-168)
+
+Grundlage sind `DESIGN.md` (Form und Dichte, Dialoge, R-1) und `uiux-design.md` Kap. 5 im Entwurf v0.6.1 (`894d49e`, einschließlich MAR-182; Teil A unverändert seit v0.6 `4fee15c`). REQ-077 (1366 × 768) ist die Untergrenze, kein Planungsmaß. Seitenzoom bis 150 % wird unterstützt. Technische Umsetzung:
+
+- **Eine Bruchstelle für alle Screens.** CU-059 legt im Tailwind-Theme die Bruchstelle `full` = `min-width: 1366px` fest. Die Media Query misst die Viewport-Breite in CSS-Pixeln einschließlich Scrollleiste, und ein maximiertes Chrome-Fenster bei 1366 × 768 und 100 % ist genau so breit. Layouts werden **einspaltig als Grundform** geschrieben; mehrspaltige Anordnungen stehen nur unter dem Präfix `full:`. So gilt R-1 (1) in jedem Screen, ohne eigene Regel je Screen. Die Angaben „ab 1366 px“ in den `screen.md` beschreiben die `full`-Anordnung. Eine weitere Bruchstelle gibt es nicht; die schmale Ansicht von UI-019 ist ein eigener Rahmen (Kap. 2.17).
+- **Keine waagrechte Scrollleiste der Seite (R-1 (2)).** Der Inhaltsbereich hat `min-width: 0`. Tabellen und breite Vergleiche (`Table` aus CU-058, CU-094, CU-177, UI-017, UI-018) liegen in einem Behälter mit `overflow-x: auto`; die erste Spalte ist `position: sticky; left: 0`. Lange Werte ohne Leerzeichen brechen mit `overflow-wrap: anywhere` um, außer wo das Design eine Kürzung mit vollem Wert im Tooltip vorsieht (`data-truncated`, Kap. 6.3).
+- **Seitenpanels (R-1 (3)).** Unterhalb von `full` zeigt ein Screen seine Seitenpanels als `Sheet` aus CU-058: eine überlagernde Fläche mit „Schließen“, der Fokus bleibt im Panel, Esc schließt. Ab `full` stehen die Panels wie gestaltet daneben. Welche Bereiche stapeln und welche überlagern, legt das Design je Screen fest; die Specification legt nur den Baustein fest.
+- **Kopf- und Aktionsleisten (R-1 (4)).** Seitenkopf und Aktionsleiste langer Formulare bleiben im scrollenden Inhaltsbereich sichtbar (`position: sticky`). Ihre Buttons brechen bei Platzmangel um (`flex-wrap: wrap`).
+- **Schrift (R-1 (5)).** Keine Schrift unter 12 CSS-px. Größen kommen aus den Tokens (`px`/`rem`), nie abhängig von der Viewport-Breite. Seitenzoom verkleinert den Viewport in CSS-Pixeln; die Regeln oben greifen dadurch von selbst.
+- **Dialoge (DESIGN.md, u. a. UI-004 und UI-005).** Alle Dialoge nutzen `Dialog` aus CU-058. Breite `min(<Designbreite>, 100vw − 16px)`, Höhe höchstens `100dvh − 16px`. Der Dialog ist eine Spalte aus Titel, Inhalt (`overflow-y: auto`) und Aktionsleiste, sodass Titel und Aktionen immer sichtbar bleiben. Jeder Dialog übergibt seine Designbreite als Eigenschaft `width` (z. B. 720 für UI-004, 800 für UI-005).
+- **Rahmen** (Navigationsspalte und schmale Ansicht): Kap. 2.17. **Nachweis:** Fenstergrößen-Matrix, Kap. 6.3.
+
+---
+
+### 2.1 F-01 Gerätearten, Merkmale und Auswahllisten (REQ-004 bis REQ-007, REQ-076)
+
+**Komponenten:** `web-ui` (UI-027, UI-028), `http-api`, `settings`, `listing-content` (Neuberechnung), `audit`. **Screens:** UI-025, UI-027, UI-028. **Flows:** FLOW-05.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/device-types` | – | `items[]`: `id, name, active, version, attributeCount` | – |
+| `POST /api/device-types` | `name`, `active` | `201` DeviceType | `name_taken`, `validation_failed` |
+| `PATCH /api/device-types/{id}` | `version`, `name?`, `active?` | DeviceType | `version_conflict`, `name_taken` |
+| `GET /api/device-types/{id}/attributes` | – | `items[]`: Attribut nach Kap. 3.1 plus `hasValues` | `not_found` |
+| `POST /api/device-types/{id}/attributes` | Attribut ohne `id`, `version` | `201` Attribut | `name_taken` (Bezeichnung je Geräteart), `validation_failed` |
+| `PATCH /api/attributes/{id}` | `version` und geänderte Felder | Attribut | `name_taken` (Umbenennen auf eine vergebene Bezeichnung), `validation_failed`, `attribute_has_values`, `variant_flag_would_merge_listings`, `version_conflict` |
+| `PUT /api/device-types/{id}/attribute-order` | `version` (der Geräteart), `attributeIds[]` vollständig | Geräteart mit neuer Version | `version_conflict`, `validation_failed` (Liste unvollständig) |
+| `GET /api/pick-lists` | – | `items[]`: `id, key, name, isBatteryList, version` | – |
+| `GET /api/pick-lists/{id}/values` | – | `items[]`: `id, label, active, batteryPresent, sortOrder, version` | – |
+| `POST /api/pick-lists/{id}/values` | `label`, `active`, `batteryPresent?` | `201` Wert | `name_taken` („Wert gibt es in dieser Liste bereits“), `validation_failed` |
+| `PATCH /api/pick-list-values/{id}` | `version`, `label?`, `active?`, `batteryPresent?` | Wert | `name_taken`, `version_conflict` |
+| `PUT /api/pick-lists/{id}/value-order` | `version` (der Liste), `valueIds[]` | Liste | `version_conflict` |
+
+Es gibt **keinen** Endpunkt zum Löschen von Gerätearten, Merkmalen oder Listenwerten (REQ-004, REQ-005, REQ-007: nur deaktivieren) und keinen zum Anlegen neuer Auswahllisten (UI-028 kennt nur die Listen der Startbelegung, RQ-07).
+
+**Regeln (zusätzlich zu Kap. 3.1)**
+
+- **Name der Geräteart** 1–50 Zeichen nach Entfernen der Randleerzeichen, eindeutig über `name_key` (Unicode-Kleinschreibung, Baseline 4.4); AC-REQ-004-02.
+- **Merkmal:** Bezeichnung 1–100 Zeichen, eindeutig je Geräteart (auch beim Umbenennen), ohne `{` und `}`, nicht gleich einem festen Platzhalternamen aus Requirements Kap. 9.7 (`Hersteller`, `Modellbezeichnung`, … `Stückzahl`), damit Platzhalter eindeutig bleiben. Ausgenommen ist das Merkmal mit der Systemrolle `battery_capacity`, dessen Bezeichnung „Akkukapazität“ zugleich der Bestandsplatzhalter ist. Texte: Tabelle „Meldungstexte“ in Kap. 8.2 (Schlüssel M-02 bis M-04; M-04 „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ nach K-07).
+- **Datentyp und Ebene** sind nach dem ersten gespeicherten Wert gesperrt (`hasValues`, CU-074: Prüfung über `json_extract` in Modellvorlagen, Geräten und Modell-Inseraten; einzige erlaubte direkte Lesestelle fremder Tabellen, Kap. 4.1); AC-REQ-005-04, AC-REQ-005-08.
+- **„variantenbildend“** nur bei Ebene *Gerät*, nie bei Systemrolle `battery_capacity` (AC-REQ-005-07). Die **Menge der Variantenmerkmale** einer Geräteart sind alle Merkmale der Ebene *Gerät* mit `variantForming = true`, **aktive und deaktivierte** (K-03, MAR-176; Requirements Kap. 6.0 vergleicht „den Wert jedes Variantenmerkmals“). Sie ändert sich nur durch das Kennzeichen, nie durch Deaktivieren oder Aktivieren. Wird das Kennzeichen entfernt, meldet `settings` (`settings/variant-flag-guard.ts`, CU-075) das Prüfereignis `VariantSetChanging { deviceTypeId, variantAttributeIds }` (Kap. 2.0.4). Der Handler in `inventory/inventory-checks.ts` (CU-290; eine Einheit `inventory/variant-flag-guard.ts` gibt es nicht, FIND-227) prüft je Modellvorlage der Geräteart mit der Vergleichsregel (CU-119), ob danach zwei Modell-Inserate übereinstimmen würden; dann `variant_flag_would_merge_listings` mit `details.groups[]: { modelTemplateId, listingIds[] }` (REQ-005, AC-REQ-005-09). Bestehende Zuordnungen bleiben unverändert (AC-REQ-005-10). Das Setzen des Kennzeichens fügt nur ein Unterscheidungsmerkmal hinzu und ist immer zulässig.
+- **Deaktivieren eines Merkmals** (auch eines Variantenmerkmals) wird **nie abgelehnt** (K-03, MAR-176; REQ-005: „nicht mehr abgefragt; vorhandene Werte bleiben gespeichert“). Ein deaktiviertes Variantenmerkmal wird für neue Geräte nicht mehr abgefragt, bleibt aber in der Vergleichsregel (Kap. 2.6). *Beispiel:* Nach „RAM deaktivieren“ hat ein neu erfasstes MacBook keinen RAM-Wert; gegen ein Modell-Inserat mit „16GB“ zeigt UI-005 „RAM: Gerät –, Modell-Inserat 16GB“, und der Nutzer entscheidet („trotzdem zuordnen“, neues Modell-Inserat oder Kennzeichen entfernen nach AC-REQ-005-09, -10).
+- **Systemrollen** (`keyboard_layout`, `power_supply`, `battery`, `battery_capacity`): Datentyp, Ebene und Auswahlliste sind fest; Bezeichnung, Pflicht, Reihenfolge, Datenblatt-Block und Status sind änderbar. Die Regeln von REQ-014 hängen an der Rolle, nicht an der Bezeichnung.
+- **Mindest-/Höchstwert** nur bei Ganzzahl und Dezimalzahl, `min ≤ max`.
+- **Auswahlliste** Pflicht bei Datentyp `pick`; beim Datentyp `ports` (Mehrfachangabe Anzahl × Typ) sind die Listen „Anschlusstyp“ und „Anschlussposition“ fest, die Position ist je Eintrag optional (Kap. 3.4).
+- **Listenwerte:** eindeutig je Liste ohne Groß-/Kleinschreibung (AC-REQ-007-02); bei der Liste Akku ist `batteryPresent` Pflicht (REQ-007). Eine Umbenennung wirkt überall, weil Datensätze die ID speichern (Baseline 4.3).
+- **Umbenennen eines Merkmals:** Titelmuster und Merkmalszuordnungen speichern Merkmale über die Merkmals-ID (Kap. 3.4); eine Umbenennung wirkt dort ohne weiteres. Kanalweite Texte (Beschreibungsvorlagen, Zusatzangaben, Textbausteine) gelten für mehrere Gerätearten und lösen `{Merkmalsbezeichnung}` je Geräteart über die Bezeichnung auf; sie werden nicht umgeschrieben (RQ-06). *Beispiel:* „RAM“ wird zu „Arbeitsspeicher“; `{RAM}` in einer Beschreibungsvorlage löst sich nicht mehr auf, die Zeile entfällt in allen Kanal-Inhalten, freigegebene fallen auf *Entwurf*. Eine Warnung beim Umbenennen wäre eine Design-Erweiterung (DG-14).
+
+**Wirkung auf Kanal-Inhalte:** Jede Änderung an Merkmal (Bezeichnung, Einheit, Schreibweise, Status), Listenwert (Bezeichnung) oder Geräteart (Name) meldet `SettingsChanged` mit dem Geltungsbereich (Geräteart bzw. alle Gerätearten, die die Liste nutzen); `listing-content` bildet die betroffenen Kanal-Inhalte neu (Kap. 2.8). Die Anzahlen werden nicht angezeigt (UI-043 nur nach UI-030/UI-031).
+
+**Zustände:** UI-027 und UI-028 nach Kap. 2.0.7; `UI-027.disabled` = `hasValues` sperrt Datentyp und Ebene. Die Zeilenaktion „Merkmal deaktivieren“ hat keinen fachlichen Fehlerfall (K-03); es gelten nur die allgemeinen Zustände (P-05 bis P-08). **Migrationen:** keine eigene; Tabellen in der Initialmigration (Kap. 3.8), Startbelegung nach Kap. 2.1.1.
+
+**Ablauf „Kennzeichen variantenbildend ändern“** (Frage: Wie verhindert der Server, dass zwei Modell-Inserate ununterscheidbar werden?)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant S as settings
+  participant I as inventory
+  participant L as listing-content
+  participant D as resellr-db
+
+  U->>W: UI-027 Merkmal RAM, Kennzeichen variantenbildend entfernen
+  W->>A: PATCH /api/attributes/12 (version, variantForming false)
+  A->>S: Merkmal ändern
+  S->>D: Transaktion beginnen, Merkmal ändern
+  S->>I: Prüfereignis VariantSetChanging (Geräteart)
+  I->>D: Modell-Inserate der Geräteart lesen
+  I->>I: Vergleich nach neuer Menge der Variantenmerkmale
+  alt zwei Modell-Inserate einer Modellvorlage würden übereinstimmen
+    S->>D: Rollback
+    A-->>W: 422 variant_flag_would_merge_listings (Gruppen)
+    W-->>U: UI-027.validation am Kennzeichen mit Liste der Modell-Inserate
+  else Version veraltet
+    A-->>W: 409 version_conflict
+    W-->>U: UI-027.conflict (P-05)
+  else zulässig
+    S->>D: Merkmal speichern, Protokolleintrag
+    S->>L: Ereignis SettingsChanged (Geräteart)
+    L->>D: betroffene Kanal-Inhalte neu bilden
+    S->>D: Commit
+    A-->>W: 200 Merkmal (neue version)
+    W-->>U: Banner „Merkmal gespeichert“
+  end
+```
+
+#### 2.1.1 Startbelegung (REQ-006)
+
+- Inhalt abschließend nach Requirements Kap. 9.2, 9.3, 9.8 und 9.12: vier Gerätearten mit Merkmalen, Ebenen, Variantenkennzeichen und Pflicht, Titelmuster, Auswahllisten, Kanäle Shop, Kleinanzeigen und eBay (aktiv, Höchstlängen 128/65/80, VB nur Kleinanzeigen), Merkmalszuordnungen, Beschreibungsvorlagen, Datenblatt-Layout. Merkmale „Tastaturlayout“, „Netzteil“, „Akku“, „Akkukapazität“ erhalten ihre Systemrolle. Die Reihenfolge der Merkmale folgt Kap. 9.3.
+- Nicht enthalten (AC-REQ-006-03): Kategorie- und Zustandszuordnungen, Texte der Textbausteine, GPSR-Angaben, Händlerangaben, Code-Übersetzungstabelle, Lieferanten.
+- Ablage: `packages/seed-data/src/initial-settings.ts` (Daten, kein Code mit Kundenbezug, REQ-074). Eingespielt einmalig durch die Datenmigration `20261110_0002_seed_initial_settings.ts` beim Anlegen der Datenbank (Baseline 10.2 „Erster Start“). Spätere Updates ändern die Startbelegung bestehender Installationen nicht.
+- **Prüfung OP-22 (Verantwortung Software Architect, A-17):** Die Startwerte 80 Zeichen (eBay-Titel) und 128 Zeichen (Produktname PrestaShop) entsprechen dem Kenntnisstand des Architekten. Sie sind Einstellung (REQ-029) und werden vor dem Pilotbetrieb am echten Formular geprüft (Kap. 9.3). In der Startbelegung ist kein Merkmalsfeld Pflichtfeld des Kanals (Requirements Kap. 9.8).
+
+### 2.2 F-02 Händlermarke, Hersteller und GPSR, Lieferanten, Code-Übersetzung, Textbausteine, Datenblatt-Layout
+
+(REQ-022, REQ-026 bis REQ-028, REQ-051, REQ-053, REQ-054, REQ-099 bis REQ-101)
+
+**Komponenten:** `web-ui`, `http-api`, `settings`, `media` (Logo), `listing-content`, `audit`. **Screens:** UI-008, UI-026, UI-030, UI-031, UI-032, UI-033, UI-039, UI-043. **Flows:** FLOW-04, FLOW-05.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/merchant-profile` | – | `brandName, contactText, logo: { hash, url } \| null, version` | – |
+| `PUT /api/merchant-profile` | `version, brandName, contactText` | Profil | `validation_failed`, `version_conflict` |
+| `PUT /api/merchant-profile/logo` | multipart `file` (PNG/JPEG ≤ 5 MB), Feld `version` | Profil | `file_too_large`, `unsupported_media_type` („Logo: nur PNG oder JPEG bis 5 MB“, AC-REQ-028-02) |
+| `DELETE /api/merchant-profile/logo?version=` | – | Profil ohne Logo | `version_conflict` |
+| `GET /api/manufacturers?includeInactive=true` | – | `items[]`: `id, name, active, gpsrComplete, gpsrMissing[], gpsr, version` | – |
+| `POST /api/manufacturers` | `name` | `201` neu, oder `200` mit `existing: true` und dem vorhandenen Hersteller (REQ-100, AC-REQ-100-02) | `manufacturer_deactivated`, `validation_failed` |
+| `PATCH /api/manufacturers/{id}` | `version, name?, active?, gpsr?` | `{ manufacturer, impact }` | `name_taken`, `validation_failed`, `version_conflict` |
+| `GET /api/suppliers?includeInactive=true` | – | `items[]` | – |
+| `POST /api/suppliers` | `name, active` | `201` | `name_taken`, `validation_failed` |
+| `PATCH /api/suppliers/{id}` | `version, name?, active?` | Lieferant | `name_taken`, `version_conflict` |
+| `GET /api/condition-codes` | – | `items[]`: `id, code, supplierId, plainText, suggestedConditionValueId, suggestedVisualGrade, version` | – |
+| `POST /api/condition-codes` | Eintrag ohne `id` | `201` | `name_taken` („Diesen Code gibt es für diesen Lieferanten bereits“, AC-REQ-022-02), `validation_failed` (AC-REQ-022-04) |
+| `PATCH /api/condition-codes/{id}` / `DELETE …?version=` | – | Eintrag / `204` | `version_conflict` |
+| `GET /api/condition-codes/resolve?code=&supplierId=` | – | `{ found, plainText, suggestedConditionValueId, suggestedVisualGrade }` | – |
+| `GET /api/text-blocks` | – | `items[]` nach Kap. 3.1 | – |
+| `POST /api/text-blocks` | Baustein ohne `id` | `201 { textBlock, impact }` | `name_taken`, `placeholder_not_allowed`, `validation_failed` |
+| `PATCH /api/text-blocks/{id}` | `version` und Änderungen | `{ textBlock, impact, legalStatusReset }` | wie oben, `version_conflict` |
+| `GET /api/datasheet-layout` / `PUT …` | `version, headerLabels[], blockOrder[], attributeOrder{deviceTypeId: attributeIds[]}` | Layout | `validation_failed`, `version_conflict` |
+| `GET /api/datasheets/preview-device` | – | `{ deviceId \| null }` (Beispielgerät für den Vorschau-Link in UI-039); ab S8, Route CU-224, Abfrage CU-306 (FIND-227) | – |
+
+`impact` = `{ updated, rerelease, manualReview }` nach REQ-053 und REQ-043 (Kap. 2.8.4); er ist der Bericht der Änderungsereignisse (Kap. 2.0.4). Vor S5 gibt es keine Kanal-Inhalte, `impact` ist dann `{0, 0, 0}` und UI-043 zeigt `.empty`; die ACs von REQ-053 werden in S6 abgenommen (Kap. 4.4.0). Es gibt keine Löschfunktion für Hersteller, Lieferanten und Textbausteine (REQ-026, REQ-099, REQ-101); das Löschen eines Code-Eintrags ist erlaubt (REQ-022).
+
+**Regeln**
+
+- **Hersteller (REQ-100, REQ-101):** Name 1–50 Zeichen nach Trim, eindeutig ohne Groß-/Kleinschreibung. `POST` mit vorhandenem aktivem Namen legt nichts an und liefert den vorhandenen (UI-008 „<Name> gibt es bereits und wird verwendet“); ist er deaktiviert, `manufacturer_deactivated`.
+- **GPSR (REQ-027, AC-REQ-027-02):** Speichern ist auch unvollständig erlaubt. `gpsrComplete` = Herstellername, Straße und Hausnummer, Postleitzahl, Ort, Land und Kontakt vorhanden; `gpsrMissing[]` nennt die fehlenden Teile (UI-031 „<Teil> fehlt“). Kontakt ist eine E-Mail-Adresse oder eine Internetadresse mit `http://` oder `https://`; ein vorhandener, ungültiger Kontakt wird abgelehnt („E-Mail-Adresse oder Internetadresse ungültig“). Die Längen der GPSR-Felder (Kap. 3.1) sind technische Obergrenzen des Architekten ohne Requirement; Texte: Tabelle „Meldungstexte“ in Kap. 8.2 (Schlüssel M-05 bis M-13, Wortlaut nach MAR-159).
+- **Textbaustein (REQ-026, REQ-054):** Name 1–100, eindeutig; Art fest aus fünf Werten; Text 1–5.000 Zeichen; Platzhalter nach Requirements Kap. 9.7, Zeile „Textbaustein“ (alle außer `{Baustein:Name}`); Geltungsbereich „alle“ oder Auswahl je Gerätearten und Kanäle. Prüfstatus nur bei `legal` und `battery_notice`; neue Bausteine dieser Arten sind `unchecked`; jede Textänderung an einem `checked`-Baustein setzt `unchecked` und meldet `legalStatusReset: true` (UI-030-Hinweis). `checked` braucht Prüfdatum (nicht in der Zukunft) und prüfende Stelle (1–100). Feldfehler (K-05, MAR-176; Design v0.6.1 UI-030 und M-24): Fehlt das Prüfdatum, die prüfende Stelle oder beides, lehnt der Server mit `validation_failed` ab, je fehlendem Feld ein Eintrag in `fields[]` (`legalCheckedOn` bzw. `legalCheckedBy`, Code `legal_check_required`) mit **einem** Text „Prüfdatum und prüfende Stelle erforderlich“ (M-24, Wortlaut von AC-REQ-054-03). `web-ui` zeigt den Text **einmal** unter den beiden Feldern und markiert beide Felder; einen Text „Prüfende Stelle fehlt“ gibt es nicht mehr. Datum in der Zukunft → „Prüfdatum darf nicht in der Zukunft liegen“ (UI-030) am Feld Prüfdatum. *Beispiel:* Prüfdatum 05.11.2026 eingetragen, prüfende Stelle leer → einmal „Prüfdatum und prüfende Stelle erforderlich“, nichts gespeichert.
+- **Code-Übersetzung (REQ-022):** Code 1–20, Klartext 1–500, Kombination Code (ohne Groß-/Kleinschreibung) und Lieferant eindeutig, ohne Lieferant zählt als eigener Schlüssel. Änderungen wirken nur auf künftige Erfassungen (AC-REQ-022-03); sie lösen keine Neuberechnung aus.
+- **Auflösen eines Codes (REQ-015):** Eintrag des Lieferanten vor dem Eintrag ohne Lieferant; Vergleich ohne Groß-/Kleinschreibung (AC-REQ-015-01).
+- **Händlermarke (REQ-028):** Name 1–100, Kontakt 0–500; Logo nach Kap. 2.11 (Dateiprüfung) mit eigener Grenze 5 MB, ersetzt das bisherige. Zuständigkeit (FIND-203): `merchant_profile` schreibt nur `settings` (CU-084). Beim Hochladen prüft und speichert `media` die Datei und liefert den Hash (CU-090); CU-084 setzt `logo_hash` in derselben Transaktion.
+- **Datenblatt-Layout (REQ-051):** Kopfzeilentexte je 0–50 Zeichen (UI-039), Blockreihenfolge ist eine Permutation der sechs Blöcke, Merkmalsreihenfolge je Geräteart eine Permutation der Merkmale dieser Geräteart. Fehlt eine Merkmalsreihenfolge, gilt die Reihenfolge aus UI-027.
+- **Beispielgerät für den Vorschau-Link in UI-039 (FIND-207, FIND-227):** das zuletzt erfasste Gerät, das die Voraussetzungen des Datenblatts erfüllt (zugeordnet, geprüft, nicht storniert, REQ-050). Gibt es keines, ist der Link deaktiviert (DG-13). Die Abfrage gehört zu `datasheet` (CU-306, S8) und liest über `inventory-reader` (CU-129); `settings` liest dafür nichts aus `inventory`, so entsteht kein Kreis. Der Pfad liegt bewusst nicht unter `/api/datasheet-layout` (CU-087). Bis S8 ist der Link in UI-039 deaktiviert, weil es UI-023 noch nicht gibt (Kap. 4.4.0).
+
+**Wirkung auf Kanal-Inhalte:** Textbaustein, GPSR-Angaben, Herstellername und Händlermarke melden `SettingsChanged`; der Geltungsbereich ist beim Textbaustein die Schnittmenge aus seinen Gerätearten und Kanälen (alter **und** neuer Geltungsbereich), beim Hersteller alle Modell-Inserate seiner Modellvorlagen, bei der Händlermarke alle Kanal-Inhalte. `impact` geht nur bei Textbaustein und Hersteller an die Oberfläche (UI-043, REQ-053). Code-Übersetzung, Lieferant und Datenblatt-Layout ändern keine Kanal-Inhalte.
+
+**Zustände:** UI-043 zeigt die drei Zahlen aus `impact`; `UI-043.empty`, wenn alle drei 0 sind; „Zu den betroffenen Inseraten“ öffnet `/inserate?flag=changed_since_release` (UI-002). Übrige Zustände nach Kap. 2.0.7. Der Ablauf „Textbaustein speichern“ steht in Kap. 2.8 (Diagramm F-08).
+
+### 2.3 F-03 Kanäle, Preisregeln, Titelmuster, Beschreibungsvorlagen und Zuordnungen
+
+(REQ-023 bis REQ-025, REQ-029 bis REQ-031, REQ-075, REQ-085; Ä-32, T-9)
+
+**Komponenten:** `web-ui` (UI-029, UI-034 bis UI-038), `http-api`, `channels`, `settings`, `listing-content` (Vorschau, Anzahl im Geltungsbereich, Neuberechnung), `content-engine`, `audit`. **Flows:** FLOW-05.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/channels` | – | `items[]`: `id, code, name, active, titleMaxLength, vbAllowed, priceRule, sortOrder, version` | – |
+| `PATCH /api/channels/{id}` | `version, active?, titleMaxLength?, vbAllowed?` | Kanal | `validation_failed` („Höchstlänge: ganze Zahl von 20 bis 500“), `version_conflict` |
+| `PUT /api/channels/{id}/price-rule` | `version, referenceChannelId, deltaCents` | Kanal | `price_rule_cycle`, `validation_failed` („Ein Kanal kann nicht sein eigener Bezugskanal sein“), `version_conflict` |
+| `DELETE /api/channels/{id}/price-rule?version=` | – | Kanal | `version_conflict` |
+| `GET /api/title-patterns?deviceTypeId=` | – | `items[]`: `id, deviceTypeId, channelId\|null, parts[], version` | – |
+| `PUT /api/title-patterns` | `deviceTypeId, channelId\|null, version\|null, parts[]` | Titelmuster | `placeholder_not_allowed`, `validation_failed`, `version_conflict` |
+| `DELETE /api/title-patterns/{id}?version=` | nur kanaleigene Muster | `204` | `version_conflict` |
+| `GET /api/channels/{id}/description-template` / `PUT …` | `version, sections[]` | Vorlage | `placeholder_not_allowed`, `validation_failed`, `version_conflict` |
+| `GET /api/channels/{id}/condition-mappings` / `PUT …` | `version, rows[]` (ganze Tabelle) | Tabelle | `validation_failed` (Zeile doppelt: „Für diese Kombination gibt es bereits einen Eintrag“), `placeholder_not_allowed`, `version_conflict` |
+| `GET /api/category-mappings` | – | Matrix `items[]`: `deviceTypeId, channelId, categoryPath, categoryRef, version` | – |
+| `PUT /api/category-mappings/{deviceTypeId}/{channelId}` / `DELETE …?version=` | `version\|null, categoryPath, categoryRef` | Zelle | `mapping_exists` (`version: null` auf eine belegte Zelle), `validation_failed`, `version_conflict` |
+| `GET /api/channels/{id}/attribute-mappings/{deviceTypeId}` / `PUT …` | `version\|null, fields[]` | Zuordnung | `validation_failed`, `version_conflict` |
+| `POST /api/previews/title` | `deviceTypeId, channelId\|null, parts[], listingId` | `items[]` je aktivem Kanal: `title, length, maxLength, truncation` (`none\|parts\|word`) | `validation_failed` |
+| `POST /api/previews/description` | `channelId, sections[], listingId` | `{ text, droppedLines[] }` | `validation_failed` |
+| `POST /api/scope-counts` | `kind` und Bezug (siehe unten) | `{ count }` | – |
+
+**Regeln**
+
+- **Kanal (REQ-029):** Titel-Höchstlänge 20–500. Deaktivieren: keine neuen Kanal-Inhalte für neue Modell-Inserate, bestehende bleiben lesbar (AC-REQ-029-02). **Aktivieren** legt für jedes Modell-Inserat ohne Kanal-Inhalt dieses Kanals einen Inhalt im Status *Entwurf* an (RQ-08). Änderungen an einem Kanal lösen nur Neuberechnungen dieses Kanals aus (AC-REQ-029-03). Neue Kanäle entstehen nur per Datenmigration, ohne Oberfläche (ADR-005, UI-038).
+- **Preisregel (REQ-085):** Bezugskanal aktiv und ≠ eigener Kanal; kein Kreis über alle Regeln (`packages/domain/src/pricing/price-rule-graph.ts`, Tiefensuche; dieselbe Funktion liefert `inventory` die Reihenfolge, Kap. 2.7); Auf-/Abschlag in Cent mit Vorzeichen, höchstens zwei Nachkommastellen in der Eingabe. Bereits erfasste Preise bleiben unverändert (AC-REQ-085-01); die Regel wirkt bei der nächsten Preiserfassung (Kap. 2.7).
+- **Titelmuster (REQ-030):** `parts[]` mit `kind` `placeholder` oder `text`; Platzhalter nur aus „Modelldaten“ und „Inseratswerte außer `{Lieferumfang}`, `{Preis}`“ (Requirements Kap. 9.7); `{Hersteller}` und `{Modellbezeichnung}` sind Pflicht und haben Priorität 1; Präfix und Suffix je 0–50 Zeichen, fester Text 1–100 (technische Obergrenzen; Texte: Kap. 8.2, Schlüssel M-17 bis M-19); Priorität ganze Zahl ≥ 1. Je Geräteart genau ein Muster ohne Kanal; kanaleigene Muster optional (AC-REQ-030-03).
+- **Beschreibungsvorlage (REQ-031):** `sections[]` mit `heading` (0–100), `lines[]` (Text mit Platzhaltern, je Zeile 0–1.000 Zeichen; technische Obergrenzen; Texte: Kap. 8.2, Schlüssel M-20, M-21), Elementen `textBlock` (ein bestimmter Baustein) und `textBlockKind` (alle gültigen einer Art) als eigene Zeilen, `deviceTypeIds[]` leer = alle. Alle Platzhalter nach Kap. 9.7 sind zulässig.
+- **Zustandszuordnung (REQ-023):** Zeile `conditionValueId, visualGrade (1–5 oder null = „alle Noten“), label (1–100), extra (0–100)`; je Zustand und Note höchstens eine Zeile; Platzhalter in `extra` wie im Titelmuster (AC-REQ-023-04).
+- **Kategoriezuordnung (REQ-024):** je Geräteart und Kanal höchstens ein Eintrag; Pfad 1–255, Kennung 0–100 (technische Obergrenze; Text: Kap. 8.2, Schlüssel M-14). Ein neuer Eintrag (`version: null`) für eine belegte Zelle wird nicht überschrieben, sondern mit `mapping_exists` und dem vorhandenen Pfad abgelehnt (AC-REQ-024-02, FIND-220). Eine veraltete `version` auf eine belegte Zelle bleibt `409 version_conflict`.
+- **Merkmalszuordnung (REQ-025):** `fields[]` mit `label` (1–100), `source` (genau eine Quelle Q-01 bis Q-08 nach Requirements Kap. 9.11; Q-01 speichert die Merkmals-ID), `required`, `valueMap[]` (interner Wert → Kanal-Wert 1–100, interne Werte eindeutig), bei Q-08 `fixedText` (1–255). Die Reihenfolge von `fields[]` ist die Reihenfolge im Kanal-Inhalt und im Kopier-Assistenten (REQ-025, UI-036).
+- **Vorschau (Ä-32):** `listing-content/preview-service.ts` (CU-162) lädt das `ContentInput` des gewählten Modell-Inserats über CU-166, ersetzt darin die Einstellung durch die **ungespeicherten** Werte und bildet den Stand mit `content-engine`; gespeichert wird nichts. So gibt es nur eine Stelle, die `ContentInput` zusammenstellt (FIND-203). `web-ui` ruft die Vorschau 400 ms nach der letzten Eingabe auf (UI-029 „kurz verzögert“). Ohne Modell-Inserat der Geräteart zeigt die Vorschau nichts (UI-029 Annahme).
+- **Anzahl im Geltungsbereich (Ä-32, T-9):** `POST /api/scope-counts` zählt Kanal-Inhalte, die die Einstellung betrifft, ohne zu prüfen, ob sie sich ändern: `title_pattern` (Geräteart, optional Kanal), `description_template` (Kanal, Gerätearten der Abschnitte), `condition_mappings` (Kanal), `attribute_mapping` (Kanal und Geräteart), `category_mapping` (Kanal und Geräteart), `model_template` (Modellvorlage, für UI-007). CU-171 bildet daraus das Ereignis, das das Speichern auslösen würde, und zählt das Ergebnis von `scope-resolver` (CU-165); die Regel „welche Kanal-Inhalte betrifft eine Einstellung“ steht damit nur einmal im Code (FIND-203). `web-ui` zeigt „gilt für n Kanal-Inhalte im Geltungsbereich“ vor dem Speichern. **UI-029** verlangt dazu eine Bestätigung (Design UI-029): „Titelmuster speichern“ öffnet den Bestätigungsdialog P-04 mit diesem Satz; erst die Bestätigung sendet `PUT`. UI-034, UI-036 und UI-037 zeigen den Satz ohne Bestätigungsschritt, wie gestaltet.
+
+**Wirkung auf Kanal-Inhalte:** Jede Speicherung meldet `SettingsChanged` mit Kanal und ggf. Geräteart; `listing-content` bildet neu (Kap. 2.8). Nach dem Speichern zeigt die Oberfläche nur das Banner, kein UI-043 (K-5).
+
+**Zustände:** UI-029, UI-034 bis UI-038 nach Kap. 2.0.7; `.speichert` während `PUT`. Vorschau und Anzahl im Geltungsbereich sind lesende Anfragen; bei Zeitüberschreitung oder fehlender Verbindung gilt P-06 wie für jede lesende Anfrage (Kap. 2.0.8, FIND-208).
+
+**Ablauf „Merkmalszuordnung speichern“** (Frage: Was passiert vor und beim Speichern einer kanalweiten Einstellung?)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant C as channels
+  participant L as listing-content
+  participant E as content-engine
+  participant D as resellr-db
+
+  U->>W: UI-036 Zeilen ändern
+  W->>A: POST /api/scope-counts (attribute_mapping)
+  A->>D: Kanal-Inhalte im Geltungsbereich zählen
+  A-->>W: 200 count
+  W-->>U: gilt für n Kanal-Inhalte im Geltungsbereich
+  U->>W: Speichern
+  W->>A: PUT /api/channels/2/attribute-mappings/1 (version, fields)
+  A->>C: prüfen und speichern
+  alt Feldregel verletzt
+    A-->>W: 422 validation_failed (fields)
+    W-->>U: UI-036.validation an der Zelle
+  else Version veraltet
+    A-->>W: 409 version_conflict
+    W-->>U: UI-036.conflict (P-05)
+  else gültig
+    C->>D: Zuordnung und Protokolleintrag speichern (Transaktion)
+    C->>L: Ereignis SettingsChanged (Kanal, Geräteart)
+    loop je Kanal-Inhalt im Geltungsbereich
+      L->>E: Stand neu bilden
+      L->>L: Status und Kennzeichnungen nach Kap. 2.8.3
+    end
+    A-->>W: 200 Zuordnung (neue version)
+    W-->>U: Banner „Gespeichert“
+  end
+```
+
+### 2.4 F-04 Modell-Bibliothek (REQ-008 bis REQ-011, REQ-058, REQ-095 für Modellvorlagen)
+
+**Komponenten:** `web-ui` (UI-006, UI-007, UI-008, UI-041), `http-api`, `catalog`, `settings` (Merkmalsdefinitionen), `listing-content`, `audit`. **Flows:** FLOW-01, FLOW-06, FLOW-08.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/model-templates?q=&deviceTypeId=&limit=` | `q` ab 2 Zeichen; ohne `q` die 50 zuletzt angelegten (UI-006) | `items[]`: `id, deviceType, manufacturer, modelName, typeDesignation, mpn, mpnUnknown` | `validation_failed` bei `q` mit 1 Zeichen („Mindestens 2 Zeichen“, AC-REQ-009-04) |
+| `GET /api/model-templates/{id}` | – | Modellvorlage nach Kap. 3.3 | `not_found` |
+| `GET /api/model-templates/{id}/usage` | – | `{ deviceCount, listingCount, deleteBlockedReason \| null }` (bedient von `inventory`, CU-295) | `not_found` |
+| `POST /api/model-templates` | Modellvorlage ohne `id`, `confirmDuplicate?`, `confirmMpnWarning?` | `201` | `validation_failed`, `confirmation_required` (`possible_duplicate` mit `details.matches[]`; Could: `mpn_in_use`) |
+| `PATCH /api/model-templates/{id}` | `version` und Änderungen, `confirmMpnWarning?` | Modellvorlage | `device_type_in_use`, `validation_failed`, `version_conflict` |
+| `DELETE /api/model-templates/{id}?version=` | – | `204` | `delete_not_allowed` („… Geräte verweisen auf die Modellvorlage“), `version_conflict` |
+| `GET /api/model-templates/{id}/device-prefill?conditionCode=&supplierId=` | – | Vorbelegung für UI-003, bedient von `inventory` (Kap. 2.5) | `not_found` |
+
+**Regeln**
+
+- Felder und Grenzen nach Kap. 3.3 und Requirements REQ-008, Kap. 9.6: Modellbezeichnung 1–100, Typbezeichnung 0–50, Herstellernummer 1–40 aus Buchstaben, Ziffern, `-`, `/`, `.` **oder** `mpnUnknown: true` (AC-REQ-008-02/-03), Original-EAN 8 oder 13 Ziffern mit GS1-Prüfziffer (`packages/domain/src/validation/ean.ts`, AC-REQ-008-04). Merkmalswerte der Ebene *Modell* nach ihrer Definition, Pflichtmerkmale Pflicht (AC-REQ-008-05); Vorbelegungswerte der Ebene *Gerät* optional, aber typgeprüft.
+- **Mögliche Dublette (REQ-011):** gleicher Hersteller und gleiche Modellbezeichnung nach `model_name_key` (Kleinschreibung, alle Leerzeichen entfernt, AC-REQ-011-01). Ohne `confirmDuplicate: true` antwortet `POST` mit `confirmation_required`/`possible_duplicate`; UI-007 zeigt den Dialog „Vorhandene verwenden“ / „Trotzdem anlegen“.
+- **Gleiche Herstellernummer (REQ-058, Could):** nur wenn umgesetzt; analog mit `mpn_in_use`, Speichern nach Bestätigung (AC-REQ-058-01).
+- **Ändern (REQ-010):** Geräteart gesperrt, sobald ein Gerät auf die Modellvorlage verweist. `catalog` meldet beim Ändern der Geräteart das Prüfereignis `ModelTemplateDeviceTypeChanging`; `inventory` lehnt mit `device_type_in_use` ab, wenn Geräte verweisen (Kap. 2.0.4). Änderungen an Modelldaten melden `ContentInputsChanged(modelTemplateId)`; Vorbelegungswerte wirken nur auf künftige Geräte und lösen keine Neuberechnung aus (AC-REQ-010-05).
+- **Suche (REQ-009):** Teilübereinstimmung ohne Groß-/Kleinschreibung in `search_key` (Modellbezeichnung, Typbezeichnung, Herstellernummer, normalisiert) oder im Herstellernamen (`manufacturer.name_key`, per Join); eine Umbenennung des Herstellers wirkt deshalb ohne Nachpflege (AC-REQ-009-01/-02).
+- **Löschen (REQ-095):** nur ohne Gerät (jeder Status) und ohne Modell-Inserat (AC-REQ-095-03); geprüft über das Prüfereignis `ModelTemplateDeleting`, das `inventory` mit `delete_not_allowed` ablehnt; Protokolleintrag.
+- **Hersteller neu (UI-008):** über `POST /api/manufacturers` (Kap. 2.2).
+
+**Zustände:** UI-006 `.empty` unterscheidet „Keine Modellvorlage gefunden“ (Suche ohne Treffer) und „Noch keine Modellvorlagen“ (`total = 0` ohne Suche); UI-007 `.disabled` = Geräteart gesperrt (`deviceCount > 0` aus `…/usage`); `UI-007.speichert` während `POST`/`PATCH`. UI-007 zeigt beim Ändern „gilt für n Kanal-Inhalte im Geltungsbereich“ aus `POST /api/scope-counts` mit `kind: model_template` (ab S5; vorher gibt es keine Kanal-Inhalte, Kap. 4.4.0).
+
+**Ablauf „Modellvorlage anlegen mit Dubletten-Hinweis“** (Frage: Wie wirkt der Hinweis nach REQ-011?)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant K as catalog
+  participant D as resellr-db
+
+  U->>W: UI-007 Modellvorlage MacBook pro 13 speichern
+  W->>A: POST /api/model-templates (ohne confirmDuplicate)
+  A->>K: prüfen und anlegen
+  alt Feldregel verletzt, z. B. EAN-Prüfziffer
+    A-->>W: 422 validation_failed (fields)
+    W-->>U: UI-007.validation
+  else gleicher Hersteller und gleiche Modellbezeichnung vorhanden
+    K->>D: Treffer nach model_name_key lesen
+    A-->>W: 422 confirmation_required (possible_duplicate, matches)
+    W-->>U: Dialog Vorhandene verwenden oder Trotzdem anlegen
+    U->>W: Trotzdem anlegen
+    W->>A: POST /api/model-templates (confirmDuplicate true)
+    K->>D: Modellvorlage und Protokolleintrag speichern (Transaktion)
+    A-->>W: 201 Modellvorlage
+    W-->>U: Banner „Modellvorlage gespeichert“
+  else keine Dublette
+    K->>D: Modellvorlage und Protokolleintrag speichern (Transaktion)
+    A-->>W: 201 Modellvorlage
+    W-->>U: Banner „Modellvorlage gespeichert“
+  end
+```
+
+### 2.5 F-05 Gerät erfassen, prüfen und finden (REQ-012 bis REQ-016, REQ-094, REQ-062)
+
+**Komponenten:** `web-ui` (UI-003, UI-009, UI-010), `http-api`, `inventory`, `catalog` (Vorbelegung), `settings` (Code-Übersetzung, Merkmalsdefinitionen), `listing-content` (Bestandsangaben), `audit`. **Flows:** FLOW-01, FLOW-02, FLOW-03.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/model-templates/{id}/device-prefill?conditionCode=&supplierId=` | – | `{ conditionValueId, visualGrade, conditionDescription, values, reviewKeys[], codeResult: { found, plainText } }` | `not_found` |
+| `POST /api/devices` | `wiNr, supplierId?, conditionCode?, modelTemplateId, conditionValueId, visualGrade, conditionDescription, values{}, confirmedKeys[]` | `201` Gerät (Kap. 3.4) mit `captureStatus`, `reviewKeys[]` | `wi_nr_taken`, `validation_failed` |
+| `GET /api/devices?wiNr=&limit=&offset=` | Teil der WI-Nr, ab 1 Zeichen | `items[]`: `id, wiNr, modelTemplateLabel, listing: { id, title } \| null, stockStatus, captureStatus` | – |
+| `GET /api/devices/unassigned` | – | `items[]`: `id, wiNr, modelTemplateLabel, captureStatus, capturedOn`, ältestes zuerst | – |
+| `GET /api/devices/{id}` | – | Gerät mit Modelldaten (nur lesen), Verkauf, Storno, Modell-Inserat | `not_found` |
+| `PATCH /api/devices/{id}` | `version, conditionValueId?, visualGrade?, conditionDescription?, values?, confirmedKeys[], deviationDecision?, targetListingId?, confirmTargetDeviation?` | Gerät (+ ggf. neues bzw. Ziel-Modell-Inserat) | `validation_failed`, `device_not_available`, `confirmation_required` (`variant_deviation`, `target_deviation`), `version_conflict` |
+
+**Vorbelegung und Prüfmarkierungen (REQ-013, REQ-015)**
+
+- `GET …/device-prefill` bedient `inventory/device-prefill-query.ts` (CU-293): Er liest die Vorbelegungswerte über `catalog-reader` und das Ergebnis der Code-Übersetzung über `settings-reader` und ruft die reine Funktion `packages/domain/src/inventory/device-prefill.ts`. Diese bildet die Vorbelegung aus den Vorbelegungswerten der Modellvorlage und dem Ergebnis der Code-Übersetzung. `reviewKeys` sind alle Merkmale mit Vorbelegungswert sowie `condition` und `visualGrade`, wenn der Code-Eintrag dafür einen Vorschlag hat (AC-REQ-015-04). Der Klartext eines Codes geht ohne Prüfmarkierung in die Zustandsbeschreibung (AC-REQ-015-01); bei unbekanntem Code bleibt sie leer (AC-REQ-015-03).
+- Der Server bildet die Vorbelegung beim Speichern selbst neu (dieselbe Funktion) und setzt die Prüfmarkierungen: **verbleibend = Vorbelegungsschlüssel − `confirmedKeys` − Schlüssel, deren Wert vom vorbelegten abweicht**. Nur eine ausdrückliche Bestätigung oder eine Änderung hebt eine Markierung auf (REQ-013, AC-REQ-013-02). `captureStatus` = `checked`, wenn keine Markierung bleibt, sonst `review_pending` (AC-REQ-013-04).
+- Bei `PATCH` gilt dieselbe Regel gegen die gespeicherten Markierungen.
+
+**Prüfregeln der Gerätewerte (REQ-014, Kap. 9.6)** – `packages/domain/src/schemas/attribute-values.ts` (CU-067) erzeugt das Zod-Schema zur Laufzeit aus den Merkmalsdefinitionen der Geräteart (LP-4); Oberfläche und Server nutzen dasselbe Schema:
+
+| Feld | Regel | Meldung |
+| --- | --- | --- |
+| `wiNr` | Pflicht, `^[A-Za-z0-9]{1,20}$`, eindeutig ohne Groß-/Kleinschreibung über Geräte im Status *verfügbar* und *verkauft* | „WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)“; `wi_nr_taken` |
+| `modelTemplateId` | Pflicht | „Bitte eine Modellvorlage wählen“ |
+| `conditionValueId` | Pflicht, Wert der Liste Zustand; neue Eingabe nur aktive Werte | „Zustand fehlt“ |
+| `visualGrade` | Pflicht, ganze Zahl 1–5 | „Optik-Note: ganze Zahl von 1 bis 5“ / „Optik-Note fehlt“ (AC-REQ-014-04) |
+| `conditionDescription` | 0–1.000 Zeichen | „Zustandsbeschreibung: höchstens 1.000 Zeichen“ |
+| Rolle `keyboard_layout`, `power_supply`, `battery` | Pflicht, wenn die Geräteart das aktive Merkmal hat | „<Feld> fehlt“ |
+| Rolle `battery_capacity` | Pflicht genau dann, wenn der gewählte Akku-Wert `batteryPresent` trägt; `{ "percent": 0–100 }` oder `{ "notDeterminable": true }` | „Akkukapazität fehlt“ (AC-REQ-007-04, AC-REQ-014-06); „Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar““ (AC-REQ-014-02) |
+| übrige Merkmale der Ebene *Gerät* | nach Datentyp, Bereich und Pflicht (Kap. 3.1) | „<Merkmal>: <Regel>“ |
+
+Gespeichert wird auch mit Prüfmarkierungen, aber nie mit verletzten Pflicht- oder Formatregeln (AC-REQ-013-04, AC-REQ-014-04).
+
+**Variantenangabe eines zugeordneten Geräts ändern (REQ-014, REQ-020, UI-005 Kontext B)**
+
+- Weicht das zugeordnete, verfügbare Gerät nach der Änderung nach der Vergleichsregel (Kap. 2.6) vom Modell-Inserat ab und fehlt `deviationDecision`, antwortet der Server `422 confirmation_required` mit `details.kind = variant_deviation`, `details.deviations[]` (`key, label, deviceValue, listingValue`) und `details.rebookTargets[]`: andere Modell-Inserate derselben Modellvorlage, **je Ziel mit seinen Abweichungen** zum geänderten Gerät (`{ listingId, title, deviations[] }`, leer = stimmt überein). Nichts ist gespeichert.
+- Entscheidungen in einem zweiten `PATCH` mit denselben Werten: `keep` (speichert, Protokolleintrag wie „trotzdem zuordnen“ mit den Abweichungen, AC-REQ-014-07), `new_listing` (speichert und legt aus dem Gerät ein Modell-Inserat an wie Kap. 2.6), `rebook` mit `targetListingId` (speichert und bucht um wie Kap. 2.6). Weicht das gewählte Ziel ab und ist `confirmTargetDeviation` nicht `true` oder hat sich das Ziel seit der Anzeige geändert, antwortet der Server `confirmation_required` mit `details.kind = target_deviation` und den aktuellen Abweichungen; nichts ist gespeichert. Die Oberfläche zeigt dann den zweiten Dialogschritt `UI-005.ziel-abweichung` (K-04, MAR-176; Design v0.6, Abläufe in Kap. 2.6); erst „Trotzdem umbuchen“ sendet `confirmTargetDeviation: true`.
+- `device-service` (CU-121) prüft und speichert die Werte und entscheidet, welche Folge gilt; `new_listing` und `rebook` führt `assignment-service` (CU-123) aus, damit Anlegen und Umbuchen nur dort umgesetzt sind (FIND-203).
+- Änderungen der Akkukapazität oder des Akku-Werts eines zugeordneten Geräts ändern nur Bestandsangaben (REQ-091, AC-REQ-014-08): `StockChanged(listingId)`.
+- Verkaufte und stornierte Geräte sind nicht änderbar (`device_not_available`, `UI-010.disabled` „Werte schreibgeschützt“; Auslegung RQ-17).
+
+**Suche (REQ-016, REQ-094):** Teilübereinstimmung auf `wi_nr_key`, alle Bestandsstatus, stornierte mit Status (AC-REQ-012-05). Nicht zugeordnete Geräte: Status *verfügbar*, `listing_id IS NULL`, sortiert nach `captured_at` aufsteigend (AC-REQ-094-01).
+
+**Zustände (Besonderheiten):** UI-003 `.loading` = Vorbelegung lädt nach Wahl der Modellvorlage; `UI-003.validation` = Feldfehler am Feld und beim Speichern die Fehlerzusammenfassung oben (Kap. 2.0.5); `UI-003.disabled` = „Speichern und zuordnen“ deaktiviert, solange `reviewKeys` nicht leer sind (Tooltip „Erst Werte prüfen“). „Speichern und zuordnen“ ist `POST /api/devices` und öffnet bei Erfolg UI-004. Die Checkbox „Weiteres Gerät derselben Modellvorlage“ (Design-Annahme) ist reiner Oberflächenzustand. Der Formularstand von UI-003 liegt beim Wechsel zu UI-007 und zurück im `sessionStorage` (Schlüssel `resellr.deviceIntake.draft`, Baseline 6.4 Auflage). UI-009 `.empty` je Reiter. UI-010 `.disabled` = verkauft oder storniert.
+
+**Ablauf „Gerät einbuchen“** (Frage: Wie entstehen Vorbelegung und Prüfmarkierungen, und wo wird abgelehnt?)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant K as catalog
+  participant S as settings
+  participant I as inventory
+  participant D as resellr-db
+
+  U->>W: UI-003 WI-Nr 626198, Lieferant, Code DGS, Modellvorlage wählen
+  W->>A: GET /api/model-templates/7/device-prefill?conditionCode=DGS
+  A->>K: Vorbelegungswerte lesen
+  A->>S: Code-Übersetzung auflösen
+  A-->>W: 200 Werte, reviewKeys, Klartext
+  W-->>U: Felder mit Chip „zu prüfen“
+  U->>W: Werte bestätigen oder ändern, Speichern und zuordnen
+  W->>A: POST /api/devices (Werte, confirmedKeys)
+  A->>I: Gerät anlegen
+  alt Feldregel verletzt, z. B. Akkukapazität 101
+    A-->>W: 422 validation_failed (fields)
+    W-->>U: UI-003.validation am Feld und oben zusammengefasst
+  else WI-Nr vergeben
+    I->>D: wi_nr_key unter verfügbar und verkauft prüfen
+    A-->>W: 422 wi_nr_taken (Gerät, Modell-Inserat)
+    W-->>U: Fehler am Feld WI-Nr mit Link
+  else gültig
+    I->>I: Vorbelegung neu bilden, verbleibende Prüfmarkierungen berechnen
+    I->>D: Gerät und Protokolleintrag speichern (Transaktion)
+    A-->>W: 201 Gerät (captureStatus)
+    W-->>U: UI-004 öffnen bzw. Banner „Gerät 626198 gespeichert“
+  end
+```
+
+### 2.6 F-06 Zuordnen, Modell-Inserat anlegen, Umbuchen (REQ-017 bis REQ-020)
+
+**Komponenten:** `web-ui` (UI-004, UI-005), `http-api`, `inventory`, `listing-content`, `audit`. **Flows:** FLOW-01, FLOW-02, FLOW-08.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/model-templates/{id}/listings?deviceId=` | – | `items[]`: `id, displayTitle, variantSummary, quantity`, mit `deviceId` zusätzlich `deviations[]` zum Gerät (UI-004, UI-005); bedient von `inventory/listing-choice-query.ts` (CU-294) | `not_found` |
+| `POST /api/devices/{id}/assignment` | `version, listingId, confirmDeviation` | `{ device, listing: { id, quantity }, adjustStockChannels[] }` | `review_pending`, `other_model_template`, `already_assigned`, `device_not_available`, `confirmation_required` (`variant_deviation`), `version_conflict` |
+| `POST /api/listings` | `fromDeviceId, deviceVersion, articleNumber?` | `201` Modell-Inserat | `review_pending`, `variant_duplicate`, `article_number_taken`, `device_not_available`, `version_conflict` |
+| `POST /api/devices/{id}/rebooking` | `version, targetListingId, confirmDeviation` | wie Zuordnung, dazu `previousListing: { id, quantity }` | `device_not_available`, `device_not_assigned`, `other_model_template`, `confirmation_required` (`target_deviation`), `version_conflict` |
+
+**Vergleichsregel (Requirements Kap. 6.0)** – `packages/domain/src/inventory/compare-variants.ts` (CU-119, ab S2), reine Funktion, von Server und Oberfläche genutzt:
+
+- verglichen werden `conditionValueId`, `visualGrade`, die Zustandsbeschreibung nach `trim()` und Unicode-Kleinschreibung (zwei leere sind gleich, leer und nicht leer verschieden) und der Wert jedes Merkmals der Ebene *Gerät* mit `variantForming = true`, **aktiv oder deaktiviert** (K-03, MAR-176; Kap. 2.1). Ein deaktiviertes Variantenmerkmal hat bei neu erfassten Geräten keinen Wert und weicht deshalb von einem Modell-Inserat mit Wert ab (Regel unten),
+- nicht verglichen: übrige Gerätemerkmale, Akkukapazität, WI-Nr (AC-REQ-018-03),
+- ein fehlender Wert ist nur einem fehlenden Wert gleich; Mehrfachangaben (Anschlüsse) werden als sortierte Liste verglichen,
+- Ergebnis: Liste `{ key, label, deviceValue, listingValue }` mit formatierten Werten (z. B. „RAM: Gerät 8GB, Modell-Inserat 16GB“, AC-REQ-018-04); bei Zustandsbeschreibung beide Texte vollständig (AC-REQ-018-05).
+
+**Zuordnen (REQ-017, REQ-018):** Voraussetzungen in dieser Reihenfolge: Gerät *verfügbar* (`device_not_available`), nicht zugeordnet (`already_assigned`), `captureStatus = checked` (`review_pending` mit `details.keys`), gleiche Modellvorlage (`other_model_template`). Weichen Variantenangaben ab und ist `confirmDeviation` nicht `true`: `confirmation_required`/`variant_deviation`. Mit Bestätigung: Zuordnung, Protokolleintrag „trotzdem zuordnen“ mit Zeitpunkt und Abweichungen (AC-REQ-018-02); die Inseratswerte bleiben unverändert. `device.assigned_at` = jetzt (bestimmt die Reihenfolge der WI-Nrn in `{WI-Nr}`, Kap. 2.8.2). Danach `StockChanged(listingId)`; `adjustStockChannels` nennt veröffentlichte Kanal-Inhalte, die jetzt „Bestand auf Kanal anpassen“ tragen (UI-004-Hinweis mit Link zu UI-021). Die Liste kommt aus dem Bericht des `StockChanged`-Handlers von `listing-content` (Kap. 2.0.4); `inventory` liest dafür keine Kanal-Inhalte.
+
+**Modell-Inserat anlegen (REQ-019):** Gerät *verfügbar* und `checked`; Variantenangaben müssen sich von jedem anderen Modell-Inserat der Modellvorlage unterscheiden (`variant_duplicate` mit Verweis, AC-REQ-019-02). Artikelnummer = WI-Nr des Geräts, außer `articleNumber` ist gesetzt; ist sie vergeben: `article_number_taken` und UI-004 zeigt das Feld „Artikelnummer“. Übernommen werden Variantenangaben und übrige inserierte Gerätewerte (alle Merkmale der Ebene *Gerät* ohne Variantenkennzeichen, **ohne** Akkukapazität); Lieferumfang leer, EAN-Kennzeichnung `original`, keine Preise, keine Fotos (AC-REQ-019-01). Ein bisher anders zugeordnetes Gerät verlässt sein Modell-Inserat (AC-REQ-019-07). `ListingCreated` legt in derselben Transaktion je aktivem Kanal einen Kanal-Inhalt im Status *Entwurf* an. Protokolleinträge: Anlage des Modell-Inserats, Zuordnung.
+
+**Umbuchen (REQ-020, Should):** nur verfügbare, zugeordnete Geräte; Ziel derselben Modellvorlage, ≠ bisheriges Modell-Inserat; REQ-018 gilt für das Ziel: Weicht das Ziel ab und ist `confirmDeviation` nicht `true`, folgt `confirmation_required`/`target_deviation` mit den aktuellen Abweichungen zum Ziel; nichts ist gespeichert.
+
+**Umbuchungsziel weicht ab (K-04, MAR-176; Design v0.6 UI-005 „Umbuchen: Ziel weicht ab“):** Der Dialog UI-005 (CU-135) sendet „Umbuchen“ in Schritt 1 **immer ohne** Bestätigung (Kontext A: `POST /api/devices/{id}/rebooking` mit `confirmDeviation: false`; Kontext B: `PATCH` mit `deviationDecision: rebook` ohne `confirmTargetDeviation`). Stimmt das Ziel überein, bucht der Server sofort um (AC-REQ-020-01, -04); den zweiten Schritt sieht der Nutzer dann nicht. Antwortet er `confirmation_required`/`target_deviation`, wechselt derselbe Dialog zu `UI-005.ziel-abweichung`: Titel „Umbuchen: Ziel weicht ab“, Zeile „Ziel: <Titel>“, Tabelle aus `details.deviations` gegen das **Ziel**-Modell-Inserat, Knöpfe „Anderes Ziel wählen“, „Abbrechen“, „Trotzdem umbuchen“. Die Abweichungen kommen aus der Antwort des Servers, nicht aus der zuvor geladenen Zielliste; so zeigt der Schritt auch dann den aktuellen Stand, wenn sich das Ziel inzwischen geändert hat. Beim Öffnen von Schritt 2 liegt der Fokus auf „Anderes Ziel wählen“ (Design). „Anderes Ziel wählen“ kehrt ohne Serveraufruf zu Schritt 1 zurück, die bisherige Auswahl bleibt markiert; „Abbrechen“ und Esc schließen den Dialog, nichts ist gespeichert. „Trotzdem umbuchen“ sendet dieselbe Anfrage mit `confirmDeviation: true` bzw. `confirmTargetDeviation: true`. Während dieser Anfrage gilt `UI-005.ziel-abweichung.speichert` (P-08: Auswahl und alle drei Knöpfe gesperrt, Primärknopf „Umbuchen …“, keine Zeitgrenze). Antwortet der Server darauf erneut mit `target_deviation` (Ziel inzwischen erneut geändert), bleibt Schritt 2 mit den neuen Abweichungen stehen. *Beispiel:* Gerät 626198 (Optik-Note 4) soll von MI-A nach MI-B (Optik-Note 2). Schritt 2 zeigt „Optik-Note: Gerät 4, Ziel-Modell-Inserat 2“; erst „Trotzdem umbuchen“ bucht um, MI-A hat danach eine Stückzahl weniger, MI-B eine mehr. Beide Modell-Inserate erhalten `StockChanged`; das bisherige bleibt mit Stückzahl 0 bestehen (AC-REQ-020-03). Protokolleintrag `rebooked`, bei bestätigter Abweichung mit den Abweichungen wie „trotzdem zuordnen“.
+
+**Zustände:** UI-004 `.empty` = Modellvorlage ohne Modell-Inserat (nur „Neues Modell-Inserat anlegen“, AC-REQ-017-03); `.disabled` = „Zuordnen“ ohne Auswahl. UI-005 erscheint, wenn eine Antwort `confirmation_required`/`variant_deviation` liefert; Kontext A aus UI-004, Kontext B aus UI-003/UI-010 (Kap. 2.5). „Umbuchen“ in UI-005 ist nur aktiv, wenn `rebookTargets` nicht leer ist („Kein anderes Modell-Inserat dieser Modellvorlage“). `target_deviation` führt zu `UI-005.ziel-abweichung`, die laufende Bestätigung zu `UI-005.ziel-abweichung.speichert` (K-04, Ablauf oben).
+
+**Ablauf „Zuordnen mit Abweichung“** (Baseline Ablauf 1, hier mit Endpunkten und Statuscodes)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant I as inventory
+  participant L as listing-content
+  participant D as resellr-db
+
+  U->>W: UI-004 Modell-Inserat MI-A wählen, Zuordnen
+  W->>A: POST /api/devices/41/assignment (version, listingId 9, confirmDeviation false)
+  A->>I: Zuordnung prüfen
+  alt Prüfmarkierung offen
+    A-->>W: 422 review_pending (keys)
+    W-->>U: Erst Werte prüfen mit Nennung der Felder
+  else andere Modellvorlage
+    A-->>W: 422 other_model_template
+    W-->>U: Gerät gehört zu anderer Modellvorlage
+  else Variantenangaben weichen ab
+    A-->>W: 422 confirmation_required (variant_deviation)
+    W-->>U: UI-005 Kontext A
+    U->>W: Trotzdem zuordnen
+    W->>A: POST /api/devices/41/assignment (confirmDeviation true)
+    I->>D: Zuordnung, Protokolleintrag mit Abweichungen (Transaktion)
+    I->>L: Ereignis StockChanged (MI-A)
+    L->>D: Kennzeichnung Bestand auf Kanal anpassen bei veröffentlichten Kanal-Inhalten
+    A-->>W: 200 Gerät, Stückzahl 2
+    W-->>U: Banner „Gerät 626199 zugeordnet (Stückzahl 2)“
+  else Version veraltet
+    A-->>W: 409 version_conflict
+    W-->>U: UI-004.conflict (P-05)
+  else keine Abweichung
+    I->>D: Zuordnung und Protokolleintrag (Transaktion)
+    I->>L: Ereignis StockChanged (MI-A)
+    A-->>W: 200 Gerät, Stückzahl 2
+    W-->>U: Banner mit Stückzahl
+  end
+```
+
+### 2.7 F-07 Modell-Inserat pflegen: Inseratswerte und Preise (REQ-032, REQ-033, REQ-088, REQ-091)
+
+**Komponenten:** `web-ui` (UI-014), `http-api`, `inventory`, `channels` (Preisregeln), `listing-content`, `audit`. **Flows:** FLOW-01, FLOW-02 (Variante), FLOW-06.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/listings/{id}?includeCancelled=` | – | Modell-Inserat mit `displayTitle`, `stock { quantity, wiNrs[], batteryText, stockHash }`, `prices[]`, `devices[]`, `deliveryScope[]`, `version`; bedient von `inventory/listing-detail-query.ts` (CU-292). Kanal-Karten und Fotos lädt UI-014 über `GET /api/listings/{id}/channel-contents` (Kap. 2.9) und `GET /api/listings/{id}/photos` (Kap. 2.11), damit jede Komponente nur ihre eigenen Daten liefert (FIND-202) | `not_found` |
+| `PATCH /api/listings/{id}` | `version`, optional `conditionValueId, visualGrade, conditionDescription, variantValues, otherValues, deliveryScopeTextBlockIds[], articleNumber, eanMode, ownEan`, `confirmDeviatingDevices` | Modell-Inserat | `validation_failed`, `variant_duplicate`, `article_number_taken`, `confirmation_required` (`assigned_devices_deviate` mit `details.devices[]: { wiNr, deviations[] }`), `version_conflict` |
+| `PUT /api/listings/{id}/prices/{channelId}` | `version, amountCents, vb` | `{ listing: { version }, prices[] }` (alle Kanäle, weil Preisregeln mehrere ändern können) | `validation_failed` („Preis: Zahl größer 0 mit höchstens zwei Nachkommastellen“), `version_conflict` |
+
+**Regeln (REQ-088):** Modelldaten sind über diesen Endpunkt nicht änderbar; das Schema enthält sie nicht (AC-REQ-088-06). Variantenangaben müssen sich weiter von jedem anderen Modell-Inserat der Modellvorlage unterscheiden (`variant_duplicate`, AC-REQ-088-02). Weichen danach zugeordnete verfügbare Geräte ab, ist `confirmDeviatingDevices: true` nötig; die Bestätigung wird protokolliert (AC-REQ-088-03, `UI-014.abweichung-bestaetigen`). Lieferumfang: nur aktive Textbausteine der Art *Lieferumfang*, deren Geltungsbereich die Geräteart umfasst (AC-REQ-088-05). Artikelnummer 1–30, `^[A-Za-z0-9-]+$`, eindeutig ohne Groß-/Kleinschreibung. EAN: bei `own` Pflicht, 8 oder 13 Ziffern mit Prüfziffer (AC-REQ-088-04); bei `original` wird `ownEan` auf `null` gesetzt.
+
+**Preise und Preisregel (REQ-032, REQ-033, RQ-03)**
+
+- Preis > 0, höchstens zwei Nachkommastellen (Oberfläche wandelt „269,00“ in `26900`), `vb` nur bei Kanälen mit `vbAllowed` (AC-REQ-032-04, sonst `validation_failed`).
+- Jeder Preis hat `source` = `manual` oder `rule`. Speichert der Nutzer einen Preis, wird er `manual`.
+- `inventory/price-rule-applier.ts` (CU-127) liest die Preisregeln über `channel-reader` (CU-161) und erhält die topologische Reihenfolge von `packages/domain/src/pricing/price-rule-graph.ts` (CU-156); die Reihenfolge ist damit nur dort umgesetzt (FIND-203). Er wendet danach in derselben Transaktion alle Regeln an, deren Bezugskanal sich geändert hat, in dieser Reihenfolge: Für jeden Kanal mit Regel, dessen Preis **nicht** `manual` ist, gilt Preis = Bezugspreis + Auf-/Abschlag; ist das ≤ 0 oder fehlt der Bezugspreis, entfällt der Regelpreis (AC-REQ-033-03). `manual`-Preise bleiben (AC-REQ-033-02). Regelpreise werden in UI-014 mit „Vorschlag nach Preisregel“ angezeigt.
+- Eine neue oder geänderte Preisregel ändert bestehende Preise nicht (AC-REQ-085-01); sie wirkt bei der nächsten Preisspeicherung des Bezugskanals. Dann folgt ihr auch ein Preis, der schon vorher als Regelpreis (`rule`) gespeichert war; nur `manual`-Preise bleiben (RQ-03). Vor S5 gibt es weder Pflege der Preisregeln noch die Einheit CU-127: CU-126 speichert dann nur den eingegebenen Preis, Regelpreise entstehen erst ab S5 (Kap. 4.4.0, FIND-227).
+- Jede Preisänderung ist eine Inhaltsangabe des betroffenen Kanals: `ContentInputsChanged(listingId, channelIds)`.
+
+**Zustände:** `UI-014.edit` ist der Bearbeitungsmodus der Inseratswerte (lokaler Oberflächenzustand); `UI-014.abweichung-bestaetigen` entsteht aus `confirmation_required`/`assigned_devices_deviate`; `UI-014.speichert` während `PATCH`/`PUT`. Preise speichern beim Verlassen des Felds oder mit Enter (UI-014). Die Kanal-Karten zeigen `status`, `flags[]` (Kap. 3.5) und den Preis mit `source`. Für das Datenblatt öffnet „Datenblatt“ den Dialog „Datenblatt für Gerät“ mit den Geräten aus `devices[]`, die zugeordnet, geprüft und nicht storniert sind (UI-014, Design-Annahme). „Importdatei erzeugen“ nur bei REQ-057 (Kap. 2.21).
+
+**Ablauf „Shop-Preis ändern mit Preisregel“** (Frage: Wie entstehen Regelpreise, und wie wirkt die Änderung auf die Kanal-Inhalte?)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant I as inventory
+  participant C as channels
+  participant L as listing-content
+  participant D as resellr-db
+
+  U->>W: UI-014 Shop-Preis 289,00 eingeben, Feld verlassen
+  W->>A: PUT /api/listings/9/prices/1 (version, amountCents 28900)
+  A->>I: Preis speichern
+  alt Preis ungültig, z. B. 12,345
+    A-->>W: 422 validation_failed
+    W-->>U: Feldfehler Preis
+  else Version veraltet
+    A-->>W: 409 version_conflict
+    W-->>U: UI-014.conflict (P-05)
+  else gültig
+    I->>D: Shop-Preis manual speichern (Transaktion)
+    I->>C: Preisregeln über channel-reader lesen, Reihenfolge nach price-rule-graph
+    I->>D: Kleinanzeigen-Preis 299,00 als rule speichern, falls nicht manual
+    I->>L: Ereignis ContentInputsChanged (Modell-Inserat, Shop und Kleinanzeigen)
+    L->>D: Kanal-Inhalte neu bilden, Status nach Kap. 2.8.3
+    A-->>W: 200 Preise aller Kanäle
+    W-->>U: Banner „Preis gespeichert“, Kleinanzeigen mit „Vorschlag nach Preisregel“
+  end
+```
+
+### 2.8 F-08 Kanal-Inhalte bilden und neu berechnen (REQ-034 bis REQ-041, REQ-043, REQ-045, REQ-053, REQ-091; ADR-005)
+
+**Komponenten:** `content-engine` (reine Funktionen in `packages/domain/src/content-engine/`), `listing-content` (Neuberechnung, Status, Kennzeichnungen), alle schreibenden Fachkomponenten (Ereignisse). Kein eigener Screen; sichtbar in UI-002, UI-014, UI-016 bis UI-019, UI-043.
+
+#### 2.8.1 Eingabe und Ergebnis von `content-engine`
+
+`buildContentState(input: ContentInput): ContentState` ist deterministisch: gleiche Eingabe, zeichengleiches Ergebnis; keine Uhrzeit, kein Zufall, kein Datenbankzugriff (ADR-005, Baseline 2.4). `ContentInput` enthält Modellvorlage, Hersteller mit GPSR, Geräteart mit Merkmalen, Listenwerte, Modell-Inserat (Inseratswerte, Lieferumfang, Preis des Kanals, Fotos), Kanal mit Titelmuster, Beschreibungsvorlage, Merkmals-, Zustands- und Kategoriezuordnung, alle Textbausteine, Händlerangaben und die manuellen Anpassungen des Kanal-Inhalts.
+
+`ContentState` (gespeichert als JSON in `channel_content.current_state` bzw. `released_state`, Schema `packages/domain/src/content-engine/content-state.ts`, `engineVersion: 1`):
+
+| Feld | Inhalt |
+| --- | --- |
+| `title` | `{ text, autoText, truncation: none\|parts\|word, manual }` |
+| `description` | `{ manual, sections[] }`; jede Section `{ heading, keep, lines[] }`, jede Line `{ text, keep }`; bei manueller Anpassung `{ manual: true, text, autoText }` |
+| `category` | `{ path, ref, source: mapping\|manual }` oder `null` |
+| `condition` | `{ label, extra }` oder `null` |
+| `price` | `{ amountCents, vb }` oder `null` |
+| `attributeFields[]` | `{ key, label, value, required }`, Reihenfolge der Merkmalszuordnung |
+| `gpsr` | `{ complete, legalName, addressLines[], contact, euRp: { name, addressLines[], contact } \| null, productId }` |
+| `photos[]` | Datei-Hashes in Reihenfolge |
+| `missing[]` | `category`, `condition_mapping`, `gpsr` (Kap. 9.4 der Requirements) |
+
+`text`/`value` können die Bestandsplatzhalter `{WI-Nr}`, `{Stückzahl}` und `{Akkukapazität}` unverändert enthalten (ADR-005). Der **Inhalts-Hash** ist SHA-256 über die kanonische JSON-Form (Schlüssel sortiert) des **ausgegebenen Teils** von `ContentState` (`content-hash.ts`): alle Felder außer `attributeFields[].required`, `title.truncation` und `missing[]`. Diese drei sind Prüfangaben, keine Ausgabe; ändert der Nutzer nur „Pflichtfeld“ in einer Merkmalszuordnung, entsteht deshalb kein Änderungsentwurf ohne sichtbare Änderung (RQ-13, FIND-220). Die Freigabebedingungen prüfen sie trotzdem bei jeder Freigabe am aktuellen Stand. Weil Bestandsplatzhalter darin unaufgelöst stehen, ändert eine Bestandsänderung den Hash nicht (REQ-045, REQ-091). Die IDs der verwendeten Textbausteine stehen **nicht** im Stand, sondern in `channel_content.used_text_block_ids`; eine Änderung des Prüfstatus ändert den Stand deshalb nicht.
+
+#### 2.8.2 Bildungsregeln
+
+| Teil | Regel | Quelle |
+| --- | --- | --- |
+| Werte formatieren | Text unverändert; Ganzzahl ohne Tausendertrennzeichen; Dezimalzahl mit Komma („13,3“); Einheit mit oder ohne Leerzeichen nach `unitSpacing` („16GB“, „13,3 Zoll“); Ja/Nein als „Ja“/„Nein“; Auswahl als aktuelle Bezeichnung des Listenwerts; Anschlüsse als „2 × USB-A 3.x, 1 × HDMI“, mit Position „2 × USB-A 3.x (hinten)“; Preis „279,00 €“ bzw. „50,00 € VB“ | REQ-005, REQ-078, AC-REQ-032-02 |
+| Platzhalter | nach Requirements Kap. 9.7; in Titelmustern und Merkmalszuordnungen über die Merkmals-ID, in kanalweiten Texten wird `{Merkmalsbezeichnung}` je Geräteart über die Bezeichnung aufgelöst (RQ-06); `{Herstellernummer}` leer bei „unbekannt“; `{EAN}` = eigene EAN oder Original-EAN; `{Lieferumfang}` = Texte der aktiven gewählten Bausteine, je Baustein eine Zeile; `{Merkmalsliste}` = alle nicht leeren Merkmale der Geräteart ohne Akkukapazität als „Bezeichnung: Wert“, eine Zeile je Merkmal, Reihenfolge der Geräteart; `{Zustandsbezeichnung Kanal}` = Bezeichnung der Zustandszuordnung ohne Zusatzangabe (RQ-04); `{Baustein:Name}` = Text des aktiven Bausteins mit diesem Namen | REQ-040, REQ-036 |
+| Titel | Bestandteile in Reihenfolge, je Bestandteil Präfix + Wert + Suffix; leerer Platzhalter → ganzer Bestandteil entfällt (AC-REQ-030-05). Kürzung: solange zu lang, entfällt der verbleibende Bestandteil mit der höchsten Priorität > 1, bei Gleichstand der hinterste (`truncation: parts`). Reicht das nicht, wird am letzten Leerzeichen vor der Höchstlänge geschnitten, abschließende Satzzeichen `, ; : / -` und `(` entfallen, `truncation: word` → Kennzeichnung „Titel gekürzt, bitte prüfen“. Enthält der Text vor der Höchstlänge kein Leerzeichen (schon das erste Wort ist zu lang), bleibt das erste Wort **vollständig** stehen, es wird nie im Wort geschnitten (K-02, MAR-176; Auslegung RQ-18): `truncation: word`, Kennzeichnung „Titel gekürzt, bitte prüfen“, und die Freigabebedingung `title_too_long` (Kap. 2.9) lehnt die Freigabe ab, bis der Nutzer den Titel manuell anpasst (REQ-043). *Beispiel:* Höchstlänge 65, erstes Wort mit 70 Zeichen → Titel = dieses Wort (70 Zeichen), Freigabe abgelehnt mit „Titel zu lang: höchstens 65 Zeichen“. Kanaleigenes Titelmuster vor dem der Geräteart | REQ-030, REQ-034, REQ-035, AC-REQ-035-01 bis -04 |
+| Beschreibung | Abschnitte der Vorlage, deren Geltung die Geräteart umfasst. Eine Zeile mit mindestens einem Platzhalter, deren Platzhalter alle leer sind, entfällt samt festem Text. Ein Abschnitt mit mindestens einem Platzhalter oder Baustein, deren Werte alle leer sind, entfällt samt Überschrift. Textbausteine: nur aktive, deren Geltungsbereich Geräteart und Kanal umfasst; Platzhalter darin werden aufgelöst. Enthält eine Zeile oder ein Abschnitt Bestandsplatzhalter, wird das Entfallen erst bei der Ausgabe entschieden: `keep: false` heißt „entfällt, wenn auch alle Bestandsplatzhalter leer sind“. Ausgabe: Überschrift als eigene Zeile, Zeilen mit `\n`, Abschnitte durch eine Leerzeile getrennt | REQ-031, REQ-036, AC-REQ-031-02/-03, AC-REQ-091-02 |
+| Merkmalsfelder | je Feld der Merkmalszuordnung der Wert der Quelle Q-01 bis Q-08 (Requirements Kap. 9.11), danach die Wertzuordnung; Q-01 auf das Merkmal mit Rolle `battery_capacity` und Q-07 ergeben Bestandsplatzhalter; ein Merkmal, das die Geräteart nicht hat, ergibt kein Feld; ein leerer Wert ergibt ein Feld mit `value: ""` | REQ-025, REQ-037 |
+| Kategorie | manuelle Kategorie vor Zuordnung; ohne beides `null` und `missing: category` | REQ-038, REQ-086 |
+| Zustand | Zuordnung des Kanals für Zustand und Optik-Note; Eintrag mit Note vor „alle Noten“; Zusatzangabe mit aufgelösten Platzhaltern, leere Platzhalter ergeben nichts; ohne Eintrag `null` und `missing: condition_mapping` | REQ-023, REQ-039 |
+| GPSR | Angaben des Herstellers; `complete` nach Kap. 2.2; fehlt etwas, `missing: gpsr`; Produktidentifikation = EAN des Modell-Inserats, sonst Herstellernummer (nicht „unbekannt“), sonst Artikelnummer (A-26) | REQ-041 |
+| Fotos | Hashes der Fotos des Modell-Inserats in Reihenfolge | REQ-042 |
+| manuelle Anpassung | Titel bzw. Beschreibung = gespeicherter manueller Text; zusätzlich steht der automatisch gebildete Text in `autoText` | REQ-043 |
+
+**Bestandsangaben** (`packages/domain/src/content-engine/stock.ts`, REQ-091, A-16): `quantity` = Anzahl zugeordneter Geräte im Status *verfügbar*; `wiNrs` = deren WI-Nrn nach `assigned_at`, dann `id` aufsteigend, mit „, “ verbunden (AC-REQ-043-05); `batteryText` nach Requirements Kap. 9.7 Regeln 1 bis 4 („85 %“, „82–90 %“, „85 % bzw. nicht ermittelbar“, „nicht ermittelbar“, leer). `stockHash` = SHA-256 über `{ quantity, wiNrs, batteryText }`. `resolveStock(state, stock)` ersetzt die Platzhalter und wendet die Entfall-Regeln an; das geschieht nur bei der Ausgabe (Kopier-Assistent, Vergleich, Übersicht, Import-Datei).
+
+#### 2.8.3 Neuberechnung, Status und Kennzeichnungen (Requirements Kap. 6.0, 9.4)
+
+`listing-content/recompute-service.ts` verarbeitet die Ereignisse einer Transaktion vor dem Commit:
+
+1. `scope-resolver.ts` ermittelt die betroffenen Kanal-Inhalte aus dem Ereignis (Tabelle unten).
+2. `content-input-loader.ts` lädt die Eingaben gebündelt (Einstellungen einmal je Lauf, Modell-Inserate in Gruppen zu 500).
+3. Je Kanal-Inhalt: neuen Stand bilden, Hash vergleichen, Regeln anwenden, Zeile nur bei Änderung schreiben.
+
+| Status vorher | neuer Hash = aktueller Hash | neuer Hash ≠ aktueller Hash |
+| --- | --- | --- |
+| *Entwurf* | nichts | aktueller Stand = neuer Stand |
+| *Freigegeben* | nichts | aktueller Stand = neuer Stand; weicht er vom freigegebenen ab, Status → *Entwurf* (freigegebener Stand bleibt zum Vergleich) |
+| *Veröffentlicht*, *Beendet* | nichts | aktueller Stand = neuer Stand (Änderungsentwurf); Status bleibt |
+
+Die ersten drei und die fünfte Kennzeichnung sind **gespeicherte Zustände** (Spalten in Kap. 3.3): Sie entstehen und enden nur durch die Ereignisse, die Requirements Kap. 9.4 nennt, und verschwinden nicht von selbst, wenn eine Änderung zurückgenommen wird (FIND-205, MAR-164). CU-167 ändert sie nur bei diesen Ereignissen und berechnet sie nie aus den Hashes neu; die Feldtabelle `channel_content` in Kap. 3.3 nennt dieselben Regeln (FIND-226). Die übrigen werden aus dem aktuellen Stand bzw. den Anpassungsspalten abgeleitet und nicht gespeichert.
+
+| Kennzeichnung | gesetzt | entfernt |
+| --- | --- | --- |
+| geändert seit Freigabe (`flag_changed_since_release`) | wenn eine Neubildung einen Stand ergibt, der vom freigegebenen abweicht (`current_hash ≠ released_hash`, REQ-045), bei Status *Freigegeben* (dann zugleich → *Entwurf*), *Entwurf* nach Rückfall, *Veröffentlicht*, *Beendet* | **nur** durch Freigabe (REQ-044, REQ-089; K-01, MAR-176). Beispiel: Preis 279 € → 289 € → 279 €; die Kennzeichnung bleibt bis zur nächsten Freigabe |
+| Änderung auf Kanal übertragen | bei Freigabe eines Änderungsentwurfs im Status *Veröffentlicht* | Abgleich-Bestätigung, *Veröffentlicht* → *Beendet* |
+| Bestand auf Kanal anpassen (`flag_adjust_stock`) | bei `StockChanged`, wenn der Status *Veröffentlicht* ist und sich `stockHash` gegenüber dem Stand vor dem Ereignis geändert hat (REQ-052, REQ-091) | **nur** Abgleich-Bestätigung (REQ-090) oder *Veröffentlicht* → *Beendet* (REQ-046). Kehrt der Bestand zur Momentaufnahme zurück, bleibt die Kennzeichnung (Requirements Kap. 9.4; RQ-01 entfällt). Die Momentaufnahme (bei Veröffentlichung und Abgleich) dient nur dazu, die geänderten Angaben zu nennen (AC-REQ-052-02) |
+| manuell angepasst | `manual_title` bzw. `manual_description` vorhanden | Verwerfen |
+| Daten geändert, manuell angepassten Text prüfen (`flag_manual_text_review`) | bei einer Neubildung, wenn sich der Hash von `autoText` gegenüber dem Basis-Hash der Anpassung (`manual_title_base_hash`, `manual_description_base_hash`) ändert | **nur** Verwerfen oder erneutes Speichern der Anpassung (setzt den Basis-Hash auf den aktuellen `autoText`, T-1); nicht durch Freigabe und nicht, wenn die Daten zurückkehren (Requirements Kap. 9.4) |
+| Kategorie manuell | `manual_category` vorhanden | Verwerfen |
+| Titel gekürzt, bitte prüfen | `title.truncation = word` im aktuellen Stand | Neubildung ohne diese Kürzung, manueller Titel |
+| Kategorie fehlt, Zustandszuordnung fehlt, GPSR-Herstellerangaben fehlen | `missing[]` im aktuellen Stand | Angabe vorhanden |
+| ausverkauft | Modell-Inserat mit `quantity = 0` | Stückzahl > 0 |
+
+Bei Änderungsentwürfen zeigen Übersicht und Kopier-Assistent den freigegebenen Stand (REQ-045); die Kennzeichnungen des aktuellen Stands (z. B. „Kategorie fehlt“ im Entwurf) erscheinen nur in UI-016 und UI-018.
+
+**Ereignisse und Geltungsbereich**
+
+| Ereignis | Auslöser | betroffene Kanal-Inhalte |
+| --- | --- | --- |
+| `ListingCreated` | Kap. 2.6 | neue Inhalte je aktivem Kanal anlegen und bilden |
+| `ContentInputsChanged` | Modell-Inserat (Werte, Preise, Fotos), Modellvorlage, manuelle Anpassung, Kategorie | Inhalte der genannten Modell-Inserate, ggf. eingeschränkt auf Kanäle |
+| `SettingsChanged` | Kap. 2.1 bis 2.3 | nach Geltungsbereich: Geräteart, Kanal, Hersteller, Textbaustein (Gerätearten × Kanäle vor und nach der Änderung), Händlermarke (alle) |
+| `ChannelActivated` | Kap. 2.3 | fehlende Inhalte des Kanals anlegen |
+| `StockChanged` | Zuordnung, Umbuchung, Verkauf, Rücknahme, Storno, WI-Nr-Korrektur, Akku eines zugeordneten Geräts | nur Kennzeichnung „Bestand auf Kanal anpassen“ der veröffentlichten Inhalte der Modell-Inserate setzen; kein neuer Stand. Bericht: `adjustStockChannels` |
+
+Prüfereignisse (Kap. 2.0.4) bilden keine Kanal-Inhalte; sie prüfen nur:
+
+| Prüfereignis | meldet | prüft | Ablehnung |
+| --- | --- | --- | --- |
+| `VariantSetChanging` | `settings` | `inventory`: würden Modell-Inserate einer Modellvorlage zusammenfallen? | `variant_flag_would_merge_listings` |
+| `ModelTemplateDeviceTypeChanging` | `catalog` | `inventory`: verweisen Geräte auf die Modellvorlage? | `device_type_in_use` |
+| `ModelTemplateDeleting` | `catalog` | `inventory`: verweisen Geräte oder Modell-Inserate? | `delete_not_allowed` |
+| `ListingDeleting` | `inventory` | `listing-content`: ist ein Kanal-Inhalt *Veröffentlicht*? | `delete_not_allowed` |
+
+**Engine-Version (AR-04):** `ENGINE_VERSION` in `content-engine/index.ts`. Weicht der Wert in `app_meta.engine_version` beim Start ab oder fehlt er (Update mit geänderter Bildung, erster Start), bildet CU-173 nach den Migrationen alle Kanal-Inhalte neu und legt fehlende an, bevor der Server bereit meldet; danach speichert es den Wert. Die Migration `0001` schreibt den Wert nicht (FIND-201). Vor einer solchen Neubildung liegt immer eine Kopie (Kap. 2.19, Schritt 5). Die Release-Notizen nennen das (Baseline 10.6).
+
+#### 2.8.4 Anzahlen nach REQ-053
+
+`recompute-service` zählt je Lauf jeden betroffenen Kanal-Inhalt, dessen Stand sich geändert hat, genau einmal:
+
+1. **zur erneuten Freigabe**: Status vorher *Freigegeben*, *Veröffentlicht* oder *Beendet* und neuer Hash ≠ freigegebener Hash,
+2. sonst **manuell angepasst, zur Prüfung**: in diesem Lauf hat sich der automatisch gebildete Text unter einer manuellen Anpassung geändert (die Kennzeichnung „Daten geändert, manuell angepassten Text prüfen“ wird gesetzt oder bleibt gesetzt),
+3. sonst **aktualisiert**.
+
+Beispiel AC-REQ-043-07: 8 Entwürfe ohne Anpassung → aktualisiert; 2 Entwürfe mit angepasster Beschreibung → manuell angepasst; 5 veröffentlichte → zur erneuten Freigabe; Antwort `{ updated: 8, manualReview: 2, rerelease: 5 }`.
+
+Lesart (RQ-12, FIND-220): Requirements REQ-053 nennt „Änderungsentwürfe“ unter „aktualisiert“ und „bisher *Veröffentlicht*“ unter „zur erneuten Freigabe“. Ein veröffentlichter Inhalt mit schon bestehendem Änderungsentwurf zählt hier als „zur erneuten Freigabe“, weil der Nutzer ihn freigeben muss. Ein manuell angepasster Inhalt zählt in „manuell angepasst, zur Prüfung“, sobald dieser Lauf den Text unter der Anpassung ändert, auch wenn der Hinweis schon bestand; ist er zugleich zur erneuten Freigabe fällig, zählt er dort. Jeder Inhalt zählt genau einmal.
+
+#### 2.8.5 Leistung (REQ-060, REQ-061, AR-03)
+
+Ziel nach Baseline 7.3: auch die Neuberechnung aller 9.000 Kanal-Inhalte (A-12) in unter 5 s auf einem Arbeitsplatzrechner der Mittelklasse. Maßnahmen: Einstellungen einmal je Lauf laden, Modell-Inserate gebündelt lesen, nur geänderte Zeilen schreiben, vorbereitete Anweisungen. Der Lasttest in S5 misst das (Kap. 6.3); verfehlt er das Ziel, gilt der Rückfallweg AR-03 als Architekturänderung.
+
+**Ablauf „Textbaustein ändern mit Wirkung auf viele Kanal-Inhalte“** (Baseline Ablauf 3, hier mit Endpunkten, UI-043 und Fehlerfällen)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant S as settings
+  participant L as listing-content
+  participant E as content-engine
+  participant D as resellr-db
+
+  U->>W: UI-030 Textbaustein Abholung ändern, Speichern
+  W->>A: PATCH /api/text-blocks/5 (version, body)
+  A->>S: Platzhalter prüfen
+  alt unbekannter Platzhalter
+    A-->>W: 422 placeholder_not_allowed
+    W-->>U: UI-030.validation am Text
+  else Version veraltet
+    A-->>W: 409 version_conflict
+    W-->>U: UI-030.conflict (P-05)
+  else gültig
+    S->>D: Textbaustein speichern, Prüfstatus ggf. zurücksetzen, Protokolleintrag
+    S->>L: Ereignis SettingsChanged (Geltungsbereich)
+    loop je Kanal-Inhalt im Geltungsbereich
+      L->>E: buildContentState
+      L->>L: Hash vergleichen, Status und Kennzeichnungen setzen, zählen
+    end
+    alt technischer Fehler bei der Neubildung
+      A->>D: Rollback, nichts geändert
+      A-->>W: 500 internal_error (referenceNumber)
+      W-->>U: UI-030.error mit Referenznummer
+    else erfolgreich
+      A->>D: Commit
+      A-->>W: 200 textBlock, impact (8, 2, 5)
+      W-->>U: UI-043 mit drei Zahlen
+    end
+  end
+```
+
+### 2.9 F-09 Prüfen, manuell anpassen und freigeben (REQ-043, REQ-044, REQ-045, REQ-059, REQ-086, REQ-087, REQ-089; K-3, T-1)
+
+**Komponenten:** `web-ui` (UI-016, UI-017, UI-018, UI-022), `http-api`, `listing-content`, `content-engine`, `settings` (Prüfstatus), `audit`. **Flows:** FLOW-01, FLOW-04, FLOW-06.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/channel-contents/{id}` | – | `id, listingId, channel, status, version, currentHash, display` (aktueller Stand mit aufgelösten Bestandsangaben), `releasedAt, flags[], conditions[]` (`key, ok, message`), `manual { title, description, category }`, `uncheckedLegalTextBlocks[]`, `categoryWarning` (Could) | `not_found` |
+| `GET /api/listings/{id}/channel-contents` | – | je Kanal mit Kanal-Inhalt: `id, channelId, status, flags[], price, lastReconciledAt, publishedOn, openConditionCount` (Kanal-Karten UI-014) | `not_found` |
+| `GET /api/listings/{id}/channel-comparison` | – | `{ channels[]: { channelId, name, status, flags[], openConditionCount }, rows[]: { key, label, kind: fixed\|identifier\|attribute, values: { <channelId>: string \| null }, different } }` (UI-017, Regeln unten) | `not_found` |
+| `PUT /api/channel-contents/{id}/manual-title` | `version, text` | `{ content, outcome }` | `validation_failed` („Titel zu lang: höchstens <n> Zeichen“), `version_conflict` |
+| `DELETE /api/channel-contents/{id}/manual-title?version=` | – | `{ content, outcome }` | `version_conflict` |
+| `PUT /api/channel-contents/{id}/manual-description` | `version, text` | `{ content, outcome }` | `placeholder_not_allowed` („Unbekannter Platzhalter {…}“), `validation_failed`, `version_conflict` |
+| `DELETE /api/channel-contents/{id}/manual-description?version=` | – | `{ content, outcome }` | `version_conflict` |
+| `PUT /api/channel-contents/{id}/manual-category` | `version, path` | `{ content, outcome }` | `validation_failed` („Kategorie: 1 bis 255 Zeichen“), `version_conflict` |
+| `DELETE /api/channel-contents/{id}/manual-category?version=` | – | `{ content, outcome }` | `version_conflict` |
+| `POST /api/channel-contents/{id}/release` | `version, seenContentHash, confirmUncheckedLegal` | `{ content }` | `stale_content`, `release_conditions_violated`, `confirmation_required` (`unchecked_legal_text`), `version_conflict` |
+| `GET /api/channel-contents/{id}/comparison` | – | `{ case: change_draft\|draft_after_release\|none, releasedAt, rows[] }`, je Zeile `field, label, changed, releasedValue, currentValue` | `not_found` |
+
+`outcome` = `{ statusBefore, statusAfter, changeDraft }` (T-1): `web-ui` wählt daraus die Ergebnismeldung von UI-016 („Anpassung gespeichert“; „Anpassung gespeichert, Kanal-Inhalt ist wieder Entwurf, bitte erneut freigeben“; „Änderungsentwurf angelegt“ mit Link UI-018; oder keine Statusmeldung).
+
+**Manuelle Anpassung (REQ-043, REQ-086)**
+
+- In jedem Status möglich (UI-016). Titel 1 bis Höchstlänge des Kanals (AC-REQ-043-03); Beschreibung 1–20.000 Zeichen (technische Obergrenze; Text: Kap. 8.2, Schlüssel M-16; vor „Unbekannter Platzhalter“ geprüft), als Platzhalter nur die Bestandsplatzhalter `{WI-Nr}`, `{Stückzahl}`, `{Akkukapazität}` (REQ-043, T-1); Kategorie 1–255.
+- Speichern setzt den Text und den Basis-Hash (Hash des aktuellen `autoText`), entfernt damit „Daten geändert, manuell angepassten Text prüfen“ und löst `ContentInputsChanged` für diesen Kanal-Inhalt aus; Status und Kennzeichnungen folgen Kap. 2.8.3. „Gespeicherter Stand“ ist der aktuelle Stand, bei *Veröffentlicht*/*Beendet* also der Änderungsentwurf (T-1).
+- `DELETE` verwirft die Anpassung; der Text wird neu gebildet (AC-REQ-043-04); Status und Kennzeichnungen folgen Kap. 2.8.3.
+- Ungespeicherte Eingaben bleiben im Browser (`apps/web/src/features/channel-content/unsaved-adaptation-store.ts`, je Modell-Inserat, Kanal und Fenster, übersteht Kanalwechsel und Routenwechsel innerhalb der Seite). „Eingabe verwerfen“ ist rein clientseitig.
+- **Kategorie-Warnung (REQ-059, Could):** `categoryWarning = { deviceTypeName }`, wenn die manuelle Kategorie in der Kategoriezuordnung desselben Kanals einer anderen Geräteart zugeordnet ist (AC-REQ-059-01); keine Sperre. Berechnet von `listing-content/category-warning.ts` (CU-289, S11).
+
+**Freigabe (REQ-044, REQ-089, REQ-087)** – Reihenfolge der Prüfungen in `listing-content/release-service.ts`:
+
+1. **Status:** *Entwurf* → Freigabe; *Veröffentlicht* oder *Beendet* mit „geändert seit Freigabe“ → Freigabe des Änderungsentwurfs. *Freigegeben* sowie *Veröffentlicht*/*Beendet* ohne Änderungsentwurf: fachlich wirkungslos, Antwort `200` mit unverändertem Inhalt (Baseline 9.3 „Doppelklick“).
+2. **Gesehener Stand:** `seenContentHash ≠ current_hash` → `409 stale_content` (Ablauf 2).
+3. **Freigabebedingungen** auf dem aktuellen Stand mit aufgelösten Bestandsangaben; jede verletzte Bedingung wird genannt (AC-REQ-044-02): `price_missing` „Preis fehlt“, `category_missing` „Kategorie fehlt“, `condition_missing` „Zustandszuordnung fehlt“, `gpsr_incomplete` „GPSR-Herstellerangaben fehlen“, `title_too_long` „Titel zu lang: höchstens <n> Zeichen“, `required_field_empty` „Pflichtfeld „<Feld>“ ist leer“ (AC-REQ-044-03). Jede Verletzung trägt `fieldKey`, damit UI-016 zum Feld springt.
+4. **Ungeprüfter Rechtstext:** Enthält `used_text_block_ids` einen aktiven Baustein der Art *Rechtliches* oder *Akku-Hinweis* mit Prüfstatus `unchecked` und ist `confirmUncheckedLegal` nicht `true` → `confirmation_required` mit `details.kind = unchecked_legal_text` und den Namen (UI-022, AC-REQ-087-01/-03).
+5. **Speichern:** freigegebener Stand = aktueller Stand, `released_hash`, `released_at` (jede Freigabe einen neuen Zeitpunkt, auch bei gleichem Stand; Kap. 2.12), „geändert seit Freigabe“ entfernt; *Entwurf* → *Freigegeben*; bei *Veröffentlicht* zusätzlich „Änderung auf Kanal übertragen“ (AC-REQ-089-01); bei *Beendet* keine weitere Kennzeichnung (AC-REQ-089-03). Protokolleinträge: Freigabe; bei Bestätigung nach REQ-087 zusätzlich ein Eintrag „Freigabe mit ungeprüftem Rechtstext bestätigt“ mit den Namen der Bausteine.
+
+**Kanäle vergleichen (UI-017, FIND-207):** `listing-content/channel-comparison-query.ts` (CU-301) bildet die Zeilen aus dem **aktuellen** Stand jedes Kanal-Inhalts mit aufgelösten Bestandsangaben:
+
+- feste Zeilen (`fixed`): Titel (`title.text`), Preis, Kategorie (`category.path`), Zustandsbezeichnung (`condition.label`, mit Zusatzangabe), Beschreibung, GPSR-Angaben (eine Zeile je Angabe wie im Kopier-Assistenten);
+- Kennungen (`identifier`): Herstellernummer, EAN, Artikelnummer und Stückzahl, jeweils der Wert des Merkmalsfelds des Kanals mit der Quelle Q-02 `mpn`, Q-03 `ean`, Q-04 `articleNumber` bzw. Q-07 `quantity` (nach Wertzuordnung); hat ein Kanal kein solches Feld, ist der Wert `null` („–“);
+- Merkmale (`attribute`): je Merkmal, das in mindestens einem Kanal als Merkmalsfeld mit Quelle Q-01 vorkommt, eine Zeile, Reihenfolge der Geräteart. Das Design nennt beispielhaft „Prozessor, RAM, Speicher“; die Auswahl aller zugeordneten Merkmale ist DG-12.
+- `different` = mindestens zwei Kanäle mit Wert (`≠ null`) haben nach `trim()` verschiedene Werte; Kanäle ohne Feld zählen nicht. Bei `identifier` hebt UI-017 `different` zusätzlich hervor (Design UI-017).
+
+**Vergleich (REQ-045, UI-018):** Beide Stände werden mit **denselben** aktuellen Bestandsangaben aufgelöst, damit Bestandsänderungen nicht als Änderung erscheinen. `changed` vergleicht die aufgelösten Werte je Feld. `web-ui` hebt Unterschiede mit der Bibliothek `diff` hervor: Wortebene bei einzeiligen Feldern, Zeilenebene bei der Beschreibung (UI-018 Annahme; Entscheidung des Architekten). `case = draft_after_release` ist Fall (b) von UI-018 (`UI-018.entwurf-vergleich`).
+
+**Zustände (Besonderheiten):** `UI-016.ungespeichert-hinweis` entsteht ohne Serveraufruf, wenn „Freigeben“ bei ungespeicherter Eingabe im aktuellen Kanal gewählt wird. `UI-016.verlassen-rueckfrage` über den Router-Blocker von React Router (Kanalwechsel ausgenommen) und `beforeunload` beim Schließen. `UI-016.conflict`: Nach `409` lädt „Stand neu laden“ nur die Daten; der eigene Text bleibt als „Ihr Text (nicht gespeichert)“ sichtbar, „Meinen Text übernehmen“ setzt ihn in den Bearbeitungsmodus (T-1). `UI-016.geaendert` = Status *Entwurf* mit „geändert seit Freigabe“. „Freigeben“ ist nie wegen verletzter Bedingungen deaktiviert (UI-016). UI-017 `.empty` = nur ein Kanal in `channels[]`; der Chip „unterschiedlich“ steht an Zeilen mit `different`. UI-018 `.empty` = `case: none`. UI-022 öffnet bei `unchecked_legal_text`; „Ungeprüfter Rechtstext enthalten – trotzdem freigeben“ sendet die Freigabe erneut mit `confirmUncheckedLegal: true` und demselben `seenContentHash`.
+
+**Ablauf „Kanal-Inhalt freigeben“** (Baseline Ablauf 2, hier mit Endpunkten, Prüfreihenfolge und UI-022)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant L as listing-content
+  participant D as resellr-db
+
+  U->>W: UI-016 Freigeben
+  alt ungespeicherte Anpassung im Kanal
+    W-->>U: UI-016.ungespeichert-hinweis, kein Serveraufruf
+  else nur gespeicherter Stand
+    W->>A: POST /api/channel-contents/31/release (version, seenContentHash)
+    A->>L: freigeben
+    L->>D: Kanal-Inhalt und Bestand lesen
+    alt gesehener Stand veraltet
+      A-->>W: 409 stale_content
+      W-->>U: UI-016.conflict (P-05)
+    else Freigabebedingung verletzt
+      A-->>W: 422 release_conditions_violated (alle Verletzungen)
+      W-->>U: Fehlerbanner mit Liste und Links zu den Feldern
+    else ungeprüfter Rechtstext ohne Bestätigung
+      A-->>W: 422 confirmation_required (unchecked_legal_text)
+      W-->>U: UI-022 mit Namen der Bausteine
+      U->>W: Ungeprüfter Rechtstext enthalten – trotzdem freigeben
+      W->>A: POST /api/channel-contents/31/release (confirmUncheckedLegal true)
+      L->>D: freigegebenen Stand, Status, Zeitpunkt, zwei Protokolleinträge (Transaktion)
+      A-->>W: 200 Kanal-Inhalt Freigegeben
+      W-->>U: Banner „Kanal-Inhalt freigegeben“
+    else gültig
+      L->>D: freigegebenen Stand, Status, Zeitpunkt, Protokolleintrag (Transaktion)
+      A-->>W: 200 Kanal-Inhalt Freigegeben
+      W-->>U: Banner „Kanal-Inhalt freigegeben“, Link zum Kopier-Assistenten
+    end
+  end
+```
+
+### 2.10 F-10 Kanal-Status und Abgleich (REQ-046, REQ-052, REQ-090; Ä-31)
+
+**Komponenten:** `web-ui` (UI-020, UI-021, UI-014, UI-019, UI-002), `http-api`, `listing-content`, `audit`. **Flows:** FLOW-01, FLOW-02, FLOW-03, FLOW-06, FLOW-09.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `POST /api/channel-contents/{id}/status` | `version, target: published\|ended, publishedOn?, externalRef?` | `{ content }` | `invalid_status_transition`, `validation_failed`, `version_conflict` |
+| `POST /api/channel-contents/{id}/reconciliation` | `version, seenStockHash` | `{ content }` | `nothing_to_reconcile`, `invalid_status_transition`, `stale_stock`, `version_conflict` |
+
+`GET /api/channel-contents/{id}` liefert für UI-021 zusätzlich `stockChanges[]` (`key: quantity\|wiNrs\|battery, label, snapshotValue, currentValue, changed`; alle drei Angaben, `changed` gegenüber der Momentaufnahme) und `stockHash`.
+
+**Übergänge (Requirements Kap. 9.4, AC-REQ-046-01 bis -08)**
+
+| von | nach | zulässig | Folge |
+| --- | --- | --- | --- |
+| *Freigegeben* | *Veröffentlicht* | ja; `publishedOn` Pflicht, nicht in der Zukunft; `externalRef` 0–500 | Momentaufnahme des Bestands; keine Abgleich-Kennzeichnung |
+| *Veröffentlicht* | *Beendet* | ja | „Änderung auf Kanal übertragen“ und „Bestand auf Kanal anpassen“ werden entfernt (gespeicherte Kennzeichnungen, Kap. 2.8.3; im Status *Beendet* setzt `StockChanged` sie nicht neu); „geändert seit Freigabe“ und Änderungsentwurf bleiben (AC-REQ-046-08) |
+| *Beendet* | *Veröffentlicht* | nur ohne „geändert seit Freigabe“, sonst „Erst Änderung freigeben“ (AC-REQ-046-04) | neue Momentaufnahme, keine Abgleich-Kennzeichnung (AC-REQ-046-05); `publishedOn` Pflicht |
+| *Entwurf* | *Veröffentlicht* oder *Beendet* | nein, „Erst freigeben“ (AC-REQ-046-02) | – |
+| *Freigegeben* | *Beendet* | nein, „Freigegeben kann nicht beendet werden“ (AC-REQ-046-06) | – |
+
+Ein Kanal-Inhalt wird nie automatisch freigegeben (AC-REQ-044-04). UI-020 bietet nur zulässige Übergänge an; unzulässige erscheinen nicht (Design UI-020, FIND-208). Die Server-Ablehnung `invalid_status_transition` bleibt für veraltete Seiten.
+
+**Abgleich (REQ-090, Ä-31):** nur im Status *Veröffentlicht*. Trägt der Inhalt weder „Änderung auf Kanal übertragen“ noch „Bestand auf Kanal anpassen“ → `nothing_to_reconcile` („Kanal ist abgeglichen“, AC-REQ-090-03; UI-021 `.empty` zeigt das schon aus den geladenen Daten). Weicht `seenStockHash` vom aktuellen Bestand ab → `409 stale_stock`; so wird kein Bestand bestätigt, den der Nutzer nicht gesehen hat. Sonst: „Änderung auf Kanal übertragen“ und „Bestand auf Kanal anpassen“ entfernt, Momentaufnahme = aktueller Bestand, `last_reconciled_at` = jetzt, Protokolleintrag; „geändert seit Freigabe“ bleibt (AC-REQ-090-02).
+
+**„Bestand auf Kanal anpassen“ (REQ-052, Requirements Kap. 9.4):** gespeicherte Kennzeichnung (Kap. 2.8.3), gesetzt bei jeder Änderung einer Bestandsangabe im Status *Veröffentlicht*, entfernt nur durch Abgleich oder *Veröffentlicht* → *Beendet*. Kehrt der Bestand zur Momentaufnahme zurück, bleibt sie; der Kanal kann inzwischen angepasst worden sein. *Beispiel:* Im Shop steht das MacBook-Inserat mit 2 Stück. Ein Verkauf setzt die Kennzeichnung, der Nutzer stellt den Shop auf 1 und nimmt den Verkauf dann zurück: Die Kennzeichnung bleibt bis zur Abgleich-Bestätigung, und UI-021 zeigt die aktuelle Stückzahl 2 neben der Momentaufnahme 2. Die Übersicht nennt die geänderten Bestandsangaben aus `stockChanges` (AC-REQ-052-02); sind alle unverändert, zeigt UI-021 die aktuellen Werte ohne Hervorhebung. (Bisherige Auslegung RQ-01 entfällt, FIND-205.)
+
+**Zustände:** UI-020 `.validation` am Datum; UI-021 `.conflict` bei `stale_stock` (P-05: Bestand neu laden und erneut prüfen); UI-021 `.empty` ohne Kennzeichnung. Lebenszyklus des Kanal-Inhalts: Kap. 3.5.
+
+**Ablauf „Verkauf mit Abgleich“** (Frage: Wie entsteht und verschwindet „Bestand auf Kanal anpassen“?)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant I as inventory
+  participant L as listing-content
+  participant D as resellr-db
+
+  U->>W: UI-011 Gerät 626199 verkauft über Kleinanzeigen
+  W->>A: POST /api/devices/42/sale (version, channelId 2, soldOn)
+  I->>D: Status verkauft, Protokolleintrag (Transaktion)
+  I->>L: Ereignis StockChanged (MI-A)
+  L->>D: Shop veröffentlicht, Bestand geändert, Bestand auf Kanal anpassen setzen
+  A-->>W: 200 Gerät, Stückzahl 1, adjustStockChannels Shop
+  W-->>U: Banner „Verkauf erfasst. Stückzahl: 1“ mit Hinweis
+  U->>W: im Shop Stückzahl anpassen, UI-021 Abgleich bestätigen
+  W->>A: POST /api/channel-contents/31/reconciliation (version, seenStockHash)
+  A->>L: Abgleich prüfen
+  alt Bestand inzwischen erneut geändert
+    A-->>W: 409 stale_stock
+    W-->>U: UI-021.conflict (P-05)
+  else keine Kennzeichnung offen
+    A-->>W: 422 nothing_to_reconcile
+    W-->>U: Kanal ist abgeglichen
+  else gültig
+    L->>D: Kennzeichnungen entfernen, Momentaufnahme, Zeitpunkt, Protokolleintrag (Transaktion)
+    A-->>W: 200 Kanal-Inhalt ohne Abgleich-Kennzeichnung
+    W-->>U: Banner „Abgleich bestätigt“
+  end
+```
+
+### 2.11 F-11 Fotos verwalten (REQ-042; T-2, Baseline 9.4, TH-04)
+
+**Komponenten:** `web-ui` (UI-015), `http-api`, `media`, `inventory`, `listing-content`, `audit`. **Flows:** FLOW-01.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/listings/{id}/photos` | – | `items[]`: `id, hash, position, originalName, byteSize, url, thumbUrl` | `not_found` |
+| `POST /api/listings/{id}/photos` | multipart, **eine** Datei je Anfrage, ohne `version` (T-2) | `201 { photo, listingVersion, count }` | `413 file_too_large`, `415 unsupported_media_type` (je „<Datei>: nur JPEG oder PNG bis 20 MB“), `photo_limit_reached`, `shutting_down` |
+| `PUT /api/listings/{id}/photos/order` | `version` (des Modell-Inserats), `photoIds[]` vollständig | `{ items[], listingVersion }` | `validation_failed` (Menge stimmt nicht), `version_conflict` |
+| `DELETE /api/listings/{id}/photos/{photoId}?version=` | – | `{ items[], listingVersion }` | `not_found`, `version_conflict` |
+| `GET /media/photos/{hash}`, `GET /media/thumbs/{hash}` | – | Bilddatei, `Cache-Control: private, max-age=31536000, immutable`; `{hash}` wird vor jedem Dateizugriff gegen `^[0-9a-f]{64}$` geprüft (FIND-218) | `404` |
+
+**Ablauf des Uploads (Baseline 9.4):** `media/photo-upload-service.ts` streamt die Datei nach `<Datenordner>/media/.incoming/<zufällig>` mit Grenze 20 MB (`@fastify/multipart`, Abbruch bei Überschreitung), berechnet dabei SHA-256, prüft die Signatur (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`) und liest Abmessungen mit `sharp` (`limitInputPixels` 100 Mio.; ungültige Bilder → `415` mit derselben Meldung). Dann Vorschaubild (`sharp().rotate().resize({ width: 400 })`, JPEG Qualität 80) ebenfalls nach `media/.incoming`. **Ablegen und Speichern unter der Sperre des Hashes (FIND-226):** CU-090 nimmt die Sperre für diesen Hash im Prozess (CU-088; dieselbe Sperre nimmt das Aufräumen, Kap. 2.19). Unter der Sperre: Fehlt das Original unter `media/photos/<hash[0..1]>/<hash>.<ext>` bzw. das Vorschaubild unter `media/thumbs/<hash>.jpg`, wird die temporäre Datei dorthin verschoben, sonst gelöscht (gleicher Inhalt). Danach die Transaktion: Anzahl < 20 prüfen, `media_file` neu anlegen, falls die Zeile fehlt, sonst ihr `unreferenced_since` auf NULL setzen; `listing_photo` mit Position `max + 1`, `ContentInputsChanged(listingId)`, Protokolleintrag. Erst nach dem Commit wird die Sperre frei. So sieht ein Upload entweder Zeile und Datei oder keins von beiden und legt dann beides neu an; das Aufräumen kann keine Datei löschen, auf die ein Upload gerade einen Verweis setzt. Scheitert die Transaktion, bleibt die Datei ohne Zeile (oder, wenn die Zeile schon bestand, unverändert); das Aufräumen behandelt sie nach Kap. 2.19. Vor der Transaktion prüft der Dienst den Zustand `stopping` (Kap. 2.17). Das Logo (Kap. 2.2) läuft über denselben Weg in CU-090.
+
+**Mehrere Dateien (T-2):** `web-ui` lädt nacheinander, je Datei eine Anfrage mit Fortschritt (`XMLHttpRequest.upload.onprogress`, UI-015 „Lade <Datei> hoch (n %)“); Ablehnungen erscheinen je Datei, die übrigen laufen weiter. Die 21. Datei scheitert an `photo_limit_reached` (AC-REQ-042-03).
+
+**Reihenfolge und Entfernen:** Die Reihenfolge wird vollständig übertragen und gegen den Bestand geprüft (T-2). Entfernen löscht nur den Verweis; es gibt keinen Trigger und keine Vormerk-Tabelle. Ob eine Datei verwaist ist, stellt allein das Aufräumen fest (Spalte `media_file.unreferenced_since`, Kap. 2.19, 3.1; FIND-226). Die Datei bleibt, solange ein Modell-Inserat oder ein aktueller oder freigegebener Stand auf sie verweist (Baseline 9.4, REQ-045/REQ-047). Jede Änderung ist eine Inhaltsangabe aller Kanal-Inhalte des Modell-Inserats (UI-015 „Folge“); auf manuell angepasste Texte wirkt sie nicht, weil kein Platzhalter Fotos enthält.
+
+**Zustände:** UI-015 nach Kap. 2.0.7; `.loading` = Upload läuft; `.disabled` = 20 Fotos; `.ausgang-unbekannt` sperrt die Fotoverwaltung bis zum Neuladen. Es gibt keinen Speicherknopf; „Fertig“ navigiert nur zu UI-014.
+
+**Ablauf „Foto hochladen“** (Frage: In welcher Reihenfolge entstehen Datei und Datensatz?)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant M as media
+  participant L as listing-content
+  participant D as resellr-db
+  participant F as media-store
+
+  U->>W: UI-015 fünf Dateien ablegen
+  loop je Datei nacheinander
+    W->>A: POST /api/listings/9/photos (multipart)
+    A->>M: Datei annehmen
+    M->>F: in media/.incoming streamen, Hash und Signatur prüfen
+    alt zu groß, falscher Typ oder kein lesbares Bild
+      M->>F: temporäre Datei löschen
+      A-->>W: 413 oder 415 mit Dateiname
+      W-->>U: Meldung an dieser Datei
+    else Datei gültig
+      M->>F: Vorschaubild erzeugen, Original unter Hash ablegen
+      M->>D: Anzahl prüfen, Foto speichern, Protokolleintrag (Transaktion)
+      alt bereits 20 Fotos
+        A-->>W: 422 photo_limit_reached
+        W-->>U: Höchstens 20 Fotos je Modell-Inserat
+      else gespeichert
+        M->>L: Ereignis ContentInputsChanged (Modell-Inserat)
+        L->>D: Kanal-Inhalte neu bilden
+        A-->>W: 201 Foto, listingVersion
+        W-->>U: Vorschaubild mit Nummer im Raster
+      end
+    end
+  end
+```
+
+### 2.12 F-12 Kopier-Assistent und Foto-Übergabe (REQ-047 bis REQ-049; Ä-30, T-7, C-3, H-16)
+
+**Komponenten:** `web-ui` (UI-019 in zwei Layouts), `http-api`, `listing-content`, `media`, `shared/desktop-shell`. **Flows:** FLOW-09.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/channel-contents/{id}/copy-view` | – | `{ status, flags[], releasedAt, releasedHash, newStateNotReleased, stockHash, fields[], photos[], canMarkPublished, canReconcile }` | `copy_assistant_unavailable` (Status *Entwurf*, „Erst freigeben“), `not_found` |
+| `POST /api/channel-contents/{id}/photo-handover` | `{}` | `{ folderPath, count }` | `500 internal_error` („Foto-Ordner konnte nicht angelegt werden. Bitte stattdessen die ZIP-Datei laden. Referenz: <Nr>“) |
+| `POST /api/channel-contents/{id}/photo-zip` | `{}` | `{ downloadUrl }` | `500 internal_error` („Fotos konnten nicht bereitgestellt werden. Referenz: <Nr>“) |
+| `GET /downloads/{token}.zip` | – | ZIP als Anhang, Name `<Artikelnummer>-<Kanalcode>-fotos.zip` | `404` |
+
+**Feldliste (REQ-047, T-7):** immer der **freigegebene** Stand mit aktuell aufgelösten Bestandsangaben, nie der Änderungsentwurf; `newStateNotReleased` = „geändert seit Freigabe“ (Hinweis „Neuer Stand noch nicht freigegeben“, AC-REQ-047-05). Feste Reihenfolge: Titel, Beschreibung, Kategorie, Zustand, Zustand – Zusatz (nur wenn vorhanden), Preis, die Merkmalsfelder in der Reihenfolge der Merkmalszuordnung, dann die GPSR-Angaben Herstellername, Postanschrift, Elektronische Kontaktadresse, ggf. die drei Angaben der verantwortlichen Person in der EU, Produktidentifikation (DG-01, DG-02, DG-05). Die Reihenfolge der festen Felder ist nicht einstellbar; ob REQ-029 das verlangt, entscheidet der Owner (E-1, RQ-11). Optionale GPSR-Angaben ohne Wert (verantwortliche Person) erscheinen nicht und zählen nicht (RQ-16). **Merkmalsfelder ohne Wert nach Auflösung entfallen** (REQ-037, AC-REQ-047-07); ein Feld mit Quelle WI-Nr oder Akkukapazität kann deshalb nach der Freigabe entfallen oder erscheinen (REQ-047). Jedes Feld: `key` (stabil, z. B. `title`, `attr:Prozessor`, `gpsr:contact`), `label`, `value` (zeichengenau der Kopierwert, Zeilenumbrüche als `\n`).
+
+**Übernahme-Markierungen (REQ-049, Ä-30, H-16):** `apps/web/src/features/copy-assistant/copy-progress-store.ts` speichert je Fenster im `sessionStorage` die Schlüssel `<channelContentId>:<releasedAt>:<fieldKey>:<valueHash>`. `releasedAt` ändert sich mit **jeder** Freigabe, auch wenn derselbe Stand erneut freigegeben wird; die alten Markierungen gelten damit nicht mehr (AC-REQ-049-02, FIND-220). `valueHash` (SHA-256 des Kopierwerts, gekürzt auf 16 Zeichen) bindet die Markierung an das Feld **mit seinem angezeigten Wert** (K-06, MAR-176; Auslegung RQ-14; Design v0.6.1 UI-019 „Markierungen übernommen“): Ändert sich der angezeigte Wert eines Felds (z. B. Stückzahl nach einem Verkauf), ist das Feld wieder offen und zählt in „n von m übernommen“ wieder als offen. Eine zusätzliche Anzeige „Wert seit Übernahme geändert“ gibt es nicht. *Beispiel:* Stückzahl „2“ kopiert (übernommen), ein Gerät wird verkauft, nach „Neu laden“ zeigt das Feld „1“ ohne Marke „übernommen“, und aus „9 von 9“ wird „8 von 9“. „n von m“ zählt nur die angezeigten Felder (AC-REQ-049-03). Neuladen derselben Seite und Kanalwechsel behalten die Markierungen, ein zweites Fenster beginnt leer (DG-03). Scheitert `navigator.clipboard.writeText`, wird das Feld nicht markiert (UI-019 Annahme), der Toast nennt Strg+C, und der volle Wert ist markierbar, auch im schmalen Layout (Ä-30).
+
+**Aktualität (Ä-30, FIND-208):** `copy-view` wird **nicht** still neu geladen (`refetchOnWindowFocus: false` für diese Abfrage). Bei Rückkehr ins Fenster ruft `web-ui` die Ansicht im Hintergrund ab, ohne die angezeigten Werte zu ersetzen. Weichen `releasedAt` oder `stockHash` ab, erscheint das Banner „Bitte neu laden“ (P-05, Design UI-019); erst „Neu laden“ übernimmt die neuen Werte. Die Markierungen überstehen das Neuladen nach den Regeln oben.
+
+**Foto-Übergabe (REQ-048, C-3):** Die Routen gehören zu `listing-content` (CU-172); CU-208 und CU-209 sind Dateidienste von `media` (Kap. 4.1). `copy-view-service` (CU-212) ermittelt die Fotos des **freigegebenen** Stands und die Namen und übergibt die Liste an `media`: `media/photo-handover-service.ts` (CU-208) kopiert sie nach `<Übergabeordner>/<Artikelnummer>-<Kanalcode>-<JJJJMMTT-HHMMSS>/` als `01_<Name>.<ext>`, `02_…` (Name = Originalname ohne Endung, auf `A-Za-z0-9_-` bereinigt, höchstens 40 Zeichen) und öffnet den Ordner im Windows-Explorer (`shared/desktop-shell.ts`, abgelöst und ohne Fenster gestartet, Kap. 2.18). `media` liest dafür keine Kanal-Inhalte (FIND-202). Der Übergabeordner liegt außerhalb des Datenordners und wird beim Start geprüft (Kap. 2.19). ZIP: `media/photo-zip-service.ts` erzeugt die Datei `<Artikelnummer>-<Kanalcode>-<JJJJMMTT-HHMMSS>-fotos.zip` mit denselben Namen im Übergabeordner (Bibliothek `yazl`, ohne Komprimierung, weil JPEG und PNG bereits komprimiert sind) und gibt eine einmalige Download-Adresse zurück (Route in CU-091); Ordner und ZIP werden nach 7 Tagen gelöscht. Ohne Fotos: `photos: []` und „Keine Fotos zugeordnet“ (AC-REQ-048-02).
+
+**Zustände:** `UI-019.empty (Entwurf)` aus `copy_assistant_unavailable`; `.empty (Fotos)`; Banner „Bitte neu laden“ (P-05) aus dem Hintergrundabruf (oben); `.success` = alle Felder markiert (clientseitig); `.disabled` = „Abgleich bestätigen“ bei `canReconcile = false` („Kanal ist abgeglichen“); „Als veröffentlicht melden“ nur bei `canMarkPublished` (Status *Freigegeben* oder *Beendet* ohne Änderungsentwurf). Schmales Layout über `?ansicht=schmal` in derselben Route (Umschalter, ADR-001), Mindestbreite 480 px, Hinweis UI-044 als Streifen am Ende der scrollenden Fläche (Kap. 2.17).
+
+**Ablauf „Feld kopieren und Fotos übergeben“**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant L as listing-content
+  participant M as media
+  participant X as Windows-Explorer
+  participant C as Zwischenablage
+
+  U->>W: UI-019 öffnen
+  W->>A: GET /api/channel-contents/31/copy-view
+  alt Status Entwurf
+    A-->>W: 422 copy_assistant_unavailable
+    W-->>U: UI-019.empty Erst freigeben
+  else freigegeben
+    A->>L: freigegebenen Stand mit aktuellem Bestand auflösen
+    A-->>W: 200 Felder ohne leere Merkmalsfelder, releasedAt
+    loop je Feld
+      U->>W: Kopieren
+      W->>C: writeText (reiner Text)
+      alt Zwischenablage verweigert
+        W-->>U: Toast Kopieren nicht möglich, Wert markierbar
+      else kopiert
+        W->>W: Markierung im sessionStorage unter releasedAt und Feld
+        W-->>U: Kopiert, n von m übernommen
+      end
+    end
+    U->>W: Foto-Ordner öffnen
+    W->>A: POST /api/channel-contents/31/photo-handover
+    A->>L: Fotos des freigegebenen Stands ermitteln
+    L->>M: Liste nummeriert in den Übergabeordner kopieren
+    alt Ordner nicht beschreibbar
+      A-->>W: 500 internal_error (referenceNumber)
+      W-->>U: Hinweis auf ZIP mit Referenznummer
+    else kopiert
+      M->>X: Ordner öffnen
+      A-->>W: 200 folderPath, count
+      W-->>U: n Fotos bereitgestellt
+    end
+  end
+```
+
+### 2.13 F-13 Datenblatt (REQ-050, REQ-051, REQ-081, REQ-040; ADR-007, T-8)
+
+**Komponenten:** `web-ui` (UI-023, UI-014-Dialog), `http-api`, `datasheet`, `inventory`, `catalog`, `settings`, `media`. **Flows:** FLOW-01.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/devices/{id}/datasheet` | – | `{ pdfUrl, pageCount }` | `datasheet_precondition` mit `details.reason` ∈ `review_pending`, `not_assigned`, `cancelled`, `logo_missing` (Texte nach REQ-050) |
+| `GET /datasheets/{token}.pdf` | – | `application/pdf`, `Content-Disposition: inline; filename="Datenblatt-<WI-Nr>.pdf"` | `404` (Token abgelaufen) |
+| `GET /api/datasheets/preview-device` | – | `{ deviceId \| null }`: Beispielgerät für den Vorschau-Link in UI-039 (Regel Kap. 2.2, CU-306) | – |
+
+**Ablauf (Ä-32, T-8):** UI-023 ruft beim Öffnen `GET /api/devices/{id}/datasheet` auf (lesend, Zeitgrenze 5 s, REQ-061). `datasheet/datasheet-service.ts` prüft die Voraussetzungen, baut das PDF mit `pdfmake` und legt es im Speicher unter einem zufälligen Token (128 Bit) ab: höchstens 20 Einträge, 15 Minuten gültig (`datasheet/pdf-cache.ts`). „Datenblatt öffnen (PDF)“ öffnet `pdfUrl` mit `window.open` **direkt im Klick**, ohne auf den Server zu warten (Popup-Blocker). Ist `pageCount > 1`, zeigt UI-023 vorher „Datenblatt passt nicht auf eine Seite“.
+
+**Inhalt und Layout (REQ-050, AC-REQ-050-01 bis -08):** A4 hoch, Ränder 12 mm, Schrift Inter 4.1 (eingebettet, OFL). Kopf: Logo zentriert (höchstens 60 × 20 mm), darunter je Kopfzeilentext eine Zeile „<Text> ________“ (REQ-051). Danach die sechs Blöcke in der eingestellten Reihenfolge, je Block Überschrift und zweispaltige Tabelle „Bezeichnung | Wert“:
+
+| Block | feste Zeilen | dazu |
+| --- | --- | --- |
+| Identifikation | WI-Nr (des Geräts), Hersteller, Modellbezeichnung, Typbezeichnung, Herstellernummer (nicht bei „unbekannt“), EAN (des Modell-Inserats, REQ-040) | Merkmale mit Block Identifikation |
+| Zustand | Zustand, Optik-Note, Zustandsbeschreibung (des Geräts) | Merkmale mit Block Zustand |
+| Lieferumfang | Lieferumfang des Modell-Inserats, Texte der aktiven Bausteine der Art *Akku-Hinweis* mit Geltung für die Geräteart, Akkukapazität **dieses Geräts** („N %“ bzw. „nicht ermittelbar“, AC-REQ-050-08) | Merkmale mit Block Lieferumfang |
+| Technik, Anschlüsse, Software | – | Merkmale des Blocks; Anschlüsse je Eintrag eine Zeile |
+
+Werte: Modelldaten aus der Modellvorlage, Gerätewerte dieses Geräts (AC-REQ-050-07). Leere Merkmale entfallen (AC-REQ-050-04). Merkmalsreihenfolge aus dem Datenblatt-Layout, sonst aus UI-027.
+
+**Verdichtung (ADR-007, Risiko „REQ-081 knapp“):** Grundschrift 9 pt. Ergibt das mehr als eine Seite, baut der Dienst neu mit 8 pt, dann mit 7,5 pt und engeren Zeilenabständen; das Ergebnis mit der kleinsten Seitenzahl wird geliefert, `pageCount` ehrlich gemeldet. Der automatische Test prüft REQ-081 mit 5 Testgeräten je Geräteart und bis zu 40 Merkmalen (Kap. 6.2).
+
+**Zustände:** UI-023 `.loading` „Datenblatt wird erzeugt …“ bis zur Antwort; Voraussetzungsmeldung aus `datasheet_precondition` über dem Button (`.error` laut Design), Button deaktiviert (`.disabled`); technischer Fehler als Banner mit Referenznummer; `.success` nach `window.open`.
+
+**Ablauf „Datenblatt erzeugen und öffnen“**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant B as datasheet
+  participant I as inventory
+  participant S as settings
+
+  U->>W: UI-023 aufrufen
+  W->>A: GET /api/devices/42/datasheet
+  A->>B: Datenblatt erzeugen
+  B->>I: Gerät, Modell-Inserat, Modellvorlage lesen
+  B->>S: Layout, Händlermarke, Akku-Hinweise lesen
+  alt Voraussetzung fehlt, z. B. Logo
+    A-->>W: 422 datasheet_precondition (logo_missing)
+    W-->>U: Logo der Händlermarke fehlt, Link UI-026
+  else technischer Fehler
+    A-->>W: 500 internal_error (referenceNumber)
+    W-->>U: Banner mit Referenznummer
+  else erzeugt
+    B->>B: PDF bauen, bei mehr als einer Seite verdichten
+    A-->>W: 200 pdfUrl, pageCount
+    W-->>U: Button Datenblatt öffnen (PDF), ggf. Warnung
+    U->>W: Datenblatt öffnen (PDF)
+    W->>A: neuer Tab GET /datasheets/token.pdf
+    A-->>W: application/pdf
+  end
+```
+
+### 2.14 F-14 Inserat-Übersicht und Gerätesuche (REQ-052, REQ-016, REQ-094)
+
+**Komponenten:** `web-ui` (UI-002, UI-009), `http-api`, `listing-content` (Übersicht), `inventory` (Gerätesuche, Kap. 2.5).
+
+| Methode, Pfad | Anfrage | Antwort |
+| --- | --- | --- |
+| `GET /api/listings` | `q` (ab 2 Zeichen), `deviceTypeId`, `status` (`draft\|released\|published\|ended`), `flags` (kommagetrennt: `changed_since_release`, `transfer_change`, `adjust_stock`), `quantityZero=true`, `limit`, `offset` | `items[]`: `id, displayTitle, deviceTypeName, variantSummary { conditionLabel, visualGrade, variantValues[], conditionDescription }, quantity, soldOut, soldByChannel[] { channelId, count }, channels[] { channelId, status, flags[], lastReconciledAt, manualTextReview, stockChanges[] }`; `total` |
+
+- Suche: Teilübereinstimmung ohne Groß-/Kleinschreibung auf WI-Nr (verfügbare und verkaufte Geräte des Modell-Inserats, AC-REQ-052-05), Herstellername und Modellbezeichnung. Unter 2 Zeichen filtert die Oberfläche nicht (UI-002 `.validation`).
+- Filter: `status` = mindestens ein Kanal-Inhalt mit diesem Status; jede Kennzeichnung in `flags` muss an mindestens einem Kanal-Inhalt bestehen (UND über die Filter, UI-002); `quantityZero` = Stückzahl 0 (AC-REQ-052-03). „Bestand auf Kanal anpassen“ und „Änderung auf Kanal übertragen“ kommen nur bei *Veröffentlicht* vor (AC-REQ-046-07).
+- Für Kanal-Inhalte mit Änderungsentwurf gelten Status und Angaben des freigegebenen Stands (REQ-052); die Kennzeichnung „geändert seit Freigabe“ wird gezeigt.
+- Sortierung: `listing.updated_at` absteigend; der Zeitstempel wird bei jeder Änderung des Modell-Inserats und seiner Kanal-Inhalte gesetzt (UI-002 Annahme).
+- Seiten: Die Oberfläche holt bis 200 Zeilen; ist `total` größer, blättert sie in Seiten zu 50 (DESIGN.md „Tabellen“).
+- `UI-002.empty`: `total = 0` ohne Filter „Noch keine Modell-Inserate“ (AC-REQ-052-04), mit Filter „Keine Treffer“ (AC-REQ-052-07).
+
+Ablauf ohne eigenes Sequenzdiagramm: Die Übersicht ist eine einzelne lesende Abfrage von `listing-content` an `resellr-db` ohne Seiteneffekt; Fehlerfälle sind die allgemeinen lesenden Zustände (Kap. 2.0.7).
+
+### 2.15 F-15 Verkauf, Rücknahme, Storno, WI-Nr-Korrektur, Löschen (REQ-021, REQ-084, REQ-092, REQ-093, REQ-095, REQ-103)
+
+**Komponenten:** `web-ui` (UI-010 bis UI-013, UI-041), `http-api`, `inventory`, `catalog`, `listing-content`, `audit`. **Flows:** FLOW-03, FLOW-08.
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `POST /api/devices/{id}/sale` | `version, channelId, soldOn` | `{ device, listing: { id, quantity }, soldOut, adjustStockChannels[] }` | `device_not_assigned` (AC-REQ-021-05), `device_not_available` („Gerät ist bereits verkauft oder storniert“, AC-REQ-021-04), `validation_failed` („Verkaufsdatum darf nicht in der Zukunft liegen“, AC-REQ-021-02), `version_conflict` |
+| `POST /api/devices/{id}/sale-reversal` | `version` | `{ device, listing }` | `device_not_sold` (AC-REQ-084-02), `version_conflict` |
+| `POST /api/devices/{id}/cancellation` | `version, reason` | `{ device, listing \| null }` | `validation_failed` („Grund fehlt“ bzw. „Grund: 1 bis 200 Zeichen“, AC-REQ-093-03), `device_not_available` („Verkaufte Geräte können nicht storniert werden. Erst Verkauf zurücknehmen.“, AC-REQ-093-02), `version_conflict` |
+| `POST /api/devices/{id}/wi-nr-correction` | `version, wiNr` | `{ device }` | `wi_nr_taken` (AC-REQ-092-02), `validation_failed`, `device_not_available` (storniert), `version_conflict` |
+| `DELETE /api/listings/{id}?version=` | – | `204` | `delete_not_allowed` („Dem Modell-Inserat sind noch Geräte zugeordnet“ bzw. „… ein Kanal-Inhalt ist veröffentlicht“, AC-REQ-095-02), `version_conflict` |
+
+**Regeln**
+
+- **Verkauf:** Kanal ist einer der Kanäle (auch deaktivierte, weil Verkäufe dort noch vorkommen); Datum Pflicht, Standard heute, nicht in der Zukunft. Das Gerät bleibt dem Modell-Inserat zugeordnet (für „verkauft je Kanal“, REQ-052) und zählt nicht mehr in der Stückzahl. `StockChanged`; `soldOut` bei Stückzahl 0 (UI-011 Hinweis „ausverkauft“). Protokoll mit Kanal und Datum (AC-REQ-021-06).
+- **Rücknahme:** Status *verfügbar*, Kanal und Datum entfernt, Protokoll mit bisherigem Kanal und Datum (AC-REQ-084-01), `StockChanged`.
+- **Storno:** nur *verfügbar*; Status *storniert*, Grund, Zeitpunkt; die Zuordnung wird aufgehoben (`listing_id = null`), das bisherige Modell-Inserat bleibt in `cancelled_from_listing_id` nachvollziehbar (UI-014 „auch stornierte“); die WI-Nr ist sofort wieder frei (Teilindex, Kap. 3.4); kein Zurücknehmen. `StockChanged`.
+- **WI-Nr-Korrektur:** Status *verfügbar* oder *verkauft*; alte und neue WI-Nr im Protokoll; die Artikelnummer ändert sich nicht (AC-REQ-092-01); `StockChanged`, wenn das Gerät verfügbar und zugeordnet ist.
+- **Löschen eines Modell-Inserats (REQ-095):** nur ohne zugeordnetes Gerät im Status *verfügbar* oder *verkauft* und ohne Kanal-Inhalt im Status *Veröffentlicht*; löscht Kanal-Inhalte, Preise, Fotoverweise und Lieferumfang; Geräte werden nie gelöscht (REQ-103), stornierte behalten nur den Verweis `cancelled_from_listing_id = null`. Protokolleintrag „gelöscht“. Es gibt **keinen** Löschpfad für Geräte (Kap. 6.2, Code-Review-Prüfpunkt).
+
+**Zustände:** UI-010 `.disabled` je Status (Kap. 3.5); „Verkauf zurücknehmen“ mit Bestätigung nach P-04 in UI-010; UI-041 `.disabled` ohne Häkchen und wenn der Ablehnungsgrund schon aus den geladenen Daten bekannt ist (`deleteBlockedReason` in `GET /api/listings/{id}` bzw. `GET /api/model-templates/{id}/usage`). Beim Modell-Inserat nennt `deleteBlockedReason` nur Gründe aus `inventory` (zugeordnete Geräte); einen veröffentlichten Kanal-Inhalt erkennt `web-ui` aus den Kanal-Karten, und der Server lehnt beim Löschen über `ListingDeleting` ab. So liest `inventory` nicht aus `listing-content` (FIND-202).
+
+Ablauf: Verkauf mit Abgleich in Kap. 2.10. Rücknahme, Storno und WI-Nr-Korrektur folgen demselben Muster (`inventory` → `StockChanged` → `listing-content`) und haben kein eigenes Diagramm.
+
+### 2.16 F-16 Änderungsprotokoll (REQ-055, REQ-072)
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/audit-entries` | `from, to` (Kalenderdaten, Standard der Oberfläche: letzte 30 Tage), `objectType` (eine Objektart aus Kap. 3.6) **oder** `objectCategory` ∈ `settings, model_template, listing, channel_content, device, other` (höchstens einer der beiden), `limit` (50), `offset` | `items[]`: `occurredAt, objectType, objectLabel, objectRef { type, id } \| null, action, actionLabel, oldValue, newValue`, neueste zuerst; `total` | `validation_failed` („Von-Datum liegt nach Bis-Datum“) |
+
+- **Filter „Art des Objekts“ (AC-REQ-055-01, FIND-204):** gefiltert wird nach `object_type`; die Kategorie dient zusätzlich zur Gruppierung. Die Auswahl in UI-024 zeigt die sechs Kategorien des Designs und unter „Einstellung“ eingerückt die 16 Objektarten der Einstellungen (z. B. „Textbaustein“). Wahl einer Kategorie sendet `objectCategory`, Wahl einer Objektart `objectType`. Die eingerückten Einträge sind eine Design-Lücke (DG-15, Kap. 8).
+- Geschrieben wird in jeder schreibenden Transaktion (Kap. 2.0.4); `audit/audit-writer.ts` ist die einzige Stelle, die in `audit_entry` schreibt. Objektarten und Aktionen: Kap. 3.6.
+- Kategorie „other“ umfasst Löschungen und die Bestätigung ungeprüfter Rechtstexte (UI-024).
+- `objectRef` ist `null`, wenn das Objekt nicht mehr existiert (gelöschtes Modell-Inserat); sonst verlinkt UI-024 auf den Screen.
+- Löschfrist: `audit/audit-retention-job.ts` löscht täglich und beim Start Einträge älter als 24 Monate (REQ-072, AC: 24 Monate + 8 Tage gelöscht, 23 Monate vorhanden).
+
+Kein Sequenzdiagramm: einzelne lesende Abfrage einer Komponente.
+
+### 2.17 F-17 Hinweis „Sicherung einrichten“ und „resellr beenden“ (REQ-104, REQ-105, REQ-106; Ablauf 4a, T-3, X-1, X-2)
+
+**Komponenten:** `web-ui` (UI-044, UI-045, UI-046), `http-api` (`write-gate`), `ops` (Betriebsstatus, geordnetes Beenden), `resellr-launcher` (Startmenü „resellr beenden“, LP-03). **Flows:** FLOW-10.
+
+**Endpunkte**
+
+| Methode, Pfad | Anfrage | Antwort | Fehler |
+| --- | --- | --- | --- |
+| `GET /api/ops/status` | – | `{ dataDirPath, appVersion }` | `500 internal_error` |
+| `GET /api/ops/health` | – | `{ state: starting\|ready\|stopping, startId }`; ohne `Origin`-Pflicht (lesend) | – |
+| `POST /api/ops/shutdown` | `{}` | `200 { dataDirPath }`, erst **nach** Checkpoint, Schließen und Ende-Markierung | `503 shutting_down` (läuft schon), `500 internal_error` (Beenden gescheitert, resellr läuft weiter) |
+
+`GET /api/ops/status` liefert nur, was das Design zeigt (Speicherort für UI-044 und UI-046). Größe des Datenordners, freier Speicher und Art des letzten Endes stehen nur im Betriebsprotokoll (X-8 Nein, X-5, Kap. 2.19).
+
+**Hinweis UI-044 (REQ-104, AC-REQ-104-01 bis -05):**
+
+- Teil des Anwendungsrahmens `apps/web/src/app/AppFrame.tsx` (linke Navigationsspalte, 208 px breit, so hoch wie der Viewport) und des schmalen Rahmens `CompactFrame.tsx` von UI-019; eine Komponente `BackupNotice.tsx` mit den Varianten `sidebar` und `strip`. Jede Route mit Rahmen zeigt ihn; ausgenommen sind nur `/beendet` (UI-046) und die Launcher-Seiten.
+- **Navigationsspalte (Variante A, Design v0.6 UI-044):** Der Kopf „resellr“ (40 px) steht fest. Darunter liegt **ein** Bereich mit `overflow-y: auto` und `overflow-x: hidden`, als Spalte (`display: flex; flex-direction: column`) mit den sechs Einträgen (CU-045) und dem Hinweis. Der Hinweis hat `margin-top: auto`: Bei genug Höhe steht er am unteren Rand, sonst folgt er den Einträgen am Ende des Bereichs. Es gibt kein Einklappen, keinen Zustand und keine eigene Höhe für den Hinweis. Mausrad und Scrollleiste scrollen den Bereich. Liegt der Fokus auf einem Eintrag oder auf „resellr beenden“, scrollen Pfeil- und Bildtasten diesen Bereich; das ist Verhalten von Chrome, ohne eigenen Code und ohne zusätzlichen Tab-Halt. Erhält „resellr beenden“ den Fokus, scrollt Chrome ihn ins Sichtbare. Der Inhaltsbereich scrollt getrennt davon.
+- **Schmale Ansicht UI-019 (Design v0.6):** `CompactFrame` hat oben einen festen Bereich mit Titel, Kanal-Wahl und Fortschritt. Darunter liegt **eine** scrollende Fläche: Feldliste, dann die Aktionen „Als veröffentlicht melden“ und „Abgleich bestätigen“, zuletzt der Hinweis als Streifen (`strip`). Der Inhalt der Fläche ist eine Spalte mit `min-height: 100%`, der Streifen hat `margin-top: auto`. Bei genug Höhe steht er also am unteren Fensterrand, sonst nach den Aktionen. Der Streifen hat keine eigene Höhenbegrenzung und kein eigenes Scrollen. Sein Button folgt in der Tab-Reihenfolge nach der Feldliste und den Aktionen.
+- Überschrift und Text sind feste Zeichenketten aus `messages.de.ts` im Wortlaut von REQ-104; der Pfad kommt aus `GET /api/ops/status` beim Laden des Rahmens. Es gibt **keinen** gespeicherten Zustand, keine Einstellung und keine Aktion zum Ausblenden; nichts wird in `localStorage` gelegt (AC-REQ-104-03). Weder Systemdatum noch Kopien ändern den Hinweis (AC-REQ-104-04/-05).
+- Pfad als markierbarer Text, Umbruch an beliebiger Stelle mit `word-break: break-all` (Design: „bricht an beliebiger Stelle“). `overflow-wrap: anywhere` bräche einen Pfad mit Leerzeichen oder Bindestrichen zuerst dort um; ein Pfad mit 100 Zeichen bräuchte dann 6 statt 4 Zeilen (Messseite MAR-158). Schrift Inter 4.1, 12/16 px, Maße nach UI-044 (Rand 8, Innenabstand 8, Rahmen 1, Balken 4, Textbreite 170 px). **Überschrift:** Symbol 14 px, Abstand 4 px, „Sicherung einrichten“ 14 px halbfett (152 px), zusammen genau 170 px; mit dem 16-px-Symbol bräche sie auf zwei Zeilen um (MAR-158). Diese Pixelwerte beschreiben die Gestaltung. Abnahmegrundlage ist allein das Kriterium „kein Inhalt und keine Aktion unerreichbar“ (Design v0.6 UI-044, Kap. 6.3), keine Höhenrechnung. Der Hinweis wird bei keiner Fenstergröße eingeklappt, ausgeblendet oder gekürzt, und sein Text bleibt mindestens 12 CSS-px groß.
+- Zustände: `UI-044.loading` = Status lädt („wird geladen …“ an der Stelle des Pfads, der Rest steht sofort); `UI-044.error` = `500` beim Status (Text mit Referenznummer laut UI-044); bei fehlender Verbindung bleibt „wird geladen …“ und der Inhaltsbereich zeigt P-06. `UI-044.disabled` = Button „resellr beenden“ gesperrt, solange UI-045 offen ist oder das Beenden läuft. Der Zustand „Netzbetrieb“ entfällt (OD-02 A).
+
+**Rückfrage und Beenden (REQ-105, UI-045, UI-046):**
+
+- UI-045 öffnet ohne Serveraufruf; Fokus auf „Abbrechen“. „Abbrechen“ und Esc schließen den Dialog, nichts geschieht (AC-REQ-105-02).
+- „resellr beenden“ sendet `POST /api/ops/shutdown` mit Zeitgrenze 30 s (`UI-045.loading`, Buttons gesperrt, Esc wirkungslos).
+- `200` → `apps/web/src/api/app-termination.ts` stoppt alle Abfragen (`queryClient.cancelQueries()`, `clear()`, Flag `terminated`) und navigiert clientseitig nach `/beendet` mit dem Pfad aus der Antwort: `UI-046.success`, Wortlaut REQ-105 („resellr ist beendet. Sie können den Datenordner jetzt kopieren.“) und „Der Datenordner liegt hier:“ mit Pfad. Die beiden Zusatzzeilen des Designvorschlags werden nicht gebaut.
+- `500` → Dialog schließt, Banner `UI-045.error` mit Referenznummer, resellr läuft weiter, Hinweis bleibt.
+- `503 shutting_down` → Banner P-07 (Beenden läuft schon aus einem anderen Fenster).
+- Verbindungsabbruch oder 30 s ohne Antwort → `/beendet` mit `UI-046.unknown` (Text laut Design, **ohne** Button „Erneut versuchen“, ohne Pfad).
+- Neuladen von `/beendet` nach dem Beenden zeigt die Fehlerseite von Chrome (Design UI-046); das ist gewollt.
+
+**Geordnetes Beenden im Server** (`ops/shutdown-service.ts`, Baseline 9.6):
+
+1. Ist der Zustand nicht `ready` → `503 shutting_down`.
+2. Zustand `stopping`: `write-gate` lehnt neue schreibende Anfragen mit `503` ab; `GET /api/ops/health` meldet `stopping` (T-4, FIND-112).
+3. Höchstens 10 s auf laufende schreibende Anfragen warten. Länger dauern nur Aktionen mit Dateiarbeit (Upload, Foto-Übergabe, ZIP); sie prüfen vor ihrer Transaktion `isStopping()` und enden mit `503` (gilt als nicht gespeichert, Baseline 9.6).
+4. `PRAGMA wal_checkpoint(TRUNCATE)`; scheitert er oder meldet er `busy`, gilt das Beenden als gescheitert.
+5. Datenbank schließen; danach besteht sie aus der einzigen Datei `resellr.db`.
+6. Ende-Markierung `shutdown-marker.json` (`endedAt`, `appVersion`, `startId`) schreiben und mit `fsync` sichern.
+7. Einzelinstanz-Sperre freigeben, Betriebsereignis `stopped_by_user` schreiben (einzige Quelle, H-7), Antwort `200 { dataDirPath }` senden und **erst nach vollständig gesendeter Antwort** (`reply.raw` Ereignis `finish`) mit Exit-Code 0 enden (T-3). Trennt der Browser vorher die Verbindung (`close` ohne `finish`), endet der Server ebenso; spätestens 5 s nach dem Senden endet er in jedem Fall (FIND-217).
+8. Scheitert Schritt 4 bis 6: Datenbank bei Bedarf wieder öffnen, Zustand `ready`, Eintrag im Fehlerprotokoll mit Referenznummer, `500`. Es entsteht keine Ende-Markierung.
+
+**Startmenü „resellr beenden“** (Betreiberwerkzeug, Baseline 13.3.1): `resellr-launcher stop` sendet dieselbe Anfrage ohne `Origin` (G-3) und zeigt das Ergebnis über LP-03 (Kap. 2.18).
+
+**Ablauf „resellr beenden“** (Baseline Ablauf 4a, hier mit Endpunkt, Zeitgrenze und Zuständen)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant O as ops
+  participant D as resellr-db
+
+  U->>W: UI-044 resellr beenden
+  W-->>U: UI-045 Rückfrage
+  alt Abbrechen
+    W-->>U: Dialog schließt, nichts geändert
+  else resellr beenden
+    W->>A: POST /api/ops/shutdown (Zeitgrenze 30 s)
+    A->>O: geordnet beenden
+    O->>O: Zustand stopping, neue Schreibaufträge 503 shutting_down
+    O->>O: höchstens 10 s auf laufende Aktion warten
+    O->>D: wal_checkpoint TRUNCATE, schließen
+    O->>O: shutdown-marker.json schreiben
+    alt alle Schritte erfolgreich
+      O->>O: Sperre freigeben, Ereignis stopped_by_user
+      A-->>W: 200 dataDirPath
+      O->>O: nach gesendeter Antwort Exit-Code 0
+      W-->>U: UI-046.success mit Speicherort
+    else Schritt scheitert
+      O->>D: Datenbank wieder öffnen, Zustand ready
+      A-->>W: 500 internal_error (referenceNumber)
+      W-->>U: UI-045.error Banner, resellr läuft weiter
+    else keine Antwort in 30 s oder Verbindung abgebrochen
+      W-->>U: UI-046.unknown
+    end
+  end
+```
+
+### 2.18 F-18 Start, Überwachung, Launcher-Seiten und Verfügbarkeit (REQ-065, REQ-073; Ablauf 4b, FIND-112, FIND-113, H-10 bis H-14, T-4 bis T-6, ADR-006, ADR-008)
+
+**Komponenten:** `resellr-launcher` (`tools/launcher`), `launcher-pages` (`tools/launcher-pages`), `resellr-server` (`ops`), Windows (Autostart-Eintrag, Explorer), Chrome. **Screens:** LP-01, LP-02, LP-03. **Flows:** FLOW-10.
+
+**Warum kein Container auf dem Arbeitsplatzrechner** (Owner-Kommentar `bdc2d18b`): Der Anwendungscode ist plattformneutral und wird unter Linux entwickelt und getestet (ADR-003, Kap. 6). Container unter Windows hießen Docker Desktop mit WSL 2: Installation mit Adminrechten, Virtualisierung im BIOS, eine dauerhaft laufende Linux-VM mit mehreren GB Arbeitsspeicher, Datenordner und Foto-Übergabe jenseits der VM-Grenze, und die Windows-Fragen (Autostart, Fenster, Chrome) blieben trotzdem. Das widerspricht ADR-006 (ohne Adminrechte) und hilft REQ-065 nicht. Container sind erst für einen späteren Betrieb auf NAS oder Server sinnvoll (ADR-002, B und C).
+
+**Befehle von `resellr-launcher`** (ein Node.js-Programm `app/launcher.mjs`, gestartet mit `resellr-node.exe`, ADR-008):
+
+| Aufruf | Auslöser | Verhalten |
+| --- | --- | --- |
+| `supervise` | Autostart-Eintrag `HKCU\…\Run` bei der Anmeldung | Wird Überwachung, wenn keine läuft; sonst sofortiges Ende ohne Meldung. Öffnet kein Chrome. |
+| `open` | Verknüpfung „resellr“ (Startmenü, Desktop), Ende der Installation | siehe Ablauf unten |
+| `stop` | Verknüpfung „resellr beenden“ (Startmenü) | LP-03 öffnen; läuft eine Überwachung, über die Pipe `{"cmd":"stop"}`; sonst `POST /api/ops/shutdown` direkt; Ergebnis an LP-03. Die Überwachung antwortet je nach Zustand (FIND-233, Diagramm unten): in `ready` `POST /api/ops/shutdown`, dann `stopped` (Exit-Code 0) oder `error` (Beenden gescheitert; der Server läuft weiter, die Überwachung bleibt in `ready` mit normaler Neustart-Regel); in `crash_grace` (5-s-Wartezeit nach einem Absturz, kein Server läuft) Wartezeit abbrechen, kein Neustart, **`stopped`**, Ende; in `starting` keine weiteren Neustarts, Warten auf das Ergebnis des laufenden Starts (`stop_pending`): bei `ready` weiter wie in `ready`, endet der Serverprozess (Abbruch oder Absturz) **`stopped`**, Ende; endet er dort mit Exit-Code 11 (ein anderer Server läuft schon), meldet die Überwachung `already_running`, und `stop` sendet `POST /api/ops/shutdown` direkt an den laufenden Server (Hinweis 5.1 aus Review R3). **In `stopping` (FIND-234):** `503 shutting_down` heißt „Beenden läuft schon“ (z. B. gleichzeitig „resellr beenden“ in UI-045): die Überwachung bleibt in `stopping` und wartet auf das Prozessende, sie meldet **nicht** `error`. Bricht die Verbindung ohne Antwort ab, wartet sie ebenso. `error` (Beenden gescheitert) gibt es nur bei `500 internal_error` oder wenn der Serverprozess 30 s nach dem Wechsel in `stopping` noch läuft; dann bleibt sie in `ready`. **Jedes Prozessende in `stopping` führt zu `stopped` und zum Ende der Überwachung, ohne Neustart**, weil kein Server mehr läuft; bei einem Exit-Code ungleich 0 (z. B. Absturz beim Checkpoint) schreibt sie zusätzlich das Ereignis `stop_crash` mit Referenznummer ins Betriebsprotokoll. Nach `stopped` startet die Überwachung nichts mehr neu |
+| `stop --for-update` | Installationspaket vor dem Ersetzen der Dateien | wie `stop`, ohne Seite; wartet danach, bis die Pipe der Überwachung frei ist (höchstens 30 s, FIND-217); Exit-Code 0 = beendet oder lief nicht (`stopped`, auch aus `crash_grace` und nach einem Prozessende in `stopping` mit beliebigem Code), 1 = gescheitert (`error` oder Pipe nach 30 s nicht frei, z. B. weil ein laufender Start mit Migration länger dauert) |
+| `availability-report <JJJJ-MM>` | Datei `Verfügbarkeitsbericht.cmd` im Programmordner (Betriebshandbuch) | Monatsbericht nach OD-05 (a) als Textdatei im Protokollordner |
+
+**Eine Überwachung je Windows-Sitzung (H-14, FIND-112):** Die Überwachung lauscht auf der benannten Pipe `\\.\pipe\resellr-supervisor-<h>` (`<h>` = erste 16 Hex-Zeichen von SHA-256 über `%LOCALAPPDATA%`, also je Benutzer). Windows vergibt eine Pipe nur einmal und gibt sie mit dem Prozessende frei, auch nach einem Absturz. Die Pipe ist zugleich der Kanal, über den `open` den Zustand abfragt (Protokoll: eine JSON-Zeile je Nachricht; Anfragen `{"cmd":"subscribe"}` und `{"cmd":"stop"}`, Ereignisse `phase` mit `starting`, `ready`, `aborted` + `refNo`, `gave_up` + `refNo`, `already_running`, `stopped`, `error`). Wer die Pipe öffnen kann, **wird selbst** zur Überwachung; es gibt keinen abgelösten Hintergrundprozess (H-13). Unter Linux (Entwicklung, Tests) ist es ein Unix-Socket im temporären Ordner.
+
+**Ablauf `open` (FIND-112, T-4):**
+
+1. `GET /api/ops/health` mit 1 s Zeitgrenze. `ready` → Chrome mit `http://127.0.0.1:<port>/` öffnen, Ende.
+2. `stopping` oder keine Verbindung: Pipe der Überwachung verbinden.
+   - Verbunden → `subscribe` und warten. `ready` → Chrome öffnen. `aborted` oder `gave_up` → LP-02 mit dieser Referenznummer. `already_running` → noch einmal Schritt 1; antwortet kein Server, LP-02 mit der Referenznummer der Warnung. `stopped` oder Pipe geschlossen ohne Ergebnis (z. B. direkt nach „resellr beenden“) → weiter mit Schritt 3, **höchstens einmal**.
+   - Nicht verbunden → Schritt 3.
+3. Pipe selbst öffnen (bei Konflikt zurück zu Schritt 2), Server starten, auf `ready` warten wie oben, dann als Überwachung weiterlaufen.
+4. Dauert das Warten länger als 3 s, öffnet `open` LP-01. **Nach 120 s ohne Ergebnis (K-07, MAR-176; Design v0.6 `LP-02.zeitueberschreitung`):** `open` schreibt `start_timeout` mit **eigener** Referenznummer in Betriebs- und Fehlerprotokoll (CU-296) und setzt `launcher-state.js` auf `phase: 'timeout'` mit dieser `refNo` (CU-268). LP-01 wechselt damit zu `LP-02.zeitueberschreitung` („resellr startet länger als erwartet“, Text nach Design). `open` **wartet weiter** auf das Ergebnis und schreibt es ebenso in `launcher-state.js`: `ready` → die Seite leitet selbst zur lokalen Adresse weiter wie LP-01; `aborted` oder `gave_up` → die Seite zeigt `LP-02.default` („Start abgebrochen“) mit der Referenznummer des Abbruchs. Ein Neuladen der Seite zeigt den jeweils aktuellen Zustand. Ein altes Startergebnis wird nie verwendet: Startergebnisse tragen die `startId` des Versuchs (FIND-112 b).
+5. **Obergrenze des Wartens (K-07):** Ein Startversuch, der **10 min** nach dem Start des Serverprozesses noch nicht `ready` gemeldet hat, gilt als hängend. Die Überwachung, die ihn gestartet hat (CU-264), beendet den Serverprozess, schreibt `start_aborted` mit **eigener** Referenznummer (`function` `launcher.start_limit`) in beide Protokolle und als `aborted` in `start-result.json`, meldet `aborted` + `refNo` über die Pipe, startet nicht neu und endet. Jedes wartende `open` zeigt damit `LP-02.default` mit dieser Nummer. Das Beenden mitten in einer Migration ist unschädlich, weil der Migrationslauf in **einer** Transaktion läuft (CU-029) und SQLite einen nicht abgeschlossenen Lauf beim nächsten Öffnen verwirft. Weil die Grenze in der Überwachung liegt, endet das Warten jedes `open` spätestens mit ihr (oder mit dem Schließen der Pipe, dann Schritt 3, höchstens einmal). Begründung für 10 min: Startprüfung und Migration brauchen auch bei großem Datenbestand Sekunden bis wenige Minuten; die Grenze trennt nur „hängt“ von „dauert“, ohne einen langsamen Start abzubrechen.
+6. **Rückfall S-7 (T-5):** Kann sich die Seite nicht selbst aktualisieren, öffnet `open` nach 120 s `LP-02.zeitueberschreitung` im Text des Rückfalls des Designs (ohne den Satz „resellr öffnet sich von selbst, sobald es bereit ist.“) in einem neuen Tab und bei späterem `ready` die lokale Adresse bzw. bei Abbruch `LP-02.default` ebenfalls in einem neuen Tab.
+
+**Referenznummern in beiden Protokollen (FIND-210, beide Klärungen):** Jede Referenznummer, die der Launcher anzeigt (`start_timeout`, `start_aborted`, `crash`, `gave_up`), schreibt `launcher-log` (CU-296) ins Betriebsprotokoll **und** ins Fehlerprotokoll (`refNo`, `function` z. B. `launcher.start_timeout`). So stimmt der Verweis auf das Fehlerprotokoll in LP-02 und in Kap. 2.0.5.
+
+**Überwachung (`tools/launcher/src/supervisor/`):**
+
+- Startet `resellr-server` mit `child_process.spawn(process.execPath, [serverEntry], { stdio: ['ignore','ignore','ignore','ipc'], windowsHide: true })` und den Umgebungswerten `RESELLR_START_ID`, `RESELLR_DATA_DIR`, `RESELLR_LOG_DIR`, `RESELLR_HANDOVER_DIR`, `RESELLR_UPDATE_COPY_DIR`. `process.execPath` ist `resellr-node.exe` (Windows-GUI-Teilsystem), daher entsteht kein Konsolenfenster (S-2).
+- Der Server meldet Bereitschaft über IPC (`{ type: 'ready', startId }`).
+- **Kopplung (H-13, S-3):** Nicht abgelöste Kindprozesse legt Node.js unter Windows in ein Job-Objekt, das sie beim Ende des Elternprozesses beendet. Zusätzlich beendet sich der Server geordnet, wenn der IPC-Kanal schließt (`process.on('disconnect')`: Checkpoint, Schließen, Exit-Code 12). Weil das Job-Objekt meist schneller ist, verlässt sich keine Auswertung auf das Ereignis „Ende nach Ende der Überwachung“ (H-13). Koppelt das Job-Objekt im Spike nicht, ist das IPC-Ende allein der Mechanismus (S-3).
+- **Kindprozesse (FIND-213):** Jeder Kindprozess von Launcher und Server bekommt `windowsHide: true`, auch kurze Aufrufe wie `reg query`. Programme, die den Launcher überleben sollen (Chrome, `explorer.exe`), starten mit `detached: true`, `stdio: 'ignore'` und `unref()`; Node.js legt abgelöste Prozesse nicht in sein Job-Objekt, sie enden also nicht mit dem Launcher. Nur `resellr-server` startet nicht abgelöst (Kopplung oben). Die Windows-CI (CU-278) prüft, dass Chrome nach dem Ende von `open` und nach dem Ende der Überwachung weiterläuft und dass kein Konsolenfenster erscheint (S-8).
+- **Exit-Codes** (`packages/runtime-shared/src/exit-codes.ts`): `0` vom Nutzer beendet → kein Neustart, Ereignis `stopped`, Überwachung endet. `10` Start abgebrochen → kein Neustart, Startergebnis lesen, Ereignis `aborted`, Überwachung endet. `11` läuft bereits → kein Neustart, keine Zählung als Absturz, Warnung, Ereignis `already_running`, Überwachung endet. `12` Überwachung verloren (kommt nur ohne Überwachung vor). Jeder andere Code = Absturz.
+- **Startgrenze (K-07):** CU-264 misst je Startversuch die Zeit bis `ready`; nach 10 min beendet es den Serverprozess (`child.kill()`) und meldet den Abbruch wie in Schritt 5 des Ablaufs `open`. Dieses Prozessende ist kein Absturz und wird nicht in die Neustartgrenze gezählt.
+- **Absturz und Neustartgrenze (H-12, H-10):** Nach einem Absturz wartet die Überwachung 5 s. Endet sie in dieser Zeit selbst (Abmelden, Herunterfahren), wird **kein** Absturz protokolliert; der nächste Start ordnet das Ende als „ohne geordnetes Beenden“ ein (S-4). Sonst: Ereignis `crash` mit Referenznummer, `state.json.lastCrashAt`, Neustart. **Höchstens 3 Neustarts in 10 Minuten** (gleitendes Fenster); der vierte Absturz im Fenster führt zu `gave_up` mit Referenznummer im Betriebsprotokoll und im Startergebnis, die Überwachung endet (Baseline 9.6; Zählweise festgelegt nach H-12).
+- **Verfügbarkeitsprüfung (`health-probe`, OD-05 a):** alle 5 min `GET /api/ops/health` mit 5 s Zeitgrenze, Eintrag `{ ts, ok }` in `availability-<Datum>.jsonl`.
+
+**Startergebnis und Rückmeldungen (Baseline 2.3, 9.6):** `resellr-server` schreibt `Protokolle/start-result.json` (`startId`, `state: ready\|aborted`, `refNo`, `at`); die Überwachung schreibt `gave_up` dort ebenfalls hinein. `resellr-launcher` schreibt für die Seiten `launcher-pages/launcher-state.js`. Alle drei Dateien werden atomar geschrieben (CU-009, FIND-217).
+
+**Launcher-Seiten (T-5, T-6, H-11, S-7):**
+
+- Drei statische Seiten `launcher-pages/lp-01.html`, `lp-02.html`, `lp-03.html` mit gemeinsamer Datei `launcher-pages.css` (Design-Tokens aus `DESIGN.md`, Inter 4.1 als `data:`-URL eingebettet, weil Chrome Schriften aus `file://` nicht lädt) und `launcher-pages.js`. Kein React, kein Serverzugriff, keine Skripte von außen. Texte laut LP-01 bis LP-03.
+- Parameter per URL-Kodierung: `request` (Kennung des Aufrufs), `ref`, `dataDir`. `launcher-state.js` liegt neben den Seiten im Programmordner (`launcher-pages\launcher-state.js`, Installation pro Benutzer, also beschreibbar) und wird über den festen relativen Pfad `./launcher-state.js` geladen; ein Parameter für die Skriptadresse entfällt (FIND-218). Die Referenznummer wird nur angezeigt, wenn sie dem Muster aus Kap. 2.0.5 entspricht; alle Werte werden mit `textContent` eingesetzt (H-11).
+- **Seitenwechsel (T-5):** Die Seite lädt `launcher-state.js` jede Sekunde als klassisches `<script>` mit wechselndem Abfrageteil neu (`fetch` ist aus `file://` gesperrt). Die Datei ruft `window.__resellrLauncherState({ request, phase, url, refNo, dataDir })` auf; die Seite reagiert nur auf ihre `request`. LP-01: `ready` → `location.replace(url)`, `aborted` → LP-02, `timeout` → `LP-02.zeitueberschreitung`. LP-02 in `zeitueberschreitung` lädt `launcher-state.js` weiter: `ready` → `location.replace(url)`, `aborted` → `LP-02.default` mit neuer Referenznummer (K-07). LP-03: `loading` bis `stopped` (mit `dataDir`, Text nach REQ-105), `error` (mit `refNo`) oder `not_running`.
+- **Rückfallweg (S-7, Design Kap. 8 Nr. 8):** Bestätigt der Spike den Seitenwechsel nicht, öffnet der Launcher Ziel- bzw. Ergebnisseite in einem neuen Tab, LP-01 bleibt stehen, LP-03 öffnet erst mit dem Ergebnis, `LP-03.loading` entfällt. Das ist eine kleine Designänderung über den Product Owner.
+- **Chrome finden:** `reg query` (mit `windowsHide`) auf `App Paths\chrome.exe` unter `HKCU`, dann `HKLM`; sonst Öffnen mit dem Standardbrowser über `explorer.exe <url>` und Warnung im Betriebsprotokoll. Start abgelöst wie oben (FIND-213). Normaler Tab, kein App-Fenster (Entscheidung, Baseline 6.1).
+
+**Verfügbarkeitsauswertung (OD-05 a, Baseline 7.3, FIND-113):**
+
+- Die Überwachung fasst einmal täglich (bei der ersten Prüfung nach Mitternacht und beim Start für fehlende Vortage) die Tage zusammen und schreibt je Tag eine Zeile in `availability-days.jsonl`. Die Überwachung löscht dabei Zeilen älter als 24 Monate (Housekeeping-Tabelle Kap. 2.19; Verfeinerung von Baseline 10.5, die diese Datei nicht nennt, FIND-221). Das Rohprotokoll bleibt bei 30 Tagen (Baseline 10.5).
+- Zeitanteile je Tag, nur Mo–Sa 8–18 Uhr Europe/Berlin: **verfügbar** (Zeit nach erfolgreicher Prüfung bis zur nächsten, höchstens 6 min), **nicht verfügbar** (nach erfolgloser Prüfung, nach `aborted` oder `gave_up` bis zum nächsten `ready`), **vom Nutzer beendet** (von `stopped_by_user` bis zum nächsten Startversuch), **PC aus** (Lücke ohne Ereignis, in der ein Windows-Start liegt; den Zeitpunkt protokolliert jede Überwachung beim Start als `bootTime = jetzt − os.uptime()`), **ohne Messung** (übrige Lücken; enthält auch Abmelden ohne Neustart und ist deshalb eine Obergrenze für Ausfälle der Überwachung, FIND-113 Variante a mit b). **Grenze (FIND-222):** Mit dem Windows-Schnellstart (Standard) setzt Herunterfahren `os.uptime()` nicht zurück; „PC aus“ wird dann nur nach einem Neustart erkannt, sonst fällt die Zeit unter „ohne Messung“. Die Kennzahl selbst ändert das nicht, weil beide Anteile nicht zählen (TR-09).
+- Verfügbarkeit = verfügbar ÷ (verfügbar + nicht verfügbar) (REQ-065 v0.3.3). „vom Nutzer beendet“, „PC aus“ und „ohne Messung“ werden getrennt ausgewiesen, zählen aber weder als Ausfall noch als Geschäftszeit.
+
+**Zustände:** LP-01 `default`; LP-02 `default` und `zeitueberschreitung` (K-07); LP-03 `loading`, `success`, `error`, `nicht-aktiv` (Kap. 7.3).
+
+**Ablauf „resellr starten über die Verknüpfung“** (Baseline Ablauf 4b mit Wartezweig nach FIND-112)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant L as resellr-launcher
+  participant P as launcher-pages
+  participant O as ops
+  participant G as app-logs
+  participant W as web-ui
+
+  U->>L: Startmenü resellr (open)
+  L->>O: GET /api/ops/health (1 s)
+  alt ready
+    L->>W: Chrome mit lokaler Adresse
+  else stopping oder keine Verbindung, Überwachung erreichbar
+    L->>L: Pipe verbinden, subscribe
+    opt Warten länger als 3 s
+      L->>P: LP-01 öffnen
+    end
+    alt Ereignis ready
+      L->>G: launcher-state ready
+      P->>W: Seite wechselt zur lokalen Adresse
+    else Ereignis aborted oder gave_up
+      L->>G: launcher-state aborted mit refNo dieses Starts
+      P-->>U: LP-02 mit Referenznummer
+    else Ereignis stopped oder Pipe ohne Ergebnis geschlossen
+      L->>L: Pipe übernehmen, Server starten (höchstens einmal)
+    else 120 s ohne Ergebnis
+      L->>G: start_timeout mit eigener Referenznummer
+      P-->>U: LP-02.zeitueberschreitung mit dieser Referenznummer
+      L->>L: weiter warten, höchstens bis zur Startgrenze 10 min
+      alt später Ereignis ready
+        L->>G: launcher-state ready
+        P->>W: Seite leitet selbst weiter
+      else Ereignis aborted, auch durch die Startgrenze
+        L->>G: launcher-state aborted mit refNo des Abbruchs
+        P-->>U: LP-02.default mit dieser Referenznummer
+      end
+    end
+  else keine Überwachung
+    L->>L: Pipe übernehmen, wird Überwachung
+    L->>O: resellr-server starten (IPC, ohne Fenster)
+    alt Startprüfung bestanden
+      O-->>L: IPC ready mit startId
+      L->>W: Chrome mit lokaler Adresse
+    else Startprüfung oder Migration gescheitert
+      O->>G: start-result aborted mit refNo, Fehlerprotokoll
+      O-->>L: Exit-Code 10
+      L->>P: LP-02 mit Referenznummer
+    end
+  end
+```
+
+**Lebenszyklus der Überwachung** (Frage: In welchen Zuständen ist `resellr-launcher` als Überwachung, und was beendet sie? Vereinfacht: `health-probe` läuft in `ready` alle 5 min und ist nicht dargestellt. In `stop_pending` und `stopping` startet die Überwachung nach einem Prozessende nichts neu; FIND-233, FIND-234. In `stopping` ändert `503 shutting_down` den Zustand nicht. Die Startgrenze von 10 min wirkt in `starting` und `stop_pending`; K-07.)
+
+```mermaid
+stateDiagram-v2
+  [*] --> starting: supervise oder open<br/>[Pipe frei]
+  starting --> ready: IPC ready
+  starting --> ended: Exit-Code 10 oder 11
+  starting --> ended: 10 min ohne IPC ready<br/>Server beendet, meldet aborted
+  ready --> crash_grace: Exit-Code ungleich 0, 10, 11
+  starting --> crash_grace: Exit-Code ungleich 0, 10, 11
+  crash_grace --> starting: nach 5 s<br/>[weniger als 3 Neustarts in 10 min]
+  crash_grace --> ended: nach 5 s<br/>[3 Neustarts in 10 min erreicht] gave_up
+  crash_grace --> ended: stop über Pipe<br/>kein Server, meldet stopped
+  starting --> stop_pending: stop über Pipe
+  stop_pending --> stopping: IPC ready<br/>POST ops/shutdown
+  stop_pending --> ended: Serverprozess endet<br/>meldet stopped bzw. bei Exit-Code 11 already_running
+  stop_pending --> ended: 10 min ohne IPC ready<br/>Server beendet, meldet stopped
+  ready --> stopping: stop über Pipe<br/>POST ops/shutdown
+  stopping --> ended: jedes Prozessende<br/>meldet stopped, bei Code ungleich 0 mit Referenznummer
+  stopping --> stopping: 503 shutting_down<br/>Beenden läuft schon
+  stopping --> ready: 500 oder nach 30 s noch aktiv<br/>meldet error
+  ready --> ended: Exit-Code 0 (vom Nutzer in UI-045 beendet)
+  ended --> [*]
+```
+
+### 2.19 F-19 Installation, Update, Startprüfung, Housekeeping und Protokolle (REQ-072, REQ-073, REQ-106; ADR-006, ADR-008, Baseline 9.4, 9.6, 10.2 bis 10.7)
+
+**Ordner (Baseline 10.1, 10.2):**
+
+| Ordner | Pfad | Inhalt |
+| --- | --- | --- |
+| Programmordner | `%LOCALAPPDATA%\Programs\resellr` | `resellr-node.exe`, `node.exe`, `app\server.mjs`, `app\launcher.mjs`, `app\web\…`, `app\node_modules\…` (nur native Module), `launcher-pages\…` (dazu zur Laufzeit `launcher-state.js`), `Verfügbarkeitsbericht.cmd`, `Betriebshandbuch.pdf`, `THIRD-PARTY-NOTICES.txt` |
+| **Datenordner** (REQ-106) | `%LOCALAPPDATA%\resellr\Daten` | `resellr.db` (bei laufendem resellr zusätzlich `-wal`, `-shm`), `media\photos\…`, `media\thumbs\…`, `media\logo\…`, `media\.incoming\` (temporär), `config.json`, `shutdown-marker.json` (nur nach geordnetem Beenden), `instance.lock` |
+| Protokollordner | `%LOCALAPPDATA%\resellr\Protokolle` | `errors-<Datum>.jsonl`, `operations-<Datum>.jsonl`, `availability-<Datum>.jsonl`, `availability-days.jsonl`, `state.json`, `start-result.json`, Verfügbarkeitsberichte |
+| Übergabeordner | `%LOCALAPPDATA%\resellr\Fotoübergabe` | Foto-Übergaben und ZIP-Dateien, 7 Tage |
+| Kopien vor Updates | `%LOCALAPPDATA%\resellr\Update-Kopien` | je Update ein Ordner mit `resellr.db` und `config.json`, die letzten 3 |
+
+Alle Pfade außer dem Datenordner liegen außerhalb der Sicherung (REQ-106). `config.json` enthält `port` (Standard 4310) und optional `handoverDir`; keine Bindeadresse, keine Geheimnisse, kein Zustand des Hinweises (Baseline 10.2).
+
+**Prüfung von `handoverDir` beim Start (FIND-212, CU-039):** Der Wert muss ein absoluter Pfad sein, der weder gleich dem Daten-, Protokoll-, Programm- oder Update-Kopie-Ordner ist noch darunter oder darüber liegt, und der nicht gleich dem Benutzerprofil, `Desktop`, `Downloads`, `Dokumente` oder einer Laufwerkswurzel ist. Sonst gilt der Standardpfad, und das Betriebsprotokoll erhält eine Warnung. Zusätzlich löscht das Aufräumen nur Einträge mit dem eigenen Namensmuster (Housekeeping unten). Test in Kap. 6.2. Ein automatischer Test prüft, dass der Server außerhalb des Datenordners nur in Protokoll-, Übergabe- und Update-Kopie-Ordner schreibt (Baseline 11.2, REQ-106).
+
+**Einzelinstanz-Sperre des Datenordners (H-8, H-14):** `ops/instance-lock.ts` öffnet mit `better-sqlite3` die Datei `instance.lock` und hält mit `PRAGMA locking_mode = EXCLUSIVE; BEGIN EXCLUSIVE;` eine Dateisperre des Betriebssystems bis zum Prozessende. Ist sie belegt, endet der Server sofort mit Exit-Code 11, ohne Daten anzufassen. Eine mitkopierte Sperrdatei blockiert nichts, weil nur die Sperre zählt, nicht die Datei. Kein zusätzliches natives Modul.
+
+**Startprüfung (`ops/startup-check.ts`, Baseline 9.6 Schritte 1 bis 5):**
+
+1. Fehlt `resellr.db`, obwohl `media/photos` Dateien enthält → Abbruch. Fehlt beides → neue Datenbank (erster Start).
+2. Datenbank öffnen, `PRAGMA journal_mode = WAL`, `synchronous = FULL` (jede bestätigte Transaktion übersteht einen Stromausfall, Baseline 9.6; FIND-217), `busy_timeout = 5000`, `foreign_keys = ON`; `PRAGMA quick_check`. Schemaversion neuer als das Programm → Abbruch.
+3. **Ersetzter Datenordner:** `app_meta.data_folder_stamp` ≠ `state.json.dataFolderStamp`, oder `state.json` fehlt → `integrity_check`, Prüfung aller verwiesenen Fotodateien (Anzahl fehlender), kein Aufräumen verwaister Dateien bei diesem Start.
+4. **Art des letzten Endes:** Ende-Markierung vorhanden → „vom Nutzer beendet“; sonst `state.json.lastCrashAt` nach dem letzten Serverstart → „abgestürzt“; sonst „ohne geordnetes Beenden“. Die Markierung wird erst nach Schritt 9 gelöscht, damit sie bei einem Abbruch erhalten bleibt (Baseline 9.6, FIND-211).
+5. **Kopie vor Update (FIND-211):** Weicht `app_meta.app_version` oder `app_meta.engine_version` vom Programm ab oder ist das Schema älter, zuerst Kopie über die Online-Backup-API (`db.backup()`) und von `config.json` nach `Update-Kopien\<Zeit>-v<alt>-v<neu>\`, ältere als die letzten 3 löschen (CU-248). Beim ersten Start entfällt die Kopie.
+   **Migrationen:** alle offenen in **einer** Transaktion, nur vorwärts, Dateinamen nach Kap. 4.2. `db/migrator.ts` (CU-029) führt sie selbst aus: `PRAGMA foreign_keys = OFF` (außerhalb der Transaktion, weil SQLite das Pragma innerhalb einer Transaktion ignoriert), `BEGIN IMMEDIATE`, je Migration `up(db)` mit der Kysely-Instanz derselben Verbindung und ein Eintrag in `app_migration` (`name`, `applied_at`), dann `PRAGMA foreign_key_check`; liefert es eine Zeile, `ROLLBACK` und Abbruch wie unten, sonst `COMMIT`; in jedem Fall danach `PRAGMA foreign_keys = ON`. So löscht ein Tabellenumbau in einer späteren Migration (neue Tabelle, kopieren, `DROP TABLE`, umbenennen) über `ON DELETE CASCADE` keine abhängigen Zeilen still (FIND-228, Regel in Kap. 3.8). Gibt es keine offene Migration, bleibt `foreign_keys` unverändert `ON`. SQLite erlaubt DDL in Transaktionen; der Kysely-`Migrator` wird nicht verwendet, weil er auf SQLite ohne Transaktion migriert (`supportsTransactionalDdl = false`). `better-sqlite3`-`db.transaction()` passt nicht, weil Kysely-Aufrufe asynchron sind. Scheitert eine Migration: `ROLLBACK`, das Schema bleibt auf dem alten Stand, Abbruch (LP-02); die Kopie bleibt für die Rückkehr zur alten Version. Tests: eine absichtlich fehlerhafte zweite Migration hinterlässt das Schema unverändert; eine Test-Migration mit Umbau von `listing` lässt die abhängigen Zeilen unverändert; eine Test-Migration, die einen ungültigen Fremdschlüssel hinterlässt, wird zurückgerollt (Kap. 6.2).
+6. `ENGINE_VERSION` abgleichen, ggf. alle Kanal-Inhalte neu bilden (Kap. 2.8.3).
+7. Neue Kennung des Datenordner-Stands und `app_version` in `app_meta` (CU-285) sowie in `state.json`.
+8. Lauschen auf `127.0.0.1:<port>`; `EADDRINUSE` → Abbruch.
+9. `start-result.json` mit `ready`, IPC `ready`, Betriebsereignis `server_ready` mit Art des letzten Endes und Befunden; danach Ende-Markierung löschen.
+
+Abbruch heißt: Eintrag im Fehlerprotokoll mit Referenznummer, `start-result.json` mit `aborted` und dieser Nummer, Exit-Code 10 (LP-02). Befunde aus Schritt 3 und 4 brechen nicht ab; sie stehen nur im Betriebsprotokoll (X-5).
+
+**Housekeeping (`ops/housekeeping/*`, beim Start und alle 24 h):**
+
+| Aufgabe | Regel | Einheit |
+| --- | --- | --- |
+| Protokolleinträge | löschen, wenn älter als 24 Monate (REQ-072) | `audit/audit-retention-job.ts` (einzige Stelle, die in `audit_entry` löscht) |
+| Dateien ohne Verweis | **Verweis** = Eintrag in `listing_photo`, im aktuellen oder freigegebenen Stand eines Kanal-Inhalts oder in `merchant_profile.logo_hash` (über CU-287, CU-291 und CU-086). Das Vorschaubild gehört zu seinem Original und zählt nicht gesondert. **(1) Dateien mit Zeile in `media_file`** (von resellr angelegt, letzter Verweis von resellr entfernt: Foto entfernt, Modell-Inserat gelöscht, Logo ersetzt; FIND-214, FIND-226): In einer Transaktion setzt der Lauf `unreferenced_since` = jetzt bei jeder Zeile ohne Verweis, deren Wert NULL ist, und setzt ihn bei jeder Zeile mit Verweis auf NULL zurück. **Die Karenz von 24 h zählt ab `unreferenced_since`**, nicht ab dem Alter der Datei; eine Datei wird also frühestens 24 h, nachdem ein Lauf sie verwaist vorgefunden hat, gelöscht (bei Läufen alle 24 h meist beim übernächsten Lauf). Löschen je Hash unter der Sperre des Hashes (CU-088): Verweise in einer Transaktion erneut prüfen, Zeile löschen, Commit; danach Original und Vorschaubild löschen. Ohne Mengengrenze. Scheitert das Löschen der Datei, bleibt sie ohne Zeile und fällt unter (2); Warnung. **(2) Dateien ohne Zeile** (Hinweis auf eine ältere oder fremde Datenbank oder eine gescheiterte Upload-Transaktion): löschen, wenn die Datei älter als 24 h ist (Änderungszeit), ebenfalls unter der Sperre des Hashes und nach erneuter Prüfung, dass keine Zeile entstanden ist; **Schutzgrenze**: mehr als 20 solche Dateien oder mehr als 1 % aller Dateien → keine davon löschen, Warnung. **(3)** `media/.incoming` älter als 24 h leeren. Das ganze Aufräumen entfällt beim ersten Start nach ersetztem Datenordner (Baseline 9.4). **Zuständigkeit (FIND-227):** CU-251 sammelt die Verweise über die Reader und entscheidet; alles, was `media_file` und die Dateien ändert, macht der Dateidienst CU-307 von `media` (Ausnahme in Kap. 4.1) | `ops/housekeeping/orphan-files-job.ts` (CU-251) mit `media/orphan-file-service.ts` (CU-307) |
+| Übergabeordner | Unterordner, deren Name vollständig `^[A-Za-z0-9-]+-[a-z]+-\d{8}-\d{6}$` entspricht, und Dateien, deren Name vollständig `^[A-Za-z0-9-]+-[a-z]+-\d{8}-\d{6}-fotos\.zip$` entspricht (Namen aus Kap. 2.12), älter als 7 Tage löschen; andere Einträge bleiben unberührt, auch fremde Dateien wie `urlaub-fotos.zip` (FIND-212, FIND-229) | `ops/housekeeping/handover-cleanup-job.ts` |
+| Tageszusammenfassung Verfügbarkeit | Zeilen in `availability-days.jsonl` älter als 24 Monate löschen (FIND-221) | `tools/launcher/src/availability/availability-aggregator.ts` |
+| Tagesdateien im Protokollordner | älter als 30 Tage löschen | `packages/runtime-shared/src/daily-jsonl-writer.ts` |
+| Freier Speicher | unter 10 GB auf dem Laufwerk des Datenordners → Warnung im Betriebsprotokoll (AR-09; X-8 Nein) | `ops/housekeeping/disk-space-check.ts` |
+
+**Protokolle (REQ-073, Baseline 10.7):** JSON Lines, eine Datei je Tag und Art. Fehlerprotokoll: `ts, level, refNo, function` (z. B. `datasheet.generate`), `message`, `stack`, `appVersion`, `startId`; **keine** Feldwerte, keine Anfrageinhalte (Baseline 8.4). Betriebsprotokoll: Ereignisse nach Baseline 10.7 (`supervisor_started` mit `bootTime`, `server_started`, `server_ready`, `stopped_by_user`, `shutdown_failed`, `crash`, `gave_up`, `already_running`, `start_aborted`, `start_timeout`, `supervisor_ended`, Warnungen). Server und Launcher nutzen denselben `DailyJsonlWriter`; die Ereignisse des Launchers schreibt CU-296, angezeigte Referenznummern zusätzlich ins Fehlerprotokoll (Kap. 2.18). Fastify protokolliert Anfragen nicht in Dateien.
+
+**Installationspaket (ADR-008):** Inno Setup 6, Installation ohne Adminrechte (`PrivilegesRequired=lowest`) nach `{localappdata}\Programs\resellr`. Es legt den Autostart-Eintrag `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\resellr` an (`"…\resellr-node.exe" "…\app\launcher.mjs" supervise`), die Verknüpfungen „resellr“ (Startmenü und Desktop, `open`) und „resellr beenden“ (Startmenü, `stop`). Vor dem Ersetzen von Dateien ruft es `stop --for-update` auf und bricht bei Exit-Code 1 ohne Änderung ab („resellr konnte nicht beendet werden. Bitte später erneut versuchen.“, Baseline 10.6). Nach der Installation startet es `open`. Die Deinstallation entfernt Programm (einschließlich `launcher-state.js`, `[UninstallDelete]`), Autostart-Eintrag und Verknüpfungen; Datenordner, Protokolle und Update-Kopien bleiben (Betriebshandbuch). Ohne Code-Signierung (OD-09 Aus) zeigt SmartScreen bei **jedem** Ausführen eines heruntergeladenen Pakets eine Warnung, also bei der Installation und bei jedem Update (AR-13, FIND-216).
+
+**Build des Pakets (`.github/workflows/release.yml`, Windows-Runner):** `npm ci`; `web-ui` mit Vite bauen; Server und Launcher mit esbuild zu je einer Datei bündeln (native Module extern); `better-sqlite3` und `sharp` (`@img/sharp-win32-x64`) als vorkompilierte Pakete für Windows x64 und die mitgelieferte Node.js-Version; Node.js-Laufzeit (`node-v<Version>-win-x64.zip`) von nodejs.org laden und gegen `SHASUMS256.txt` prüfen; `resellr-node.exe` durch `tools/packaging/patch-pe-subsystem.mjs` erzeugen (Feld „Subsystem“ im PE-Kopf von 3 = Konsole auf 2 = Windows-GUI; die dadurch ungültige Authenticode-Signatur wird entfernt, Eintrag „Security Directory“ auf 0, PE-Prüfsumme neu, FIND-219); `THIRD-PARTY-NOTICES.txt` durch CU-298 erzeugen (Lizenztexte aller ausgelieferten npm-Pakete laut esbuild-Metadatei, Node.js, libvips aus `@img/sharp-libvips-win32-x64`, Inter OFL; erlaubt sind MIT, ISC, BSD-2/3-Clause, Apache-2.0, 0BSD, OFL-1.1 und LGPL-3.0 nur für libvips als dynamische Bibliothek; sonst scheitert der Build, FIND-222); `iscc` baut `resellr-setup-<Version>.exe`; Upload in GitHub Releases von `MarloNET/resellr`.
+
+Ohne eigenes Sequenzdiagramm: Der Start mit Startprüfung ist der letzte Zweig des Ablaufs in Kap. 2.18, das Beenden vor einem Update der Ablauf in Kap. 2.17; das Zusammenspiel von Installationspaket, Launcher und Server zeigt das Diagramm zu ADR-008 (Kap. 11).
+
+### 2.20 F-20 Erreichbarkeit, keine ausgehenden Verbindungen, keine Personen- und Zugangsdaten (REQ-001, REQ-067, REQ-068, REQ-069, REQ-079)
+
+- **REQ-001, REQ-067 bei OD-02 A:** keine Anmeldung, kein Zugangspasswort, keine Passwortänderung; UI-001, UI-040 und FLOW-07 werden nicht gebaut, UI-025 zeigt 14 Bereiche. Der Server bindet nur an `127.0.0.1` (Kap. 2.0.1); ein Zugriff von einem anderen Gerät ist nicht möglich (AC-REQ-001-05, AC-REQ-001-07).
+- **REQ-079:** `resellr-server` und `resellr-launcher` bauen keine Verbindung außer `127.0.0.1` auf; es gibt keine HTTP-Client-Bibliothek in `apps/server` (Prüfung per Abhängigkeitsliste, Kap. 6.2); CSP `connect-src 'self'`; `web-ui` lädt nichts von fremden Servern (Schrift und Icons gebündelt).
+- **REQ-068, REQ-069:** Das Datenmodell (Kap. 3) hat keine Felder für Plattform-Zugangsdaten, Käufer oder Nutzer; Protokolleinträge, Freigaben, Abgleiche und Geräte nennen keine Person (Test Kap. 6.2).
+
+Ohne Diagramm: Diese Punkte sind Eigenschaften, keine Abläufe.
+
+### 2.21 F-21 Optionale Could-Funktionen (REQ-056, REQ-057, REQ-058, REQ-059)
+
+Sie werden nur gebaut, wenn der Product Owner sie in das Backlog nimmt; das Datenmodell enthält die nötigen Spalten schon (Kap. 3), damit keine spätere Migration nötig ist.
+
+- **REQ-056 Excel-Übernahme (UI-042):** `POST /api/imports/excel` (multipart, `.xlsx`, höchstens 10 MB) → `{ created[]: { modelTemplateId, label }, unmappedLabels[]: { sheet, labels[] } }`. `excel-import/excel-import-service.ts` liest mit `exceljs` (MIT) je Blatt die Bezeichnung-Wert-Paare, ordnet Bezeichnungen über `excel-import/label-synonyms.ts` zu (u. a. 4 Varianten der WI-Nr und 7 der Herstellernummer, Research Kap. 2), legt Modellvorlagen mit `importReviewPending = true` und Prüfmarkierungen an **allen** Werten an (Baseline 6.4 Auflage). Solche Modellvorlagen erscheinen in UI-003 nicht zur Auswahl, bis der Nutzer in UI-007 alle Werte bestätigt hat (REQ-056, AC-REQ-056-01/-02).
+- **REQ-057 Importdatei Shop:** `GET /api/exports/prestashop.csv` nach Baseline 5.2 (UTF-8, `;`, Mehrfachwerte `,`), freigegebener Stand mit aktuellen Bestandsangaben. **Blockiert durch eine Owner-Angabe:** Brutto- oder Nettopreis und Steuerregel (AR-12, Freigabe-Briefing „Deine Entscheidungen“). Ohne Antwort wird REQ-057 nicht gebaut.
+- **REQ-058:** Kap. 2.4 (`confirmation_required`/`mpn_in_use`).
+
+**Ablauf „Excel-Datei übernehmen“ (REQ-056, nur bei Umsetzung)**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Nutzer
+  participant W as web-ui
+  participant A as http-api
+  participant X as excel-import
+  participant K as catalog
+  participant D as resellr-db
+
+  U->>W: UI-042 Datei wählen, Einlesen
+  W->>A: POST /api/imports/excel (multipart)
+  A->>X: Datei lesen
+  alt keine lesbare xlsx-Datei
+    A-->>W: 415 unsupported_media_type
+    W-->>U: Nur Excel-Dateien (.xlsx) im Format des Datenblatts
+  else lesbar
+    X->>X: je Blatt Bezeichnungen über Synonyme zuordnen
+    X->>K: Modellvorlagen mit importReviewPending anlegen
+    K->>D: Modellvorlagen, Prüfmarkierungen, Protokolleinträge (Transaktion)
+    A-->>W: 200 created, unmappedLabels
+    W-->>U: Einlesebericht, Links zu UI-007
+  end
+```
+
+Die Importdatei für den Shop (REQ-057) ist eine einzelne lesende Abfrage ohne Seiteneffekt und hat kein eigenes Diagramm.
+
+- **REQ-059:** Kap. 2.9 (`categoryWarning`).
+
+---
+
+## 3. Datenmodell im Detail
+
+Das Datenmodell verfeinert Baseline Kap. 4 auf Tabellen und Felder. Es gibt 29 Fachtabellen in einer SQLite-Datei (`resellr.db`, WAL), angelegt von **einer** Initialmigration (Kap. 3.8), dazu die Verwaltungstabelle `app_migration` des Migrationslaufs (`name` TEXT PK, `applied_at` TEXT; CU-029, FIND-224). Konventionen:
+
+- Tabellen- und Spaltennamen `snake_case`, englisch; in den ER-Diagrammen in `UPPER_SNAKE_CASE`.
+- Wahrheitswerte als `INTEGER` 0/1, Zeitpunkte als ISO-8601-Text in UTC, Kalenderdaten als `YYYY-MM-DD`, Geld als Cent (`INTEGER`), Dezimalwerte als kanonische Zeichenkette (Baseline 4.4).
+- JSON-Spalten sind `TEXT` mit `CHECK (json_valid(…))`; ihr Aufbau steht in Kap. 3.4 und als Zod-Schema in `packages/domain`.
+- Eindeutigkeit ohne Groß-/Kleinschreibung über eine `…_key`-Spalte mit Unicode-Kleinschreibung (`String.prototype.normalize('NFC').toLowerCase()`), weil SQLite `NOCASE` nur ASCII kennt (Baseline 4.4).
+- `version` beginnt bei 1 und steigt mit jeder Änderung um 1 (Kap. 2.0.3).
+- Fremdschlüssel mit `ON DELETE RESTRICT`, außer wo `CASCADE` oder `SET NULL` genannt ist; `PRAGMA foreign_keys = ON`.
+- Längen- und Wertebereichsregeln prüft die Fachschicht (Zod und Fachregeln); die Datenbank sichert Eindeutigkeit, Fremdschlüssel, Wertelisten (`CHECK … IN (…)`) und Pflichtfelder als letzte Stufe (Baseline 9.2).
+- Es gibt **keine** Felder für Personen, Benutzerkonten, Passwörter oder Plattform-Zugangsdaten (REQ-068, REQ-069).
+
+### 3.1 Einstellungen
+
+**`merchant_profile`** – Händlerangaben, genau ein Datensatz (REQ-028). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | immer 1 (CHECK) |
+| `brand_name` | TEXT | – | nein | 0–100; zum Speichern über die API 1–100 |
+| `contact_text` | TEXT | – | nein | 0–500, Platzhalter `{Händler-Kontakt}` |
+| `logo_hash` | TEXT | FK | ja | → media_file.hash |
+| `version` | INTEGER | – | nein | ≥ 1 |
+| `updated_at` | TEXT | – | nein | ISO 8601 UTC |
+
+**`device_type`** – Geräteart (REQ-004). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `name` | TEXT | – | nein | 1–50, Randleerzeichen entfernt |
+| `name_key` | TEXT | UK | nein | Unicode-Kleinschreibung von name |
+| `active` | INTEGER | – | nein | 0 oder 1 |
+| `sort_order` | INTEGER | – | nein | – |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`attribute`** – Merkmal einer Geräteart (REQ-005); eindeutig je Geräteart über (device_type_id, label_key). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | stabile Merkmals-ID, Schlüssel in allen JSON-Werten |
+| `device_type_id` | INTEGER | FK | nein | → device_type |
+| `label` | TEXT | – | nein | 1–100, ohne `{` `}` |
+| `label_key` | TEXT | – | nein | Kleinschreibung; UNIQUE mit device_type_id |
+| `data_type` | TEXT | – | nein | text, integer, decimal, boolean, pick, ports |
+| `system_role` | TEXT | – | ja | keyboard_layout, power_supply, battery, battery_capacity |
+| `unit` | TEXT | – | ja | 0–20 |
+| `unit_spacing` | INTEGER | – | nein | 1 = mit Leerzeichen |
+| `min_value` | TEXT | – | ja | Dezimalzeichenkette, nur integer und decimal |
+| `max_value` | TEXT | – | ja | wie min_value, min ≤ max |
+| `pick_list_id` | INTEGER | FK | ja | → pick_list; Pflicht bei data_type pick |
+| `level` | TEXT | – | nein | model oder device |
+| `variant_forming` | INTEGER | – | nein | nur bei level device; nie bei battery_capacity |
+| `required` | INTEGER | – | nein | Pflichtmerkmal |
+| `datasheet_block` | TEXT | – | nein | identification, condition, delivery_scope, technical, ports, software |
+| `sort_order` | INTEGER | – | nein | Reihenfolge der Geräteart |
+| `active` | INTEGER | – | nein | – |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`pick_list`** – Auswahlliste der Startbelegung (Requirements Kap. 9.2), nicht anlegbar. Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `key` | TEXT | UK | nein | condition, keyboard_layout, power_supply, battery, storage_type, display_surface, operating_system, port_type, port_position |
+| `name` | TEXT | – | nein | Anzeigename |
+| `is_battery_list` | INTEGER | – | nein | 1 nur bei battery |
+| `version` | INTEGER | – | nein | Version der Reihenfolge |
+
+**`pick_list_value`** – Wert einer Auswahlliste (REQ-007); eindeutig über (pick_list_id, label_key). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | gespeichert wird immer diese ID |
+| `pick_list_id` | INTEGER | FK | nein | → pick_list |
+| `label` | TEXT | – | nein | 1–100 |
+| `label_key` | TEXT | – | nein | Kleinschreibung |
+| `battery_present` | INTEGER | – | ja | Pflicht (0/1) in der Liste battery, sonst NULL |
+| `sort_order` | INTEGER | – | nein | – |
+| `active` | INTEGER | – | nein | – |
+| `version` | INTEGER | – | nein | – |
+
+**`manufacturer`** – Hersteller mit GPSR-Herstellerangaben (REQ-027, REQ-100, REQ-101). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `name` | TEXT | – | nein | 1–50 |
+| `name_key` | TEXT | UK | nein | – |
+| `active` | INTEGER | – | nein | – |
+| `gpsr_legal_name` | TEXT | – | ja | 0–200 |
+| `gpsr_street` | TEXT | – | ja | 0–200, Straße und Hausnummer |
+| `gpsr_postal_code` | TEXT | – | ja | 0–20 |
+| `gpsr_city` | TEXT | – | ja | 0–100 |
+| `gpsr_country` | TEXT | – | ja | 0–100 |
+| `gpsr_contact` | TEXT | – | ja | E-Mail oder http(s)-Adresse, 0–254 |
+| `eu_rp_name` | TEXT | – | ja | 0–200 |
+| `eu_rp_address` | TEXT | – | ja | 0–500, mehrzeilig |
+| `eu_rp_contact` | TEXT | – | ja | 0–254 |
+| `gpsr_complete` | INTEGER | – | nein | abgeleitet beim Speichern |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`supplier`** – Lieferant (REQ-099). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `name` | TEXT | – | nein | 1–100 |
+| `name_key` | TEXT | UK | nein | – |
+| `active` | INTEGER | – | nein | – |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`condition_code`** – Eintrag der Code-Übersetzungstabelle (REQ-022); eindeutig über (code_key, IFNULL(supplier_id, 0)). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `code` | TEXT | – | nein | 1–20 |
+| `code_key` | TEXT | – | nein | Kleinschreibung |
+| `supplier_id` | INTEGER | FK | ja | → supplier; NULL = ohne Lieferant |
+| `plain_text` | TEXT | – | nein | 1–500 |
+| `suggested_condition_value_id` | INTEGER | FK | ja | → pick_list_value (Liste condition) |
+| `suggested_visual_grade` | INTEGER | – | ja | 1–5 |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`text_block`** – Textbaustein mit Prüfstatus (REQ-026, REQ-054). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `name` | TEXT | – | nein | 1–100 |
+| `name_key` | TEXT | UK | nein | – |
+| `kind` | TEXT | – | nein | battery_notice, delivery_scope, pickup_contact, legal, other |
+| `body` | TEXT | – | nein | 1–5.000 |
+| `active` | INTEGER | – | nein | – |
+| `all_device_types` | INTEGER | – | nein | 1 = Geltung für alle Gerätearten |
+| `all_channels` | INTEGER | – | nein | 1 = Geltung für alle Kanäle |
+| `legal_status` | TEXT | – | ja | unchecked oder checked; nur bei legal und battery_notice |
+| `legal_checked_on` | TEXT | – | ja | YYYY-MM-DD, nicht in der Zukunft |
+| `legal_checked_by` | TEXT | – | ja | 1–100 |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`text_block_device_type`** – Geltungsbereich Gerätearten (wenn all_device_types = 0). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `text_block_id` | INTEGER | PK, FK | nein | → text_block, ON DELETE CASCADE |
+| `device_type_id` | INTEGER | PK, FK | nein | → device_type |
+
+**`text_block_channel`** – Geltungsbereich Kanäle (wenn all_channels = 0). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `text_block_id` | INTEGER | PK, FK | nein | → text_block, ON DELETE CASCADE |
+| `channel_id` | INTEGER | PK, FK | nein | → channel |
+
+**`datasheet_layout`** – Datenblatt-Layout, genau ein Datensatz (REQ-051). Komponente `settings`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | immer 1 |
+| `header_labels` | TEXT (JSON) | – | nein | Liste von Texten je 0–50 |
+| `block_order` | TEXT (JSON) | – | nein | Permutation der sechs Blöcke |
+| `attribute_order` | TEXT (JSON) | – | nein | Objekt deviceTypeId → Liste von Merkmals-IDs |
+| `version` | INTEGER | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`media_file`** – Datei im media-store, Name aus dem Inhalts-Hash (ADR-004). Komponente `media`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `hash` | TEXT | PK | nein | SHA-256, 64 Hex-Zeichen |
+| `kind` | TEXT | – | nein | photo oder logo |
+| `ext` | TEXT | – | nein | jpg oder png |
+| `mime` | TEXT | – | nein | image/jpeg oder image/png |
+| `byte_size` | INTEGER | – | nein | – |
+| `width` | INTEGER | – | nein | – |
+| `height` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `unreferenced_since` | TEXT | – | ja | Zeitpunkt, zu dem das Aufräumen die Datei zuerst ohne Verweis vorgefunden hat; NULL, solange ein Verweis besteht. Nur CU-307 (Aufräumen) und CU-090 (Upload setzt NULL) schreiben die Spalte; Beginn der 24-h-Karenz (Kap. 2.19, FIND-226) |
+
+Es gibt keine Vormerk-Tabelle für verwaiste Dateien und keinen Trigger; der Verweis `media_orphan_candidate` aus v0.2 entfällt (FIND-226).
+
+**Datenmodell Einstellungen** – Welche Tabellen halten die allgemeinen Einstellungen, und wie hängen sie zusammen? `CHANNEL` steht in Kap. 3.2; `MEDIA_FILE` erscheint hier wegen des Logos.
+
+```mermaid
+erDiagram
+  MERCHANT_PROFILE {
+    integer id PK "NOT NULL"
+    text brand_name "NOT NULL"
+    text contact_text "NOT NULL"
+    text logo_hash FK "NULL"
+    integer version "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  DEVICE_TYPE {
+    integer id PK "NOT NULL"
+    text name "NOT NULL"
+    text name_key UK "NOT NULL"
+    integer active "NOT NULL"
+    integer sort_order "NOT NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  ATTRIBUTE {
+    integer id PK "NOT NULL"
+    integer device_type_id FK "NOT NULL"
+    text label "NOT NULL"
+    text label_key "NOT NULL"
+    text data_type "NOT NULL"
+    text system_role "NULL"
+    text unit "NULL"
+    integer unit_spacing "NOT NULL"
+    text min_value "NULL"
+    text max_value "NULL"
+    integer pick_list_id FK "NULL"
+    text level "NOT NULL"
+    integer variant_forming "NOT NULL"
+    integer required "NOT NULL"
+    text datasheet_block "NOT NULL"
+    integer sort_order "NOT NULL"
+    integer active "NOT NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  PICK_LIST {
+    integer id PK "NOT NULL"
+    text key UK "NOT NULL"
+    text name "NOT NULL"
+    integer is_battery_list "NOT NULL"
+    integer version "NOT NULL"
+  }
+  PICK_LIST_VALUE {
+    integer id PK "NOT NULL"
+    integer pick_list_id FK "NOT NULL"
+    text label "NOT NULL"
+    text label_key "NOT NULL"
+    integer battery_present "NULL"
+    integer sort_order "NOT NULL"
+    integer active "NOT NULL"
+    integer version "NOT NULL"
+  }
+  MANUFACTURER {
+    integer id PK "NOT NULL"
+    text name "NOT NULL"
+    text name_key UK "NOT NULL"
+    integer active "NOT NULL"
+    text gpsr_legal_name "NULL"
+    text gpsr_street "NULL"
+    text gpsr_postal_code "NULL"
+    text gpsr_city "NULL"
+    text gpsr_country "NULL"
+    text gpsr_contact "NULL"
+    text eu_rp_name "NULL"
+    text eu_rp_address "NULL"
+    text eu_rp_contact "NULL"
+    integer gpsr_complete "NOT NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  SUPPLIER {
+    integer id PK "NOT NULL"
+    text name "NOT NULL"
+    text name_key UK "NOT NULL"
+    integer active "NOT NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  CONDITION_CODE {
+    integer id PK "NOT NULL"
+    text code "NOT NULL"
+    text code_key "NOT NULL"
+    integer supplier_id FK "NULL"
+    text plain_text "NOT NULL"
+    integer suggested_condition_value_id FK "NULL"
+    integer suggested_visual_grade "NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  TEXT_BLOCK {
+    integer id PK "NOT NULL"
+    text name "NOT NULL"
+    text name_key UK "NOT NULL"
+    text kind "NOT NULL"
+    text body "NOT NULL"
+    integer active "NOT NULL"
+    integer all_device_types "NOT NULL"
+    integer all_channels "NOT NULL"
+    text legal_status "NULL"
+    text legal_checked_on "NULL"
+    text legal_checked_by "NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  TEXT_BLOCK_DEVICE_TYPE {
+    integer text_block_id PK, FK "NOT NULL"
+    integer device_type_id PK, FK "NOT NULL"
+  }
+  TEXT_BLOCK_CHANNEL {
+    integer text_block_id PK, FK "NOT NULL"
+    integer channel_id PK, FK "NOT NULL"
+  }
+  DATASHEET_LAYOUT {
+    integer id PK "NOT NULL"
+    json header_labels "NOT NULL"
+    json block_order "NOT NULL"
+    json attribute_order "NOT NULL"
+    integer version "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  MEDIA_FILE {
+    text hash PK "NOT NULL"
+    text kind "NOT NULL"
+    text ext "NOT NULL"
+    text mime "NOT NULL"
+    integer byte_size "NOT NULL"
+    integer width "NOT NULL"
+    integer height "NOT NULL"
+    text created_at "NOT NULL"
+    text unreferenced_since "NULL"
+  }
+  CHANNEL {
+    integer id PK "siehe oben"
+  }
+  DEVICE_TYPE ||--o{ ATTRIBUTE : "definiert"
+  PICK_LIST |o--o{ ATTRIBUTE : "Wertevorrat"
+  PICK_LIST ||--|{ PICK_LIST_VALUE : "enthält"
+  SUPPLIER |o--o{ CONDITION_CODE : "gilt für"
+  PICK_LIST_VALUE |o--o{ CONDITION_CODE : "Vorschlag Zustand"
+  MEDIA_FILE |o--o{ MERCHANT_PROFILE : "Logo"
+  TEXT_BLOCK ||--o{ TEXT_BLOCK_DEVICE_TYPE : "Geltung"
+  DEVICE_TYPE ||--o{ TEXT_BLOCK_DEVICE_TYPE : "in Geltung"
+  TEXT_BLOCK ||--o{ TEXT_BLOCK_CHANNEL : "Geltung"
+  CHANNEL ||--o{ TEXT_BLOCK_CHANNEL : "in Geltung"
+  CHANNEL ||--o{ TEXT_BLOCK_CHANNEL : "in Geltung"
+  MEDIA_FILE |o--o| MERCHANT_PROFILE : "Logo"
+```
+
+### 3.2 Kanal-Einstellungen
+
+**`channel`** – Kanal (REQ-029, ADR-005). Komponente `channels`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `code` | TEXT | UK | nein | shop, kleinanzeigen, ebay; weitere per Datenmigration |
+| `name` | TEXT | – | nein | – |
+| `active` | INTEGER | – | nein | – |
+| `title_max_length` | INTEGER | – | nein | 20–500 |
+| `vb_allowed` | INTEGER | – | nein | – |
+| `sort_order` | INTEGER | – | nein | – |
+| `condition_mappings_version` | INTEGER | – | nein | Version der ganzen Zustandszuordnung des Kanals |
+| `version` | INTEGER | – | nein | Version von Kanal und Preisregel |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`price_rule`** – Preisregel eines Kanals (REQ-085). Komponente `channels`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `channel_id` | INTEGER | PK, FK | nein | → channel |
+| `reference_channel_id` | INTEGER | FK | nein | → channel, ≠ channel_id, kein Kreis |
+| `delta_cents` | INTEGER | – | nein | Auf- oder Abschlag mit Vorzeichen |
+| `updated_at` | TEXT | – | nein | – |
+
+**`title_pattern`** – Titelmuster je Geräteart, optional je Kanal (REQ-030); eindeutig über (device_type_id, IFNULL(channel_id, 0)). Komponente `channels`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `device_type_id` | INTEGER | FK | nein | → device_type |
+| `channel_id` | INTEGER | FK | ja | → channel; NULL = Muster der Geräteart |
+| `parts` | TEXT (JSON) | – | nein | Liste { kind, placeholder, text, prefix, suffix, priority } |
+| `version` | INTEGER | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`description_template`** – Beschreibungsvorlage je Kanal (REQ-031). Komponente `channels`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `channel_id` | INTEGER | PK, FK | nein | → channel |
+| `sections` | TEXT (JSON) | – | nein | Liste { heading, deviceTypeIds, lines[] } |
+| `version` | INTEGER | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`condition_mapping`** – Zeile der Zustandszuordnung (REQ-023); eindeutig über (channel_id, condition_value_id, IFNULL(visual_grade, 0)). Komponente `channels`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `channel_id` | INTEGER | FK | nein | → channel |
+| `condition_value_id` | INTEGER | FK | nein | → pick_list_value (Liste condition) |
+| `visual_grade` | INTEGER | – | ja | 1–5; NULL = alle Noten |
+| `label` | TEXT | – | nein | 1–100 |
+| `extra` | TEXT | – | nein | 0–100, Platzhalter wie Titelmuster |
+
+**`category_mapping`** – Kategoriezuordnung (REQ-024); eindeutig über (device_type_id, channel_id). Komponente `channels`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `device_type_id` | INTEGER | FK | nein | → device_type |
+| `channel_id` | INTEGER | FK | nein | → channel |
+| `category_path` | TEXT | – | nein | 1–255 |
+| `category_ref` | TEXT | – | nein | 0–100 |
+| `version` | INTEGER | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`attribute_mapping`** – Merkmalszuordnung (REQ-025); eindeutig über (channel_id, device_type_id). Komponente `channels`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `channel_id` | INTEGER | FK | nein | → channel |
+| `device_type_id` | INTEGER | FK | nein | → device_type |
+| `fields` | TEXT (JSON) | – | nein | Liste { label, source, required, valueMap[], fixedText } |
+| `version` | INTEGER | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**Datenmodell Kanal-Einstellungen** – Welche Tabellen halten die Einstellungen je Kanal? `DEVICE_TYPE` und `PICK_LIST_VALUE` sind in Kap. 3.1 vollständig beschrieben und hier nur als Bezug mit Primärschlüssel gezeigt.
+
+```mermaid
+erDiagram
+  CHANNEL {
+    integer id PK "NOT NULL"
+    text code UK "NOT NULL"
+    text name "NOT NULL"
+    integer active "NOT NULL"
+    integer title_max_length "NOT NULL"
+    integer vb_allowed "NOT NULL"
+    integer sort_order "NOT NULL"
+    integer condition_mappings_version "NOT NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  PRICE_RULE {
+    integer channel_id PK, FK "NOT NULL"
+    integer reference_channel_id FK "NOT NULL"
+    integer delta_cents "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  TITLE_PATTERN {
+    integer id PK "NOT NULL"
+    integer device_type_id FK "NOT NULL"
+    integer channel_id FK "NULL"
+    json parts "NOT NULL"
+    integer version "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  DESCRIPTION_TEMPLATE {
+    integer channel_id PK, FK "NOT NULL"
+    json sections "NOT NULL"
+    integer version "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  CONDITION_MAPPING {
+    integer id PK "NOT NULL"
+    integer channel_id FK "NOT NULL"
+    integer condition_value_id FK "NOT NULL"
+    integer visual_grade "NULL"
+    text label "NOT NULL"
+    text extra "NOT NULL"
+  }
+  CATEGORY_MAPPING {
+    integer id PK "NOT NULL"
+    integer device_type_id FK "NOT NULL"
+    integer channel_id FK "NOT NULL"
+    text category_path "NOT NULL"
+    text category_ref "NOT NULL"
+    integer version "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  ATTRIBUTE_MAPPING {
+    integer id PK "NOT NULL"
+    integer channel_id FK "NOT NULL"
+    integer device_type_id FK "NOT NULL"
+    json fields "NOT NULL"
+    integer version "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  DEVICE_TYPE {
+    integer id PK "siehe oben"
+  }
+  PICK_LIST_VALUE {
+    integer id PK "siehe oben"
+  }
+  CHANNEL ||--o| PRICE_RULE : "hat"
+  CHANNEL ||--o{ PRICE_RULE : "ist Bezugskanal"
+  DEVICE_TYPE ||--|{ TITLE_PATTERN : "besitzt"
+  CHANNEL |o--o{ TITLE_PATTERN : "weicht ab für"
+  CHANNEL ||--o| DESCRIPTION_TEMPLATE : "besitzt"
+  CHANNEL ||--o{ CONDITION_MAPPING : "besitzt"
+  PICK_LIST_VALUE ||--o{ CONDITION_MAPPING : "Zustand"
+  CHANNEL ||--o{ CATEGORY_MAPPING : "besitzt"
+  DEVICE_TYPE ||--o{ CATEGORY_MAPPING : "gilt für"
+  CHANNEL ||--o{ ATTRIBUTE_MAPPING : "besitzt"
+  DEVICE_TYPE ||--o{ ATTRIBUTE_MAPPING : "gilt für"
+```
+
+### 3.3 Katalog, Bestand, Kanal-Inhalte und Protokoll
+
+**`model_template`** – Modellvorlage (REQ-008, REQ-010). Komponente `catalog`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `device_type_id` | INTEGER | FK | nein | → device_type |
+| `manufacturer_id` | INTEGER | FK | nein | → manufacturer |
+| `model_name` | TEXT | – | nein | 1–100 |
+| `model_name_key` | TEXT | – | nein | Kleinschreibung ohne Leerzeichen (REQ-011) |
+| `type_designation` | TEXT | – | ja | 0–50 |
+| `mpn` | TEXT | – | ja | 1–40; NULL genau dann, wenn mpn_unknown = 1 |
+| `mpn_unknown` | INTEGER | – | nein | – |
+| `original_ean` | TEXT | – | ja | 8 oder 13 Ziffern, Prüfziffer |
+| `model_values` | TEXT (JSON) | – | nein | Objekt Merkmals-ID → Wert (Ebene model) |
+| `default_device_values` | TEXT (JSON) | – | nein | Objekt Merkmals-ID → Vorbelegungswert (Ebene device) |
+| `search_key` | TEXT | – | nein | normalisiert: Modellbezeichnung, Typbezeichnung, Herstellernummer; der Herstellername wird bei der Suche über manufacturer.name_key verbunden |
+| `import_review_pending` | INTEGER | – | nein | nur REQ-056 (Could) |
+| `import_review_keys` | TEXT (JSON) | – | nein | nur REQ-056 (Could) |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`device`** – Gerät (REQ-012 bis REQ-021, REQ-084, REQ-092, REQ-093); wird nie gelöscht (REQ-103). Komponente `inventory`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `wi_nr` | TEXT | – | nein | 1–20, nur A–Z, a–z, 0–9 |
+| `wi_nr_key` | TEXT | – | nein | Kleinschreibung; UNIQUE WHERE stock_status <> cancelled |
+| `model_template_id` | INTEGER | FK | nein | → model_template |
+| `listing_id` | INTEGER | FK | ja | → listing; NULL = nicht zugeordnet |
+| `cancelled_from_listing_id` | INTEGER | FK | ja | → listing, ON DELETE SET NULL |
+| `supplier_id` | INTEGER | FK | ja | → supplier |
+| `condition_code` | TEXT | – | ja | wie erfasst, 1–20 |
+| `condition_value_id` | INTEGER | FK | nein | → pick_list_value (Liste condition) |
+| `visual_grade` | INTEGER | – | nein | 1–5 |
+| `condition_description` | TEXT | – | nein | 0–1.000 |
+| `device_values` | TEXT (JSON) | – | nein | Objekt Merkmals-ID → Wert (Ebene device) |
+| `review_keys` | TEXT (JSON) | – | nein | Liste offener Prüfmarkierungen |
+| `capture_status` | TEXT | – | nein | checked oder review_pending (abgeleitet) |
+| `stock_status` | TEXT | – | nein | available, sold, cancelled |
+| `sold_channel_id` | INTEGER | FK | ja | → channel; Pflicht bei sold |
+| `sold_on` | TEXT | – | ja | YYYY-MM-DD; Pflicht bei sold |
+| `cancel_reason` | TEXT | – | ja | 1–200; Pflicht bei cancelled |
+| `cancelled_at` | TEXT | – | ja | – |
+| `assigned_at` | TEXT | – | ja | Zeitpunkt der Zuordnung, Reihenfolge in {WI-Nr} |
+| `captured_at` | TEXT | – | nein | ISO UTC |
+| `captured_on` | TEXT | – | nein | YYYY-MM-DD Europe/Berlin |
+| `version` | INTEGER | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`listing`** – Modell-Inserat (REQ-019, REQ-088). Komponente `inventory`. `quantity`, `stock_json` und `stock_hash` sind ein **abgeleiteter Zwischenspeicher** für Filter und Sortierung, keine eigene Wahrheit: Nur CU-128 schreibt sie, in derselben Transaktion wie die Geräteänderung, immer aus den Geräten neu berechnet. Ein Invariantentest vergleicht nach jedem Integrationstest und beim Start (`integrity_check`-Zweig) die Spalten mit der Neuberechnung. Verfeinerung von Baseline Kap. 4 („nicht gespeichert, sondern abgeleitet“), FIND-221.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `model_template_id` | INTEGER | FK | nein | → model_template |
+| `condition_value_id` | INTEGER | FK | nein | → pick_list_value |
+| `visual_grade` | INTEGER | – | nein | 1–5 |
+| `condition_description` | TEXT | – | nein | 0–1.000 |
+| `condition_description_key` | TEXT | – | nein | trim und Kleinschreibung, für die Vergleichsregel |
+| `variant_values` | TEXT (JSON) | – | nein | Merkmals-ID → Wert, nur Variantenmerkmale |
+| `other_device_values` | TEXT (JSON) | – | nein | übrige Gerätemerkmale ohne Akkukapazität |
+| `article_number` | TEXT | – | nein | 1–30, A–Z a–z 0–9 - |
+| `article_number_key` | TEXT | UK | nein | Kleinschreibung |
+| `ean_mode` | TEXT | – | nein | original oder own |
+| `own_ean` | TEXT | – | ja | Pflicht genau bei own |
+| `display_title` | TEXT | – | nein | ungekürzter Titel nach Muster der Geräteart (abgeleitet) |
+| `quantity` | INTEGER | – | nein | abgeleitet |
+| `stock_json` | TEXT (JSON) | – | nein | { quantity, wiNrs, batteryText } (abgeleitet) |
+| `stock_hash` | TEXT | – | nein | abgeleitet |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | auch bei Änderung eines Kanal-Inhalts gesetzt |
+
+**`listing_delivery_scope`** – Lieferumfang eines Modell-Inserats (A-32). Komponente `inventory`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `listing_id` | INTEGER | PK, FK | nein | → listing, ON DELETE CASCADE |
+| `text_block_id` | INTEGER | PK, FK | nein | → text_block (kind delivery_scope) |
+| `position` | INTEGER | – | nein | – |
+
+**`listing_price`** – Preis je Kanal (REQ-032, REQ-033). Komponente `inventory`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `listing_id` | INTEGER | PK, FK | nein | → listing, ON DELETE CASCADE |
+| `channel_id` | INTEGER | PK, FK | nein | → channel |
+| `amount_cents` | INTEGER | – | nein | > 0 |
+| `vb` | INTEGER | – | nein | nur bei channel.vb_allowed |
+| `source` | TEXT | – | nein | manual oder rule |
+
+**`listing_photo`** – Foto eines Modell-Inserats in Reihenfolge (REQ-042). Komponente `media`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `listing_id` | INTEGER | FK | nein | → listing, ON DELETE CASCADE |
+| `file_hash` | TEXT | FK | nein | → media_file |
+| `original_name` | TEXT | – | nein | Dateiname beim Hochladen, 1–255 |
+| `position` | INTEGER | – | nein | 1–20, lückenlos |
+| `created_at` | TEXT | – | nein | – |
+
+**`channel_content`** – Kanal-Inhalt (ADR-005, Requirements Kap. 9.4); eindeutig über (listing_id, channel_id). Komponente `listing-content`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `listing_id` | INTEGER | FK | nein | → listing, ON DELETE CASCADE |
+| `channel_id` | INTEGER | FK | nein | → channel |
+| `status` | TEXT | – | nein | draft, released, published, ended |
+| `current_state` | TEXT (JSON) | – | nein | ContentState (Kap. 2.8.1) |
+| `current_hash` | TEXT | – | nein | SHA-256 von current_state |
+| `released_state` | TEXT (JSON) | – | ja | unveränderlich bis zur nächsten Freigabe |
+| `released_hash` | TEXT | – | ja | – |
+| `released_at` | TEXT | – | ja | – |
+| `used_text_block_ids` | TEXT (JSON) | – | nein | nicht Teil des Hash |
+| `manual_title` | TEXT | – | ja | 1 bis Höchstlänge |
+| `manual_title_base_hash` | TEXT | – | ja | – |
+| `manual_description` | TEXT | – | ja | 1–20.000 |
+| `manual_description_base_hash` | TEXT | – | ja | – |
+| `manual_category` | TEXT | – | ja | 1–255 |
+| `flag_changed_since_release` | INTEGER | – | nein | **gespeicherter Zustand** (FIND-226): gesetzt durch eine Neubildung mit `current_hash ≠ released_hash`, entfernt nur durch Freigabe (Kap. 2.8.3; K-01, MAR-176); wird nie aus den Hashes neu berechnet |
+| `flag_transfer_change` | INTEGER | – | nein | **gespeicherter Zustand**: gesetzt durch Freigabe eines Änderungsentwurfs im Status *Veröffentlicht*, entfernt durch Abgleich oder *Veröffentlicht* → *Beendet* (Kap. 2.8.3, 2.10) |
+| `flag_adjust_stock` | INTEGER | – | nein | **gespeicherter Zustand**: gesetzt durch `StockChanged` im Status *Veröffentlicht* bei geändertem `stockHash`, entfernt nur durch Abgleich oder *Veröffentlicht* → *Beendet*; bleibt, wenn der Bestand zur Momentaufnahme zurückkehrt (Kap. 2.8.3, 2.10) |
+| `flag_manual_text_review` | INTEGER | – | nein | **gespeicherter Zustand**: gesetzt durch eine Neubildung, die den Hash von `autoText` gegenüber `manual_…_base_hash` ändert, entfernt nur durch Verwerfen oder erneutes Speichern der Anpassung (Kap. 2.8.3) |
+| `published_on` | TEXT | – | ja | YYYY-MM-DD |
+| `external_ref` | TEXT | – | ja | 0–500 |
+| `stock_snapshot` | TEXT (JSON) | – | ja | Bestand bei Veröffentlichung bzw. Abgleich |
+| `stock_snapshot_hash` | TEXT | – | ja | – |
+| `last_reconciled_at` | TEXT | – | ja | – |
+| `version` | INTEGER | – | nein | – |
+| `created_at` | TEXT | – | nein | – |
+| `updated_at` | TEXT | – | nein | – |
+
+**`audit_entry`** – Protokolleintrag (REQ-072); nur anhängen, Löschung nach 24 Monaten. Komponente `audit`.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | PK | nein | – |
+| `occurred_at` | TEXT | – | nein | ISO UTC |
+| `object_type` | TEXT | – | nein | Kap. 3.6 |
+| `object_category` | TEXT | – | nein | settings, model_template, listing, channel_content, device, other |
+| `object_id` | INTEGER | – | ja | ohne Fremdschlüssel (Baseline 4.3) |
+| `object_label` | TEXT | – | nein | – |
+| `action` | TEXT | – | nein | Kap. 3.6 |
+| `old_value` | TEXT (JSON) | – | ja | – |
+| `new_value` | TEXT (JSON) | – | ja | – |
+
+**`app_meta`** – Schlüssel-Wert-Paare des Betriebs: `data_folder_stamp`, `engine_version`, `app_version`, `created_at`. Komponente `ops`, Repository CU-285.
+
+| Feld | Typ | Schlüssel | NULL | Regel |
+| --- | --- | --- | --- | --- |
+| `key` | TEXT | PK | nein | Schlüssel |
+| `value` | TEXT | – | nein | Wert |
+
+**Datenmodell Katalog, Bestand, Kanal-Inhalte und Protokoll** – Welche Tabellen halten Modellvorlagen, Geräte, Modell-Inserate und Kanal-Inhalte? Bezugstabellen aus Kap. 3.1 und 3.2 sind nur mit Primärschlüssel gezeigt; `AUDIT_ENTRY` und `APP_META` haben bewusst keine Fremdschlüssel (Baseline 4.3).
+
+```mermaid
+erDiagram
+  MODEL_TEMPLATE {
+    integer id PK "NOT NULL"
+    integer device_type_id FK "NOT NULL"
+    integer manufacturer_id FK "NOT NULL"
+    text model_name "NOT NULL"
+    text model_name_key "NOT NULL"
+    text type_designation "NULL"
+    text mpn "NULL"
+    integer mpn_unknown "NOT NULL"
+    text original_ean "NULL"
+    json model_values "NOT NULL"
+    json default_device_values "NOT NULL"
+    text search_key "NOT NULL"
+    integer import_review_pending "NOT NULL"
+    json import_review_keys "NOT NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  DEVICE {
+    integer id PK "NOT NULL"
+    text wi_nr "NOT NULL"
+    text wi_nr_key "NOT NULL"
+    integer model_template_id FK "NOT NULL"
+    integer listing_id FK "NULL"
+    integer cancelled_from_listing_id FK "NULL"
+    integer supplier_id FK "NULL"
+    text condition_code "NULL"
+    integer condition_value_id FK "NOT NULL"
+    integer visual_grade "NOT NULL"
+    text condition_description "NOT NULL"
+    json device_values "NOT NULL"
+    json review_keys "NOT NULL"
+    text capture_status "NOT NULL"
+    text stock_status "NOT NULL"
+    integer sold_channel_id FK "NULL"
+    text sold_on "NULL"
+    text cancel_reason "NULL"
+    text cancelled_at "NULL"
+    text assigned_at "NULL"
+    text captured_at "NOT NULL"
+    text captured_on "NOT NULL"
+    integer version "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  LISTING {
+    integer id PK "NOT NULL"
+    integer model_template_id FK "NOT NULL"
+    integer condition_value_id FK "NOT NULL"
+    integer visual_grade "NOT NULL"
+    text condition_description "NOT NULL"
+    text condition_description_key "NOT NULL"
+    json variant_values "NOT NULL"
+    json other_device_values "NOT NULL"
+    text article_number "NOT NULL"
+    text article_number_key UK "NOT NULL"
+    text ean_mode "NOT NULL"
+    text own_ean "NULL"
+    text display_title "NOT NULL"
+    integer quantity "NOT NULL"
+    json stock_json "NOT NULL"
+    text stock_hash "NOT NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  LISTING_DELIVERY_SCOPE {
+    integer listing_id PK, FK "NOT NULL"
+    integer text_block_id PK, FK "NOT NULL"
+    integer position "NOT NULL"
+  }
+  LISTING_PRICE {
+    integer listing_id PK, FK "NOT NULL"
+    integer channel_id PK, FK "NOT NULL"
+    integer amount_cents "NOT NULL"
+    integer vb "NOT NULL"
+    text source "NOT NULL"
+  }
+  LISTING_PHOTO {
+    integer id PK "NOT NULL"
+    integer listing_id FK "NOT NULL"
+    text file_hash FK "NOT NULL"
+    text original_name "NOT NULL"
+    integer position "NOT NULL"
+    text created_at "NOT NULL"
+  }
+  CHANNEL_CONTENT {
+    integer id PK "NOT NULL"
+    integer listing_id FK "NOT NULL"
+    integer channel_id FK "NOT NULL"
+    text status "NOT NULL"
+    json current_state "NOT NULL"
+    text current_hash "NOT NULL"
+    json released_state "NULL"
+    text released_hash "NULL"
+    text released_at "NULL"
+    json used_text_block_ids "NOT NULL"
+    text manual_title "NULL"
+    text manual_title_base_hash "NULL"
+    text manual_description "NULL"
+    text manual_description_base_hash "NULL"
+    text manual_category "NULL"
+    integer flag_changed_since_release "NOT NULL"
+    integer flag_transfer_change "NOT NULL"
+    integer flag_adjust_stock "NOT NULL"
+    integer flag_manual_text_review "NOT NULL"
+    text published_on "NULL"
+    text external_ref "NULL"
+    json stock_snapshot "NULL"
+    text stock_snapshot_hash "NULL"
+    text last_reconciled_at "NULL"
+    integer version "NOT NULL"
+    text created_at "NOT NULL"
+    text updated_at "NOT NULL"
+  }
+  AUDIT_ENTRY {
+    integer id PK "NOT NULL"
+    text occurred_at "NOT NULL"
+    text object_type "NOT NULL"
+    text object_category "NOT NULL"
+    integer object_id "NULL"
+    text object_label "NOT NULL"
+    text action "NOT NULL"
+    json old_value "NULL"
+    json new_value "NULL"
+  }
+  APP_META {
+    text key PK "NOT NULL"
+    text value "NOT NULL"
+  }
+  CHANNEL {
+    integer id PK "siehe oben"
+  }
+  DEVICE_TYPE {
+    integer id PK "siehe oben"
+  }
+  MANUFACTURER {
+    integer id PK "siehe oben"
+  }
+  MEDIA_FILE {
+    text hash PK "siehe oben"
+  }
+  SUPPLIER {
+    integer id PK "siehe oben"
+  }
+  TEXT_BLOCK {
+    integer id PK "siehe oben"
+  }
+  DEVICE_TYPE ||--o{ MODEL_TEMPLATE : "ordnet ein"
+  MANUFACTURER ||--o{ MODEL_TEMPLATE : "stellt her"
+  MODEL_TEMPLATE ||--o{ DEVICE : "ist Vorlage für"
+  MODEL_TEMPLATE ||--o{ LISTING : "ist Modell von"
+  LISTING |o--o{ DEVICE : "fasst zusammen"
+  SUPPLIER |o--o{ DEVICE : "liefert"
+  LISTING ||--o{ LISTING_DELIVERY_SCOPE : "Lieferumfang"
+  TEXT_BLOCK ||--o{ LISTING_DELIVERY_SCOPE : "wird gewählt"
+  LISTING ||--o{ LISTING_PRICE : "Preis je Kanal"
+  CHANNEL ||--o{ LISTING_PRICE : "Kanal"
+  PICK_LIST_VALUE ||--o{ DEVICE : "Zustand"
+  PICK_LIST_VALUE ||--o{ LISTING : "Zustand"
+  CHANNEL |o--o{ DEVICE : "verkauft über"
+  LISTING ||--o{ LISTING_PHOTO : "besitzt"
+  MEDIA_FILE ||--o{ LISTING_PHOTO : "Datei"
+  LISTING ||--o{ CHANNEL_CONTENT : "hat je Kanal"
+  CHANNEL ||--o{ CHANNEL_CONTENT : "bestimmt Format"
+  CHANNEL ||--o{ LISTING_PRICE : "für Kanal"
+```
+
+### 3.4 Aufbau der JSON-Spalten
+
+Schemas in `packages/domain/src/schemas/`. Merkmalswerte tragen als Schlüssel die Merkmals-ID als Zeichenkette (Baseline 4.4); eine neue Geräteart oder ein neues Merkmal ändert die Datenbankstruktur nie (REQ-076).
+
+| Spalte | Aufbau | Beispiel |
+| --- | --- | --- |
+| Merkmalswert je Datentyp (`model_values`, `default_device_values`, `device_values`, `variant_values`, `other_device_values`) | `text`: Zeichenkette; `integer`: Zahl; `decimal`: kanonische Zeichenkette; `boolean`: `true`/`false`; `pick`: ID des Listenwerts; `ports`: Liste `{ count ≥ 1, typeId, positionId \| null }`; Rolle `battery_capacity`: `{ "percent": 0–100 }` oder `{ "notDeterminable": true }` | `{ "12": 16, "13": 512, "14": 7, "18": { "percent": 85 }, "21": "13.3", "30": [{ "count": 2, "typeId": 41, "positionId": null }] }` |
+| `device.review_keys` | Liste von Merkmals-IDs als Zeichenkette sowie `condition`, `visualGrade` | `["12", "18", "visualGrade"]` |
+| `title_pattern.parts` | Liste `{ kind: field\|attribute\|text, field?, attributeId?, text?, prefix, suffix, priority }`; `field` ∈ `manufacturer, modelName, typeDesignation, mpn, deviceType, articleNumber, ean, condition, visualGrade, conditionDescription` | `{ "kind": "attribute", "attributeId": 12, "prefix": ", ", "suffix": " RAM", "priority": 2 }` |
+| `description_template.sections` | Liste `{ heading, deviceTypeIds[], lines[] }`; Zeile `{ kind: text, text }` (Platzhalter als `{Name}` im Text), `{ kind: textBlock, textBlockId }` oder `{ kind: textBlockKind, textBlockKind }` | `{ "heading": "Zustand", "deviceTypeIds": [], "lines": [{ "kind": "text", "text": "{Zustandsbezeichnung Kanal}" }] }` |
+| `attribute_mapping.fields` | Liste `{ label, source, required, valueMap[], fixedText? }`; `source` = `{ kind: attribute, attributeId }` (Q-01) oder `{ kind: field, field }` mit `manufacturer, modelName, typeDesignation, mpn, deviceType` (Q-02), `ean` (Q-03), `articleNumber, condition, visualGrade, conditionDescription, deliveryScope` (Q-04), `conditionLabel, conditionExtra` (Q-05), `productId` (Q-06), `quantity, wiNrs` (Q-07) oder `{ kind: fixedText }` (Q-08); `valueMap[]` = `{ from, to }`, `from` vergleicht ohne Groß-/Kleinschreibung mit dem formatierten internen Wert | `{ "label": "Typ", "source": { "kind": "field", "field": "deviceType" }, "required": false, "valueMap": [{ "from": "Notebook", "to": "Laptop" }] }` |
+| `datasheet_layout` | `header_labels`: Liste; `block_order`: Liste der sechs Blockcodes; `attribute_order`: Objekt Geräteart-ID → Liste von Merkmals-IDs | `{ "1": [3, 4, 12, 13] }` |
+| `listing.stock_json`, `channel_content.stock_snapshot` | `{ quantity, wiNrs[], batteryText }` | `{ "quantity": 2, "wiNrs": ["626198", "626199"], "batteryText": "82–90 %" }` |
+| `channel_content.current_state`, `released_state` | `ContentState` nach Kap. 2.8.1 | – |
+| `audit_entry.old_value`, `new_value` | Objekt der geänderten Felder mit lesbaren Werten (Bezeichnungen statt IDs) | `{ "Optik-Note": 2 }` → `{ "Optik-Note": 4 }` |
+
+### 3.5 Lebenszyklen
+
+**Kanal-Inhalt, Feld `status`** (Frage: Welche Übergänge sind zulässig, und wodurch werden sie ausgelöst? Kennzeichnungen sind keine eigenen Zustände; ihre Regeln stehen in Kap. 2.8.3.)
+
+```mermaid
+stateDiagram-v2
+  [*] --> draft: ListingCreated oder ChannelActivated
+  draft --> released: POST release<br/>[Hash aktuell, Bedingungen erfüllt]
+  released --> draft: Inhaltsangabe geändert<br/>[neuer Stand weicht ab]
+  released --> published: POST status published
+  published --> ended: POST status ended
+  ended --> published: POST status published<br/>[nicht geändert seit Freigabe]
+  draft --> [*]: DELETE listing
+  released --> [*]: DELETE listing
+  ended --> [*]: DELETE listing
+```
+
+Nicht zulässig: `draft` → `published`, `draft` → `ended`, `released` → `ended` (Kap. 2.10). Im Status `published` und `ended` führt eine Änderung nicht zu einem Statuswechsel, sondern zu einem Änderungsentwurf; `POST release` macht ihn zum freigegebenen Stand, ohne den Status zu ändern. Ein Kanal-Inhalt im Status `published` lässt sich nicht löschen (REQ-095).
+
+**Gerät, Feld `stock_status`** (Frage: Welche Bestandsstatus kennt ein Gerät? Geräte werden nie gelöscht, REQ-103.)
+
+```mermaid
+stateDiagram-v2
+  [*] --> available: POST devices
+  available --> sold: POST sale<br/>[zugeordnet]
+  sold --> available: POST sale-reversal
+  available --> cancelled: POST cancellation<br/>[Grund angegeben]
+```
+
+`cancelled` ist endgültig (kein Zurücknehmen, REQ-093). Der Erfassungsstatus `capture_status` hat nur `review_pending` → `checked` (alle Prüfmarkierungen aufgehoben, REQ-013) und keinen Rückweg; dafür gibt es kein eigenes Diagramm. Die Zuordnung (`listing_id`) ist kein Status; sie ändert sich durch Zuordnen, Anlegen eines Modell-Inserats, Umbuchen und Storno (Kap. 2.6, 2.15).
+
+**Textbaustein, Feld `legal_status`** (nur Arten *Rechtliches* und *Akku-Hinweis*, REQ-054)
+
+```mermaid
+stateDiagram-v2
+  [*] --> unchecked: POST text-blocks
+  unchecked --> checked: PATCH legal_status checked<br/>[Prüfdatum und prüfende Stelle]
+  checked --> unchecked: PATCH body geändert
+  checked --> unchecked: PATCH legal_status unchecked
+```
+
+**Betriebszustand von `resellr-server`** (Antwort von `GET /api/ops/health`, kein Datenbankfeld)
+
+```mermaid
+stateDiagram-v2
+  [*] --> starting: Prozessstart durch die Überwachung
+  starting --> ready: Startprüfung bestanden, Port gebunden
+  starting --> [*]: Abbruch, Exit-Code 10 oder 11
+  ready --> stopping: POST ops/shutdown
+  stopping --> ready: Beenden gescheitert, 500
+  stopping --> [*]: Beenden bestätigt, Exit-Code 0
+```
+
+### 3.6 Protokollierte Aktionen (REQ-072)
+
+| Objektart (`object_type`) | Kategorie | Aktionen (`action`) |
+| --- | --- | --- |
+| `device_type`, `attribute`, `pick_list_value`, `manufacturer`, `supplier`, `condition_code`, `text_block`, `merchant_profile`, `datasheet_layout`, `channel`, `price_rule`, `title_pattern`, `description_template`, `condition_mappings`, `category_mapping`, `attribute_mapping` | `settings` | `created`, `updated`, `activated`, `deactivated`, `reordered`, `legal_status_changed`; `deleted` (Kategorie `other`) bei `condition_code`, `price_rule`, kanaleigenem `title_pattern` und `category_mapping`, also bei jedem DELETE-Endpunkt (REQ-072, FIND-220) |
+| `model_template` | `model_template` | `created`, `updated`; `deleted` (Kategorie `other`) |
+| `listing` | `listing` | `created`, `values_updated`, `deviation_confirmed` (REQ-088), `price_updated`, `photo_added`, `photo_removed`, `photos_reordered`; `deleted` (Kategorie `other`) |
+| `channel_content` | `channel_content` | `manual_title_saved`, `manual_title_discarded`, `manual_description_saved`, `manual_description_discarded`, `manual_category_saved`, `manual_category_discarded`, `released`, `change_draft_released`, `status_changed`, `reconciled`; `unchecked_legal_confirmed` (Kategorie `other`, REQ-087) |
+| `device` | `device` | `created`, `values_updated`, `assigned`, `assigned_despite_deviation` (REQ-018, REQ-014), `rebooked`, `sold`, `sale_reversed`, `cancelled`, `wi_nr_corrected` |
+
+`old_value` und `new_value` enthalten die geänderten Felder; bei `assigned_despite_deviation` die Abweichungen, bei `sold`/`sale_reversed` Kanal und Datum, bei `wi_nr_corrected` alte und neue WI-Nr, bei `cancelled` den Grund.
+
+### 3.7 Indizes
+
+| Tabelle | Index | Zweck |
+| --- | --- | --- |
+| `device` | `UNIQUE (wi_nr_key) WHERE stock_status <> 'cancelled'` | Eindeutigkeit der WI-Nr (REQ-012, REQ-093, Baseline 6.4 Auflage) |
+| `device` | `(wi_nr_key)`, `(listing_id, stock_status)`, `(stock_status, listing_id, captured_at)` | Suche, Bestandsangaben, nicht zugeordnete Geräte |
+| `model_template` | `(manufacturer_id, model_name_key)`, `(device_type_id)`, `(search_key)` | Dublette, Suche |
+| `listing` | `UNIQUE (article_number_key)`, `(model_template_id)`, `(updated_at)` | Eindeutigkeit, Zuordnung, Sortierung |
+| `channel_content` | `UNIQUE (listing_id, channel_id)`, `(status)`, `(flag_changed_since_release)`, `(flag_transfer_change)`, `(flag_adjust_stock)` | Filter der Übersicht |
+| `listing_photo` | `(listing_id, position)`, `(file_hash)` | Reihenfolge, Verweisprüfung beim Aufräumen |
+| `condition_code` | `UNIQUE (code_key, IFNULL(supplier_id, 0))` | REQ-022 |
+| `title_pattern` | `UNIQUE (device_type_id, IFNULL(channel_id, 0))` | REQ-030 |
+| `condition_mapping` | `UNIQUE (channel_id, condition_value_id, IFNULL(visual_grade, 0))` | REQ-023 |
+| `category_mapping` | `UNIQUE (device_type_id, channel_id)` | REQ-024 |
+| `attribute_mapping` | `UNIQUE (channel_id, device_type_id)` | REQ-025 |
+| `attribute` | `UNIQUE (device_type_id, label_key)` | REQ-005 |
+| `pick_list_value` | `UNIQUE (pick_list_id, label_key)` | REQ-007 |
+| `audit_entry` | `(occurred_at)`, `(object_category, occurred_at)`, `(object_type, occurred_at)` | Filter, Löschfrist |
+
+### 3.8 Migrationen
+
+| Datei | Bauschritt | Inhalt |
+| --- | --- | --- |
+| `apps/server/src/db/migrations/20261110_0001_initial_schema.ts` | S1 (Walking Skeleton) | alle 29 Fachtabellen aus Kap. 3.1 bis 3.3, Indizes aus Kap. 3.7, `app_meta`-Wert `created_at`; `engine_version` schreibt CU-173 (FIND-201), `app_version` die Startprüfung |
+| `apps/server/src/db/migrations/20261110_0002_seed_initial_settings.ts` | S2 | Startbelegung aus `packages/seed-data` (Kap. 2.1.1) einschließlich der Datensätze `merchant_profile` (leer) und `datasheet_layout` |
+
+- Spätere Bauschritte von Release 0.1 brauchen **keine** Migration; das Datenmodell ist in S1 vollständig. Wird doch eine Schemaänderung nötig, ist sie eine Abweichung von dieser Specification (Kap. 4.7) und erhält eine neue Datei `YYYYMMDD_NNNN_<slug>.ts` mit der nächsten freien Nummer.
+- Migrationen laufen beim Start in einer Transaktion über den eigenen Migrationslauf CU-029, nur vorwärts, nach der automatischen Kopie (Kap. 2.19, FIND-211). Sie ändern keine Dateien im `media-store` (Baseline 10.6).
+- **Umbau-Migrationen (FIND-228):** Muss eine spätere Migration eine Tabelle umbauen, folgt sie dem SQLite-Verfahren „neue Tabelle anlegen, Daten kopieren, alte Tabelle mit `DROP TABLE` entfernen, neue umbenennen, Indizes neu anlegen“. Sie verlässt sich darauf, dass CU-029 die Fremdschlüssel während des Laufs ausschaltet und vor dem `COMMIT` mit `PRAGMA foreign_key_check` prüft; sie schaltet `foreign_keys` nicht selbst um. Jede solche Migration hat einen Integrationstest, der Zeilen in allen abhängigen Tabellen anlegt und nach der Migration unverändert vorfindet. **Kaskaden wirken im Migrationslauf nicht** (Hinweis 5.3 aus Review R3): Weil `foreign_keys` aus ist, löscht `ON DELETE CASCADE` keine abhängigen Zeilen. Eine Datenmigration, die etwas löschen will, löscht abhängige Zeilen selbst und ausdrücklich; sonst bricht `foreign_key_check` den Lauf ab.
+- Eine Migration darf vor der ersten Auslieferung an den Owner noch geändert werden; danach sind ausgelieferte Migrationsdateien unveränderlich.
+
+---
+
+## 4. Code-Struktur
+
+Diese Struktur ist verbindlich. Sie gilt für beide Entwickler, damit parallel keine Bausteine mit überschneidender Verantwortung entstehen. Neue Einheiten außerhalb dieser Karte entstehen nur über den Software Architect (Kap. 4.7). Das Repository enthält bisher nur Dokumentation; alle Einheiten sind neu.
+
+### 4.1 Repository- und Ordnerstruktur
+
+Verfeinert Baseline 12.1 (Vorschlag). Abweichung: Die Startbelegung liegt in einem eigenen Paket `packages/seed-data`, weil sie ausgeliefert wird; `packages/test-data` enthält nur synthetische Test- und Lastdaten. `packages/runtime-shared` ist neu, weil Server und Launcher Pfade, Exit-Codes, Referenznummern und Protokolldateien gleich behandeln müssen.
+
+```text
+resellr/
+├─ package.json                 npm-Workspaces, Skripte
+├─ tsconfig.base.json, eslint.config.mjs, .prettierrc, .nvmrc, vitest.workspace.ts, playwright.config.ts
+├─ apps/
+│  ├─ server/                   resellr-server (Node.js, Fastify)
+│  │  ├─ src/
+│  │  │  ├─ main.ts, app.ts
+│  │  │  ├─ http/               Komponente http-api
+│  │  │  ├─ db/                 Datenbank, Schema-Typen, Migrationen, Unit of Work
+│  │  │  ├─ shared/             Uhr, Fehlerklassen, Ereignistypen
+│  │  │  ├─ settings/  catalog/  inventory/  channels/  listing-content/
+│  │  │  ├─ media/  datasheet/  audit/  ops/
+│  │  │  └─ excel-import/  prestashop-export/      (nur Could)
+│  │  ├─ assets/fonts/          Inter 4.1 TTF für das PDF
+│  │  └─ test/                  Hilfen für Integrationstests
+│  └─ web/                      web-ui (React, Vite)
+│     └─ src/
+│        ├─ main.tsx
+│        ├─ app/                Router, Rahmen, Navigation, Query-Client
+│        ├─ api/                API-Client und Hooks je Server-Komponente
+│        ├─ components/ui/      shadcn/ui-Bausteine (im Repository, angepasst)
+│        ├─ components/patterns/ Muster P-01 bis P-08
+│        ├─ components/forms/   Formularbausteine
+│        ├─ features/<bereich>/ Screens und ihre Teile
+│        ├─ styles/             Tokens aus DESIGN.md, Tailwind
+│        └─ assets/fonts/       Inter 4.1 woff2
+├─ packages/
+│  ├─ domain/                   gemeinsame Typen, Zod-Schemas, Fehlercodes, Meldungen, content-engine (ohne Ein-/Ausgabe)
+│  ├─ runtime-shared/           Pfade, Exit-Codes, Referenznummer, Protokolldateien, Zustandsdateien
+│  ├─ seed-data/                Startbelegung (REQ-006)
+│  └─ test-data/                synthetische Daten für Demo, Tests, Last
+├─ tools/
+│  ├─ demo/                     npm run demo
+│  ├─ launcher/                 resellr-launcher
+│  ├─ launcher-pages/           LP-01 bis LP-03
+│  ├─ packaging/                Installer, Node-Laufzeit, PE-Umstellung, Bündelung, Lizenzhinweise
+│  ├─ qa/                       Prüfwerkzeuge der CI (AC-Abdeckung)
+│  └─ loadtest/                 Last- und Antwortzeittests
+├─ e2e/                         Playwright-Tests
+├─ .github/workflows/           ci.yml, windows.yml, release.yml
+└─ docs/                        Requirements, Baseline, Design, diese Specification, Betriebshandbuch
+```
+
+**Schichten im Server** (je Komponente): `<komponente>.routes.ts` (HTTP-Abbildung, Zod-Schemas der Anfrage, ruft genau einen Dienst) → `*-service.ts` (Anwendungsfall, Fachregeln, Transaktion, Ereignisse, Protokoll) → `*-repository.ts` (Kysely-Abfragen einer Tabellengruppe). Andere Komponenten lesen nur über die `*-reader.ts` der Komponente und melden Änderungen über Ereignisse (Baseline 2.4). Jede Komponente exportiert über `index.ts` nur ihren Reader, ihre Routen-Registrierung, ihre Ereignistypen und ihre Prüfereignis-Handler. **Ausnahmen (abschließend; FIND-202, FIND-203, FIND-227):** (1) `media` exportiert zusätzlich die Dateidienste CU-090 (Datei prüfen und ablegen), CU-208 (Foto-Übergabe), CU-209 (Foto-ZIP) und CU-307 (Aufräumen verwaister Dateien: `markUnreferenced(referencedHashes)`, `deleteOrphan(hash, isReferenced)`, `deleteUnknownFiles(limit)`); sie arbeiten nur auf Dateien und auf `media_file` und schreiben keine fremde Tabelle. (2) Betriebsaufgaben, die nur `ops` aufruft: `listing-content` exportiert `rebuildAll(uow)` aus CU-164 (alle Kanal-Inhalte neu bilden und fehlende anlegen; Aufrufer nur CU-173), `audit` exportiert die Löschfrist CU-234 (Aufrufer nur der Planer CU-250). Auch sie schreiben nur Tabellen ihrer eigenen Komponente. `ops` schreibt selbst keine Tabelle einer Fachkomponente; es entscheidet und ruft diese Funktionen auf. `shared/` und `db/` dürfen alle nutzen. Jeder API-Pfad gehört genau einer Routen-Einheit (Spalte „Verantwortung“ der Routen-Einheiten in Kap. 4.4). `eslint-plugin-boundaries` erzwingt das; `packages/domain/src/content-engine` darf nichts importieren außer `packages/domain`.
+
+### 4.2 Namenskonventionen
+
+| Gegenstand | Konvention | Beispiel |
+| --- | --- | --- |
+| Dateien (TypeScript) | kebab-case, Rolle als Suffix | `assignment-service.ts`, `device-repository.ts`, `listing-content.routes.ts` |
+| React-Komponenten | PascalCase, Datei = Komponente | `ChannelContentPage.tsx` |
+| Dienste | Fabrikfunktion `create<Name>Service(deps)`, Rückgabe Objekt mit Methoden je Anwendungsfall | `createAssignmentService({ db, uow, clock })` |
+| Repositories | `create<Name>Repository(db)` | `createDeviceRepository(db)` |
+| Zod-Schemas | `<name>Schema`, Typ `type <Name> = z.infer<…>` | `deviceCreateSchema`, `DeviceCreate` |
+| API-Hooks (Web) | `use<Ressource>Query`, `use<Aktion>Mutation` in `api/<komponente>.api.ts` | `useAssignDeviceMutation` |
+| Query-Schlüssel | `['<komponente>', '<ressource>', id?]` aus `api/query-keys.ts` | `['inventory', 'listing', 9]` |
+| Routen der Oberfläche | deutsch, kebab-case | `/inserate/:listingId/kanaele/:channelCode/kopieren` |
+| API-Pfade | englisch, Plural, kebab-case | `/api/channel-contents/{id}/release` |
+| Fehlercodes | `snake_case`, englisch | `wi_nr_taken` |
+| Ereignisse | PascalCase, Vergangenheit | `ContentInputsChanged` |
+| Tests | Unit/Integration neben der Datei: `*.test.ts`, `*.int.test.ts`; E2E `e2e/<flow>.spec.ts` | `compare-variants.test.ts`, `e2e/flow-02-einbuchen.spec.ts` |
+| Migrationen | `YYYYMMDD_NNNN_<slug>.ts` | `20261110_0001_initial_schema.ts` |
+
+**Routen der Oberfläche:** `/inserate` (UI-002), `/inserate/:listingId` (UI-014), `/inserate/:listingId/fotos` (UI-015), `/inserate/:listingId/kanaele/:channelCode` (UI-016), `/inserate/:listingId/vergleich` (UI-017), `/inserate/:listingId/kanaele/:channelCode/aenderungen` (UI-018), `/inserate/:listingId/kanaele/:channelCode/kopieren` (UI-019, `?ansicht=schmal`), `/geraete` (UI-009, `?reiter=nicht-zugeordnet`), `/geraete/neu` (UI-003), `/geraete/:deviceId` (UI-010), `/geraete/:deviceId/datenblatt` (UI-023), `/modelle` (UI-006), `/modelle/neu` und `/modelle/:modelTemplateId` (UI-007), `/protokoll` (UI-024), `/modelle/excel-uebernahme` (UI-042, nur mit REQ-056, CU-282; FIND-227), `/einstellungen/:bereich` (UI-025 bis UI-039; `bereich` ∈ `haendlermarke, geraetearten, auswahllisten, titelmuster, textbausteine, hersteller, lieferanten, code-uebersetzung, zustandszuordnung, kategoriezuordnung, merkmalszuordnung, beschreibungsvorlagen, kanaele, datenblatt-layout`), `/beendet` (UI-046). `/` leitet nach `/inserate`. Dialoge sind Komponenten, keine Routen.
+
+### 4.3 Bibliotheken und Versionen
+
+Exakte Versionen legt das Lockfile im Walking Skeleton fest (neueste stabile Minor-Version der genannten Hauptversion am Tag des Aufsetzens). Die Lizenzen der Tabelle erlauben die Auslieferung (Baseline Kap. 3, „Kosten“). Geprüft wird das nicht nur hier, sondern bei jedem Release über alle ausgelieferten Pakete einschließlich transitiver Abhängigkeiten; das Paket enthält `THIRD-PARTY-NOTICES.txt` (CU-298, Kap. 2.19, FIND-222). libvips (LGPL-3.0) wird als unveränderte dynamische Bibliothek ausgeliefert; ihr Lizenztext liegt bei.
+
+| Zweck | Bibliothek | Hauptversion | Lizenz |
+| --- | --- | --- | --- |
+| Laufzeit | Node.js | 26 LTS (Active LTS seit Oktober 2026); Rückfall 24 LTS, falls für 26 keine vorkompilierten Pakete von `better-sqlite3` und `sharp` für Windows x64 vorliegen (S1 prüft das) | MIT |
+| Sprache | TypeScript | 5.x | Apache-2.0 |
+| HTTP | Fastify, `@fastify/multipart`, `@fastify/static`, `fastify-type-provider-zod` | 5.x | MIT |
+| Validierung | Zod | 4.x | MIT |
+| Datenbank | `better-sqlite3`, Kysely (nur Abfragen, nicht der `Migrator`, Kap. 2.19) | 12.x, 0.28.x | MIT |
+| Bilder | `sharp` (libvips) | 0.34.x | Apache-2.0 (libvips LGPL-3.0) |
+| PDF | `pdfmake` | 0.2.x | MIT |
+| ZIP | `yazl` | 3.x | MIT |
+| Oberfläche | React, React DOM, React Router, TanStack Query, React Hook Form, `@hookform/resolvers` | 19.x, 7.x, 5.x, 7.x | MIT |
+| Gestaltung | Tailwind CSS, shadcn/ui (Radix-Primitives), `lucide-react` | 4.x | MIT, ISC |
+| Textdifferenz | `diff` (jsdiff) | 8.x | BSD-3-Clause |
+| Build | Vite, esbuild | 7.x, 0.25.x | MIT |
+| Tests | Vitest, Playwright (Kanal `chrome`) | 3.x, 1.x | MIT, Apache-2.0 |
+| Schrift | Inter | 4.1 (fest, Zeichenbreiten für UI-044) | OFL-1.1 |
+| Installer | Inno Setup | 6.x (Build-Werkzeug, nicht ausgeliefert) | Inno-Setup-Lizenz (frei) |
+| Could | `exceljs` | 4.x | MIT |
+
+### 4.4 Karte der Code-Einheiten
+
+Je Bauschritt (Kap. 1.3) eine Tabelle. Alle Einheiten sind neu (das Repository enthält keinen Code). Eine Einheit, die in einem späteren Schritt erweitert wird, steht nur einmal, mit dem Hinweis „erweitert in Sx“. **Migration nötig** steht im Kopf jedes Schritts. Die Nummern sind feste Kennungen: In v0.2 ergänzte Einheiten (CU-285 bis CU-305) und in v0.3 ergänzte (CU-306, CU-307) stehen in dem Schritt, zu dem sie gehören; CU-090, CU-156, CU-162 und CU-211 haben in v0.2 Ort oder Verantwortung gewechselt, in v0.3 CU-088, CU-130, CU-167, CU-224 und CU-251 (Code-Struktur-Nachträge in Kap. 10.2).
+
+#### 4.4.0 Abhängigkeiten der Bauschritte (FIND-201)
+
+Kein Schritt braucht eine Einheit eines späteren Schritts. Wo ein Schritt Daten eines späteren Schritts berührt, läuft das über Ereignisse ohne Handler (Kap. 2.0.4): Der Bericht ist leer bzw. die Prüfung bestanden, und das ist richtig, weil die Daten noch nicht existieren. Die Abnahme eines Schritts prüft nur, was in der Spalte „bis dahin gilt“ nicht ausgenommen ist.
+
+| Schritt | hängt ab von | bis zu einem späteren Schritt gilt |
+| --- | --- | --- |
+| S1 | – | – |
+| S2 | S1 | Kanäle stammen aus der Startbelegung (CU-160, CU-161 schon in S2); `impact` der Einstellungsantworten ist leer, UI-043 erscheint nicht (bis S5, CU-164); `VariantSetChanging` ohne Handler (bis S4, CU-290); Vorschau-Link in UI-039 deaktiviert, kein Aufruf von `GET /api/datasheets/preview-device` (bis S8, CU-306, CU-224, UI-023; FIND-227) |
+| S3 | S1, S2 | `ModelTemplateDeviceTypeChanging` ohne Handler (bis S4), `ModelTemplateDeleting` ohne Handler (bis S9); UI-007 ohne Zeile „Verwendung“ (bis S4, CU-295) und ohne Hinweis zum Geltungsbereich (bis S5, CU-171) |
+| S4 | S1 bis S3 | `ListingCreated`, `ContentInputsChanged`, `StockChanged` ohne Handler: keine Kanal-Inhalte, `adjustStockChannels` leer (bis S5; beim ersten Start mit S5 legt CU-173 die fehlenden Kanal-Inhalte an); kein Regelpreis (bis S5, CU-127); UI-014 ohne Kanal-Karten (bis S5) und ohne Fotos (bis S7) |
+| S5 | S1 bis S4 | Fotos in `ContentInput` leer (bis S7, CU-287) |
+| S6 | S5 | – |
+| S7 | S5, S6 | – |
+| S8 | S2, S4 | – (aktiviert den Vorschau-Link in UI-039) |
+| S9 | S4 bis S6 | – |
+| S10 | S1, S2, S4, S5, S7; F-17 (CU-245, CU-254 bis CU-257) nur S1 | F-17 darf nach S1 vorgezogen werden (Baseline 12.2). Der Rest von S10 braucht Reader späterer Schritte: CU-247 für Schritt 3 der Startprüfung (Fotodateien, CU-287 aus S7) und den Invariantentest der Bestandsspalten (CU-128, CU-129 aus S4); CU-251 und CU-307 die Verweise aus CU-287 (S7), CU-291 (S5, erweitert in S7) und CU-086 (S2); CU-234 nur die Tabelle aus S1 (FIND-227) |
+| S11 | S4, S5 | – |
+
+Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegenseitige Abhängigkeit wählen, z. B. S3 neben dem vorgezogenen F-17 oder S8 neben S6.
+
+#### S1 Walking Skeleton – Migration nötig: **ja** (`0001_initial_schema`)
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-001 | Workspace-Wurzel | `package.json`, `tsconfig.base.json`, `.nvmrc` | Workspaces, gemeinsame TypeScript-Optionen (strict), Node-Version, Skripte `build`, `test`, `e2e`, `lint`, `typecheck`, `demo` | alle |
+| CU-002 | Lint-Regeln | `eslint.config.mjs` | Codeformat, Importgrenzen zwischen Komponenten (Kap. 4.1) | alle |
+| CU-003 | Linux-CI | `.github/workflows/ci.yml` | Lint, Typprüfung, Unit-, Integrations- und E2E-Tests unter Linux mit Google Chrome | alle |
+| CU-004 | Demo-Start | `tools/demo/run-demo.ts` | `npm run demo`: bauen, temporären Datenordner anlegen, Beispieldaten einspielen, Server auf `127.0.0.1:${PORT:-4310}` starten (Baseline 11.3); die Startbelegung kommt erst mit S2 über CU-071 (FIND-223) | O5 |
+| CU-005 | Laufzeitpfade | `packages/runtime-shared/src/paths.ts` | Pfade von Daten-, Protokoll-, Übergabe- und Update-Kopie-Ordner aus Umgebung bzw. `%LOCALAPPDATA%` | F-19 |
+| CU-006 | Exit-Codes | `packages/runtime-shared/src/exit-codes.ts` | Konstanten 0, 10, 11, 12 und ihre Bedeutung | F-18 |
+| CU-007 | Referenznummer | `packages/runtime-shared/src/reference-number.ts` | Referenznummer erzeugen und prüfen (Kap. 2.0.5, H-11) | REQ-073 |
+| CU-008 | Tagesprotokoll-Schreiber | `packages/runtime-shared/src/daily-jsonl-writer.ts` | JSON-Lines-Tagesdateien schreiben, älter als 30 Tage löschen | REQ-073 |
+| CU-009 | Zustandsdateien | `packages/runtime-shared/src/runtime-state-files.ts` | `state.json`, `start-result.json` und `launcher-state.js` lesen und **atomar** schreiben (temporäre Datei im selben Ordner, `fsync`, Umbenennen; FIND-217) | F-18, F-19 |
+| CU-010 | Fehlercodes | `packages/domain/src/errors/error-codes.ts` | Liste aller Fehlercodes mit HTTP-Status (Kap. 2.0.6), erweitert je Schritt | alle |
+| CU-011 | Fehlerantwort | `packages/domain/src/errors/error-response.ts` | Zod-Schema und Typ der Fehlerantwort (Kap. 2.0.5) | alle |
+| CU-012 | Meldungskatalog | `packages/domain/src/messages/messages.de.ts` | alle deutschen Meldungen und festen Texte (inkl. REQ-104, REQ-105), erweitert je Schritt; Wortlaut der Schlüssel M-01 bis M-22 und M-24 nach Tabelle „Meldungstexte“ (Kap. 8.2); **kein** Sammeltext für `validation_failed`, M-23 entfallen (K-07) | REQ-073, REQ-078 |
+| CU-013 | Dezimal-Eingabe | `packages/domain/src/format/parse-decimal.ts` | Komma oder Punkt in kanonische Dezimalzeichenkette, keine Datumserkennung | REQ-005 |
+| CU-014 | Ausgabeformate | `packages/domain/src/format/format-value.ts` | Geld, Zahl, Einheit, Ja/Nein, Datum de-DE (Kap. 2.8.2) | REQ-078 |
+| CU-015 | Schlüssel-Normalisierung | `packages/domain/src/text/normalize-key.ts` | `toKey` (NFC, Kleinschreibung, trim) und `toModelNameKey` (ohne Leerzeichen) | REQ-004, REQ-011 |
+| CU-016 | EAN-Prüfung | `packages/domain/src/validation/ean.ts` | GTIN-8/13 mit GS1-Prüfziffer | REQ-008, REQ-088 |
+| CU-017 | Grundschemas | `packages/domain/src/schemas/common.schema.ts` | ID, Version, Datum, Zeitpunkt, Cent, Listenantwort | alle |
+| CU-018 | Server-Einstieg | `apps/server/src/main.ts` | Pfade lesen, Startablauf aufrufen, Prozesssignale | F-19 |
+| CU-019 | App-Zusammenbau | `apps/server/src/app.ts` | Fastify-Instanz bauen, Plugins und Routen aller Komponenten registrieren (Hotspot) | alle |
+| CU-020 | Bindeadresse | `apps/server/src/http/listen-address.ts` | feste Adresse `127.0.0.1` (ADR-002) | REQ-001 |
+| CU-021 | `local-guard` | `apps/server/src/http/local-guard.ts` | Regeln G-1 bis G-6 | TH-02 |
+| CU-022 | Sicherheitskopfzeilen | `apps/server/src/http/security-headers.ts` | CSP und weitere Kopfzeilen (Kap. 2.0.2) | TH-03, TH-06 |
+| CU-023 | Fehlerabbildung | `apps/server/src/http/error-mapper.ts` | Fehlerklassen → Fehlerantwort; technische Fehler ins Fehlerprotokoll mit Referenznummer | REQ-073 |
+| CU-024 | Schreibsperre | `apps/server/src/http/write-gate.ts` | laufende Schreibanfragen zählen, im Zustand `stopping` ablehnen | REQ-105 |
+| CU-025 | Statische Oberfläche | `apps/server/src/http/static-web.ts` | `web-ui` und `/assets` ausliefern, History-Fallback | ADR-001 |
+| CU-026 | Zod-Anbindung | `apps/server/src/http/zod-validation.ts` | Zod-Schemas als Fastify-Validierung | Baseline 9.2 |
+| CU-027 | Datenbankzugang | `apps/server/src/db/database.ts` | SQLite öffnen, Pragmas, Kysely-Instanz | ADR-004 |
+| CU-028 | Schema-Typen | `apps/server/src/db/schema.ts` | Kysely-Typen aller 29 Fachtabellen (einschließlich `media_file.unreferenced_since`, ohne Vormerk-Tabelle) und der Verwaltungstabelle `app_migration` | Kap. 3 |
+| CU-029 | Migrationslauf | `apps/server/src/db/migrator.ts` | offene Migrationen in **einer** Transaktion über `better-sqlite3` (`foreign_keys = OFF`, `BEGIN IMMEDIATE` … `foreign_key_check`, `COMMIT`, `foreign_keys = ON`), Eintrag in `app_migration`; nicht der Kysely-`Migrator` (Kap. 2.19, FIND-211, FIND-228) | F-19 |
+| CU-030 | Initialmigration | `apps/server/src/db/migrations/20261110_0001_initial_schema.ts` | alle Tabellen und Indizes (Kap. 3.8) | Kap. 3 |
+| CU-285 | Betriebswerte-Repository | `apps/server/src/db/app-meta-repository.ts` | Abfragen auf `app_meta` (`data_folder_stamp`, `engine_version`, `app_version`) (FIND-202) | F-19 |
+| CU-031 | Unit of Work | `apps/server/src/db/unit-of-work.ts` | Transaktion je Aktion, Ereignisse sammeln und vor dem Commit an Handler geben | Baseline 9.3 |
+| CU-032 | Uhr | `apps/server/src/shared/clock.ts` | aktuelle Zeit und „heute“ in Europe/Berlin; Testuhr nur mit `--test-clock` | REQ-078, REQ-072 |
+| CU-033 | Fehlerklassen | `apps/server/src/shared/domain-error.ts` | `ValidationError`, `RuleViolation`, `ConflictError`, `NotFoundError`, `ConfirmationRequired`, `ShuttingDownError` | alle |
+| CU-034 | Ereignistypen | `apps/server/src/shared/events.ts` | Änderungsereignisse `ListingCreated`, `ContentInputsChanged`, `SettingsChanged`, `ChannelActivated`, `StockChanged` und Prüfereignisse `VariantSetChanging`, `ModelTemplateDeviceTypeChanging`, `ModelTemplateDeleting`, `ListingDeleting` (Kap. 2.8.3, Hotspot) | F-08 |
+| CU-035 | Protokollschreiber | `apps/server/src/audit/audit-writer.ts` | einzige Stelle, die Einträge in `audit_entry` **einfügt**; gelöscht wird nur durch die Löschfrist CU-234 (FIND-203) | REQ-072 |
+| CU-036 | Fehlerprotokoll | `apps/server/src/ops/error-log.ts` | Einträge ins Fehlerprotokoll ohne Feldwerte | REQ-073 |
+| CU-037 | Betriebsprotokoll | `apps/server/src/ops/operations-log.ts` | Betriebsereignisse des Servers | REQ-065, Baseline 10.7 |
+| CU-038 | Betriebszustand | `apps/server/src/ops/lifecycle-state.ts` | Zustand `starting`/`ready`/`stopping` | F-17 |
+| CU-039 | Konfigurationsdatei | `apps/server/src/ops/config-file.ts` | `config.json` lesen, mit Standardwerten anlegen, `handoverDir` nach Kap. 2.19 prüfen (FIND-212) | F-19 |
+| CU-040 | Startablauf | `apps/server/src/ops/startup.ts` | Reihenfolge des Starts (Kap. 2.19); in S1 ohne Startprüfung, erweitert in S5 und S10 | F-19 |
+| CU-041 | Ops-Routen | `apps/server/src/ops/ops.routes.ts` | `GET /api/ops/health`, `GET /api/ops/status`; erweitert in S10 um `POST /api/ops/shutdown` | F-17 |
+| CU-042 | Web-Einstieg | `apps/web/src/main.tsx` | React starten, Provider | – |
+| CU-043 | Router | `apps/web/src/app/router.tsx` | alle Routen (Kap. 4.2), Hotspot | alle |
+| CU-044 | Anwendungsrahmen | `apps/web/src/app/AppFrame.tsx` | Rahmen mit Navigationsspalte (Kopf fest, Bereich mit Einträgen und UI-044 scrollt bei wenig Höhe, Kap. 2.17), Inhaltsbereich | Design Kap. 3 |
+| CU-045 | Navigation | `apps/web/src/app/Navigation.tsx` | sechs Einträge der linken Spalte, 28 px | Design Kap. 3 |
+| CU-046 | Query-Client | `apps/web/src/app/query-client.ts` | TanStack-Query-Einstellungen (5 s, Fokus-Neuladen außer `copy-view`, keine Wiederholung) | Kap. 2.0.8 |
+| CU-047 | API-Client | `apps/web/src/api/api-client.ts` | `fetch`-Hülle, Zeitgrenzen, Einordnung der Antwort in Zustände (Kap. 2.0.7) | alle |
+| CU-048 | Query-Schlüssel | `apps/web/src/api/query-keys.ts` | alle Query-Schlüssel (Hotspot) | alle |
+| CU-049 | Sperre nach unbekanntem Ausgang | `apps/web/src/api/write-outcome-store.ts` | Zustand „gesperrt bis Neuladen“ der Seite (P-08) | K-6 |
+| CU-050 | Ops-API | `apps/web/src/api/ops.api.ts` | Hooks für Status, Health und Beenden | F-17 |
+| CU-051 | Seitenbanner | `apps/web/src/components/patterns/PageBanner.tsx` | Erfolgs- und Fehlerbanner mit Referenznummer | REQ-073 |
+| CU-052 | Konfliktbanner | `apps/web/src/components/patterns/ConflictBanner.tsx` | P-05 mit „Neu laden“ (nur Daten) | P-05 |
+| CU-053 | Banner nicht erreichbar | `apps/web/src/components/patterns/UnreachableBanner.tsx` | P-06 mit „Erneut versuchen“ | P-06 |
+| CU-054 | Banner wird beendet | `apps/web/src/components/patterns/ShuttingDownBanner.tsx` | P-07 | P-07 |
+| CU-055 | Banner Ausgang unbekannt | `apps/web/src/components/patterns/OutcomeUnknownBanner.tsx` | P-08 | P-08 |
+| CU-056 | Bestätigungsdialog | `apps/web/src/components/patterns/ConfirmDialog.tsx` | P-04 | P-04 |
+| CU-057 | Formularfeld | `apps/web/src/components/forms/FormField.tsx` | Label, Pflichtkennzeichen, Fehlertext, Fokus auf ersten Fehler | Design Kap. 5 |
+| CU-058 | UI-Bausteine | `apps/web/src/components/ui/*` | shadcn/ui-Bausteine (Button, Dialog, Input, Select, Checkbox, Table, Tabs, Toast, Tooltip, Badge, Sheet), an Tokens angepasst; `Dialog` mit Breiten- und Höhenregel, `Table` mit eigenem waagrechten Scrollbereich und fester erster Spalte, `Sheet` für Seitenpanels unterhalb von `full` (Kap. 2.0.10) | DESIGN.md |
+| CU-059 | Design-Tokens | `apps/web/src/styles/tokens.css`, `tailwind.css` | Farben, Typografie, Radien, Abstände aus `DESIGN.md` als CSS-Variablen und Tailwind-Theme; Bruchstelle `full` (1366 px, Kap. 2.0.10) | DESIGN.md |
+| CU-060 | Schriftdateien | `apps/web/src/assets/fonts/` | Inter 4.1 woff2 (Regular, Semibold), lokal gebündelt | REQ-079 |
+| CU-061 | Demo-Daten | `packages/test-data/src/demo-seed.ts` | synthetische Beispieldaten für `npm run demo`, erweitert in jedem Schritt (Hotspot) | O5 |
+| CU-062 | E2E-Grundlage | `playwright.config.ts`, `e2e/fixtures/app-fixture.ts`, `e2e/fixtures/reachability.ts` | Server je Test-Worker mit eigenem Datenordner starten; ein Playwright-Projekt je Zeile der Fenstergrößen-Matrix FM-1 bis FM-7; Erreichbarkeitsprüfung je Screen; Testdaten `copy-view-few-fields` (9 Felder) und `copy-view-many-fields` (18 Felder) für die Lage des Streifens in UI-019 schmal (Kap. 6.3, FIND-235) | Kap. 6 |
+| CU-284 | AC-Abdeckungsprüfung | `tools/qa/check-ac-coverage.mjs` | prüft in der CI, dass jede AC-REQ-ID der **abgeschlossenen** Schritte (CU-299) in mindestens einem Testtitel vorkommt (Kap. 6.2, FIND-223) | Kap. 6 |
+| CU-299 | AC-Schrittliste | `tools/qa/ac-steps.json` | Zuordnung jeder AC-REQ-ID zu ihrem Bauschritt und Liste der abgeschlossenen Schritte | Kap. 6 |
+
+#### S2 Grundeinstellungen – Migration nötig: **ja** (`0002_seed_initial_settings`, nur Daten)
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-063 | Schemas Gerätearten und Merkmale | `packages/domain/src/schemas/device-type.schema.ts`, `attribute.schema.ts` | Anfrage- und Antwortschemas, Feldregeln | F-01 |
+| CU-064 | Schemas Auswahllisten | `packages/domain/src/schemas/pick-list.schema.ts` | Liste, Wert, `batteryPresent` | F-01 |
+| CU-065 | Schemas Hersteller, Lieferant, Code | `packages/domain/src/schemas/manufacturer.schema.ts`, `supplier.schema.ts`, `condition-code.schema.ts` | Felder und GPSR-Regeln | F-02 |
+| CU-066 | Schemas Textbaustein, Händler, Layout | `packages/domain/src/schemas/text-block.schema.ts`, `merchant-profile.schema.ts`, `datasheet-layout.schema.ts` | Felder, Prüfstatus | F-02 |
+| CU-067 | Merkmalswerte-Schema | `packages/domain/src/schemas/attribute-values.schema.ts` | Zod-Schema zur Laufzeit aus Merkmalsdefinitionen (je Ebene, Pflicht, Typ, Bereich, Rollen) | REQ-005, REQ-014, REQ-076 |
+| CU-068 | Platzhalterkatalog | `packages/domain/src/placeholders/placeholder-catalog.ts` | Platzhalter und ihre Zulässigkeit je Verwendung (Requirements Kap. 9.7) | REQ-023, REQ-026, REQ-030, REQ-031 |
+| CU-069 | Platzhalter-Parser | `packages/domain/src/placeholders/parse-placeholders.ts` | `{…}` in Texten finden und gegen den Katalog prüfen | wie CU-068 |
+| CU-070 | Startbelegung | `packages/seed-data/src/initial-settings.ts` | Daten der Startbelegung (Kap. 2.1.1) | REQ-006 |
+| CU-119 | Vergleichsregel | `packages/domain/src/inventory/compare-variants.ts` | Abweichungen der Variantenangaben (Kap. 2.6); verglichen werden aktive **und** deaktivierte Variantenmerkmale (K-03); in S2, weil reine Funktion ohne Abhängigkeit (FIND-201) | REQ-005, REQ-014, REQ-018, REQ-019, REQ-088 |
+| CU-071 | Seed-Migration | `apps/server/src/db/migrations/20261110_0002_seed_initial_settings.ts` | Startbelegung einmalig einspielen | REQ-006 |
+| CU-072 | Gerätearten-Dienst | `apps/server/src/settings/device-type-service.ts` | Gerätearten und Merkmale anlegen, ändern, ordnen, deaktivieren | REQ-004, REQ-005 |
+| CU-073 | Gerätearten-Repository | `apps/server/src/settings/device-type-repository.ts` | Abfragen auf `device_type`, `attribute` | F-01 |
+| CU-074 | Merkmalsverwendung | `apps/server/src/settings/attribute-usage-query.ts` | `hasValues` je Merkmal über alle JSON-Spalten | REQ-005 |
+| CU-075 | Variantenmengen-Prüfung | `apps/server/src/settings/variant-flag-guard.ts` | erkennt, dass das Entfernen des Kennzeichens „variantenbildend“ die Menge der Variantenmerkmale einer Geräteart verkleinert, und meldet `VariantSetChanging`; Deaktivieren und Aktivieren eines Merkmals ändern die Menge nicht und lösen nichts aus (K-03); den Vergleich der Modell-Inserate macht CU-290 | REQ-005 |
+| CU-076 | Auswahllisten-Dienst | `apps/server/src/settings/pick-list-service.ts` | Werte anlegen, umbenennen, ordnen, deaktivieren | REQ-007 |
+| CU-077 | Auswahllisten-Repository | `apps/server/src/settings/pick-list-repository.ts` | Abfragen auf `pick_list`, `pick_list_value` | REQ-007 |
+| CU-078 | Hersteller-Dienst | `apps/server/src/settings/manufacturer-service.ts` | Hersteller anlegen (inkl. „vorhanden“), umbenennen, deaktivieren, GPSR | REQ-027, REQ-100, REQ-101 |
+| CU-079 | Hersteller-Repository | `apps/server/src/settings/manufacturer-repository.ts` | Abfragen auf `manufacturer` | F-02 |
+| CU-080 | Lieferanten-Dienst | `apps/server/src/settings/supplier-service.ts` | Lieferanten pflegen | REQ-099 |
+| CU-300 | Lieferanten-Repository | `apps/server/src/settings/supplier-repository.ts` | Abfragen auf `supplier` (FIND-223) | REQ-099 |
+| CU-081 | Code-Übersetzung-Dienst | `apps/server/src/settings/condition-code-service.ts` | Einträge pflegen, Code auflösen | REQ-015, REQ-022 |
+| CU-302 | Code-Übersetzung-Repository | `apps/server/src/settings/condition-code-repository.ts` | Abfragen auf `condition_code` (FIND-223) | REQ-022 |
+| CU-082 | Textbaustein-Dienst | `apps/server/src/settings/text-block-service.ts` | Bausteine pflegen, Prüfstatus, Geltungsbereich, Ereignis mit altem und neuem Bereich | REQ-026, REQ-054 |
+| CU-083 | Textbaustein-Repository | `apps/server/src/settings/text-block-repository.ts` | Abfragen auf `text_block` und Geltungstabellen | F-02 |
+| CU-084 | Händlerangaben-Dienst | `apps/server/src/settings/merchant-profile-service.ts` | Name, Kontakt und Logo; einzige Stelle, die `merchant_profile` schreibt; die Logodatei legt es über CU-090 ab (FIND-203) | REQ-028 |
+| CU-085 | Datenblatt-Layout-Dienst | `apps/server/src/settings/datasheet-layout-service.ts` | Layout lesen und speichern | REQ-051 |
+| CU-288 | Profil-Repository | `apps/server/src/settings/profile-repository.ts` | Abfragen auf die Einzeilentabellen `merchant_profile` und `datasheet_layout` (FIND-202) | REQ-028, REQ-051 |
+| CU-160 | Kanal-Repository | `apps/server/src/channels/channels-repository.ts` | Abfragen auf `channel` (Kanalliste für Geltungsbereiche und Preise); erweitert in S5 um alle Kanal-Einstellungstabellen (FIND-201) | F-03 |
+| CU-161 | Kanal-Reader | `apps/server/src/channels/channel-reader.ts` | Leseschnittstelle Kanal-Einstellungen: in S2 die Kanalliste, erweitert in S5 um Preisregeln, Muster, Vorlagen, Zuordnungen | F-02, F-07, F-08 |
+| CU-086 | Einstellungs-Reader | `apps/server/src/settings/settings-reader.ts` | Leseschnittstelle der Einstellungen für andere Komponenten (gebündelt je Lauf) | F-08, F-13 |
+| CU-087 | Einstellungs-Routen | `apps/server/src/settings/settings.routes.ts` | alle Pfade unter `/api/device-types`, `/api/attributes`, `/api/pick-lists`, `/api/pick-list-values`, `/api/manufacturers`, `/api/suppliers`, `/api/condition-codes`, `/api/text-blocks`, `/api/merchant-profile` (einschließlich `…/logo`), `/api/datasheet-layout` | F-01, F-02 |
+| CU-088 | Dateiablage | `apps/server/src/media/file-store.ts` | Dateien nach Hash ablegen, temporäre Dateien, atomares Verschieben, Pfade; **Sperre je Hash im Prozess** (`withHashLock(hash, fn)`), die Upload (CU-090) und Aufräumen (CU-307) vom Prüfen der Datei bis nach dem Commit bzw. dem Löschen halten (Kap. 2.11, 2.19; FIND-226) | ADR-004 |
+| CU-089 | Bildprüfung | `apps/server/src/media/image-inspector.ts` | Signatur und Abmessungen prüfen (TH-04) | REQ-028, REQ-042 |
+| CU-090 | Datei-Aufnahme | `apps/server/src/media/media-file-intake.ts` | hochgeladene Bilddatei prüfen (CU-089), unter der Sperre des Hashes ablegen (CU-088), `media_file` anlegen oder `unreferenced_since` zurücksetzen, Hash zurückgeben; Dateidienst für Logo (CU-084) und Fotos (CU-204) (FIND-203, FIND-226) | REQ-028, REQ-042 |
+| CU-286 | Datei-Repository | `apps/server/src/media/media-file-repository.ts` | Abfragen auf `media_file` einschließlich `unreferenced_since` (FIND-201, FIND-226) | ADR-004 |
+| CU-287 | Medien-Reader | `apps/server/src/media/media-reader.ts` | Leseschnittstelle von `media`: Logodatei; erweitert in S7 um Fotos eines Modell-Inserats und alle verwiesenen Hashes für das Aufräumen (FIND-202) | F-08, F-13, F-19 |
+| CU-091 | Medien-Routen | `apps/server/src/media/media.routes.ts` | `GET /media/*`; erweitert in S7 um `/api/listings/{id}/photos…` und `GET /downloads/{token}.zip` | REQ-028, REQ-042, REQ-048 |
+| CU-092 | Einstellungs-API (Web) | `apps/web/src/api/settings.api.ts` | Hooks für alle Einstellungen aus F-01 und F-02 | F-01, F-02 |
+| CU-093 | Einstellungsrahmen | `apps/web/src/features/settings/SettingsLayout.tsx` | UI-025: Bereichsliste, zuletzt genutzter Bereich in `localStorage` | UI-025 |
+| CU-094 | Pflegetabelle | `apps/web/src/components/patterns/MaintenanceTable.tsx` | Muster P-01 mit Reihenfolge per Ziehen und Tasten | P-01 |
+| CU-095 | Gerätearten-Screen | `apps/web/src/features/settings/device-types/DeviceTypesPage.tsx`, `AttributePanel.tsx` | UI-027 | REQ-004, REQ-005 |
+| CU-096 | Auswahllisten-Screen | `apps/web/src/features/settings/pick-lists/PickListsPage.tsx` | UI-028 | REQ-007 |
+| CU-097 | Händlermarke-Screen | `apps/web/src/features/settings/merchant/MerchantProfilePage.tsx` | UI-026 | REQ-028 |
+| CU-098 | Hersteller-Screen | `apps/web/src/features/settings/manufacturers/ManufacturersPage.tsx` | UI-031 | REQ-027, REQ-101 |
+| CU-099 | Lieferanten-Screen | `apps/web/src/features/settings/suppliers/SuppliersPage.tsx` | UI-032 | REQ-099 |
+| CU-100 | Code-Übersetzung-Screen | `apps/web/src/features/settings/condition-codes/ConditionCodesPage.tsx` | UI-033 | REQ-022 |
+| CU-101 | Textbausteine-Screen | `apps/web/src/features/settings/text-blocks/TextBlocksPage.tsx` | UI-030 | REQ-026, REQ-054 |
+| CU-102 | Datenblatt-Layout-Screen | `apps/web/src/features/settings/datasheet-layout/DatasheetLayoutPage.tsx` | UI-039; Vorschau-Link bis S8 deaktiviert, erweitert in S8 um den Link über CU-226 (FIND-227) | REQ-051 |
+| CU-103 | Auswirkungsdialog | `apps/web/src/features/settings/ImpactDialog.tsx` | UI-043 aus `impact` (wirksam ab S5, Kap. 4.4.0) | REQ-053 |
+
+#### S3 Modell-Bibliothek – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-104 | Schema Modellvorlage | `packages/domain/src/schemas/model-template.schema.ts` | Felder, Herstellernummer oder „unbekannt“, EAN | F-04 |
+| CU-105 | Modellvorlagen-Dienst | `apps/server/src/catalog/model-template-service.ts` | anlegen, ändern, Prüfereignis `ModelTemplateDeviceTypeChanging`, Ereignis; erweitert in S9 um Löschen mit `ModelTemplateDeleting` | REQ-008, REQ-010, REQ-095 |
+| CU-106 | Modellvorlagen-Repository | `apps/server/src/catalog/model-template-repository.ts` | Abfragen und Suche auf `model_template` | REQ-009 |
+| CU-107 | Dubletten-Prüfung | `apps/server/src/catalog/duplicate-check.ts` | mögliche Dublette (REQ-011) und gleiche Herstellernummer (REQ-058, Could) | REQ-011, REQ-058 |
+| CU-108 | Katalog-Reader | `apps/server/src/catalog/catalog-reader.ts` | Leseschnittstelle für Modellvorlagen und Vorbelegung | F-05, F-08, F-13 |
+| CU-109 | Katalog-Routen | `apps/server/src/catalog/catalog.routes.ts` | `GET/POST /api/model-templates`, `GET/PATCH /api/model-templates/{id}`; erweitert in S9 um `DELETE /api/model-templates/{id}`. Die Unterpfade `…/{id}/listings`, `…/{id}/device-prefill`, `…/{id}/usage` gehören CU-130 | F-04 |
+| CU-110 | Katalog-API (Web) | `apps/web/src/api/catalog.api.ts` | Hooks Modellvorlagen | F-04 |
+| CU-111 | Merkmalsformular | `apps/web/src/components/forms/AttributeFieldsForm.tsx` | Felder einer Geräteart zur Laufzeit aus Definitionen, Reihenfolge, Prüfmarkierung | LP-4, REQ-076 |
+| CU-112 | Merkmalseingabe | `apps/web/src/components/forms/AttributeInput.tsx` | Eingabe je Datentyp inkl. Anschlüsse und Akkukapazität | REQ-005, REQ-014 |
+| CU-113 | Modell-Bibliothek-Screen | `apps/web/src/features/models/ModelLibraryPage.tsx` | UI-006 | REQ-009 |
+| CU-114 | Modellvorlage-Screen | `apps/web/src/features/models/ModelTemplatePage.tsx`, `DuplicateDialog.tsx` | UI-007 mit Dubletten-Dialog; erweitert in S4 um „Verwendung“ (CU-295) und in S5 um den Hinweis zum Geltungsbereich | REQ-008, REQ-010, REQ-011 |
+| CU-115 | Hersteller-Dialog | `apps/web/src/features/models/ManufacturerCreateDialog.tsx` | UI-008 | REQ-100 |
+
+#### S4 Bestand – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-116 | Schemas Gerät und Modell-Inserat | `packages/domain/src/schemas/device.schema.ts`, `listing.schema.ts` | Anfragen und Antworten | F-05 bis F-07 |
+| CU-117 | Vorbelegung | `packages/domain/src/inventory/device-prefill.ts` | Vorbelegung und Prüfschlüssel aus Modellvorlage und Code | REQ-013, REQ-015 |
+| CU-118 | Prüfmarkierungen | `packages/domain/src/inventory/review-flags.ts` | verbleibende Markierungen aus Bestätigungen und Änderungen | REQ-013 |
+| CU-120 | Bestandsangaben | `packages/domain/src/content-engine/stock.ts` | Stückzahl, WI-Nrn, Akkukapazität nach A-16, `stockHash` | REQ-091 |
+| CU-156 | Preisregel-Graph | `packages/domain/src/pricing/price-rule-graph.ts` | Kreisprüfung und topologische Reihenfolge der Preisregeln, einzige Umsetzung (FIND-201, FIND-203) | REQ-085, REQ-033 |
+| CU-121 | Geräte-Dienst | `apps/server/src/inventory/device-service.ts` | Gerät anlegen, Werte ändern, Prüfmarkierungen; entscheidet die Folge in Kontext B und übergibt `new_listing` und `rebook` an CU-123 (FIND-203) | REQ-012 bis REQ-014 |
+| CU-122 | Geräte-Repository | `apps/server/src/inventory/device-repository.ts` | Abfragen auf `device`, Suche, nicht zugeordnete | REQ-016, REQ-094 |
+| CU-123 | Zuordnungs-Dienst | `apps/server/src/inventory/assignment-service.ts` | einzige Stelle für zuordnen, Modell-Inserat aus Gerät anlegen und umbuchen | REQ-017 bis REQ-020 |
+| CU-124 | Modell-Inserat-Dienst | `apps/server/src/inventory/listing-service.ts` | Inseratswerte ändern mit Abweichungsbestätigung | REQ-088 |
+| CU-125 | Modell-Inserat-Repository | `apps/server/src/inventory/listing-repository.ts` | Abfragen auf `listing`, `listing_delivery_scope`, `listing_price` (FIND-202) | F-07 |
+| CU-126 | Preis-Dienst | `apps/server/src/inventory/price-service.ts` | Preis je Kanal speichern; ruft ab S5 CU-127 | REQ-032 |
+| CU-128 | Bestandsfortschreibung | `apps/server/src/inventory/listing-stock-updater.ts` | `quantity`, `stock_json`, `stock_hash` des Modell-Inserats neu bilden und `StockChanged` melden | REQ-091 |
+| CU-129 | Bestands-Reader | `apps/server/src/inventory/inventory-reader.ts` | Leseschnittstelle für Modell-Inserate, Geräte, Preise | F-08, F-13, F-14 |
+| CU-290 | Bestands-Prüfungen | `apps/server/src/inventory/inventory-checks.ts` | Handler der Prüfereignisse `VariantSetChanging` (mit CU-119) und `ModelTemplateDeviceTypeChanging`; erweitert in S9 um `ModelTemplateDeleting` (FIND-201) | REQ-005, REQ-010, REQ-095 |
+| CU-292 | Modell-Inserat-Detail | `apps/server/src/inventory/listing-detail-query.ts` | `GET /api/listings/{id}` zusammenstellen; erweitert in S9 um `deleteBlockedReason` (nur Gründe aus `inventory`, Kap. 2.15) (FIND-202) | REQ-088, REQ-095 |
+| CU-293 | Vorbelegungsabfrage | `apps/server/src/inventory/device-prefill-query.ts` | `GET /api/model-templates/{id}/device-prefill` über `catalog-reader`, `settings-reader` und CU-117 | REQ-013, REQ-015 |
+| CU-294 | Inserat-Auswahl | `apps/server/src/inventory/listing-choice-query.ts` | `GET /api/model-templates/{id}/listings` mit Abweichungen zum Gerät | REQ-017, REQ-019 |
+| CU-295 | Verwendung Modellvorlage | `apps/server/src/inventory/model-template-usage-query.ts` | `GET /api/model-templates/{id}/usage` (`deviceCount`, `listingCount`, `deleteBlockedReason`) | REQ-010, REQ-095 |
+| CU-130 | Bestands-Routen | `apps/server/src/inventory/inventory.routes.ts` | alle Pfade unter `/api/devices` außer `GET /api/devices/{id}/datasheet` (gehört CU-224, FIND-227); `POST /api/listings`, `GET/PATCH /api/listings/{id}`, `…/{id}/prices`; `/api/model-templates/{id}/listings`, `…/device-prefill`, `…/usage`; erweitert in S9 um Verkauf, Korrekturen und `DELETE /api/listings/{id}`. `GET /api/listings` (Übersicht) und `/api/listings/{id}/channel-contents` gehören CU-172, `/api/listings/{id}/photos…` CU-091 | F-05 bis F-07 |
+| CU-131 | Bestands-API (Web) | `apps/web/src/api/inventory.api.ts` | Hooks Geräte, Modell-Inserate, Preise | F-05 bis F-07 |
+| CU-132 | Einbuchen-Screen | `apps/web/src/features/devices/DeviceIntakePage.tsx` | UI-003 | REQ-012 bis REQ-015, REQ-062 |
+| CU-133 | Einbuch-Entwurf | `apps/web/src/features/devices/device-intake-draft.ts` | Formularstand UI-003 im `sessionStorage` | Baseline 6.4 |
+| CU-134 | Zuordnen-Dialog | `apps/web/src/features/devices/AssignDialog.tsx` | UI-004, auch Modus „umbuchen“ | REQ-017, REQ-019, REQ-020 |
+| CU-135 | Abweichungen-Dialog | `apps/web/src/features/devices/DeviationDialog.tsx` | UI-005 Kontext A und B, einschließlich Schritt 2 beim Umbuchen `UI-005.ziel-abweichung` und `.ziel-abweichung.speichert` (K-04, Kap. 2.6) | REQ-018, REQ-014, REQ-020 |
+| CU-136 | Geräte-Screen | `apps/web/src/features/devices/DevicesPage.tsx` | UI-009 | REQ-016, REQ-094 |
+| CU-137 | Gerät-Screen | `apps/web/src/features/devices/DevicePage.tsx` | UI-010; erweitert in S8 und S9 um Aktionen | REQ-014 |
+| CU-138 | Modell-Inserat-Screen | `apps/web/src/features/listings/ListingPage.tsx` | UI-014 (Kopf, Inseratswerte, Geräte); erweitert in S5 um Kanal-Karten und in S7 um Fotos | REQ-088 |
+| CU-139 | Inseratswerte-Formular | `apps/web/src/features/listings/ListingValuesForm.tsx` | `UI-014.edit` | REQ-088 |
+| CU-140 | Abweichende-Geräte-Dialog | `apps/web/src/features/listings/DeviatingDevicesDialog.tsx` | `UI-014.abweichung-bestaetigen` | REQ-088 |
+| CU-141 | Preisfelder | `apps/web/src/features/listings/PriceFields.tsx` | Preis und VB je Kanal; erweitert in S5 um „Vorschlag nach Preisregel“ | REQ-032, REQ-033 |
+
+#### S5 Kanal-Engine – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-142 | Schemas Kanal-Einstellungen | `packages/domain/src/schemas/channel.schema.ts`, `title-pattern.schema.ts`, `description-template.schema.ts`, `condition-mapping.schema.ts`, `category-mapping.schema.ts`, `attribute-mapping.schema.ts` | Anfragen, Antworten, JSON-Aufbau (Kap. 3.4) | F-03 |
+| CU-143 | Engine-Einstieg | `packages/domain/src/content-engine/index.ts` | `buildContentState`, `ENGINE_VERSION` | F-08 |
+| CU-144 | Stand-Schema | `packages/domain/src/content-engine/content-state.ts` | Aufbau `ContentState` | F-08 |
+| CU-145 | Titelbildung | `packages/domain/src/content-engine/build-title.ts` | Titel nach Muster und Kürzung; nie im Wort, auch wenn schon das erste Wort länger als die Höchstlänge ist (dann `truncation: word`, K-02) | REQ-030, REQ-034, REQ-035 |
+| CU-146 | Beschreibungsbildung | `packages/domain/src/content-engine/build-description.ts` | Abschnitte, Zeilen, Entfall-Regeln, Textbausteine | REQ-031, REQ-036 |
+| CU-147 | Merkmalsfelder | `packages/domain/src/content-engine/build-attribute-fields.ts` | Felder nach Quellen Q-01 bis Q-08 mit Wertzuordnung | REQ-025, REQ-037 |
+| CU-148 | Zustand und Kategorie | `packages/domain/src/content-engine/resolve-condition-and-category.ts` | Zustandsbezeichnung, Zusatzangabe, Kategorie | REQ-023, REQ-024, REQ-038, REQ-039, REQ-086 |
+| CU-149 | GPSR-Angaben | `packages/domain/src/content-engine/build-gpsr.ts` | GPSR, Vollständigkeit, Produktidentifikation | REQ-027, REQ-041 |
+| CU-150 | Platzhalter-Auflösung | `packages/domain/src/content-engine/resolve-placeholders.ts` | Platzhalterwerte inkl. `{Merkmalsliste}`, `{Lieferumfang}`, `{Baustein:Name}` | REQ-036, REQ-040 |
+| CU-151 | Bestands-Auflösung | `packages/domain/src/content-engine/resolve-stock.ts` | Bestandsplatzhalter bei der Ausgabe ersetzen, Entfall-Regeln anwenden | REQ-091 |
+| CU-152 | Inhalts-Hash | `packages/domain/src/content-engine/content-hash.ts` | kanonische Form und SHA-256 | REQ-045 |
+| CU-153 | Freigabebedingungen | `packages/domain/src/content-engine/release-conditions.ts` | Bedingungen am aufgelösten Stand prüfen | REQ-044 |
+| CU-154 | Golden Files | `packages/domain/src/content-engine/__golden__/`, `golden.test.ts` | Referenz-Kanal-Inhalte je Kanal (AR-04) | Kap. 6 |
+| CU-155 | Kanal-Dienst | `apps/server/src/channels/channel-service.ts` | Kanal-Einstellungen, Aktivierung, Preisregel (Kreisprüfung über CU-156) | REQ-029, REQ-085 |
+| CU-127 | Preisregel-Anwendung | `apps/server/src/inventory/price-rule-applier.ts` | Regelpreise ableiten (Kap. 2.7); Regeln über CU-161, Reihenfolge über CU-156 | REQ-033 |
+| CU-157 | Titelmuster-Dienst | `apps/server/src/channels/title-pattern-service.ts` | Titelmuster speichern und löschen | REQ-030 |
+| CU-158 | Beschreibungsvorlagen-Dienst | `apps/server/src/channels/description-template-service.ts` | Vorlage speichern | REQ-031 |
+| CU-159 | Kanal-Zuordnungen-Dienst | `apps/server/src/channels/mapping-service.ts` | Zustands-, Kategorie-, Merkmalszuordnung speichern | REQ-023 bis REQ-025 |
+| CU-162 | Vorschau-Dienst | `apps/server/src/listing-content/preview-service.ts` | Titel- und Beschreibungsvorschau aus ungespeicherten Werten; `ContentInput` über CU-166 (FIND-203) | Ä-32 |
+| CU-163 | Kanal-Routen | `apps/server/src/channels/channels.routes.ts` | alle Pfade unter `/api/channels` (einschließlich `…/price-rule`, `…/description-template`, `…/condition-mappings`, `…/attribute-mappings/…`), `/api/title-patterns`, `/api/category-mappings` | F-03 |
+| CU-164 | Neuberechnung | `apps/server/src/listing-content/recompute-service.ts` | Neubildung, Hash-Vergleich, Zählung nach REQ-053; exportiert `rebuildAll(uow)` für CU-173 (Ausnahme Kap. 4.1, FIND-227) | F-08 |
+| CU-165 | Geltungsbereich | `apps/server/src/listing-content/scope-resolver.ts` | betroffene Kanal-Inhalte je Ereignis | F-08 |
+| CU-166 | Eingaben-Lader | `apps/server/src/listing-content/content-input-loader.ts` | einzige Stelle, die `ContentInput` zusammenstellt, gebündelt über die Reader (Fotos über CU-287 ab S7) | F-08 |
+| CU-167 | Status- und Kennzeichnungsregeln | `apps/server/src/listing-content/content-state-rules.ts` | Regeln Kap. 2.8.3: Statusfolge einer Neubildung; Setzen und Entfernen der **gespeicherten** Kennzeichnungen nur bei den dort genannten Ereignissen (nie Neuberechnung aus den Hashes; „geändert seit Freigabe“ endet nur durch Freigabe, K-01); Ableitung der übrigen Kennzeichnungen aus dem aktuellen Stand (FIND-226) | REQ-045, Kap. 6.0 |
+| CU-168 | Kanal-Inhalt-Repository | `apps/server/src/listing-content/channel-content-repository.ts` | Abfragen auf `channel_content` | F-08 bis F-12 |
+| CU-169 | Ereignis-Handler | `apps/server/src/listing-content/event-handlers.ts` | Änderungsereignisse an Neuberechnung und Bestandskennzeichnung verteilen; erweitert in S9 um den Prüfereignis-Handler `ListingDeleting` (Hotspot) | F-08 |
+| CU-170 | Bestandskennzeichnung | `apps/server/src/listing-content/stock-flag-updater.ts` | „Bestand auf Kanal anpassen“ nach `StockChanged` | REQ-052, REQ-091 |
+| CU-171 | Anzahl im Geltungsbereich | `apps/server/src/listing-content/scope-count-query.ts` | `POST /api/scope-counts`: bildet das Ereignis, das das Speichern auslösen würde, und zählt das Ergebnis von CU-165 (FIND-203) | Ä-32, T-9 |
+| CU-172 | Kanal-Inhalt-Routen | `apps/server/src/listing-content/listing-content.routes.ts` | alle Pfade unter `/api/channel-contents` (einschließlich `…/copy-view`, `…/photo-handover`, `…/photo-zip`), `/api/listings/{id}/channel-contents`, `/api/scope-counts`, `/api/previews/*`; erweitert in S6 (`/api/listings/{id}/channel-comparison`), S7, S9 (`GET /api/listings`) | F-08 bis F-14 |
+| CU-291 | Kanal-Inhalt-Reader | `apps/server/src/listing-content/listing-content-reader.ts` | Leseschnittstelle von `listing-content`: Fotos des freigegebenen Stands (S7), verwiesene Foto-Hashes aus aktuellem und freigegebenem Stand für das Aufräumen (FIND-202) | F-12, F-19 |
+| CU-173 | Engine-Versionsprüfung | `apps/server/src/ops/engine-version-check.ts` | beim Start bei geänderter oder fehlender `ENGINE_VERSION` `rebuildAll(uow)` von CU-164 aufrufen (alles neu bilden, fehlende Kanal-Inhalte anlegen), Wert über CU-285 speichern; schreibt selbst nicht in `channel_content` (FIND-227) | AR-04 |
+| CU-174 | Lastdaten | `packages/test-data/src/load-data-generator.ts` | synthetischer Bestand nach A-12 | REQ-064 |
+| CU-175 | Lasttest Neuberechnung | `tools/loadtest/recompute-load-test.ts` | Zeit der Neuberechnung im ungünstigsten Fall | AR-03 |
+| CU-176 | Kanal-API (Web) | `apps/web/src/api/channels.api.ts` | Hooks Kanal-Einstellungen, Vorschau, Anzahl | F-03 |
+| CU-177 | Zuordnungstabelle | `apps/web/src/components/patterns/MappingTable.tsx` | Muster P-02 | P-02 |
+| CU-178 | Vorlagen-Editor | `apps/web/src/components/patterns/TemplateEditor.tsx` | Muster P-03 mit Platzhalterauswahl und Vorschau | P-03 |
+| CU-179 | Hinweis Geltungsbereich | `apps/web/src/features/settings/ScopeCountHint.tsx` | „gilt für n Kanal-Inhalte im Geltungsbereich“ | Ä-32 |
+| CU-180 | Kanal-Screens | `apps/web/src/features/settings/channels/ChannelsPage.tsx` | UI-038 | REQ-029, REQ-085 |
+| CU-181 | Titelmuster-Screen | `apps/web/src/features/settings/title-patterns/TitlePatternPage.tsx` | UI-029 | REQ-030 |
+| CU-182 | Beschreibungsvorlagen-Screen | `apps/web/src/features/settings/description-templates/DescriptionTemplatePage.tsx` | UI-037 | REQ-031 |
+| CU-183 | Zustandszuordnung-Screen | `apps/web/src/features/settings/condition-mapping/ConditionMappingPage.tsx` | UI-034 | REQ-023 |
+| CU-184 | Kategoriezuordnung-Screen | `apps/web/src/features/settings/category-mapping/CategoryMappingPage.tsx` | UI-035 | REQ-024 |
+| CU-185 | Merkmalszuordnung-Screen | `apps/web/src/features/settings/attribute-mapping/AttributeMappingPage.tsx` | UI-036 | REQ-025 |
+| CU-186 | Status- und Kennzeichnungs-Chips | `apps/web/src/components/patterns/FlagChips.tsx` | Status und Kennzeichnungen als Text-Chips in fester Reihenfolge | Design Kap. 5 |
+| CU-187 | Kanal-Karte | `apps/web/src/features/listings/ChannelCard.tsx` | Kanal-Karte in UI-014 | REQ-046, REQ-052 |
+| CU-188 | Kanal-Inhalt-API (Web) | `apps/web/src/api/listing-content.api.ts` | Hooks Kanal-Inhalte, Freigabe, Status, Abgleich, Übersicht; erweitert in S6, S7, S9 | F-09 bis F-14 |
+
+#### S6 Freigabe-Workflow – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-189 | Kanal-Inhalt-Ansicht | `apps/server/src/listing-content/channel-content-view.ts` | Anzeigeform eines Kanal-Inhalts (aufgelöst, Kennzeichnungen, Bedingungen, Bestandsänderungen) | F-09, F-10 |
+| CU-190 | Anpassungs-Dienst | `apps/server/src/listing-content/manual-adaptation-service.ts` | manuellen Titel, Beschreibung, Kategorie speichern und verwerfen, `outcome` | REQ-043, REQ-086 |
+| CU-191 | Freigabe-Dienst | `apps/server/src/listing-content/release-service.ts` | Freigabe und Freigabe des Änderungsentwurfs (Kap. 2.9) | REQ-044, REQ-087, REQ-089 |
+| CU-192 | Vergleichs-Dienst | `apps/server/src/listing-content/comparison-service.ts` | freigegebenen und aktuellen Stand feldweise vergleichen | REQ-045 |
+| CU-193 | Status-Dienst | `apps/server/src/listing-content/status-service.ts` | Übergänge nach *Veröffentlicht*/*Beendet*, Abgleich | REQ-046, REQ-090 |
+| CU-301 | Kanäle-vergleichen-Abfrage | `apps/server/src/listing-content/channel-comparison-query.ts` | Zeilen von UI-017 und Regel „unterschiedlich“ (Kap. 2.9, FIND-207) | Requirements 10.6 |
+| CU-194 | Kanal-Inhalt-Screen | `apps/web/src/features/channel-content/ChannelContentPage.tsx` | UI-016 | REQ-034 bis REQ-044 |
+| CU-195 | Speicher ungesicherter Anpassungen | `apps/web/src/features/channel-content/unsaved-adaptation-store.ts` | ungespeicherte Eingaben je Modell-Inserat, Kanal und Fenster | K-3, T-1 |
+| CU-196 | Texteditor Anpassung | `apps/web/src/features/channel-content/ManualTextEditor.tsx` | Bearbeitungsmodus Titel/Beschreibung mit Zähler | REQ-043 |
+| CU-197 | Bedingungsliste | `apps/web/src/features/channel-content/ReleaseConditionsPanel.tsx` | Freigabebedingungen mit Status | REQ-044 |
+| CU-198 | Kanäle-vergleichen-Screen | `apps/web/src/features/channel-content/ChannelComparePage.tsx` | UI-017 | Requirements 10.6 |
+| CU-199 | Änderungsentwurf-Screen | `apps/web/src/features/channel-content/ChangeDraftPage.tsx` | UI-018 | REQ-045, REQ-089 |
+| CU-200 | Textdifferenz | `apps/web/src/features/channel-content/text-diff.ts` | Wort- und Zeilendifferenz mit `diff` | UI-018 |
+| CU-201 | Rechtstext-Dialog | `apps/web/src/features/channel-content/LegalTextDialog.tsx` | UI-022 | REQ-087 |
+| CU-202 | Status-Dialog | `apps/web/src/features/channel-content/StatusDialog.tsx` | UI-020 | REQ-046 |
+| CU-203 | Abgleich-Dialog | `apps/web/src/features/channel-content/ReconcileDialog.tsx` | UI-021 | REQ-090 |
+
+#### S7 Fotos und Kopier-Assistent – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-204 | Foto-Upload | `apps/server/src/media/photo-upload-service.ts` | Upload-Ablauf nach Kap. 2.11; Datei über CU-090 | REQ-042 |
+| CU-205 | Vorschaubilder | `apps/server/src/media/thumbnail-generator.ts` | Vorschaubild mit `sharp` erzeugen | REQ-042 |
+| CU-206 | Foto-Dienst | `apps/server/src/media/photo-service.ts` | Fotos auflisten, ordnen, entfernen | REQ-042 |
+| CU-207 | Foto-Repository | `apps/server/src/media/photo-repository.ts` | Abfragen auf `listing_photo` | REQ-042 |
+| CU-208 | Foto-Übergabe | `apps/server/src/media/photo-handover-service.ts` | Dateidienst: Übergabeordner mit nummerierten Kopien aus einer übergebenen Fotoliste | REQ-048 |
+| CU-209 | Foto-ZIP | `apps/server/src/media/photo-zip-service.ts` | Dateidienst: ZIP mit nummerierten Fotos | REQ-048 |
+| CU-210 | Download-Register | `apps/server/src/media/download-registry.ts` | einmalige Download-Adressen `/downloads/{token}.zip` | REQ-048 |
+| CU-211 | Desktop-Anbindung | `apps/server/src/shared/desktop-shell.ts` | Ordner im Windows-Explorer öffnen, abgelöst und ohne Fenster (Kap. 2.18; Linux: `xdg-open` oder nur Protokoll) | REQ-048 |
+| CU-212 | Kopier-Ansicht | `apps/server/src/listing-content/copy-view-service.ts` | Feldliste des freigegebenen Stands (Kap. 2.12); ruft für Übergabe und ZIP CU-208 bzw. CU-209 | REQ-047, REQ-048 |
+| CU-213 | Medien-API (Web) | `apps/web/src/api/media.api.ts` | Hooks Fotos, Übergabe, ZIP | F-11, F-12 |
+| CU-214 | Fotos-Screen | `apps/web/src/features/photos/PhotosPage.tsx` | UI-015 | REQ-042 |
+| CU-215 | Upload-Warteschlange | `apps/web/src/features/photos/photo-upload-queue.ts` | Dateien nacheinander mit Fortschritt hochladen | T-2 |
+| CU-216 | Kopier-Assistent-Screen | `apps/web/src/features/copy-assistant/CopyAssistantPage.tsx` | UI-019 Vollfenster und schmal | REQ-047 bis REQ-049 |
+| CU-217 | Schmaler Rahmen | `apps/web/src/features/copy-assistant/CompactFrame.tsx` | Rahmen ohne Navigation: fester Kopfbereich, eine scrollende Fläche mit UI-044 als Streifen am Ende (Kap. 2.17) | X-1 |
+| CU-218 | Übernahme-Markierungen | `apps/web/src/features/copy-assistant/copy-progress-store.ts` | Markierungen „übernommen“ im `sessionStorage`, Schlüssel mit `valueHash`: ein geänderter Wert macht das Feld wieder offen (K-06, Kap. 2.12) | REQ-049 |
+| CU-219 | Zwischenablage | `apps/web/src/features/copy-assistant/clipboard.ts` | Text in die Zwischenablage, Fehlerfall | REQ-047 |
+
+#### S8 Datenblatt – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-220 | Datenblatt-Dienst | `apps/server/src/datasheet/datasheet-service.ts` | Voraussetzungen prüfen, Daten sammeln, PDF anfordern, Cache | REQ-050 |
+| CU-221 | Datenblatt-Dokument | `apps/server/src/datasheet/datasheet-document.ts` | `pdfmake`-Dokumentdefinition aus Daten und Layout (rein) | REQ-050, REQ-051 |
+| CU-222 | PDF-Erzeugung | `apps/server/src/datasheet/pdf-renderer.ts` | PDF rendern, Schrift einbetten, Seitenzahl, Verdichtung | REQ-081 |
+| CU-223 | PDF-Cache | `apps/server/src/datasheet/pdf-cache.ts` | Token-Speicher (20 Einträge, 15 min) | T-8 |
+| CU-224 | Datenblatt-Routen | `apps/server/src/datasheet/datasheet.routes.ts` | `GET /api/devices/{id}/datasheet` (einziger Pfad unter `/api/devices`, der nicht CU-130 gehört), `GET /api/datasheets/preview-device`, `GET /datasheets/{token}.pdf` (FIND-227) | F-13 |
+| CU-306 | Beispielgerät-Abfrage | `apps/server/src/datasheet/preview-device-query.ts` | `GET /api/datasheets/preview-device`: zuletzt erfasstes Gerät, das die Voraussetzungen des Datenblatts erfüllt, über `inventory-reader` (CU-129) (Kap. 2.2, FIND-227) | REQ-051, DG-13 |
+| CU-225 | PDF-Schrift | `apps/server/assets/fonts/` | Inter 4.1 TTF für `pdfmake` | ADR-007 |
+| CU-226 | Datenblatt-API (Web) | `apps/web/src/api/datasheet.api.ts` | Hooks Datenblatt erzeugen und Beispielgerät für UI-039 | F-13 |
+| CU-227 | Datenblatt-Screen | `apps/web/src/features/datasheet/DatasheetPage.tsx` | UI-023 | REQ-050 |
+| CU-228 | Gerätewahl Datenblatt | `apps/web/src/features/listings/DatasheetDeviceDialog.tsx` | Dialog „Datenblatt für Gerät“ in UI-014 | UI-014 |
+
+#### S9 Übersicht, Korrekturen, Protokoll – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-229 | Übersichtsabfrage | `apps/server/src/listing-content/overview-query.ts` | `GET /api/listings` mit Suche, Filtern, Seiten (Route in CU-172) | REQ-052 |
+| CU-230 | Verkaufs-Dienst | `apps/server/src/inventory/sale-service.ts` | Verkauf markieren, zurücknehmen | REQ-021, REQ-084 |
+| CU-231 | Korrektur-Dienst | `apps/server/src/inventory/device-correction-service.ts` | Storno, WI-Nr-Korrektur | REQ-092, REQ-093 |
+| CU-232 | Lösch-Dienst Modell-Inserat | `apps/server/src/inventory/listing-deletion-service.ts` | Modell-Inserat löschen nach REQ-095 | REQ-095, REQ-103 |
+| CU-233 | Protokollabfrage | `apps/server/src/audit/audit-query.ts` | Einträge filtern und blättern | REQ-055 |
+| CU-235 | Protokoll-Routen | `apps/server/src/audit/audit.routes.ts` | `GET /api/audit-entries` | REQ-055 |
+| CU-236 | Protokoll-API (Web) | `apps/web/src/api/audit.api.ts` | Hook Protokoll | REQ-055 |
+| CU-237 | Übersicht-Screen | `apps/web/src/features/listings/ListingOverviewPage.tsx` | UI-002 | REQ-052 |
+| CU-238 | Übersichtsfilter | `apps/web/src/features/listings/overview-filters.ts` | Filter und Suche in der Adresse (Lesezeichen, Zurück) | REQ-052 |
+| CU-239 | Verkauf-Dialog | `apps/web/src/features/devices/SaleDialog.tsx` | UI-011 | REQ-021 |
+| CU-240 | Storno-Dialog | `apps/web/src/features/devices/CancelDialog.tsx` | UI-012 | REQ-093 |
+| CU-241 | WI-Nr-Dialog | `apps/web/src/features/devices/WiNrDialog.tsx` | UI-013 | REQ-092 |
+| CU-242 | Lösch-Dialog | `apps/web/src/features/common/DeleteDialog.tsx` | UI-041 für Modell-Inserat und Modellvorlage | REQ-095 |
+| CU-243 | Protokoll-Screen | `apps/web/src/features/audit/AuditLogPage.tsx` | UI-024 | REQ-055 |
+| CU-244 | Antwortzeittest | `tools/loadtest/response-time-test.ts` | REQ-060/061 je Aktionstyp ≥ 50 Messungen | REQ-060, REQ-061 |
+
+#### S10 Betrieb – Migration nötig: **nein**
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-245 | Beenden-Dienst | `apps/server/src/ops/shutdown-service.ts` | geordnetes Beenden mit Fehlerpfad (Kap. 2.17) | REQ-105 |
+| CU-246 | Einzelinstanz-Sperre | `apps/server/src/ops/instance-lock.ts` | Sperre des Datenordners | H-8 |
+| CU-247 | Startprüfung | `apps/server/src/ops/startup-check.ts` | Schritte 1 bis 4 der Startprüfung, Befunde, Art des letzten Endes | Baseline 9.6 |
+| CU-248 | Kopie vor Migration | `apps/server/src/ops/pre-migration-copy.ts` | Kopie von Datenbank und Konfiguration, letzte 3 behalten | A-37 |
+| CU-249 | IPC zur Überwachung | `apps/server/src/ops/supervisor-ipc.ts` | `ready` melden, auf Ende des Kanals reagieren | H-13 |
+| CU-250 | Housekeeping-Planer | `apps/server/src/ops/housekeeping/scheduler.ts` | Aufgaben beim Start und alle 24 h | Baseline 10.5 |
+| CU-234 | Protokoll-Löschfrist | `apps/server/src/audit/audit-retention-job.ts` | Einträge älter als 24 Monate löschen; in S10, weil der Planer CU-250 dort entsteht (FIND-201) | REQ-072 |
+| CU-251 | Aufräumen verwaister Dateien | `apps/server/src/ops/housekeeping/orphan-files-job.ts` | Ablauf nach Kap. 2.19: Verweise über CU-287, CU-291 und CU-086 sammeln, Karenz und Schutzgrenze entscheiden, Änderungen über CU-307; schreibt selbst weder `media_file` noch Dateien (FIND-226, FIND-227) | Baseline 9.4 |
+| CU-307 | Aufräumdienst Dateien | `apps/server/src/media/orphan-file-service.ts` | Dateidienst von `media` für CU-251: `unreferenced_since` setzen und zurücksetzen, verwaiste Dateien mit Zeile und unbekannte Dateien unter der Sperre des Hashes löschen (Zeile vor Datei), `.incoming` leeren (Kap. 2.19, Ausnahme Kap. 4.1; FIND-226, FIND-227) | Baseline 9.4 |
+| CU-252 | Aufräumen Übergabeordner | `apps/server/src/ops/housekeeping/handover-cleanup-job.ts` | Übergaben älter als 7 Tage, nur Ordner und ZIP-Dateien mit vollständig verankertem eigenem Namensmuster (Kap. 2.19; FIND-212, FIND-229) | Baseline 10.5 |
+| CU-253 | Speicherplatzprüfung | `apps/server/src/ops/housekeeping/disk-space-check.ts` | Warnung unter 10 GB frei | AR-09 |
+| CU-254 | Hinweis „Sicherung einrichten“ | `apps/web/src/features/backup-notice/BackupNotice.tsx` | UI-044 in beiden Varianten; S1 schafft nur den Platz im Rahmen (CU-044), F-17 darf nach S1 vorgezogen werden | REQ-104 |
+| CU-255 | Beenden-Dialog | `apps/web/src/features/shutdown/ShutdownDialog.tsx` | UI-045 | REQ-105 |
+| CU-256 | Endzustand | `apps/web/src/features/shutdown/TerminatedPage.tsx` | UI-046 `success` und `unknown` | REQ-105 |
+| CU-257 | App-Beendigung | `apps/web/src/api/app-termination.ts` | nach dem Beenden alle Abfragen stoppen | REQ-105 |
+| CU-258 | Launcher-Einstieg | `tools/launcher/src/cli.ts` | Befehle `supervise`, `open`, `stop`, `availability-report` | F-18 |
+| CU-259 | Befehl open | `tools/launcher/src/open-command.ts` | Ablauf Kap. 2.18: nach 120 s `start_timeout` und Zustand `timeout` für LP-02, danach Weiterwarten bis Ergebnis oder Ende der Überwachung (K-07) | FIND-112, REQ-073 |
+| CU-260 | Befehl stop | `tools/launcher/src/stop-command.ts` | Beenden über das Startmenü und für Updates, über die Pipe der Überwachung; bei `already_running` aus `stop_pending` direkt `POST /api/ops/shutdown` (Kap. 2.18) | REQ-105, Baseline 10.6 |
+| CU-261 | Überwachung | `tools/launcher/src/supervisor/supervisor.ts` | Lebenszyklus der Überwachung nach dem Zustandsdiagramm Kap. 2.18, einschließlich `stopping` (jedes Prozessende → `stopped`, `503 shutting_down` → weiter warten; FIND-234) | ADR-006 |
+| CU-262 | Neustart-Regel | `tools/launcher/src/supervisor/restart-policy.ts` | 5-s-Wartezeit, 3 Neustarts in 10 min | H-10, H-12 |
+| CU-263 | Überwachungs-Pipe | `tools/launcher/src/supervisor/supervisor-pipe.ts` | Pipe-Server und -Client, Nachrichtenprotokoll | H-14 |
+| CU-264 | Serverprozess | `tools/launcher/src/supervisor/server-process.ts` | Server starten, Exit-Code einordnen, Startgrenze 10 min bis `ready` (K-07) | ADR-006 |
+| CU-265 | Verfügbarkeitsprüfung | `tools/launcher/src/health-probe.ts` | alle 5 min prüfen und protokollieren | REQ-065, OD-05 |
+| CU-266 | Server-Client | `tools/launcher/src/health-client.ts` | `GET /api/ops/health`, `POST /api/ops/shutdown` über Loopback | F-17, F-18 |
+| CU-267 | Chrome öffnen | `tools/launcher/src/chrome-opener.ts` | Chrome finden und Adresse oder Datei öffnen, abgelöst und ohne Fenster (Kap. 2.18, FIND-213) | Baseline 6.1 |
+| CU-268 | Launcher-Zustand | `tools/launcher/src/launcher-state-writer.ts` | `launcher-state.js` neben den Seiten über CU-009 schreiben; Phasen `ready`, `aborted`, `timeout` (K-07), `stopped`, `error`, `not_running` | T-5 |
+| CU-296 | Launcher-Protokoll | `tools/launcher/src/launcher-log.ts` | Betriebsereignisse des Launchers (`supervisor_started`, `crash`, `gave_up`, `start_timeout`, `start_aborted` mit `launcher.start_limit` (K-07), `stop_crash` (FIND-234), `supervisor_ended`) und jede angezeigte Referenznummer zusätzlich ins Fehlerprotokoll (Kap. 2.18) | REQ-065, REQ-073 |
+| CU-269 | Tageszusammenfassung | `tools/launcher/src/availability/availability-aggregator.ts` | Tagesanteile nach Kap. 2.18 | REQ-065, FIND-113 |
+| CU-270 | Monatsbericht | `tools/launcher/src/availability/availability-report.ts` | Bericht für einen Monat | REQ-065 |
+| CU-271 | Launcher-Seiten | `tools/launcher-pages/lp-01.html`, `lp-02.html`, `lp-03.html`, `launcher-pages.css`, `launcher-pages.js` | LP-01 bis LP-03 mit Seitenwechsel; LP-02 mit Zustand `zeitueberschreitung`, der bei späterem `ready` selbst weiterleitet (K-07) | X-4, T-5, T-6 |
+| CU-272 | Seiten-Build | `tools/launcher-pages/build-launcher-pages.mjs` | Inter als `data:`-URL einbetten | T-6 |
+| CU-273 | Installer-Skript | `tools/packaging/installer/resellr.iss` | Inno-Setup-Paket (Kap. 2.19) | ADR-008 |
+| CU-274 | PE-Umstellung | `tools/packaging/patch-pe-subsystem.mjs` | `resellr-node.exe` aus `node.exe` erzeugen | ADR-008, S-2 |
+| CU-275 | Node-Laufzeit | `tools/packaging/fetch-node-runtime.mjs` | Laufzeit laden und Prüfsumme prüfen | ADR-008 |
+| CU-276 | Bündelung | `tools/packaging/bundle-app.mjs` | Server und Launcher mit esbuild bündeln, native Module beilegen | ADR-008 |
+| CU-277 | Verfügbarkeitsbericht-Datei | `tools/packaging/Verfügbarkeitsbericht.cmd` | Monatsbericht für den Vormonat starten | REQ-065 |
+| CU-278 | Windows-CI | `.github/workflows/windows.yml` | Installer bauen, als Standardbenutzer installieren, Launcher- und Betriebstests | AR-15 |
+| CU-279 | Release-Workflow | `.github/workflows/release.yml` | Installationspaket bauen, Lizenzprüfung (CU-298), veröffentlichen | Baseline 10.6 |
+| CU-298 | Lizenzhinweise | `tools/packaging/collect-licenses.mjs` | `THIRD-PARTY-NOTICES.txt` aus allen ausgelieferten Paketen erzeugen; Build scheitert bei fehlender oder nicht erlaubter Lizenz (FIND-222) | Baseline 3 |
+| CU-280 | Betriebshandbuch | `docs/operations/betriebshandbuch.md` (als PDF ausgeliefert) | Installation, Start, Beenden, Handsicherung, Wiederherstellung, Update, Fehlermeldung, Verfügbarkeitsbericht | Baseline 10.3 |
+
+#### S11 Could – Migration nötig: **nein** (Spalten schon in `0001`)
+
+| Nr. | Einheit | Ort | Verantwortung | Features |
+| --- | --- | --- | --- | --- |
+| CU-281 | Excel-Übernahme | `apps/server/src/excel-import/excel-import-service.ts` | Datei lesen, Modellvorlagen mit Prüfmarkierungen anlegen | REQ-056 |
+| CU-303 | Bezeichnungs-Synonyme | `apps/server/src/excel-import/label-synonyms.ts` | Zuordnung von Spaltenbezeichnungen zu Merkmalen | REQ-056 |
+| CU-304 | Excel-Routen | `apps/server/src/excel-import/excel-import.routes.ts` | `POST /api/imports/excel` | REQ-056 |
+| CU-282 | Excel-Screen | `apps/web/src/features/models/ExcelImportPage.tsx` | UI-042 unter `/modelle/excel-uebernahme` | REQ-056 |
+| CU-297 | Excel-API (Web) | `apps/web/src/api/excel-import.api.ts` | Hook Excel-Übernahme (FIND-202) | REQ-056 |
+| CU-289 | Kategoriewarnung | `apps/server/src/listing-content/category-warning.ts` | `categoryWarning` nach REQ-059 (FIND-202) | REQ-059 |
+| CU-283 | Shop-Importdatei | `apps/server/src/prestashop-export/prestashop-csv-builder.ts` | REQ-057 (blockiert bis Owner-Angabe) | REQ-057 |
+| CU-305 | Shop-Export-Routen | `apps/server/src/prestashop-export/prestashop-export.routes.ts` | Download der Importdatei | REQ-057 |
+
+Zusätzlich gilt: Jede Einheit hat ihre Tests neben sich (`*.test.ts`, `*.int.test.ts`); die E2E-Tests je Flow liegen in `e2e/` und gehören zum Bauschritt ihres Flows (Kap. 6.2).
+
+### 4.5 Gemeinsame Stellen (Hotspots)
+
+| Stelle | Einheit | Regel für neue Einträge |
+| --- | --- | --- |
+| Routen-Registrierung | CU-019 `app.ts` | je Komponente **eine** Zeile `app.register(<komponente>Routes)`; neue Routen nur in der Routen-Datei der Komponente |
+| Ereignistypen | CU-034 `shared/events.ts` | nur die fünf Änderungs- und vier Prüfereignisse aus Kap. 2.8.3; ein neues Ereignis ist eine Specification-Änderung |
+| Ereignis-Handler | CU-169 `event-handlers.ts` (`listing-content`), CU-290 `inventory-checks.ts` (`inventory`) | ein Eintrag je Ereignis, alphabetisch; je Ereignis genau ein Handler |
+| Schema-Typen und Migrationen | CU-028, `db/migrations/` | keine Änderung nach S1 ohne Kap. 4.7 |
+| Fehlercodes und Meldungen | CU-010, CU-012 | neue Codes alphabetisch, Text im Wortlaut von Requirements bzw. Design |
+| Oberflächen-Routen | CU-043 `router.tsx` | Pfade nur nach Kap. 4.2 |
+| Navigation | CU-045 | sechs feste Einträge, keine Änderung |
+| Query-Schlüssel | CU-048 | Schlüssel je Komponente gruppiert |
+| Einstellungsbereiche | CU-093 | 14 feste Bereiche (UI-025, ohne Zugangspasswort) |
+| Demo-Daten | CU-061 | jeder Bauschritt ergänzt Beispieldaten in einer eigenen Funktion `seed<Bereich>()` |
+| Workspace-Skripte und Abhängigkeiten | CU-001 | neue Abhängigkeiten nur aus Kap. 4.3; sonst Kap. 4.7 |
+
+### 4.6 Walking Skeleton (S1)
+
+Ergebnis von S1 ist ein lauffähiger, getesteter Durchstich ohne Fachfunktion:
+
+- Repository-Struktur nach Kap. 4.1 mit allen Workspaces, Build, Lint, Typprüfung, CI (CU-001 bis CU-004).
+- `npm run demo` startet den Server mit frischem Datenordner; Chrome zeigt den Anwendungsrahmen mit Navigation und dem leeren Inhalt „Noch keine Modell-Inserate“ (UI-002 ist in S1 nur Platzhalterseite der Route).
+- Datenbank mit **vollständigem** Schema aus Migration `0001` und den Kysely-Typen aller Tabellen (CU-027 bis CU-030), Unit of Work, Protokollschreiber, Fehlerabbildung mit Fehlerprotokoll und Referenznummer, `local-guard`, Sicherheitskopfzeilen, Schreibsperre.
+- `GET /api/ops/health` und `GET /api/ops/status` funktionieren; der E2E-Test prüft Rahmen, Navigation und `local-guard` (falscher Host, fremder Ursprung).
+- **Nicht** in S1: leere Dienst- oder Repository-Dateien für spätere Schritte, Platzhalter-Screens außer UI-002, Startbelegung.
+
+### 4.7 Änderungen an der Karte
+
+Fehlt eine Einheit oder ist eine Verantwortung unklar, fragt der Entwickler den Software Architect (Rolle „Code unit map requests“). Liegt die Verantwortung bei einer vorhandenen Einheit, nennt der Architekt sie. Sonst legt er die neue Einheit mit Name, Ort und Verantwortung fest, trägt sie als Code-Struktur-Nachtrag ins Änderungsprotokoll (Kap. 10.2) ein und informiert den CEOrchestrator. Ein Nachtrag innerhalb der bestehenden Komponenten und Verantwortungen braucht keine neue Owner-Freigabe; ändert er Komponentengrenzen, Schnittstellen oder freigegebenes Verhalten, ist er eine Architekturänderung.
+
+---
+
+## 5. Nicht-funktionale Umsetzung
+
+| Anforderung | Umsetzung in dieser Specification | Nachweis (Kap. 6) |
+| --- | --- | --- |
+| **REQ-060** (95 % ≤ 2 s, keine > 5 s), **REQ-064** (Volumen A-12) | lokaler Prozess, synchrones `better-sqlite3`, vorbereitete Anweisungen, Indizes nach Kap. 3.7; Kennzeichnungen und Bestandsangaben als Spalten mitgeführt, damit die Übersicht eine einzige Abfrage ist; Listen serverseitig gefiltert, bis 200 Zeilen bzw. Seiten zu 50; Suche ab 2 Zeichen | Antwortzeittest CU-244 auf Lastdaten CU-174 |
+| **REQ-061** (Kanal-Inhalte ≤ 3 s, Datenblatt ≤ 5 s) | Bildung im Speicher ohne externe Aufrufe; PDF mit `pdfmake` ohne Browser-Prozess, höchstens drei Durchläufe bei Verdichtung | wie oben, je ≥ 50 Messungen |
+| Neuberechnung (AR-03) | gebündeltes Laden, nur geänderte Zeilen schreiben; Ziel < 5 s für 9.000 Kanal-Inhalte | Lasttest CU-175 in S5; verfehlt → Architekturänderung nach AR-03 |
+| **REQ-065** (≥ 99 %) | Autostart, Überwachung mit Neustart (3 in 10 min), schneller Neustart nach Beenden, WAL; Messung nach OD-05 (a) mit Tageszusammenfassung (Kap. 2.18) | Unit-Tests der Auswertung, Windows-CI, Monatsbericht im Pilot |
+| **REQ-067** bei OD-02 A, **REQ-001** | nur `127.0.0.1`, keine Anmeldung | AC-REQ-001-05, AC-REQ-001-07 |
+| **REQ-068**, **REQ-069** | keine Felder für Zugangsdaten und Personen; Protokoll ohne Nutzer; Fehlerprotokoll ohne Feldwerte | Schema-Test, Review |
+| **REQ-072** | Protokolleintrag in jeder schreibenden Transaktion (CU-035), Löschung nach 24 Monaten (CU-234) | Test je Objektart, Test mit Testuhr |
+| **REQ-073** | zentrale Fehlerabbildung (CU-023), Referenznummer (CU-007), Meldungskatalog ohne technische Details, Fehlerprotokoll 30 Tage | Fehlerinjektion in 5 Funktionen |
+| **REQ-074** | keine Kundentexte im Code; Startbelegung ohne kundenspezifische Inhalte (Kap. 2.1.1); Händlermarke nur als Einstellung | Suchtest über Quellcode, Bundle und erzeugte Ausgaben |
+| **REQ-075** | Kanäle als Daten; Neuberechnung je Kanal getrennt; Golden Files | Golden-File-Vergleich mit Testkanal |
+| **REQ-076** | Merkmalswerte als JSON je Merkmals-ID, Formulare aus Definitionen (CU-111) | E2E „Monitor“ ohne Migration, Schema-Prüfsumme unverändert |
+| **REQ-077** | Chrome unter Windows 11; ohne Funktionsverlust ab 1366 × 768 und bei Seitenzoom bis 150 % auf jedem PC, nicht auf einen gemessenen PC zugeschnitten (Owner-Entscheide MAR-162, MAR-168); Reflow, Dialoge und Rahmen nach Kap. 2.0.10 und 2.17; UI-019 schmal ab 480 px | E2E über die Fenstergrößen-Matrix FM-1 bis FM-7 (Kap. 6.3); Abnahme am Arbeitsplatzrechner |
+| **REQ-078** | Meldungskatalog nur deutsch; `format-value.ts` (de-DE, „1.234,56 €“, TT.MM.JJJJ, Europe/Berlin); Eingaben mit Komma und Punkt | Unit-Tests, E2E-Formatprüfung |
+| **REQ-079** | keine ausgehenden Verbindungen, keine HTTP-Client-Bibliothek im Server, CSP `connect-src 'self'`, alles lokal gebündelt | Netzprüfung in der E2E-Suite |
+| **REQ-080**, **REQ-062**, **REQ-063** | Tastaturbedienung der Häufigkeitsabläufe (Design Kap. 5), Fokusführung UI-003 | Messung im Pilot (Requirements) |
+| **REQ-081** | Verdichtung in zwei Stufen (Kap. 2.13) | Seitenzahltest 5 Geräte je Geräteart |
+| **REQ-103** | kein Löschpfad für Geräte; Löschen von Modell-Inseraten und -vorlagen nur über REQ-095 | Bestandsvergleich, Code-Review |
+| **REQ-104** bis **REQ-106** | Kap. 2.17 bis 2.19 | E2E, Betriebstests, AC-REQ-106-01 vor Pilotstart |
+| Barrierefreiheit | nicht anwendbar (E-3, REQ-071 zurückgezogen) | – |
+
+**Sicherheitsbedrohungen (Baseline 8.3):** TH-01 Bindung an Loopback (CU-020); TH-02 `local-guard` G-1 bis G-6 (CU-021); TH-03 React-Escaping, kein `dangerouslySetInnerHTML`, CSP ohne Inline-Skripte (CU-022), Launcher-Seiten mit `textContent` (H-11); TH-04 Upload-Prüfung (CU-089, CU-204), feste Inhaltstypen, `nosniff`; TH-05 Owner-Risiko (E-7), BitLocker-Empfehlung im Betriebshandbuch; TH-06 wie REQ-079; TH-07 Lockfile, `npm audit` in der CI, Dependabot-Vorschläge; TH-08 akzeptiert.
+
+---
+
+## 6. Verifikation
+
+### 6.1 Testebenen und Werkzeuge
+
+Verfeinert Baseline 11.1. Alle Tests außer den Windows-Tests laufen unter Linux in der CI (CU-003).
+
+| Ebene | Gegenstand | Werkzeug, Ort |
+| --- | --- | --- |
+| Unit | `content-engine` vollständig mit tabellengesteuerten Fällen aus den ACs (u. a. TM-1, Kürzung, Entfall-Regeln, `{Akkukapazität}`), Vergleichsregel, Prüfmarkierungen, Preisregel-Graph, Platzhalter-Parser, EAN, Formatierung, Status- und Kennzeichnungsregeln, Neustart-Regel, Verfügbarkeitsauswertung | Vitest, `*.test.ts` neben der Einheit |
+| Golden Files | vollständige Kanal-Inhalte für festgelegte Testdaten je Kanal (AR-04) | Vitest-Snapshots, CU-154 |
+| Integration | Dienste gegen eine echte SQLite-Datei in einem temporären Datenordner: Transaktion und Rollback, Protokolleinträge, Neuberechnung mit Zählung, Konfliktprüfung, Datei-Konsistenz, Startprüfung, Beenden mit Fehlerinjektion | Vitest, `*.int.test.ts` |
+| API | jeder Endpunkt mit Erfolgs- und Fehlerfällen aus Kap. 2, einschließlich `local-guard` (falscher Host, fremder Ursprung, fehlender Ursprung außer bei `shutdown`) | Fastify `inject` |
+| End-to-End | FLOW-01 bis FLOW-06, FLOW-08 bis FLOW-10 in Google Chrome, Zwischenablage (Berechtigung `clipboard-read`/`clipboard-write` im Test), Foto-Übergabe, Datenblatt (PDF-Antwort und Seitenzahl), schmale Ansicht, UI-044 in jedem Rahmen, P-05 bis P-08 durch gezielt beendeten oder gesperrten Server | Playwright, `e2e/*.spec.ts`, je Zeile der Fenstergrößen-Matrix (Kap. 6.3) |
+| Launcher-Seiten | LP-01 bis LP-03 als `file://`-Seiten in Chrome mit wechselnder `launcher-state.js` (Seitenwechsel nach T-5, Schrift nach T-6, Referenznummer nach H-11) | Playwright unter Linux und Windows |
+| Last | Lastdaten nach A-12, Antwortzeiten je Aktionstyp, Neuberechnung im ungünstigsten Fall | CU-174, CU-175, CU-244 |
+| Windows | Installer als Standardbenutzer, Autostart-Eintrag, kein Konsolenfenster, eine Überwachung, Neustart-Regel, Exit-Codes, Kopplung, native Module, Beenden für Update | `.github/workflows/windows.yml` (CU-278), Runner `windows-2025` |
+
+### 6.2 Regeln für die Testabdeckung
+
+- **Jede AC-REQ-ID** der Requirements v0.3.3 (außer *Withdrawn* und den Netzbetriebs-ACs AC-REQ-001-01/-02/-04/-06/-08/-09, AC-REQ-097-xx, AC-REQ-104-06, AC-REQ-105-05) hat mindestens einen automatisierten Test, dessen Titel mit der ID beginnt (`it('AC-REQ-018-02 trotzdem zuordnen …')`). CU-284 prüft das in der CI, aber nur für die ACs der abgeschlossenen Bauschritte laut CU-299; so bleibt die CI vor S10 grün, und jeder Schritt wird bei seiner Abnahme in CU-299 als abgeschlossen eingetragen (FIND-223). Ausnahmen mit manuellem Nachweis: AC-REQ-050-05 (Druck auf A4-Drucker), AC-REQ-106-01 (vor Pilotstart, Baseline 11.2), AC-REQ-057-01 (Testinstallation des Shops, nur bei REQ-057).
+- **Jeder Fehlercode** aus Kap. 2.0.6 und jeder `422`-Code der Features hat einen API-Test.
+- **Jeder gestaltete Zustand** aus Kap. 7.3 hat mindestens einen E2E- oder Komponententest; die Muster P-05 bis P-08 werden je Musterart einmal End-to-End und je Screen mit Komponententests (gemockter API-Client) geprüft.
+- **Golden Files** werden nur bewusst aktualisiert; eine Änderung braucht einen Hinweis in den Release-Notizen (AR-04).
+- **Kein Löschpfad für Geräte:** ein Test sucht im Server-Code nach `deleteFrom('device')`; Code Review prüft dasselbe (REQ-103).
+- **Keine ausgehenden Verbindungen (REQ-079):** In der E2E-Suite meldet der Server im Testmodus jede ausgehende Verbindung über `node:diagnostics_channel` (`net.client.socket`, `undici:request:create`); der Test erwartet null Verbindungen außer zu `127.0.0.1`. Playwright protokolliert alle Anfragen des Browsers und erwartet nur `127.0.0.1` und `file://`.
+- **Schreibpfade (REQ-106):** Ein Integrationstest beobachtet alle Dateioperationen des Servers während eines vollständigen Durchlaufs und erwartet Schreibzugriffe nur im Datenordner, Protokollordner, Übergabeordner und Update-Kopie-Ordner.
+- **Betriebsrobustheit (FIND-211 bis FIND-214, FIND-217, FIND-226, FIND-228, FIND-229, FIND-233, FIND-234; K-07):** (a) eine absichtlich fehlerhafte zweite Migration lässt Schema und `app_migration` unverändert, die Kopie vor dem Update existiert; eine Test-Migration mit Umbau von `listing` (neue Tabelle, kopieren, `DROP TABLE`, umbenennen) lässt die Zeilen in `listing_price`, `listing_photo`, `listing_delivery_scope` und `channel_content` unverändert; eine Test-Migration mit verletztem Fremdschlüssel wird zurückgerollt; danach ist `foreign_keys` wieder `ON`; (b) `handoverDir` auf Profil, Laufwerkswurzel oder Datenordner wird verworfen; fremde Dateien und Ordner im Übergabeordner, darunter `urlaub-fotos.zip` und `A1-shop-20261101-120000-fotos.zip.bak`, bleiben beim Aufräumen erhalten, eigene Ordner und ZIP-Dateien älter als 7 Tage werden gelöscht; (c) Löschen eines Modell-Inserats mit 11 Fotos: Der erste Lauf danach setzt `unreferenced_since` und löscht nichts, auch nicht bei Dateien, die schon Monate alt sind; ein Lauf 24 h später löscht alle 11 Dateien samt Vorschaubildern und Zeilen; 21 unbekannte Dateien ohne `media_file`-Zeile lösen dagegen die Schutzgrenze aus; wird eine verwaiste Datei vor Ablauf der Karenz wieder hochgeladen, setzt der Upload `unreferenced_since` zurück und sie bleibt; ein Upload derselben Datei, der parallel zum Löschen läuft (Testhaken in der Sperre CU-088), endet mit vorhandener Zeile **und** vorhandener Datei; (d) Windows-CI: Chrome läuft nach dem Ende von `open` weiter (S-8); (e) `stop --for-update` während der 5-s-Wartezeit nach einem Absturz: kein Neustart, Meldung `stopped`, Exit-Code 0; `stop` während `starting`: kein Neustart nach einem Abbruch, nach `ready` geordnetes Beenden; `stop` in `stopping`, wenn der Server beim Beenden mit Exit-Code 1 endet (Testhaken beim Checkpoint): Meldung `stopped`, kein Neustart, Ereignis `stop_crash` mit Referenznummer im Betriebsprotokoll, `stop --for-update` mit Exit-Code 0; `stop` über die Pipe, während UI-045 schon beendet (Server antwortet `503 shutting_down`): kein `error`, nach dem Prozessende `stopped`, `stop --for-update` mit Exit-Code 0; in `stop_pending` Exit-Code 11: Meldung `already_running`, `stop` beendet den laufenden Server direkt (FIND-234, Hinweis 5.1 R3); (f) Invariantentest der Bestandsspalten (Kap. 3.3); (g) Start mit Testhaken, der `ready` verzögert (die Grenzen 120 s und 10 min sind für den Test über `RESELLR_TEST_START_TIMEOUTS` auf 2 s und 6 s verkürzt): nach der ersten Grenze `start_timeout` mit eigener Referenznummer in beiden Protokollen und `launcher-state.js` mit `phase: 'timeout'`, nach späterem `ready` Phase `ready`; ohne `ready` nach der zweiten Grenze Serverprozess beendet, `start_aborted` mit eigener Referenznummer (`launcher.start_limit`), Phase `aborted`, kein Neustart, nächster Start mit intakter Datenbank (auch wenn die Grenze mitten in einer Test-Migration greift) (K-07).
+- **Entscheidungen K-01 bis K-07 (MAR-176), je ein Test:** (K-01) Preis 279 € → 289 € → 279 € an einem freigegebenen Inhalt: „geändert seit Freigabe“ bleibt bis zur Freigabe; (K-02) Titelmuster mit einem ersten Wort aus 70 Zeichen bei Höchstlänge 65: Titel = dieses Wort ungekürzt, `truncation: word`, Freigabe abgelehnt mit `title_too_long`, nach manuellem Titel zulässig; (K-03) Variantenmerkmal mit gespeicherten Werten deaktivieren: `200`, kein `variant_flag_would_merge_listings`; ein danach erfasstes Gerät ohne Wert ergibt gegen ein Modell-Inserat mit Wert `variant_deviation` mit „leer ≠ Wert“; Entfernen des Kennzeichens wird bei Zusammenfallen weiter abgelehnt; (K-04) E2E Umbuchen auf ein abweichendes Ziel: `UI-005.ziel-abweichung` mit Fokus auf „Anderes Ziel wählen“, „Anderes Ziel wählen“ ohne Serveraufruf, „Trotzdem umbuchen“ bucht um; Umbuchen auf ein übereinstimmendes Ziel ohne Schritt 2; (K-05) UI-030 mit fehlender prüfender Stelle: ein Text M-24, beide Felder markiert; (K-06) E2E Kopier-Assistent: Stückzahl „2“ kopiert, Verkauf eines Geräts, nach „Neu laden“ Feld wieder offen, „n von m“ um eins kleiner; (K-07) API-Test `validation_failed` mit `message: ""`; Komponententest: kein Sammeltext „Bitte die markierten Felder prüfen.“; Komponententest UI-003 (FIND-236): „Gerät speichern“ mit WI-Nr „62-61“ und Akkukapazität 101 zeigt beide Fehler am Feld und oben die Fehlerzusammenfassung mit beiden Texten, einmal aus der Prüfung im Browser und einmal aus einer gemockten Antwort `422 validation_failed` mit beiden Feldern; Texte M-04 und M-22 nach Kap. 8.2; LP-02 in beiden Zuständen (Playwright auf den Launcher-Seiten, Kap. 6.1).
+- **Uhr:** Löschfristen, „nicht in der Zukunft“, AC-REQ-104-04 (+400 Tage) und die Aufbewahrung des Übergabeordners laufen mit der Testuhr (CU-032).
+
+### 6.3 Nachweis der Schwellenwerte
+
+| Anforderung | Messung | Bestanden, wenn |
+| --- | --- | --- |
+| REQ-060 | CU-244: je Aktionstyp (Speichern, Suchen, Öffnen, Zuordnen) ≥ 50 Messungen auf Lastdaten A-12, Zeit bis zur vollständigen Antwort | 95 % ≤ 2 s, Maximum ≤ 5 s |
+| REQ-061 | CU-244: Kanal-Inhalte eines Modell-Inserats für 3 Kanäle bilden; Datenblatt erzeugen | je 95 % ≤ 3 s bzw. ≤ 5 s |
+| AR-03 | CU-175: Textbaustein mit Geltung für alle Kanal-Inhalte ändern | < 5 s auf dem Referenzrechner der CI; Ergebnis im Bericht |
+| REQ-064 | Lastdaten CU-174 vollständig geladen | REQ-060 und REQ-061 erfüllt |
+| REQ-081 | 5 Testgeräte je Geräteart, bis 40 befüllte Merkmale | `pageCount = 1` |
+| REQ-076 | E2E „Monitor“ mit 6 Merkmalen bis zur Freigabe je Kanal und Datenblatt | keine Migration, Prüfsumme des Schemas unverändert |
+| REQ-077 | E2E aller Flows und Erreichbarkeitsprüfung jedes Screens in jeder Zeile der Fenstergrößen-Matrix (unten) | kein Inhalt und keine Aktion unerreichbar; keine waagrechte Scrollleiste der Seite und der Navigationsspalte; Kopf „resellr“ sichtbar; keine Schrift unter 12 CSS-px |
+| AC-REQ-104-01 | E2E in FM-1 bis FM-7 mit Datenordner-Pfad mit 100 Zeichen; in UI-019 schmal mit den Testdaten `copy-view-few-fields` und `copy-view-many-fields` (unten) | Hinweis in jedem Rahmen vorhanden; in FM-6 ohne Scrollen sichtbar und am unteren Rand der Navigationsspalte (`margin-top: auto`, Kap. 2.17); in UI-019 schmal nach der **bedingten Regel** des Designs (FIND-235): Ist der Inhalt der scrollenden Fläche niedriger als die Fläche, liegt die Unterkante des Streifens am unteren Fensterrand (± 1 px), sonst folgt der Streifen direkt nach den Aktionen und ist per Scrollen vollständig erreichbar; vollständiger Text und vollständiger Pfad per Scrollen lesbar und markierbar, nichts abgeschnitten, keine Überlappung mit den Einträgen; „resellr beenden“ mit Maus und mit Tab und Enter bedienbar (Design v0.6 UI-044). **Nur Bericht:** in FM-1 ohne Scrollen vollständig sichtbar (Information für die Owner-Bestätigung von Design v0.6, kritische Annahme 1) |
+| REQ-073 | Fehlerinjektion in 5 Funktionen (Datenblatt, Foto-Upload, Freigabe, Speichern Textbaustein, Beenden) | Protokolleintrag und Nutzermeldung erfüllen alle Merkmale |
+| REQ-072 | Einträge 23 Monate und 24 Monate + 8 Tage alt | erster vorhanden, zweiter gelöscht |
+| REQ-065 | Unit-Tests der Tageszusammenfassung mit Ereignisfolgen (Absturz, Neustart aufgegeben, Beenden, Herunterfahren, Lücke) | Anteile nach Kap. 2.18 |
+
+**Fenstergrößen-Matrix (REQ-077; Owner-Entscheide MAR-162 und MAR-168, ersetzt S-6):** Die Oberfläche wird nicht auf die Fläche eines gemessenen PCs zugeschnitten, sondern über feste Prüfwerte mit Reserve unter der Untergrenze geprüft. Die Werte sind CSS-Pixel des Viewports; Seitenzoom und Anzeigeskalierung werden als kleinerer Viewport mit passendem `deviceScaleFactor` nachgebildet (beides verkleinert die CSS-Fläche gleich). Sie sind **Prüfwerte, keine Designannahme**; das Maß aus Ä-28 (etwa 1350 × 630 px) ist keine Grundlage mehr (Design v0.6).
+
+| Zeile | Viewport (CSS-px) | `deviceScaleFactor` | Fall | Gilt |
+| --- | --- | --- | --- | --- |
+| FM-1 | 1366 × 600 | 1 | Untergrenze REQ-077: 1366 × 768, Chrome maximiert mit Lesezeichenleiste, 100 %; Anordnung `full` | bindend |
+| FM-2 | 1366 × 520 | 1 | kleinere Höhe (zusätzliche Leisten, zweizeilige Taskleiste); Navigationsspalte scrollt | bindend |
+| FM-3 | 1092 × 480 | 1,25 | FM-1 bei 125 % Seitenzoom oder Anzeigeskalierung; R-1 | bindend |
+| FM-4 | 910 × 400 | 1,5 | FM-1 bei 150 %; R-1, Grenze der Zusicherung im Design (910 CSS-px) | bindend |
+| FM-5 | 480 × 600 | 1 | schmale Ansicht von UI-019 (Prüfpunkt C-5) | bindend |
+| FM-6 | 1920 × 950 | 1 | großes Fenster: Full-HD-Bildschirm, Chrome maximiert mit Lesezeichenleiste; Anordnung `full` mit viel Platz (Abnahmekriterium Design v0.6 „bis voller Bildschirm“, Owner-Entscheid MAR-168 „auf jedem PC“; FIND-232) | bindend |
+| FM-7 | 480 × 1000 | 1 | schmale Ansicht von UI-019 mit viel Höhe: Lage des Streifens UI-044 nach der bedingten Regel (Kap. 2.17, FIND-235) | bindend |
+
+**Warum 1366 statt 1350 Breite (Änderung gegenüber Revision 3):** Die Media Query misst die Viewport-Breite einschließlich Scrollleiste, und ein maximiertes Chrome-Fenster bei 1366 × 768 ist 1366 CSS-px breit. Mit 1350 läge FM-1 unter der Bruchstelle `full` und prüfte die gestapelte statt der vollen Anordnung. FM-3 und FM-4 sind 1366 geteilt durch 1,25 bzw. 1,5, abgerundet. FM-4 trifft damit genau die Grenze, bis zu der das Design R-1 zusichert; 900 px lag darunter.
+
+- **Ablauf:** Jede Zeile ist ein eigenes Playwright-Projekt (CU-062); alle E2E-Flows laufen in FM-1 bis FM-6. Dazu ruft eine Erreichbarkeitsprüfung jede Route mit Rahmen einmal mit Testdaten auf (UI-019 schmal nur in FM-5). FM-7 prüft nur UI-019 schmal: Erreichbarkeit und Lage des Streifens UI-044.
+- **Testdaten für die Lage des Streifens (FIND-235):** Das Ergebnis hängt davon ab, ob der Inhalt in die Höhe passt; deshalb legt CU-062 zwei Kanal-Inhalte fest, beide mit Datenordner-Pfad mit 100 Zeichen. `copy-view-few-fields`: Kleinanzeigen-Inhalt mit **9 Feldern** (Titel, Beschreibung mit einer Zeile, Kategorie, Zustand, Preis, Herstellername, Postanschrift, Elektronische Kontaktadresse, Produktidentifikation; kein Zustand-Zusatz, keine Merkmalsfelder, keine verantwortliche Person). `copy-view-many-fields`: Shop-Inhalt mit **18 Feldern** wie im Beispiel des Designs („n von 18“). Der Test misst zuerst die natürliche Höhe des Inhalts (Feldliste, Aktionen, Streifen) und prüft dann den passenden Fall der bedingten Regel. Damit **beide** Fälle sicher vorkommen, prüft er `copy-view-few-fields` zusätzlich mit der Fensterhöhe „gemessene Inhaltshöhe + 200 px, mindestens 1000“ (Fall „unten“) und `copy-view-many-fields` in FM-5 480 × 600 (Fall „nach den Aktionen“). So wird keine designgerechte Umsetzung wegen der Testdaten rot.
+- **Großes Fenster (FM-6, FIND-232):** zusätzlich zur Erreichbarkeit: Anordnung `full` aktiv; Hinweis UI-044 ohne Scrollen sichtbar, seine Unterkante liegt am unteren Rand des scrollenden Bereichs der Navigationsspalte; Seitenpanels stehen neben dem Inhalt, nicht als `Sheet`; feste Kopf- und Aktionsleisten verdecken kein bedienbares Element; Dialoge UI-004 und UI-005 haben ihre Designbreite (720 bzw. 800 px). UI-019 im Vollfenster zeigt die Felder und den Hinweis in der Navigationsspalte wie in FM-1. Die Stichprobe des Designs (UI-003, 007, 010, 014, 017, 019, 027, 028 und Dialog UI-005 bei 125 % und 150 %) ist darin enthalten.
+- **„Aktion erreichbar“:** Jedes bedienbare Element (`button`, `a[href]`, `input`, `select`, `textarea`, Rollen `button`, `tab`, `menuitem`, `checkbox`, `switch`; nicht `disabled`, nicht `aria-hidden`) liegt nach `scrollIntoViewIfNeeded()` vollständig im Viewport, und `document.elementFromPoint` in seiner Mitte liefert das Element oder ein Kind, also nicht eine feste Leiste, ein Banner oder ein anderer Rahmenteil. Elemente in geschlossenen Menüs und Dialogen prüft der Flow, der sie öffnet.
+- **„Inhalt erreichbar“:** In `main`, `nav`, `aside` und `[role=dialog]` schneidet kein Element mit `overflow: hidden` oder `clip` Inhalt ab (`scrollWidth` oder `scrollHeight` größer als die Client-Größe), außer bei Werten, die das Design als gekürzt gestaltet (Attribut `data-truncated` mit vollständigem Wert im Tooltip). Inhalt außerhalb des Viewports muss in einem scrollbaren Bereich liegen.
+- **Seite und Spalte:** `scrollWidth` ist höchstens `clientWidth`, für das Dokument und für den Bereich der Navigationsspalte (keine waagrechte Scrollleiste). Der Kopf „resellr“ liegt im Viewport. Kein sichtbarer Text hat eine berechnete Schriftgröße unter 12 px.
+- **„Nur Bericht“:** betrifft nur die Prüfung „Hinweis ohne Scrollen sichtbar“ in FM-1 (Zeile AC-REQ-104-01). Sie läuft in der CI, ein Fehler bricht den Lauf nicht ab, erscheint aber im Testbericht. Lehnt der Owner die kritische Annahme 1 des Designs v0.6 ab, wird sie bindend.
+
+### 6.4 Prüfungen am Arbeitsplatzrechner
+
+**Grenzen des Windows-Spikes, die hier geschlossen werden (v0.5, Kap. 9.2):** Der Spike lief auf Windows Server 2025 im CI-Runner, nicht auf Windows 11, und ohne echte Anmeldung (Lauf 42475377911). Am Arbeitsplatzrechner mit Windows 11 werden deshalb erstmals belegt: SmartScreen-Warnung bei der Installation (im Spike nicht aussagekräftig); Smart App Control steht in „Windows-Sicherheit“ auf „Aus“ (OD-09 setzt das voraus; im Spike nicht geprüft; sonst Eskalation an den Software Architect); Autostart bei echter Anmeldung (S-1); kein Konsolenfenster (Sichtprüfung, S-2); Defender-Scan (unten, S-2, TR-05); „resellr beenden“ über das Startmenü, also `stop` über die Pipe (im Spike bewusst über `POST /api/ops/shutdown`, Spike-Auftrag Ä-9), und danach bleibt Chrome offen (S-8); beides prüft zuerst die Windows-CI (CU-278), ebenfalls unter Windows Server; Abmelden und Herunterfahren (S-4). Bestätigt eine dieser Prüfungen den Hauptweg nicht, gilt der Rückfallweg aus Kap. 9.2.
+
+Vor Pilotstart (Abnahme, Baseline 11.2): Installation mit SmartScreen-Warnung; Smart App Control „Aus“; Autostart bei echter Anmeldung; kein Konsolenfenster (Sichtprüfung); „resellr beenden“ über das Startmenü, danach Chrome noch offen; Abmelden und Herunterfahren mit Art des letzten Endes; schmale Ansicht von UI-019 neben einem Kanal-Formular (Prüfpunkt C-5); AC-REQ-104-01 mit dem echten Pfad; Nutzerreisen J-01 bis J-06 bei 1366 × 768 und eine Stichprobe bei 150 % Seitenzoom (REQ-077; Abnahme, keine Messung und keine Anpassung an diesen PC); AC-REQ-106-01; **Defender-Scan** (TR-05, S-2; Nachtrag nach MAR-177 und MAR-184): die installierte `resellr-node.exe` unter `%LOCALAPPDATA%\Programs\resellr\` und das Installationspaket einzeln mit dem Aufruf aus Spike-Prüfung P2.4, `MpCmdRun.exe -Scan -ScanType 3 -File <Pfad> -DisableRemediation`, als Standardbenutzer. Vorher zeigt „Windows-Sicherheit“ den Viren- und Bedrohungsschutz aktiv. Bestanden: Exit-Code 0 je Datei und kein Eintrag zu diesen Dateien im Schutzverlauf. Befund: Exit-Code 2 oder ein Eintrag im Schutzverlauf. Ein anderer Exit-Code oder ein vom System abgelehnter Aufruf ist weder „bestanden“ noch „Befund“: Aufruf einmal wiederholen; bleibt es so, Eskalation an den Software Architect. Am Arbeitsplatzrechner gibt es keine EICAR-Positivkontrolle und keine Änderung an Ausschlüssen. Ist ein anderer Virenschutz aktiv, prüft dessen Einzeldatei-Scan dieselben Dateien. Befund in `resellr-node.exe`: Rückfallweg S-2 (Kap. 9.2); Befund nur im Installationspaket: Eskalation an den Software Architect. Im Spike hat P2.4 bestanden (Windows Server 2025, Lauf 42475377911, Kap. 9.2); dieser Scan wiederholt die Prüfung unter Windows 11 mit dem echten Installationspaket. Betriebshandbuch einmal vollständig durchgehen. Die Messungen REQ-062, REQ-063 und REQ-080 folgen im Pilotbetrieb nach den Requirements.
+
+---
+
+## 7. Abdeckung
+
+### 7.1 Requirements → Specification
+
+| REQ | Priorität | Abschnitt | Kern der technischen Umsetzung |
+| --- | --- | --- | --- |
+| REQ-001 | Must | 2.20 | nur `127.0.0.1`, keine Anmeldung (OD-02 A); Netzbetriebsteil nicht anwendbar |
+| REQ-002, REQ-003 | *Withdrawn* | – | – |
+| REQ-004 bis REQ-007 | Must | 2.1, 2.1.1 | Gerätearten, Merkmale mit Systemrollen, Auswahllisten, Startbelegung; Deaktivieren nie abgelehnt, deaktivierte Variantenmerkmale bleiben in der Vergleichsregel (K-03, RQ-05) |
+| REQ-008 bis REQ-010 | Must | 2.4 | Modellvorlage, Suche, Ändern mit Geräteart-Sperre |
+| REQ-011 | Should | 2.4 | `possible_duplicate` |
+| REQ-012 bis REQ-016 | Must | 2.5 | Erfassung, Vorbelegung, Prüfmarkierungen, Code-Übersetzung, Suche |
+| REQ-017 bis REQ-019 | Must | 2.6 | Zuordnen, Abweichung, Modell-Inserat anlegen |
+| REQ-020 | Should | 2.6 | Umbuchen; abweichendes Ziel über Schritt 2 `UI-005.ziel-abweichung` (K-04) |
+| REQ-021 | Must | 2.15 | Verkauf |
+| REQ-022 | Must | 2.2 | Code-Übersetzungstabelle |
+| REQ-023 bis REQ-025 | Must | 2.3 | Zuordnungen je Kanal |
+| REQ-026 bis REQ-028 | Must | 2.2 | Textbausteine, GPSR, Händlermarke |
+| REQ-029 | Must | 2.3, 2.12 | Kanäle; Feldreihenfolge des Kopier-Assistenten **abgedeckt mit Auslegung, Owner-Entscheidung E-1 offen** (Kap. 8.3, RQ-11) |
+| REQ-030, REQ-031 | Must | 2.3 | Titelmuster, Beschreibungsvorlage |
+| REQ-032 | Must | 2.7 | Preis je Kanal |
+| REQ-033 | Should | 2.7 | Regelpreis (RQ-03) |
+| REQ-034 bis REQ-041 | Must | 2.8 | Bildung der Kanal-Inhalte; Titel nie im Wort gekürzt, auch beim ersten Wort (K-02, RQ-18) |
+| REQ-042 | Must | 2.11 | Fotos |
+| REQ-043 | Should | 2.9, 2.8.3 | manuelle Anpassung mit Basis-Hash |
+| REQ-044, REQ-045 | Must | 2.9, 2.8.3 | Freigabe, Kennzeichnung, Änderungsentwurf; „geändert seit Freigabe“ endet nur durch Freigabe (K-01) |
+| REQ-046 | Must | 2.10 | Status-Übergänge |
+| REQ-047, REQ-048 | Must | 2.12 | Kopier-Assistent, Foto-Übergabe |
+| REQ-049 | Should | 2.12 | Markierungen „übernommen“ je Feld mit angezeigtem Wert (K-06, RQ-14) |
+| REQ-050, REQ-051 | Must | 2.13, 2.2 | Datenblatt, Layout |
+| REQ-052 | Must | 2.14, 2.10 | Übersicht, „Bestand auf Kanal anpassen“ (gespeicherte Kennzeichnung, Kap. 2.8.3) |
+| REQ-053, REQ-054 | Must | 2.8.4, 2.2 | Anzahlen, Prüfstatus; Meldung „Prüfdatum und prüfende Stelle erforderlich“ (K-05) |
+| REQ-055 | Should | 2.16 | Protokollansicht, Filter nach Objektart (FIND-204, DG-15) |
+| REQ-056 bis REQ-059 | Could | 2.21, 2.4, 2.9 | optional |
+| REQ-060, REQ-061, REQ-064 | NFR | 5, 6.3 | Lasttest |
+| REQ-062, REQ-063, REQ-080 | NFR | 5, 6.4 | Pilotmessung |
+| REQ-065 | NFR | 2.18 | Überwachung, Messung OD-05 (a) |
+| REQ-066 | *Withdrawn* | – | – |
+| REQ-067 | NFR | 2.20 | nur „nicht erreichbar“ (OD-02 A) |
+| REQ-068, REQ-069 | NFR | 2.20, 3 | keine Felder |
+| REQ-070, REQ-071 | *Withdrawn* | – | – |
+| REQ-072 | NFR | 2.0.9, 2.16, 3.6 | Protokoll, Löschfrist |
+| REQ-073 | NFR | 2.0.5, 2.18, 2.19 | Fehlerformat, Fehlerprotokoll, Referenznummer; LP-02 bei Zeitüberschreitung und Startgrenze (K-07) |
+| REQ-074 bis REQ-076 | NFR | 2.1, 2.1.1, 5 | Einstellung statt Code |
+| REQ-077, REQ-078 | NFR | 5, 2.0.1, 2.8.2 | Plattform, Formate |
+| REQ-079 | NFR | 2.20 | keine ausgehenden Verbindungen |
+| REQ-081 | NFR | 2.13 | Verdichtung, Seitenzahltest |
+| REQ-082, REQ-083 | *Withdrawn* | – | – |
+| REQ-084 | Must | 2.15 | Rücknahme |
+| REQ-085 | Should | 2.3 | Preisregel |
+| REQ-086, REQ-087 | Must | 2.9 | Kategorie überschreiben, Rechtstext bestätigen |
+| REQ-088 | Must | 2.7 | Inseratswerte |
+| REQ-089, REQ-090 | Must | 2.9, 2.10 | Änderungsentwurf freigeben, Abgleich |
+| REQ-091 | Must | 2.8.2, 2.10 | Bestandsplatzhalter |
+| REQ-092 | Should | 2.15 | WI-Nr-Korrektur |
+| REQ-093 | Must | 2.15 | Storno |
+| REQ-094 | Should | 2.5 | nicht zugeordnete Geräte |
+| REQ-095 | Should | 2.15, 2.4 | Löschen |
+| REQ-096, REQ-098 | *Withdrawn* | – | – |
+| REQ-097 | Must | – | **nicht anwendbar** bei OD-02 A (REQ-097 gilt nur im Netzbetrieb) |
+| REQ-099 bis REQ-101 | Must/Should | 2.2 | Lieferanten, Hersteller |
+| REQ-102 | *Withdrawn* | – | – |
+| REQ-103 | NFR | 2.15, 6.2 | kein Löschpfad für Geräte |
+| REQ-104, REQ-105 | Must | 2.17 | Hinweis, geordnetes Beenden |
+| REQ-106 | NFR | 2.19 | ein Datenordner |
+
+Keine aktive Requirement ist ohne Umsetzung; nicht anwendbar sind nur die Netzbetriebsteile nach OD-02 A.
+
+### 7.2 Flows und Screens → Specification
+
+| Design | Abschnitt | Code-Einheiten |
+| --- | --- | --- |
+| FLOW-01 | 2.4, 2.5, 2.6, 2.7, 2.9, 2.11, 2.12, 2.10, 2.13 | S3 bis S8 |
+| FLOW-02 | 2.5, 2.6, 2.10 | CU-132 bis CU-135, CU-203 |
+| FLOW-03 | 2.15, 2.10, 2.14 | CU-239, CU-237, CU-202, CU-203 |
+| FLOW-04 | 2.2, 2.8, 2.9, 2.12, 2.10 | CU-101, CU-098, CU-103, CU-194, CU-199 |
+| FLOW-05 | 2.1, 2.3, 2.2 | CU-095, CU-181, CU-184, CU-185, CU-182, CU-102 |
+| FLOW-06 | 2.7, 2.4, 2.9, 2.12, 2.10 | CU-138, CU-114, CU-199, CU-216, CU-203 |
+| FLOW-07 | **nicht umgesetzt** (OD-02 A) | – |
+| FLOW-08 | 2.15, 2.6 | CU-240, CU-241, CU-239, CU-242 |
+| FLOW-09 | 2.12 | CU-216 bis CU-219 |
+| FLOW-10 | 2.17, 2.18 | CU-254 bis CU-257, CU-258 bis CU-272 |
+
+| Screen | Abschnitt | Code-Einheit | Screen | Abschnitt | Code-Einheit |
+| --- | --- | --- | --- | --- | --- |
+| UI-001 | nicht umgesetzt (OD-02 A) | – | UI-024 | 2.16 | CU-243 |
+| UI-002 | 2.14 | CU-237, CU-238 | UI-025 | 2.1 | CU-093 |
+| UI-003 | 2.5 | CU-132, CU-133 | UI-026 | 2.2 | CU-097 |
+| UI-004 | 2.6 | CU-134 | UI-027 | 2.1 | CU-095 |
+| UI-005 | 2.6, 2.5 | CU-135 | UI-028 | 2.1 | CU-096 |
+| UI-006 | 2.4 | CU-113 | UI-029 | 2.3 | CU-181 |
+| UI-007 | 2.4 | CU-114 | UI-030 | 2.2 | CU-101 |
+| UI-008 | 2.4, 2.2 | CU-115 | UI-031 | 2.2 | CU-098 |
+| UI-009 | 2.5 | CU-136 | UI-032 | 2.2 | CU-099 |
+| UI-010 | 2.5, 2.15 | CU-137 | UI-033 | 2.2 | CU-100 |
+| UI-011 | 2.15 | CU-239 | UI-034 | 2.3 | CU-183 |
+| UI-012 | 2.15 | CU-240 | UI-035 | 2.3 | CU-184 |
+| UI-013 | 2.15 | CU-241 | UI-036 | 2.3 | CU-185 |
+| UI-014 | 2.7 | CU-138 bis CU-141, CU-187, CU-228 | UI-037 | 2.3 | CU-182 |
+| UI-015 | 2.11 | CU-214, CU-215 | UI-038 | 2.3 | CU-180 |
+| UI-016 | 2.9 | CU-194 bis CU-197 | UI-039 | 2.2, 2.13 | CU-102, CU-306 (Beispielgerät ab S8) |
+| UI-017 | 2.9 | CU-198 | UI-040 | nicht umgesetzt (OD-02 A) | – |
+| UI-018 | 2.9 | CU-199, CU-200 | UI-041 | 2.15 | CU-242 |
+| UI-019 | 2.12 | CU-216 bis CU-219 | UI-042 | 2.21 (Could) | CU-282 |
+| UI-020 | 2.10 | CU-202 | UI-043 | 2.2, 2.8.4 | CU-103 |
+| UI-021 | 2.10 | CU-203 | UI-044 | 2.17 | CU-254 |
+| UI-022 | 2.9 | CU-201 | UI-045 | 2.17 | CU-255 |
+| UI-023 | 2.13 | CU-227 | UI-046 | 2.17 | CU-256 |
+| LP-01, LP-02, LP-03 | 2.18 | CU-271 | | | |
+
+### 7.3 Gestaltete Zustände → technische Abbildung
+
+Grundregel: Jeder Zustand folgt Kap. 2.0.7. **Zusätzlich gilt in jedem Screen mit Anwendungsrahmen:** P-06 (`.unreachable`) bei jeder lesenden Anfrage, P-05 (`.conflict`), P-07 (`.wird-beendet`) und P-08 (`.speichert`, `.ausgang-unbekannt`) bei jeder schreibenden Aktion, auch wo die `screen.md` den Zustand nicht einzeln nennt (Design Kap. 5). Die Tabelle nennt je Screen die gestalteten Zustände und nur die Besonderheiten.
+
+| Screen | Gestaltete Zustände | Besonderheiten der Abbildung |
+| --- | --- | --- |
+| UI-001 | alle | nicht umgesetzt (OD-02 A) |
+| UI-002 | default, loading, empty, empty (Filter), error, validation | `empty` bei `total = 0` ohne Filter, `empty (Filter)` mit Filter; `validation` = Suche < 2 Zeichen filtert nicht (clientseitig) |
+| UI-003 | default, loading, empty, error, validation, success, disabled, ausgang-unbekannt | `loading` = Vorbelegung; `disabled` = `reviewKeys` nicht leer; `validation` = Feldfehler am Feld, auch `wi_nr_taken`, und bei „Gerät speichern“ bzw. „Speichern und zuordnen“ die Fehlerzusammenfassung oben aus denselben Feldfehlern, ohne eigenen Text (Kap. 2.0.5, CU-132; FIND-236) |
+| UI-004 | default, loading, empty, error, validation, success, disabled, ausgang-unbekannt | `empty` = keine Modell-Inserate; `validation` für `article_number_taken`; `review_pending`, `other_model_template` als Meldung im Dialog |
+| UI-005 | default, loading/error, empty, validation, success, disabled, ausgang-unbekannt, `ziel-abweichung`, `ziel-abweichung.speichert` (beide Design v0.6, K-04) | entsteht aus `confirmation_required`/`variant_deviation`; Kontext A/B nach Aufrufer. `ziel-abweichung` aus `confirmation_required`/`target_deviation` nach „Umbuchen“, Abweichungen aus `details.deviations`; Fokus auf „Anderes Ziel wählen“; `ziel-abweichung.speichert` = P-08 während „Trotzdem umbuchen“ (Kap. 2.6) |
+| UI-006 | default, loading, empty (Treffer), empty (Bibliothek), error, validation, success, disabled | zwei `empty` nach Kap. 2.4 |
+| UI-007 | default, loading, empty, speichert, error, validation, success, disabled | `disabled` = `deviceCount > 0`; Dubletten-Dialog aus `possible_duplicate` |
+| UI-008 | default, validation, error, success, loading, empty, disabled, ausgang-unbekannt | `existing: true` → Hinweis „<Name> gibt es bereits und wird verwendet“ |
+| UI-009 | default, loading, empty (Suche), empty (nicht zugeordnet), error, validation, success, disabled | Reiter über `?reiter=` |
+| UI-010 | default, loading, empty, error, validation, success, disabled | `disabled` = `stockStatus ≠ available` (Werte) bzw. Aktionen je Status (Kap. 3.5) |
+| UI-011 bis UI-013 | default, validation, error, success, loading, empty, disabled, ausgang-unbekannt | Fehlercodes nach Kap. 2.15 |
+| UI-014 | default, loading, empty, abweichung-bestaetigen, Shop-Karte ohne Freigabe (Could), speichert, error, validation, success, disabled | `abweichung-bestaetigen` aus `assigned_devices_deviate`; Could-Zustand nur mit REQ-057 |
+| UI-015 | default, loading, empty, error, validation, success, disabled, ausgang-unbekannt | je Datei; `disabled` bei 20 Fotos |
+| UI-016 | vier `default`-Varianten, bearbeiten, speichert, ungespeichert-hinweis, verlassen-rueckfrage, conflict, loading, empty, error, validation, success, disabled, ausgang-unbekannt | Kap. 2.9: `ungespeichert-hinweis` ohne Serveraufruf; `conflict` mit „Meinen Text übernehmen“; `default (geändert seit Freigabe)` = `draft` + Kennzeichnung |
+| UI-017 | default, loading, empty, error, validation, success, disabled | `empty` = nur ein aktiver Kanal |
+| UI-018 | default (Fall a), entwurf-vergleich (Fall b), loading, empty, error, validation, success, disabled, ausgang-unbekannt | `case` aus `GET …/comparison` |
+| UI-019 | default, loading, empty (Entwurf), empty (Fotos), error, validation, success, disabled | `empty (Entwurf)` aus `copy_assistant_unavailable`; `success` clientseitig; zwei Layouts |
+| UI-020 | default, validation, error, success, loading, empty, disabled, ausgang-unbekannt | nur zulässige Übergänge angeboten |
+| UI-021 | default, empty, error, loading, validation, success, disabled, ausgang-unbekannt | `empty` aus geladenen Kennzeichnungen; `stale_stock` → P-05 |
+| UI-022 | default, error, loading, empty, validation, success, disabled, ausgang-unbekannt | erneute Freigabe mit `confirmUncheckedLegal` |
+| UI-023 | default, loading, empty, error, success, disabled | `error` = Voraussetzungsmeldung aus `datasheet_precondition` oder `500` |
+| UI-024 | default, loading, empty, error, validation, success, disabled | `validation` = Von > Bis (clientseitig und Server) |
+| UI-025 | default | zuletzt genutzter Bereich in `localStorage` (`resellr.settings.lastSection`), 14 Bereiche |
+| UI-026 | default, empty, speichert, loading, error, validation, success, disabled | `empty` = kein Logo |
+| UI-027 | default, loading, empty, speichert (wo genannt), error, validation, success, disabled | `validation` am Kennzeichen „variantenbildend“ aus `variant_flag_would_merge_listings.flag` mit den Modell-Inseraten aus `details.groups`; „Merkmal deaktivieren“ hat keinen fachlichen Fehlerfall (K-03, Kap. 2.1) |
+| UI-028 bis UI-039 | default, loading, empty, speichert (wo genannt), error, validation, success, disabled | `empty` je Screen nach `screen.md`; UI-029/034/036/037 zeigen vorher „gilt für n …“ (CU-179) |
+| UI-040 | alle | nicht umgesetzt (OD-02 A) |
+| UI-041 | default, disabled, error, loading, empty, validation, success, ausgang-unbekannt | `disabled` auch bei `deleteBlockedReason` |
+| UI-042 | default, loading, error, success, empty, validation, disabled | nur mit REQ-056 |
+| UI-043 | default, empty, loading, error, validation, success, disabled | nur Anzeige von `impact`; kein `.error` (K-5) |
+| UI-044 | default, loading, error, disabled, Netzbetrieb, empty, success, validation, `.unreachable`, `.ausgang-unbekannt`, `.wird-beendet` | Kap. 2.17; „Netzbetrieb“ entfällt (OD-02 A); bei fehlender Verbindung bleibt „wird geladen …“ (DG-06) |
+| UI-045 | default, loading, error, unknown, validation, empty, success, disabled, `.wird-beendet` | Zeitgrenze 30 s → `unknown` (UI-046) |
+| UI-046 | success, unknown, loading, error, empty, validation, disabled | ohne die nicht verbindlichen Zusatzzeilen und ohne „Erneut versuchen“ |
+| LP-01 | default | Seitenwechsel nach T-5 |
+| LP-02 | default, `zeitueberschreitung` (Design v0.6, K-07) | Referenznummer nach H-11. `default` bei `aborted` oder `gave_up`, auch nach der Startgrenze von 10 min mit deren eigener Nummer. `zeitueberschreitung`: 120 s ohne Startergebnis, Titel „resellr startet länger als erwartet“, Referenznummer von `start_timeout`; leitet bei späterem `ready` selbst weiter wie LP-01, wechselt bei Abbruch zu `default` (Kap. 2.18). Im Rückfall S-7 Text des Designs ohne Selbstweiterleitung |
+| LP-03 | loading, success, error, nicht-aktiv | `loading` entfällt nur im Rückfallweg S-7 |
+
+---
+
+## 8. Lücken und Klärungsbedarf am Design
+
+### 8.1 Designlücken
+
+Keiner dieser Punkte blockiert die Specification. Bis zur Antwort gilt die genannte Standardlösung. **Berichtigung gegenüber v0.1 (FIND-210):** Die Standardlösungen von DG-01, DG-02, DG-03, DG-07 und DG-08 führen sehr wohl Gestaltung ein (Bezeichnungen, Feldanzahl, Verhalten, Wahl der Seite, Texte). Der Product Owner hat sie bestätigt oder entschieden (MAR-159, MAR-163, MAR-164, verbindlich zusammengeführt in MAR-176, Kap. 8.2). Der Design-Entwurf v0.6.1 (MAR-167, MAR-169, Textkorrektur MAR-181, Klarstellung MAR-182) trägt DG-01, DG-02, DG-03, UI-005, LP-02 und den Meldungskatalog nach und schließt mit Teil A (anpassendes Fenster) DG-16; er ist vom Owner noch nicht bestätigt.
+
+| ID | Screen | Lücke | Standardlösung | Stand |
+| --- | --- | --- | --- | --- |
+| DG-01 | UI-019 | Bezeichnungen der festen Kopierfelder | Begriffe der Requirements (Kap. 2.12), GPSR-Angaben einzeln | bestätigt (MAR-159, MAR-164); in v0.6 nachgetragen |
+| DG-02 | UI-019 | Zustand und Zusatz: ein oder zwei Felder | zwei; das zweite nur mit Zusatzangabe (RQ-04) | bestätigt; in v0.6 |
+| DG-03 | UI-019 | (a) „übernommen“ je Fenster; (b) Verhalten bei geändertem Bestand | (a) je Fenster; (b) Markierung gilt mit dem angezeigten Wert, geänderter Wert macht das Feld wieder offen (RQ-14) | (a) bestätigt; (b) **gelöst, K-06** (MAR-176); in v0.6.1 nachgetragen |
+| DG-04 | alle mit `.loading` | Zeitüberschreitung beim Laden | P-06; `.error` nur mit Referenznummer; nicht für „Datenblatt öffnen (PDF)“ | bestätigt (MAR-159) |
+| DG-05 | UI-019, UI-036 | Feldreihenfolge nach REQ-029 | feste Reihenfolge der festen Felder, Merkmalsfelder nach UI-036 | **Requirements-Abweichung, Owner-Entscheidung E-1** (Kap. 8.3, RQ-11) |
+| DG-06 | UI-044 | Speicherort lädt ohne Verbindung | „wird geladen …“, Inhalt P-06; nach „Erneut versuchen“ auch der Speicherort neu | bestätigt (MAR-164) |
+| DG-07 | LP-02 | Zeitüberschreitung beim Start | Zustand `LP-02.zeitueberschreitung` nach Design v0.6 mit Selbstweiterleitung; Startgrenze 10 min; Referenznummer in beiden Protokollen (Kap. 2.18) | **gelöst, K-07** (MAR-176); in v0.6 |
+| DG-08 | mehrere | Meldungstexte ohne Wortlaut im Design, einschließlich der neuen Grenzen (manuelle Beschreibung, Titelmuster, Beschreibungsvorlage, Merkmalsbezeichnung, Excel-Datei) | Texte nach Tabelle „Meldungstexte“ in Kap. 8.2 (Meldungskatalog Design v0.6.1) im Meldungskatalog CU-012; kein Sammeltext (M-23 entfallen), die Fehlerzusammenfassung in UI-003 bleibt (Kap. 2.0.5); Zahlenwerte sind technische Obergrenzen des Architekten | **gelöst, K-07** (MAR-176); in v0.6.1 |
+| DG-09 | LP-01 bis LP-03 | Rückfallweg S-7 | Design Kap. 8 Nr. 8 | nur bei Spike-Ergebnis |
+| DG-10 | UI-030 | fehlendes Prüfdatum hat im Design keinen Text, AC-REQ-054-03 schon | ein Text „Prüfdatum und prüfende Stelle erforderlich“ für fehlendes Datum, fehlende Stelle oder beides, beide Felder markiert (Kap. 2.2) | **gelöst, K-05** (MAR-176); in v0.6.1 |
+| DG-11 | UI-027 | Ablehnung der Zeilenaktion „Merkmal deaktivieren“ | – | **entfallen** (K-03, MAR-176: Deaktivieren wird nie abgelehnt); Nummer nicht neu vergeben |
+| DG-12 | UI-017 | Welche Merkmale erscheinen als Zeilen? | jedes Merkmal, das ein Kanal als Merkmalsfeld führt (Kap. 2.9) | an PO gemeldet |
+| DG-13 | UI-039 | Beispielgerät des Vorschau-Links | zuletzt erfasstes Gerät, das die Voraussetzungen des Datenblatts erfüllt; sonst Link deaktiviert; vor S8 immer deaktiviert (Kap. 4.4.0) | an PO gemeldet |
+| DG-14 | UI-027 | Warnung beim Umbenennen eines Merkmals (RQ-06) | keine Warnung; Design-Erweiterung nur auf Wunsch des Owners | an PO gemeldet, kein Muss für Release 0.1 (MAR-164) |
+| DG-15 | UI-024 | Filter „Art des Objekts“ braucht Objektarten, das Design nennt nur Kategorien (AC-REQ-055-01, FIND-204) | Kategorien plus eingerückte Objektarten unter „Einstellung“ (Kap. 2.16) | an PO gemeldet |
+| DG-16 | Anwendungsrahmen (Navigation, UI-044), alle Screens | Verhalten bei wenig Höhe und bei 125 % und 150 % Vergrößerung; der Owner will eine Oberfläche, die sich anpasst, statt einer auf einen PC zugeschnittenen (MAR-162) | Design-Entwurf v0.6 Teil A: Variante A (Spalte scrollt unter festem Kopf), Hinweis in UI-019 am Ende der scrollenden Fläche, Dialogregel, R-1 | **geschlossen durch Design v0.6** (MAR-169, `4fee15c`), eingearbeitet in Kap. 2.0.10, 2.17, 6.3; Owner-Bestätigung von v0.6 ausstehend |
+
+**Technische Randbedingungen für DG-16** (an den Product Owner, keine Gestaltungsvorgabe): (a) Mit dem Stack (React, CSS, Kap. 5) ist jede Lösung aus Media Queries auf Breite und Höhe, Container Queries, Scrollbereichen und Ein- und Ausklappen machbar, ohne neuen Baustein und ohne neue Abhängigkeit. (b) AC-REQ-104-01 verlangt, dass der Hinweis „Sicherung einrichten“ ohne Nutzeraktion sichtbar ist und es keine Aktion zum Ausblenden gibt (AC-REQ-104-03). An der Untergrenze (FM-1) darf ein Einklappen die Überschrift deshalb nicht verbergen; sonst wäre es eine Requirements-Abweichung mit Owner-Entscheidung. (c) Jede Variante muss die Kriterien der Fenstergrößen-Matrix erfüllen; gestaltete Kürzungen tragen den vollständigen Wert im Tooltip. (d) Betroffen sind in der Specification nur Kap. 2.17 (UI-044), die Rahmen `AppFrame.tsx` und `CompactFrame.tsx` (Kap. 4.4) und Kap. 6.3; Schnittstellen und Datenmodell ändern sich nicht.
+
+**Abgleich mit Design v0.6:** (a) erfüllt, ohne neue Abhängigkeit. (b) Es gibt kein Einklappen, die Überschrift steht immer im Text. Neu ist, dass der Hinweis bei wenig Höhe erst nach Scrollen der Spalte sichtbar wird. Das Design führt das als Auslegung von AC-REQ-104-01 und legt es dem Owner als kritische Annahme 1 vor; es ist also keine stille Abweichung. (c) erfüllt: gekürzt werden nur Werte in UI-019 schmal, mit vollem Wert per Klick oder Tooltip. (d) **nicht ganz eingehalten:** Die Dialogregel und R-1 wirken über CU-058 und CU-059 auf alle Screens, nicht nur auf die Rahmen (Kap. 2.0.10). Schnittstellen und Datenmodell bleiben unverändert, und es gibt keine neue Code-Einheit.
+
+Nicht als Lücke geführt, weil durch Owner oder Product Owner entschieden: Zusatzzeilen und „Erneut versuchen“ in UI-046 (Owner-Standard: nicht verbindlich); X-5, X-6, X-8 (nicht gestaltet).
+
+### 8.2 Entscheidungsprotokoll K-01 bis K-07 (verbindlich nach MAR-176)
+
+MAR-163 (`decisions`) und MAR-164 (`ts-klaerung-r1`) hatten sieben Punkte unterschiedlich beantwortet. Der Product Owner hat sie in [MAR-176](/MAR/issues/MAR-176#document-k-entscheidung) (`k-entscheidung`, Rev. `004e2a12`) **verbindlich** entschieden. Maßstab waren der Wortlaut der Requirements v0.3.3 und das freigegebene Design v0.5.3. Kein Punkt ändert den Wortlaut der Requirements oder das freigegebene Design; es gibt deshalb keine Frage an den Owner aus K-01 bis K-07. Vier Punkte (K-02, K-04, K-06, K-07) sind Auslegungen und stehen mit Beispiel im Freigabe-Briefing. Die Specification setzt alle sieben Punkte ohne Alternative um; Vermerke „vorläufig“ gibt es dazu nicht mehr.
+
+| ID | Punkt | Entscheidung (MAR-176) | Art | Umsetzung |
+| --- | --- | --- | --- | --- |
+| K-01 | „geändert seit Freigabe“ (früher RQ-02) | endet **nur** durch Freigabe (REQ-044, REQ-089); 279 € → 289 € → 279 € lässt die Kennzeichnung stehen, der Inhalt wird einmal freigegeben | Wortlaut | 2.8.3, Kap. 3.3 `flag_changed_since_release`, CU-167; RQ-02 bleibt gestrichen |
+| K-02 | Titel, erstes Wort länger als die Höchstlänge (AC-REQ-035-04) | nie im Wort kürzen: das Wort bleibt ganz, „Titel gekürzt, bitte prüfen“, die Freigabebedingung `title_too_long` lehnt ab, bis der Nutzer den Titel anpasst (REQ-043) | Auslegung | 2.8.2, CU-145, 6.2, RQ-18 |
+| K-03 | Variantenmerkmal deaktivieren (RQ-05) | Deaktivieren wird **nie** abgelehnt; deaktivierte Variantenmerkmale bleiben in der Vergleichsregel und werden für neue Daten nur nicht mehr abgefragt; abgelehnt wird weiter nur das Entfernen des Kennzeichens (AC-REQ-005-09) | Wortlaut | 2.0.6, 2.1, 2.6, 7.3, CU-075, CU-119, CU-290; DG-11 entfallen; RQ-05 |
+| K-04 | Umbuchungsziel weicht ab (UI-005) | zweiter Dialogschritt `UI-005.ziel-abweichung` nach Design v0.6 („Umbuchen: Ziel weicht ab“, „Anderes Ziel wählen“, „Abbrechen“, „Trotzdem umbuchen“); erst „Trotzdem umbuchen“ speichert | Auslegung | 2.5, 2.6, 7.3, CU-135 |
+| K-05 | Text bei fehlendem Prüfdatum (UI-030) | „Prüfdatum und prüfende Stelle erforderlich“ (Wortlaut AC-REQ-054-03); Design v0.6.1: ein Text für fehlendes Datum, fehlende Stelle oder beides | Wortlaut | 2.2, M-24, CU-012, 6.2 |
+| K-06 | Markierung „übernommen“ bei geändertem Wert (DG-03 b) | gilt für das Feld mit seinem angezeigten Wert; ändert sich der Wert, ist das Feld wieder offen und zählt in „n von m“ als offen; eine neue Freigabe setzt alles zurück | Auslegung | 2.12, CU-218, RQ-14, DG-03, 6.2 |
+| K-07 | LP-02 bei Zeitüberschreitung und Meldungstexte (DG-07, DG-08) | LP-02: eigener Zustand `LP-02.zeitueberschreitung` nach Design v0.6, leitet bei späterem Erfolg selbst weiter, Referenznummer in Betriebs- und Fehlerprotokoll; Meldungstexte M-01 bis M-22 nach Design v0.6, M-23 (Sammeltext) **entfällt**, M-24 nach K-05; die Fehlerzusammenfassung des freigegebenen Designs (UI-003 beim Speichern) bleibt (MAR-182 FIND-1) | Auslegung (Texte, LP-02); Wortlaut (M-23) | 2.0.5, 2.18, 6.2, 7.3 (UI-003, LP-02), CU-012, CU-259, CU-264, CU-268, CU-271, CU-296; Startgrenze 10 min (Kap. 2.18 Schritt 5) |
+
+**Designstand.** Das Design v0.6 widersprach der Entscheidung an drei Textstellen (K-05, K-06, M-23). Der UI/UX Designer hat sie korrigiert (MAR-181, `3d418bd`); der Product Owner hat im Review MAR-182 (FIND-1) klargestellt, dass nur der Sammeltext M-23 entfällt und die Fehlerzusammenfassung des freigegebenen Designs bleibt. Maßgeblich ist **Design-Entwurf v0.6.1 einschließlich MAR-182**, Branch `design/MAR-167`, Commit `894d49e`. Ändert sich der Branch bis zur Owner-Bestätigung noch einmal, wird dieser Verweis angeglichen. Die Specification verweist auf diesen Stand; die Zieltexte unten stimmen mit ihm wörtlich überein. Die Owner-Bestätigung von v0.6.1 steht aus (Kap. 9.4).
+
+**Meldungstexte (DG-08, K-05, K-07; verbindlich).** Der Meldungskatalog CU-012 und die API-Tests (Kap. 6.2) folgen dieser Tabelle. Die Nummern M-xx des Meldungskatalogs im Design v0.6.1 dienen als Schlüssel; M-23 ist entfallen und wird nicht neu vergeben.
+
+| Schlüssel | Fall (Screen) | Wortlaut | Quelle |
+| --- | --- | --- | --- |
+| M-01 | Gerät bereits zugeordnet (UI-004) | „Gerät ist bereits einem Modell-Inserat zugeordnet“ | Design v0.6.1, MAR-159 |
+| M-02 | Merkmal: Bezeichnung leer oder zu lang (UI-027) | „Bezeichnung: 1 bis 100 Zeichen“ | Design v0.6.1 |
+| M-03 | Merkmal: Bezeichnung mit `{` oder `}` (UI-027) | „Bezeichnung darf { und } nicht enthalten“ | Design v0.6.1 |
+| M-04 | Merkmal: Bezeichnung gleich festem Platzhalternamen (UI-027) | „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ (<Name> = eingegebene Bezeichnung) | Design v0.6.1 (K-07) |
+| M-05 bis M-13 | GPSR-Felder zu lang (UI-031) | „<Feld>: höchstens <n> Zeichen“ je Feld wie im Meldungskatalog, z. B. „Herstellername: höchstens 200 Zeichen“, „Postleitzahl: höchstens 20 Zeichen“, „Elektronische Kontaktadresse: höchstens 254 Zeichen“, „Postanschrift der verantwortlichen Person: höchstens 500 Zeichen“; Grenzen aus Kap. 3.1 | Design v0.6.1 |
+| M-14 | Kategorie-Kennung zu lang (UI-035) | „Kategorie-Kennung: höchstens 100 Zeichen“ | Design v0.6.1 |
+| M-15 | Eintrag nicht mehr vorhanden (alle) | „Dieser Eintrag ist nicht mehr vorhanden.“ | Design v0.6.1 |
+| M-16 | Manuelle Beschreibung (UI-016) | „Beschreibung: 1 bis 20.000 Zeichen“ | Design v0.6.1 |
+| M-17, M-18 | Titelmuster: Präfix, Suffix (UI-029) | „Präfix: höchstens 50 Zeichen“, „Suffix: höchstens 50 Zeichen“ | Design v0.6.1 |
+| M-19 | Titelmuster: fester Text (UI-029) | „Fester Text: 1 bis 100 Zeichen“ | Design v0.6.1 |
+| M-20, M-21 | Beschreibungsvorlage: Überschrift, Zeile (UI-037) | „Überschrift: höchstens 100 Zeichen“, „Zeile: höchstens 1.000 Zeichen“ | Design v0.6.1 |
+| M-22 | Excel-Datei über 10 MB (UI-042, Could) | „Excel-Datei: höchstens 10 MB“ | Design v0.6.1 (K-07) |
+| M-23 | – | **entfallen**: kein Sammeltext bei mehreren Feldfehlern, `message` bei `validation_failed` leer; die Fehlerzusammenfassung in UI-003 bleibt und hat keinen eigenen Text (Kap. 2.0.5) | MAR-176 (K-07), MAR-182 (FIND-1) |
+| M-24 | Prüfdatum, prüfende Stelle oder beides fehlt bei „rechtlich geprüft“ (UI-030) | „Prüfdatum und prüfende Stelle erforderlich“, einmal, beide Felder markiert | AC-REQ-054-03, Design v0.6.1 (K-05) |
+| – | LP-02 bei Zeitüberschreitung (`LP-02.zeitueberschreitung`) | Titel „resellr startet länger als erwartet“; Absätze 1 bis 3, Referenznummer und Fortschrittszeile wörtlich nach Design v0.6 `launcher-pages/LP-02-start-abgebrochen/screen.md`; im Rückfall S-7 der dort genannte Rückfalltext | Design v0.6 (K-07) |
+
+### 8.3 Owner-Entscheidung E-1: Feldreihenfolge des Kopier-Assistenten (REQ-029)
+
+REQ-029 (Must) nennt die „Feldreihenfolge des Kopier-Assistenten“ als Kanal-Einstellung; das freigegebene Design macht nur die Reihenfolge der Merkmalsfelder einstellbar (UI-036). Die Frage liegt beim Owner. **Empfehlung des Product Owners: A; Standard bei „kein Einwand“: A** (MAR-176, Abschnitt 4).
+
+- **Option A:** REQ-029 bezieht sich auf die Merkmalsfelder; Titel, Beschreibung, Kategorie, Zustand, Preis und GPSR-Angaben stehen in fester Reihenfolge. *Beispiel:* In jedem Kanal kopierst du zuerst den Titel, dann die Beschreibung; nur Merkmalsfelder wie Prozessor und RAM ordnest du je Kanal selbst (UI-036). **Folge für diese Specification: keine.** So ist sie geschrieben (Kap. 2.12, RQ-11, Kap. 7.1).
+- **Option B:** Alle Felder sind je Kanal verschiebbar. *Beispiel:* Bei eBay kopierst du zuerst den Preis, bei Kleinanzeigen zuerst den Titel.
+
+**Aufwand von Option B (berichtigt nach MAR-176, Abschnitt 4; v0.3 hatte ihn mit „ein Feld, eine Migration, die Karte bleibt sonst gleich“ zu niedrig angegeben):**
+1. **Gestaltung (größter Posten):** UI-036 ordnet heute je Kanal und Geräteart; eine Reihenfolge je Kanal für alle Felder überschneidet sich damit. Der UI/UX Designer muss UI-036 und UI-019 neu gestalten (neues Bedienelement, ggf. Mockup), danach bestätigt der Owner das Design erneut.
+2. **Datenmodell:** Feld `copy_field_order` (JSON, Liste der festen Feldschlüssel) in `channel`, Startreihenfolge in der Startbelegung. **Keine neue Migrationsdatei:** Release 0.1 hat eine Initialmigration (CU-030), die vor der ersten Auslieferung geändert werden darf (Kap. 3.8); die Änderung geht in CU-030 und `0002`.
+3. **Code-Einheiten:** Feldliste Kap. 2.12 (CU-212: Reihenfolge aus `copy_field_order` statt fest, Merkmalsfelder als ein Block darin); Kanal-Schnittstelle Kap. 2.3 (Prüfung „jedes feste Feld genau einmal“, auch für optionale GPSR-Felder und Merkmalsfelder, die nach der Auflösung entfallen); die neue Einstellung im Kanal-Screen; Tests zu AC-REQ-047-01.
+4. **Ablauf:** Designänderung über den Product Owner, Owner-Bestätigung, danach Delta dieser Specification mit erneutem Architecture Review.
+
+**Bewertung:** Option B ist mittel aufwendig, nicht gering. Option A erfüllt AC-REQ-047-01 („eingestellte Reihenfolge“), und B lässt sich später ohne Datenverlust nachrüsten (neues Feld mit der heutigen festen Reihenfolge als Startwert).
+
+**Vorbereitet für beide Fälle:**
+- **Owner wählt A oder hat keinen Einwand:** RQ-11 wird von „Abweichung, Owner-Entscheidung E-1“ zu „Auslegung, vom Owner bestätigt“; Kap. 7.1, DG-05, 9.4 und Briefing nennen E-1 als entschieden. Rein redaktionell, kein erneuter Review nötig außer der Prüfung dieser Zeilen.
+- **Owner wählt B:** Auftrag an den UI/UX Designer (UI-036, UI-019) über den Product Owner; danach Delta der Specification an den Stellen unter 2. und 3., erneutes Architecture Review und erneute Owner-Freigabe. Bis dahin bleibt diese Specification bei A und wird **nicht** vorab geändert.
+
+---
+
+## 9. Annahmen, offene technische Fragen und Risiken
+
+### 9.1 Einordnung
+
+- **Bekannte Tatsachen:** Requirements v0.3.3, Baseline v0.3.2, Design v0.5.2 und die Owner-Entscheidungen in den Metadaten. Für Fenstergröße, Rahmen und Dialoge gilt der Design-Entwurf v0.6.1 Teil A, für UI-005 Schritt 2, LP-02 und die Meldungstexte dessen Teil B, soweit Kap. 8.2 es sagt; seine Owner-Bestätigung steht aus (Kap. 9.4).
+- **Entscheidungen des Architekten** (vorgeschlagen, mit dieser Specification freizugeben): ADR-008, Kap. 2.0 (Schnittstellenregeln), Kap. 3 (Datenmodell), Kap. 4 (Code-Struktur), die Auslegungen in Kap. 9.3.
+- **Entscheidungen des Product Owners:** MAR-159, MAR-163, MAR-164; ihre Widersprüche K-01 bis K-07 sind verbindlich entschieden (MAR-176, Kap. 8.2).
+- **Spike-Annahmen:** S-1, S-2, S-3, S-5 und S-7 sind **durch den Windows-Spike bestätigt** (GitHub-Issue #2, Lauf 42475377911; v0.5), mit den Grenzen aus Kap. 9.2; was der Spike nicht zeigen konnte, belegt die Abnahme (Kap. 6.4). S-4 wird bei der Abnahme, S-8 in der Windows-CI (CU-278) geprüft. S-6 ist entfallen (Owner-Entscheid MAR-162, Kap. 6.3).
+
+### 9.2 Spike-Annahmen (Baseline 10.2, 10.7; Ausführungsweg im Kommentar `1d050fcf`)
+
+**Ergebnis des Windows-Spikes (v0.5).** Quelle: `spike/ERGEBNIS.md` (Repository `MarloNET/resellr`, Branch `spike/windows-hosting`, Commit `ad17ab2`), maßgeblicher CI-Lauf [42475377911](https://github.com/MarloNET/resellr/actions/runs/42475377911) auf Commit `9428f22`, Artefakt `windows-spike-results` (`results.json`, `checks/<ID>.json`, Beobachter-CSV), geprüft gegen Spike-Auftrag v1.2 (MAR-158, Rev. `636316e8`). Alle 22 Prüfungen (P1.1 bis P1.5, P2.1 bis P2.4, P3.1 bis P3.8, P5.1, P5.2, Z1.1 bis Z1.3) liefen in diesem einen Lauf und haben **bestanden**; P2.R (Rückfall S2) wurde nicht ausgelöst. Umgebung: Runner-Image `win25-vs2026` 20261103.298.1, Windows Server 2025 Datacenter, Build 10.0.26100.33674 (24H2), Node.js v26.13.0, Chrome 156; Prüfkonto `spikeuser` nur in der Gruppe „Benutzer“ (kein Administrator), interaktive Sitzung 2; Defender-Dienst aktiv. Verbrauch: 4 von höchstens 10 Läufen, maßgeblicher Lauf 5 min 57 s (Grenze 18 min). Der Branch ist ein Wegwerf-Prototyp und wird nicht gemergt; er bleibt bis zur Owner-Freigabe als Nachweis stehen.
+
+**Prüfung des Ergebnisses durch den Software Architect.** Werte im Artefakt nachgelesen und die Änderungen am Prüfskript zwischen Lauf 1 und Lauf 4 gegen den Auftrag geprüft. Der Prototyp (`spike/proto`, `spike/stub`) ist seit Lauf 1 unverändert. Die Korrekturen betreffen nur das Prüfskript und lassen jedes Akzeptanzkriterium unverändert: P1.4 löst die Verknüpfungen als `spikeuser` auf, wie der Auftrag es verlangt (vorher als Runner-Konto), und liest die Ausgabe robust ein; P2.1 schließt jetzt genau die 14 festgelegten Bytes aus (vorher falsch gebildete Liste; die gemeldeten Abweichungen lagen genau in diesen Feldern); P2.3 Typfehler im Beobachter; P3.2 Exit-Code als 64-Bit-Wert; P5.1 wiederholt `npm ci` einmal nur bei einem Netzfehler beim Download und wertet einen bleibenden Netzfehler als „nicht aussagekräftig“, nie als „bestanden“ (in Lauf 4 ein Versuch); Z-1 läuft nach jedem erfolgreichen Build. Zwei Abweichungen vom Auftrag schwächen die Aussage nicht: (1) Der Fensterbeobachter lief als `spikeuser` statt als Administrator; dieselbe Sitzung 2 ist belegt, er sah also denselben Desktop. (2) P2.3 wertet nur Fenster von `resellr-node.exe`, `node.exe` und `resellr-start.exe` aus, nicht die von `conhost.exe`, `OpenConsole.exe` und `WindowsTerminal.exe`. Die Rohdaten (`window-watch.csv`) enthalten aber für keinen dieser Prozesse ein neues Fenster (nur ein schon vorher offenes Terminal-Fenster des Runners), und der Prozessbeobachter fand bei 123 Starts von `resellr-node.exe` kein `conhost.exe` als Kind, während er die vier `conhost.exe` der Hilfsprozesse `cmd.exe` erfasst hat; die Erkennung funktioniert also. Randnotiz: Die Beobachtung nach der Neustartgrenze (P3.6) endete etwa 6 s statt 10 s nach `gave_up`; zu diesem Zeitpunkt lief kein Server mehr. Die Fensterbeobachtung begann 0,46 s statt 1 s vor der Aktion „Start“; vorher lief kein `resellr-node.exe`.
+
+**Grenzen der Aussage.** (a) Prüfumgebung ist Windows Server 2025 im CI-Runner, nicht Windows 11: gleiche Versionsbasis wie Windows 11 24H2 (Build 26100), aber Server-Ausgabe. Unter Windows 11 kann Windows-Terminal Konsolenfenster übernehmen; ein Programm mit GUI-Teilsystem legt keine Konsole an und ist davon nicht betroffen, die Sichtprüfung folgt trotzdem bei der Abnahme. (b) Der Standardbenutzer wurde über `CreateProcessWithLogonW` gestartet, nicht über eine echte Anmeldung; den Anmelde-Start prüft die Abnahme. (c) Nicht im Umfang: S-4 (Abmelden, Herunterfahren), S-6 (entfallen), S-8 (Chrome bleibt offen; Windows-CI CU-278), `stop` über die Pipe (Prototyp bewusst über `POST /api/ops/shutdown`, Spike-Auftrag Ä-9; Windows-CI CU-278), SmartScreen (in der CI nicht aussagekräftig) und Smart App Control (aus, OD-09). (d) Geprüft wurde ein Wegwerf-Prototyp; die Produkt-Einheiten CU-258 bis CU-279 entstehen in S10 neu, die Windows-CI (CU-278) prüft sie bei jedem Build erneut, ebenfalls unter Windows Server. Was davon auf dem Arbeitsplatzrechner geprüft wird, steht in Kap. 6.4.
+
+| ID | Annahme (Hauptweg) | Prüfung | Rückfallweg und betroffene Stellen |
+| --- | --- | --- | --- |
+| S-1 | **bestätigt** (Spike, Lauf 42475377911; Anmelde-Start offen bis zur Abnahme). Autostart-Eintrag `HKCU\…\Run` ohne Adminrechte startet `supervise` bei der Anmeldung (Spike-Punkt 1) | Spike P1.1 bis P1.5 bestanden: Installation als Standardbenutzer ohne Rechte-Dialog, Exit-Code 0 in 38,5 s, Programm unter `%LOCALAPPDATA%\Programs`, kein Eintrag unter `HKLM`; Autostart-Wert `REG_SZ`, zeichengleich; dieselbe Befehlszeile als Standardbenutzer: `ready` in 0,9 s, genau 1 Überwachung und 1 Server (Kind der Überwachung), beide mit Besitzer `spikeuser`; Verknüpfungen mit Ziel `resellr-node.exe` und `open`/`stop`, `stopped` 0,2 s nach `stop`; Deinstallation entfernt Programm, Eintrag und Verknüpfungen, `resellr.db` bleibt. Offen: Start durch echte Anmeldung (Abnahme, Kap. 6.4) | nicht ausgelöst. Bleibt für die Abnahme: Verknüpfung im Autostart-Ordner des Benutzers; ändert nur CU-273 |
+| S-2 | **bestätigt, einschließlich Defender** (Spike, Lauf 42475377911; Sichtprüfung und Scan unter Windows 11 bei der Abnahme). `resellr-node.exe` (umgestellte Kopie von `node.exe`, Signatur entfernt) startet Launcher und Server ohne Konsolenfenster, auch nicht kurz, und ohne Befund im Virenschutz (Spike-Punkt 2) | Spike P2.1 bis P2.4 bestanden: Teilsystem 3 → 2; `resellr-node.exe` `NotSigned`, Eintrag 4 („Security Directory“) = 0, Länge = Versatz der Zertifikatstabelle von `node.exe`; Prüfsumme mit `MapFileAndCheckSumW` bestätigt; sonst nur die 14 festgelegten Bytes verschieden (FIND-219); gleiche Node-Version v26.13.0. 0 sichtbare Fenster in allen vier Beobachtungsfenstern (Start, `stop`, Neustart, Neustartgrenze; Fensteraufzählung im Mittel alle 16 ms, in einzelnen Sekunden bis 32 ms, wegen der Timer-Auflösung von Windows) und 0 `conhost.exe`/`OpenConsole.exe` als Kind von `resellr-node.exe` bei 123 Starts, Sitzung des Prototyps = Sitzung des Beobachters = 2. Kurze Fenster zwischen zwei Aufzählungen deckt das zweite Kriterium ab: Der Prozessbeobachter arbeitet ereignisbasiert und erfasst auch kurzlebige Prozesse, und ohne Konsolen-Host gibt es kein Konsolenfenster. Aktiver Defender-Scan (`MpCmdRun -Scan -ScanType 3 -File … -DisableRemediation`, Signaturen 1.463.189.0, 0,3 Tage alt, Ausschlüsse `C:\` und `D:\` des Runners vorher entfernt): Positivkontrolle Exit-Code 2 in jedem Ordner, gebaute und installierte `resellr-node.exe` und Installer Exit-Code 0, `Get-MpThreatDetection` ohne Eintrag. P2.R nicht ausgelöst. Weiter: Scan bei jedem Build in der Windows-CI (TR-05) und bei der Abnahme (Kap. 6.4) | nicht ausgelöst. Bleibt für Abnahme und Windows-CI: kleiner Start-Baustein mit Windows-GUI-Teilsystem, der `node.exe` mit `CREATE_NO_WINDOW` startet; ändert CU-274, CU-276, CU-273 (ADR-008). Greift bei einem Konsolenfenster oder einer Bedrohung in `resellr-node.exe`; ein Befund nur im Installer geht als Eskalation an den Software Architect |
+| S-3 | **bestätigt** (Spike, Lauf 42475377911; `stop` über die Pipe in der Windows-CI). Eine Überwachung je Sitzung über die Pipe; Neustart-Regel; Exit-Codes; Kopplung über Job-Objekt und IPC (Spike-Punkt 3, H-13, H-14) | Spike P3.1 bis P3.8 bestanden: in 10 von 10 Wiederholungen genau 1 Überwachung und 1 Server, übrige `supervise` mit `already_supervised`; Absturz (Exit-Code 4294967295) → `crash` mit Referenznummer, neuer Server nach 5,0 s; geordnetes Ende: `200`, kein Neustart, Pipe nach 94 ms neu übernommen; abgebrochener Start (Exit-Code 10) → `aborted`, `open` erhält dieselbe Referenznummer; „läuft bereits“ (Exit-Code 11) ohne Neustart und ohne Schreibzugriff; Neustartgrenze: 3 Neustarts, beim 4. Absturz `gave_up` mit derselben Nummer in `start-result.json`; Ende der Überwachung → Server endet in 54 ms, `ipc_disconnect` protokolliert, `integrity_check` = `ok`; Pipe nach Absturz in 116 ms übernommen. Nicht geprüft: `stop` über die Pipe (Spike-Auftrag Ä-9; Windows-CI CU-278) | nicht ausgelöst. Bleibt dokumentiert: Einzelinstanz: Sperre über eine Datei im Protokollordner mit `better-sqlite3` wie CU-246; Statuskanal von `open`: Abfrage von `start-result.json` und `health` im Sekundentakt statt Pipe; ändert CU-263 und CU-259. Kopplung: koppelt das Job-Objekt nicht, ist das IPC-Ende allein der Mechanismus (CU-249, schon umgesetzt) (FIND-219) |
+| S-4 | Abmelden und Herunterfahren: kein verwertbares Signal; Einordnung über die 5-s-Regel (H-10) als Standard (Spike-Punkt 4) | nur ersatzweise in der CI; Abnahme | keiner nötig; im ungünstigsten Fall Fehleinordnung „abgestürzt“ nur in der Anzeige des Betriebsprotokolls |
+| S-5 | **bestätigt mit Node.js 26** (Spike, Lauf 42475377911). `better-sqlite3` und `sharp` laden aus dem Benutzerprofil als Standardbenutzer (Spike-Punkt 5; Smart App Control aus, OD-09) | Spike P5.1, P5.2 bestanden: `npm ci` mit Node v26.13.0 verwendet vorkompilierte Pakete (`better-sqlite3` 12.11.1 ohne `node-gyp`, `@img/sharp-win32-x64` 0.34.5); als `spikeuser` aus `%LOCALAPPDATA%\Programs\…\node_modules` geladen, `journal_mode` = `wal`, 1 000 Zeilen, `sharp` 1600 px und 320 px. Node.js 24 war nicht nötig; TR-02 bleibt als Prüfung in S1 für die dann aktuellen Versionen | nicht ausgelöst. Bleibt dokumentiert: fehlen vorkompilierte Pakete: Node-Version wechseln (TR-02). Laden sie als Standardbenutzer nicht (Virenschutz, Richtlinie): Ausnahme für den Programmordner durch den Betreiber; geht das nicht, Entscheidungsvorlage an den Owner (Installation mit Adminrechten widerspräche ADR-006) (FIND-219) |
+| S-6 | **entfallen** (Owner-Entscheid MAR-162: keine Messung am PC des Owners, kein Spike-Punkt 6; Abweichung von Baseline 10.2 und 11.2). Die bisherigen Werte bleiben nur Herleitung des Prüfwerts FM-1: Design UI-044 etwa 607 px Seitenhöhe mit Lesezeichenleiste, geplant mit 600 px; UI-044 braucht mit 100-Zeichen-Pfad 572 px (Probelauf in Chromium unter Linux, Inter 5,59 px je Zeichen, MAR-158) | Fenstergrößen-Matrix FM-1 bis FM-7 in der CI (Kap. 6.3) | kein Rückfallweg nötig; Erreichbarkeit nach Kap. 6.3, Sichtbarkeit ohne Scrollen in FM-1 nur Bericht (TR-03) |
+| S-7 | **bestätigt** (Spike Z-1, Lauf 42475377911). Launcher-Seiten wechseln selbst, indem sie `launcher-state.js` als Skript neu laden (T-5) | Spike Z1.1 bis Z1.3 bestanden (Playwright, Google Chrome 156 unter Windows, `file://`): Wechsel auf die `http`-Adresse 1,1 s nach dem Umschreiben, auf `lp-02.html` mit Referenznummer nach 1,0 s, 0 Konsolenfehler; Inter als `data:`-URL geladen (als relative Datei ebenfalls, T-6 bleibt bei `data:`). Weiter: Playwright unter Linux und Windows (Kap. 6.1) | nicht ausgelöst. Bleibt dokumentiert: neuer Tab statt Seitenwechsel (Design Kap. 8 Nr. 8); ändert CU-268, CU-271 und LP-03 über den Product Owner; für `LP-02.zeitueberschreitung` gilt der Rückfalltext des Designs ohne Selbstweiterleitung (Kap. 2.18 Schritt 6, K-07) |
+| S-8 | Chrome und `explorer.exe`, abgelöst gestartet, laufen nach dem Ende von `open` und der Überwachung weiter; kein Kindprozess zeigt ein Konsolenfenster (FIND-213) | Windows-CI (CU-278): Chrome-Prozess nach Ende von `open` und nach `stop` vorhanden; maßgeblich für „kein Konsolenfenster“ ist wie bei S-2 das Kriterium „kein `conhost.exe`/`OpenConsole.exe` als Kind von `resellr-node.exe`“, ereignisbasiert erfasst; eine Fensteraufzählung ist nur Ergänzung (im Spike im Mittel alle 16 ms, nicht 10 ms). Die Technik der Beobachtung bleibt der Umsetzung überlassen | Chrome über `cmd.exe /d /c start "" "<chrome.exe-Pfad>" "<url>"` mit `windowsHide` und `windowsVerbatimArguments` starten (`start` gibt Argumente an das Programm weiter und startet es außerhalb des Job-Objekts). Die Windows-CI prüft dabei auch, dass Adressen mit `&` und `%` (Parameter der Launcher-Seiten) unverändert ankommen; sonst kleiner Start-Baustein wie bei S-2. Ändert nur CU-267. `explorer.exe <chrome.exe-Pfad> <url>` aus v0.2 entfällt, weil `explorer.exe` weitere Argumente nicht zuverlässig weitergibt (Hinweis Review R2) |
+
+Der Spike hat alle geprüften Hauptwege bestätigt; kein Rückfallweg ist ausgelöst, und keine Stelle der Specification ändert sich dadurch (keine neue Code-Einheit, keine Migration). Die Rückfallwege bleiben stehen für den Fall, dass die Abnahme am Arbeitsplatzrechner (Kap. 6.4) oder die Windows-CI (S-8, CU-278) etwas anderes zeigt. Dann ändert sich nur die genannte Stelle; die Architektur bleibt gleich (Baseline 10.2). Die Änderung wird mit Review und, wo nötig, erneuter Owner-Freigabe nachgezogen.
+
+### 9.3 Auslegungen der Requirements
+
+RQ-01 und RQ-02 aus v0.1 entfallen: Die Specification folgt dem Wortlaut von Requirements Kap. 9.4 (FIND-205; K-01, MAR-176). Die Nummern werden nicht neu vergeben; RQ-15 ist nicht vergeben.
+
+| ID | Stelle | Auslegung | Grund |
+| --- | --- | --- | --- |
+| RQ-03 | REQ-033 | Regelpreis wird gespeichert und folgt dem Bezugspreis bis zur Änderung durch den Nutzer | AC-REQ-033-01 bis -03 |
+| RQ-04 | REQ-047, Kap. 9.7 | `{Zustandsbezeichnung Kanal}` liefert nur die Bezeichnung; Zusatzangabe als eigenes Kopierfeld | Namen von Platzhalter und Quelle Q-05; DG-02 bestätigt |
+| RQ-05 | REQ-005 | Deaktivierte Merkmale: gespeicherte Werte erscheinen weiter in Kanal-Inhalten und Datenblatt. Deaktivierte Variantenmerkmale bleiben in der Vergleichsregel; das Deaktivieren wird nie abgelehnt (K-03). Folge: Ein neu erfasstes Gerät ohne Wert weicht von älteren Modell-Inseraten mit Wert ab (UI-005 zeigt „leer ≠ Wert“) | Wortlaut Requirements Kap. 6.0 („den Wert jedes Variantenmerkmals“) und REQ-005 (nur „nicht mehr abgefragt“); MAR-176 K-03 und Abschnitt 5 |
+| RQ-06 | REQ-005, Kap. 9.7 | Merkmals-Platzhalter in kanalweiten Texten werden je Geräteart über die Bezeichnung aufgelöst und beim Umbenennen nicht umgeschrieben | Texte gelten für mehrere Gerätearten mit gleich benannten Merkmalen; Warnung beim Umbenennen nur als Design-Erweiterung (DG-14) |
+| RQ-07 | REQ-007 | keine neuen Auswahllisten in Release 0.1 | REQ-007 und UI-028 nennen nur die Pflege der Werte |
+| RQ-08 | REQ-029 | Aktivieren eines Kanals legt fehlende Kanal-Inhalte als *Entwurf* an | sonst wäre ein reaktivierter Kanal für bestehende Modell-Inserate nicht nutzbar |
+| RQ-09 | REQ-021, REQ-095 | Verkaufte Geräte bleiben dem Modell-Inserat zugeordnet (für „verkauft je Kanal“) und verhindern das Löschen | AC-REQ-095-02 |
+| RQ-10 | REQ-021 | Verkauf ist auch über einen deaktivierten Kanal erfassbar | Verkäufe auf einem gerade abgeschalteten Kanal kommen vor; REQ-021 schränkt nicht ein |
+| RQ-11 | REQ-029 | **Abweichung vom Wortlaut, Owner-Entscheidung E-1:** einstellbar ist nur die Reihenfolge der Merkmalsfelder; die festen Felder stehen in fester Reihenfolge | freigegebenes Design UI-019/UI-036; Kap. 8.3 |
+| RQ-12 | REQ-053 | Zählung: ein veröffentlichter Inhalt mit schon bestehendem Änderungsentwurf zählt unter „zur erneuten Freigabe“; ein bestehender Hinweis „manuell angepasst“ zählt erneut, wenn der Lauf den Text darunter ändert; jeder Inhalt zählt genau einmal (Kap. 2.8.4) | Requirements nennen die Gruppen, aber nicht diese Fälle (FIND-220) |
+| RQ-13 | REQ-045 | Prüfangaben (`required`, `truncation`, `missing`) gehen nicht in den Inhalts-Hash ein; „Pflichtfeld“ ändern erzeugt keinen Änderungsentwurf | „geht ein“ meint die Ausgabe an den Kanal (FIND-220) |
+| RQ-14 | REQ-049 | „übernommen“ gilt für das Feld mit seinem angezeigten Wert; ändert sich der Wert, ist das Feld wieder offen und zählt in „n von m“ als offen; eine neue Freigabe setzt weiter alles zurück | ein nie kopierter Wert ist nicht „übernommen“; sonst könnte der Nutzer den Kanalbestand nach „Bestand auf Kanal anpassen“ nicht als offen erkennen (K-06, MAR-176; Grenzfall, leicht umkehrbar) |
+| RQ-16 | REQ-047 | optionale GPSR-Angaben ohne Wert erscheinen nicht als Kopierfeld und zählen nicht in „n von m“ | AC-REQ-049-03 („nur angezeigte Felder“); Design v0.6 gleich |
+| RQ-18 | REQ-035, AC-REQ-035-04 | Ist schon das erste Wort des Titels länger als die Höchstlänge, bleibt es ganz stehen; die Freigabebedingung `title_too_long` lehnt die Freigabe ab, bis der Nutzer den Titel anpasst | REQ-035 „nie innerhalb eines Worts abgeschnitten“; der Randfall steht in keinem AC; so gelten Wortgrenze und Höchstlänge beide (K-02, MAR-176) |
+| RQ-17 | REQ-014 | verkaufte und stornierte Geräte sind nicht mehr änderbar | Werte verkaufter Geräte sind abgeschlossen; Folge: Datenblattwerte eines verkauften Geräts lassen sich nicht mehr korrigieren (FIND-220) |
+
+### 9.4 Offene Fragen
+
+| Frage | Entscheider | Bis | Wirkung bis dahin |
+| --- | --- | --- | --- |
+| Ergebnis des Windows-Spikes (GitHub-Issue #2, MAR-158) | CEOrchestrator | **erledigt** mit v0.5 (Lauf 42475377911) | S-1, S-2, S-3, S-5, S-7 bestätigt; Grenzen und Abnahme nach Kap. 9.2 und 6.4 |
+| Owner-Bestätigung von Design v0.6.1 (`894d49e`, einschließlich MAR-182), u. a. dessen kritische Annahmen 1 und 2 (Hinweis bei wenig Höhe durch Scrollen erreichbar; Hinweis in UI-019 schmal am Ende der Fläche) | Owner | vor der Owner-Freigabe dieser Specification | v0.6.1 gilt nach Kap. 1.2 und 8.2; bei Änderung Delta an den betroffenen Stellen |
+| E-1 Feldreihenfolge (REQ-029) | Owner | mit der Owner-Freigabe dieser Specification | Option A (Empfehlung und Standard bei „kein Einwand“, Kap. 8.3) |
+| DG-12 bis DG-15 | Product Owner über CEOrchestrator | vor Implementierung der betroffenen Screens | Standardlösung nach Kap. 8.1 |
+| Brutto oder netto in der Importdatei (REQ-057, AR-12) | Owner | nur wenn REQ-057 ins Backlog kommt | REQ-057 nicht gebaut |
+| Prüfung der Titel-Höchstlängen eBay und Shop am echten Formular (OP-22, A-17) | Software Architect | vor Pilotbetrieb | Startwerte 80 und 128 |
+
+### 9.5 Technische Risiken
+
+| ID | Risiko | Wirkung | Maßnahme |
+| --- | --- | --- | --- |
+| TR-01 | Ein Spike-Hauptweg funktioniert nicht (AR-15) | Verzögerung Schritt S10 | Spike bestanden (Kap. 9.2); Rest-Risiko aus den Grenzen des Spikes (Windows Server statt Windows 11, keine echte Anmeldung) über Windows-CI und Abnahme (Kap. 6.4); Rückfallwege S-1 bis S-5, S-7, S-8 |
+| TR-02 | Für Node.js 26 fehlen vorkompilierte Pakete von `better-sqlite3` oder `sharp` für Windows x64 | Build scheitert | Node.js 24 LTS (Kap. 4.3); Prüfung in S1 |
+| TR-03 | Der Owner bestätigt die Auslegung von AC-REQ-104-01 im Design v0.6 nicht (Hinweis bei wenig Höhe erst nach Scrollen sichtbar) | Rahmen und ein Testkriterium ändern sich | Prüfung „ohne Scrollen in FM-1“ läuft schon als Bericht mit (Kap. 6.3); Inter wird mit resellr ausgeliefert (REQ-079), daher gleiche Zeichenbreiten auf jedem PC; reicht der Platz trotzdem nicht, Entscheidungsvorlage REQ-104 |
+| TR-04 | Neuberechnung über 5 s (AR-03) | REQ-060 verletzt | Lasttest in S5; Rückfall AR-03 als Architekturänderung |
+| TR-05 | Virenschutz stuft die umgestellte `resellr-node.exe` als verdächtig ein | Start blockiert | Signatur beim Umstellen entfernen; Defender-Scan im Spike (P2.4) **ohne Befund**: gebaute und installierte `resellr-node.exe` und Installer Exit-Code 0, Positivkontrolle angeschlagen, Signaturen 1.463.189.0 vom 08.11.2026 (Lauf 42475377911, Windows Server 2025, Kap. 9.2); weiter in der Windows-CI bei jedem Build und bei der Abnahme unter Windows 11 (S-2, Kap. 6.4). Das Risiko bleibt, weil Signaturen sich ändern und am Arbeitsplatzrechner ein anderer Virenschutz laufen kann; Rückfall S-2 |
+| TR-06 | Datenblätter mit sehr langen Werten passen trotz Verdichtung nicht auf eine Seite (REQ-081) | Warnung, zwei Seiten | Seitenzahltest; bei Bedarf Layoutänderung über den Product Owner (A-10 „inhaltlich gleichwertig“) |
+| TR-07 | Umbenennen eines Merkmals ändert kanalweite Texte (RQ-06) | unerwartete Änderungsentwürfe | sichtbar über „geändert seit Freigabe“ und UI-018; Hinweis im Betriebshandbuch |
+| TR-09 | Windows-Schnellstart: Herunterfahren wird nicht als „PC aus“ erkannt (FIND-222) | mehr Zeit unter „ohne Messung“ im Verfügbarkeitsbericht | Grenze in Kap. 2.18 benannt; Kennzahl unberührt; Betriebshandbuch erklärt die Spalte |
+| TR-10 | Ein Migrationsfehler nach einem Update (FIND-211) | Start bricht ab (LP-02) | eine Transaktion, Schema bleibt alt; Kopie vor jedem Versionswechsel für die Rückkehr |
+| TR-08 | Job-Objekt beendet den Server vor dem geordneten Ende (H-13) | kein Ereignis „Ende nach Überwachung“ | WAL sichert den Stand; Auswertung verlässt sich nicht darauf |
+
+Die Architekturrisiken AR-01 bis AR-15 der Baseline gelten weiter. Ihre Bewertung ändert diese Specification nicht, aber drei Maßnahmen wirken durch Owner-Entscheidungen schwächer, wie die Baseline selbst sagt (6.3, X-8): AR-02 ohne Anzeige der Datenordner-Größe (X-8 Nein), AR-11 ohne Ein-Klick-Weg „Datenordner öffnen“ (X-6 nicht gebaut), AR-09 nur mit einer Warnung im Betriebsprotokoll, die erst auffällt, wenn der Betreiber nachschaut (X-8 Nein) (FIND-221).
+
+---
+
+## 10. Traceability und Änderungsprotokoll
+
+### 10.1 Behandlung der Eingaben aus Cross-Check und Reviews
+
+| Eingabe | Behandlung | Stelle |
+| --- | --- | --- |
+| T-1 (UI-016) | Ergebnismeldung aus `outcome`; gespeicherter Stand = aktueller Stand; Speicher ungespeicherter Eingaben je Fenster; „Stand neu laden“ nur Daten; Basis-Hash; nur Bestandsplatzhalter in manueller Beschreibung | 2.9, 2.8.3, CU-195 |
+| T-2 (UI-015) | Uploads nacheinander, Anhängen ohne Versionsprüfung, Reihenfolge vollständig | 2.11 |
+| T-3 (UI-045) | Antwort vollständig senden vor Prozessende, Speicherort in der Antwort, 30 s | 2.17, 2.0.8 |
+| T-4 (UI-046, Ablauf 4b) | `health` unterscheidet `stopping`; Übernahme nach geordnetem Ende | 2.17, 2.18 |
+| T-5 (`launcher-pages`) | Zustandsdatei als Skript, Rückfallweg, Referenznummer des Launchers bei Zeitüberschreitung | 2.18, S-7 |
+| T-6 (Schrift, Parameter) | Inter als `data:`-URL, URL-kodierte Parameter | 2.18 |
+| T-7 (UI-019) | freigegebener Stand mit aufgelösten Bestandsangaben, n und m neu berechnet, Markierung am Hash | 2.12 |
+| T-8 (UI-023) | PDF beim Aufruf, Adresse mit Token, Öffnen im Klick | 2.13 |
+| T-9 (Anzahl im Geltungsbereich) | `POST /api/scope-counts` | 2.3 |
+| T-10 (Nachweise, Umfang) | E2E über die Fenstergrößen-Matrix FM-1 bis FM-7; „Datenordner im Explorer öffnen“ und Statuswarnungen nicht gebaut | 6.3, 2.17 |
+| FIND-112 (Wartezweig Ablauf 4b) | Ende bei Sperre frei, Startergebnis mit `startId`, eigene Referenznummer bei Zeitüberschreitung, `stopping` ≠ bereit | 2.18 |
+| FIND-113 („ohne Messung“) | Windows-Startzeit als Unterscheidung (Variante a), Rest als Obergrenze benannt (Variante b) | 2.18 |
+| H-2 (CSP) | `style-src 'unsafe-inline'`, Skripte nur `'self'` | 2.0.2 |
+| H-11 (Referenznummer in `launcher-pages`) | festes Format, `textContent` | 2.0.5, 2.18 |
+| H-12 (Neustartgrenze) | 3 Neustarts in 10 min, vierter Absturz → aufgeben | 2.18 |
+| H-13 (Job-Objekt, abgelöster Start) | Aufrufer wird selbst Überwachung; keine Auswertung auf „Ende nach Überwachung“ | 2.18 |
+| H-14 (Sperren ohne natives Modul) | benannte Pipe, SQLite-Sperre | 2.18, 2.19 |
+| H-15 (redaktionell Baseline) | betrifft die Baseline-Fassung; in dieser Specification konsistent umgesetzt | – |
+| H-16 (Ä-30 sichtbar für Nutzer) | DG-03 an den Product Owner | 8 |
+| H-17 (Weiterleitungsliste) | `.conflict` bei UI-021 (2.10), markierbarer Wert bei Kopierfehler (2.12) | 2.10, 2.12 |
+| Baseline 6.4 „Auflagen an die Technical Specification“ | Markierungen am Hash; freigegebener Stand bleibt beim Rückfall; WI-Nr-Teilindex; Einbuch-Entwurf im `sessionStorage`; „zuletzt genutzter Bereich“ im Browser; Upload-Fortschritt je Datei; Prüfmarkierungen bei REQ-056 | 2.12, 2.8.3, 3.7, 2.5, 7.3, 2.11, 2.21 |
+| Ä-29 bis Ä-32 | keine Zeitgrenze beim Schreiben; Kopier-Assistent; Konflikt beim Abgleich; Datenblatt, Vorschau, Anzahl | 2.0.8, 2.12, 2.10, 2.13, 2.3 |
+| OP-22 (A-17) | Startwerte bestätigt nach Kenntnisstand, Prüfung am Formular vor Pilot | 2.1.1, 9.4 |
+| Owner-Kommentar `bdc2d18b` (Container) | Begründung festgehalten, keine Änderung | 2.18 |
+
+### 10.2 Änderungsprotokoll
+
+| Version | Datum | Änderung | Adressierte Findings |
+| --- | --- | --- | --- |
+| 0.1 | 07.11.2026 | Erstfassung auf Requirements v0.3.3 (`ce76d962`), Baseline v0.3.2 (`2876806d`), Design v0.5.2 (`a9356c1`); mit Annahmen S-1 bis S-7 bis zum Windows-Spike; neue ADR-008 | aus Vorphasen: FIND-112, FIND-113 (MAR-146), Hinweise T-1 bis T-10 (MAR-150), H-2, H-11 bis H-17 |
+| 0.2 | 07.11.2026 | Überarbeitung nach Architecture Review Runde 1 (MAR-157, Rev. `f54d5195`) mit den Klärungen MAR-159, MAR-163, MAR-164 (bei Widerspruch vorläufig MAR-164, Kap. 8.2) und den eigenen Befunden aus MAR-158; Briefing neu | FIND-201 bis FIND-225, alle behoben (Tabelle unten) |
+| 0.2, Nachtrag | 07.11.2026 | Owner-Entscheid zu MAR-162 (CEOrchestrator-Kommentar `dc349316` an MAR-161), vor Review Runde 2: Messung am PC des Owners entfällt, S-6 entfällt (Abweichung von Baseline 10.2 Punkt 6 und 11.2, im Briefing ausgewiesen); REQ-077 wird über die Fenstergrößen-Matrix FM-1 bis FM-5 mit Kriterium „kein Inhalt, keine Aktion unerreichbar“ geprüft; neue Designlücke DG-16 (responsive Rahmen, Designänderung beim PO) mit technischen Randbedingungen; FM-3 und FM-4 bis DG-16 nur Bericht. Geändert: Metadaten, Briefing (kritische Annahme 2, Weitere Annahmen, Was sich geändert hat, Deine Entscheidungen, Lesetipps), 2.17, 4.4 (CU-062), 5, 6.1, 6.3, 6.4, 8.1, 9.1, 9.2, 9.4, 9.5 (TR-01, TR-03), 10.1 | keine neuen Findings |
+| 0.2, Nachtrag 2 | 07.11.2026 | Design-Entwurf v0.6 Teil A, anpassendes Fenster (Owner-Entscheid MAR-168; Hinweis des UI/UX Designers an MAR-161; `design/MAR-167` @ `4fee15c`), vor Review Runde 2: neues Kap. 2.0.10 (Bruchstelle `full`, Grundform einspaltig, Tabellen mit eigenem Scrollbereich, `Sheet` für Seitenpanels, Dialogregel, Schrift ≥ 12 px); Kap. 2.17 Navigationsspalte Variante A und schmale Ansicht mit Hinweis am Ende der Fläche; Kap. 6.3: FM-1/FM-2 auf 1366 px Breite, FM-3 1092 × 480, FM-4 910 × 400, alle Zeilen bindend, AC-REQ-104-01 nach dem Kriterium des Designs, „ohne Scrollen in FM-1“ nur Bericht; DG-16 geschlossen. Geändert: Metadaten, 1.2, Briefing (Kurzfassung, kritische Annahme 2, Weitere Annahmen, Entscheidungen, Was sich geändert hat, Lesetipps), 2.0.10, 2.12, 2.17, 4.4 (CU-044, CU-058, CU-059, CU-217), 5, 6.3, 6.4, 8.1, 9.1, 9.2, 9.4, 9.5 (TR-03) | keine neuen Findings |
+| 0.3 | 07.11.2026 | Überarbeitung nach Architecture Review Runde 2 ([MAR-170](/MAR/issues/MAR-170#document-architecture-review-techspec-v01-r2), Rev. `da549bb0`), Korrekturzyklus 2 von 3; Briefing aktualisiert und gekürzt (Zwischenstände, die der Owner nie gesehen hat, gestrichen, Empfehlung zu F6) | FIND-226 bis FIND-233; Reste von FIND-202 und FIND-205 (Tabelle unten); Hinweis zum Rückfallweg S-8 |
+| 0.4 | 07.11.2026 | Einarbeitung der verbindlichen Entscheidungen K-01 bis K-07 des Product Owners ([MAR-176](/MAR/issues/MAR-176#document-k-entscheidung), Rev. `004e2a12`), der Findings aus Architecture Review Runde 3 ([MAR-174](/MAR/issues/MAR-174#document-architecture-review-techspec-v01-r3), Rev. `11d6d784`, `pass`) und der Hinweise 5.1 bis 5.3; Bezug auf Design-Entwurf v0.6.1 (`3d418bd`); E-1 als Owner-Frage mit berichtigter Aufwandsangabe; Spike-Annahmen weiter offen (Delta v0.5); Briefing aktualisiert; Auftrag [MAR-178](/MAR/issues/MAR-178) | FIND-234, FIND-235 (Tabelle unten) |
+| 0.4.1 | 08.11.2026 | Kleine Revision nach Architecture Review v0.4 Runde 1 ([MAR-183](/MAR/issues/MAR-183#document-architecture-review-techspec-v04-r1), Rev. `aa3a061a`, `changes_requested`), Korrekturrunde 2 von 3 des Zyklus: Fehlerzusammenfassung in UI-003 wieder abgebildet; Bezug auf Design-Entwurf v0.6.1 @ `894d49e` (einschließlich MAR-182); Nachtrag Defender-Scan bei der Abnahme (Kap. 6.4) und Verweis auf Spike-Prüfung P2.4 (Kap. 9.2) nach Backlog-Review [MAR-184](/MAR/issues/MAR-184#document-backlog-review-spike-2-r2), Hinweis B; Briefing nachgezogen; Auftrag [MAR-187](/MAR/issues/MAR-187). Keine neue Code-Einheit, keine neue Migration, keine geänderte Verantwortung | FIND-236, FIND-237 (Tabelle unten) |
+| 0.5 | 08.11.2026 | Spike-Delta: Ergebnis des Windows-Spikes (GitHub-Issue #2, [MAR-188](/MAR/issues/MAR-188); `spike/ERGEBNIS.md` @ `ad17ab2`, maßgeblicher Lauf 42475377911 auf `9428f22`) nach eigener Prüfung gegen Spike-Auftrag v1.2 eingearbeitet: S-1, S-2 (einschließlich Defender), S-3, S-5, S-7 bestätigt, kein Rückfallweg; Grenzen (Windows Server 2025 statt Windows 11, nicht geprüfte Punkte) in Kap. 9.2, Abnahme Kap. 6.4 und Briefing; Hinweise 5.1 und 5.3 aus dem Delta-Review v0.4.1 ([MAR-189](/MAR/issues/MAR-189#document-architecture-review-techspec-v041-r2), Rev. `fc901cae`, `pass`); Briefing nicht verlängert (F6); Auftrag [MAR-191](/MAR/issues/MAR-191). Keine neue Code-Einheit, keine neue Migration, keine geänderte Verantwortung | keine Findings; Hinweise MAR-189 5.1 bis 5.5 und MAR-183 5.4 (Tabelle unten) |
+| 0.5.1 | 08.11.2026 | Redaktionelle Korrektur nach Architecture Review v0.5 ([MAR-192](/MAR/issues/MAR-192#document-architecture-review-techspec-v05-r1), Rev. `c2f0ca05`, `pass`, 0 blocker, 0 major, 2 minor); nur Text, keine inhaltliche Änderung an Schnittstelle, Datenmodell, Code-Struktur oder Prüfungen; Auftrag [MAR-193](/MAR/issues/MAR-193). Keine neue Code-Einheit, keine neue Migration, keine geänderte Verantwortung | FIND-238, FIND-239 (Tabelle unten) |
+
+**Behandlung je Finding (alle in v0.2):**
+
+| Finding | Behandlung | Stelle |
+| --- | --- | --- |
+| FIND-201 | behoben: Abhängigkeitstabelle je Bauschritt mit „bis dahin gilt“; CU-119 nach S2, CU-156 als Domänenfunktion nach S4, CU-127 nach S5, CU-160/CU-161 nach S2, CU-234 nach S10, `media_file`-Zugriff (CU-286) nach S2; Prüfereignisse statt Vorgriff; `engine_version` schreibt CU-173 statt Migration `0001` | 4.4.0, 4.4, 2.0.4, 2.8.3, 3.8 |
+| FIND-202 | behoben: Reader CU-287 (`media`) und CU-291 (`listing-content`); Abfragedienste CU-292 bis CU-295; Repositories für `listing_price` (CU-125), `merchant_profile`/`datasheet_layout` (CU-288), `app_meta` (CU-285); je Pfad eine Routen-Einheit; neu CU-289 (REQ-059), CU-296 (Launcher-Protokoll), CU-297 (Excel-Hooks, Route `/modelle/excel-uebernahme`) | 4.1, 4.4, 2.4, 2.5, 2.7, 2.15 |
+| FIND-203 | behoben: Topologie nur CU-156; `ContentInput` nur CU-166 (Vorschau CU-162 jetzt in `listing-content`); Geltungsbereich nur CU-165; Kontext-B-Folgen von CU-121 an CU-123; `merchant_profile` schreibt nur CU-084, Datei über CU-090; CU-035 fügt ein, CU-234 löscht; CU-159 umbenannt | 4.4, 2.2, 2.3, 2.5 |
+| FIND-204 | behoben: Filter `objectType` zusätzlich zu `objectCategory`, Index; Auswahl in UI-024 als DG-15 | 2.16, 3.7, 8.1 |
+| FIND-205 | behoben nach MAR-164: RQ-01, RQ-02 und „Daten geändert …“ als gespeicherte Kennzeichnungen nach Requirements Kap. 9.4; AC-REQ-035-04 ohne Schnitt im Wort; REQ-029 als Requirements-Abweichung RQ-11 mit Owner-Entscheidung E-1, Kap. 7.1 angepasst. Widersprüche zu MAR-163 als K-01, K-02 | 2.8.2, 2.8.3, 7.1, 8.2, 8.3, 9.3, Briefing |
+| FIND-206 | behoben nach MAR-164: `variant-flag-guard` auch beim Deaktivieren (K-03); Anzeige DG-11 | 2.1, 2.6, 8.1, 9.3 |
+| FIND-207 | behoben: Zeilen und Regel „unterschiedlich“ für UI-017 (CU-301), Merkmalsauswahl DG-12; Beispielgerät UI-039 (DG-13) | 2.9, 2.2, 8.1 |
+| FIND-208 | behoben: UI-019 Banner statt stillem Neuladen; P-08 nur Speicherknöpfe; UI-020 nur zulässige Übergänge; UI-029 Bestätigung; Zeitüberschreitung von Vorschau und Anzahl = P-06; UI-005 nach MAR-164 inline (K-04) | 2.0.7, 2.0.8, 2.3, 2.6, 2.10, 2.12, 8.2 |
+| FIND-209 | behoben: Meldungsschlüssel je Verwendung, Texte von UI-014, UI-027, UI-030, UI-034 im Wortlaut; `name_taken` bei `PATCH /api/attributes/{id}` | 2.0.5, 2.0.6, 2.1 |
+| FIND-210 | behoben: UI-030 drei Feldfehler (DG-10, Text K-05); LP-02 Textvariante, Referenznummer in beiden Protokollen (DG-07, Text K-07); neue Grenzen in DG-08 mit Texten nach MAR-164; Satz „keine neue Gestaltung“ berichtigt | 2.2, 2.18, 2.19, 8.1, 8.2 |
+| FIND-211 | behoben: eigener Migrationslauf CU-029 mit `BEGIN IMMEDIATE … COMMIT` und `app_migration`; Kopie bei jedem Wechsel von App- oder Engine-Version; Ende-Markierung erst nach erfolgreichem Start gelöscht; Test | 2.19, 3.3, 3.8, 4.4, 6.2 |
+| FIND-212 | behoben: Prüfregel für `handoverDir` (CU-039), Aufräumen nur nach eigenem Namensmuster, Test | 2.19, 6.2 |
+| FIND-213 | behoben: Chrome und `explorer.exe` mit `detached`, `stdio: 'ignore'`, `unref()`; `windowsHide` für jeden Kindprozess; Prüfung als S-8 in der Windows-CI | 2.18, 2.12, 9.2 |
+| FIND-214 | behoben: Schutzgrenze nur für Dateien ohne `media_file`-Zeile; von resellr entkoppelte Dateien ohne Grenze; Vorschaubild zählt mit dem Original; Test | 2.19, 6.2 |
+| FIND-215 | behoben: RQ-06 als kritische Annahme 4 mit Beispiel und Alternative (DG-14), RQ-07 unter „Bewusst nicht enthalten“; Punkte aus FIND-205/-206 im Briefing | Briefing |
+| FIND-216 | behoben: 607 px und 572 px mit Herkunft in S-6 (seit dem Nachtrag MAR-162 nur Herleitung von FM-1); „etwa 10 Sekunden“ und „1 bis 2 Entwicklertage“ gestrichen; SmartScreen einheitlich „bei Installation und jedem Update“ | 9.2, 2.19, ADR-008, Briefing |
+| FIND-217 | behoben: (a) Ende auch bei `close`, spätestens nach 5 s; (b) `stop` über die Pipe ohne Neustart, `--for-update` wartet auf die freie Pipe; (c) `synchronous = FULL`; (d) atomares Schreiben in CU-009 | 2.17, 2.18, 2.19, 4.4 |
+| FIND-218 | behoben: `launcher-state.js` über festen relativen Pfad; Hash-Prüfung bei `/media`; `/downloads` in Pfadregel und G-5 | 2.0.1, 2.11, 2.18 |
+| FIND-219 | behoben: S-3 nennt CU-259 und den Rückfall für die Kopplung; S-5 mit Rückfall für den Ladefall bzw. Owner-Vorlage; S-2 mit Defender-Scan, Signatur wird beim Umstellen entfernt | 9.2, 2.19, ADR-008 |
+| FIND-220 | behoben: `deleted` für alle DELETE-Endpunkte; `mapping_exists` bei AC-REQ-024-02; Markierungen an `releasedAt`; REQ-053 (RQ-12), REQ-014 (RQ-17), Inhalts-Hash (RQ-13) als Auslegung | 3.6, 2.3, 2.12, 2.8, 9.3 |
+| FIND-221 | behoben: Bestandsspalten als abgeleiteter Zwischenspeicher mit Invariantentest; Aussage zu AR-02, AR-09, AR-11 berichtigt; Frist von `availability-days.jsonl` in der Housekeeping-Tabelle | 3.3, 9.5, 2.18, 2.19 |
+| FIND-222 | behoben: `THIRD-PARTY-NOTICES.txt` und Lizenzprüfung im Release (CU-298); Grenze der Erkennung „PC aus“ benannt (TR-09) | 4.3, 2.19, 2.18, 9.5 |
+| FIND-223 | behoben: CU-284 nur für abgeschlossene Schritte (CU-299), `tools/qa/` in 4.1; CU-004 ohne Startbelegung; CU-254 präzisiert; CU-080, CU-081, CU-281, CU-283 aufgeteilt; CU-067 `.schema.ts`; Querverweise berichtigt | 4.1, 4.4, 6.2, 7.1 |
+| FIND-224 | behoben: zusammengesetzte Primärschlüssel `PK, FK` in Diagrammen und Feldtabellen; Beziehungen für `condition_value_id`, `sold_channel_id`, `listing_price.channel_id`, `text_block_channel.channel_id`, Logo; Verwaltungstabelle `app_migration` genannt | 3.1 bis 3.3, 3.8 |
+| FIND-225 | behoben: Metadaten und Kap. 1.2 nennen PR #1 gemergt, `main` v0.5.3 ohne inhaltliche Änderung | Metadaten, 1.2 |
+
+**Behandlung je Finding (v0.3, Review Runde 2):**
+
+| Finding | Behandlung | Stelle |
+| --- | --- | --- |
+| FIND-205 (Rest) und FIND-226 (a) | Die vier Kennzeichnungsspalten in `channel_content` sind als **gespeicherter Zustand** mit „gesetzt durch / entfernt durch“ beschrieben; CU-167 berechnet sie nie aus den Hashes neu; Übergang *Veröffentlicht* → *Beendet* entfernt „Bestand auf Kanal anpassen“ als gespeicherte Kennzeichnung | 3.3, 2.8.3, 2.10, CU-167 |
+| FIND-226 (b) | Vormerk-Tabelle und Trigger entfallen; neue Spalte `media_file.unreferenced_since` (Teil von `0001`, CU-028, CU-286); die Karenz von 24 h zählt ab dem ersten Lauf, der die Datei verwaist findet; Löschen je Hash unter einer Sperre im Prozess (CU-088): Verweise in einer Transaktion erneut prüfen, Zeile löschen, dann Datei; der Upload legt unter derselben Sperre Datei und Zeile neu an bzw. setzt `unreferenced_since` zurück; Tests | 2.11, 2.19, 3.1, 6.2 (a, c), CU-088, CU-090, CU-251, CU-307 |
+| FIND-202 (Rest) und FIND-227 (a), (b) | Beispielgerät für UI-039 als `GET /api/datasheets/preview-device` in `datasheet` (CU-306, Route CU-224, S8), kein Kreis `settings` ↔ `inventory`; Vorschau-Link bis S8 deaktiviert (4.4.0); CU-130 ohne `/api/devices/{id}/datasheet` | 2.2, 2.13, 4.4.0, CU-102, CU-130, CU-224, CU-226, CU-306 |
+| FIND-227 (c) | Ausnahmen in 4.1 abschließend benannt: Dateidienst CU-307 von `media` für das Aufräumen (CU-251 entscheidet, schreibt aber weder `media_file` noch Dateien); `rebuildAll(uow)` von `listing-content` (CU-164) nur für CU-173; Löschfrist CU-234 nur für CU-250 | 4.1, 2.19, CU-164, CU-173, CU-251, CU-307 |
+| FIND-227 (d) | Verweis „Kap. 4.4.12“ berichtigt; `inventory/variant-flag-guard.ts` durch CU-075 und CU-290 ersetzt; Satz zum Applier vor S5 berichtigt; `/modelle/excel-uebernahme` in 4.2; „CU-285 bis CU-305“; Abhängigkeit von S10 auf S2, S4, S5, S7 | 2.0.1, 2.1, 2.7, 4.2, 4.4, 4.4.0 |
+| FIND-228 | CU-029: `foreign_keys = OFF` vor `BEGIN IMMEDIATE`, `foreign_key_check` vor `COMMIT` (Befund → `ROLLBACK`, Abbruch), danach `ON`; Regel für Umbau-Migrationen; Tests | 2.19, 3.8, 6.2 (a), CU-029 |
+| FIND-229 | ZIP-Dateien nur mit vollständig verankertem Muster `^[A-Za-z0-9-]+-[a-z]+-\d{8}-\d{6}-fotos\.zip$`; Test mit `urlaub-fotos.zip` | 2.19, 6.2 (b), CU-252 |
+| FIND-230 | Tabelle „Meldungstexte“ in Kap. 8.2: je Schlüssel M-xx vorläufiger Wortlaut mit Quelle (MAR-164, MAR-159) und Alternative v0.6; Kap. 2 verweist nur noch auf die Schlüssel; vorläufige Zustände `UI-005` Zielabweichung (K-04), Fehlerbanner UI-027 (DG-11, K-03) und `LP-02.timeout` (K-07) in Kap. 7.3 | 2.0.5, 2.1, 2.2, 2.3, 2.9, 7.3, 8.1, 8.2 |
+| FIND-231 | Aussage berichtigt: kein Wechsel ändert Schnittstelle oder Tabelle, bei K-04 und K-07 ändert sich aber der Ablauf (CU-135, CU-259, CU-268, CU-271) | Briefing, 8.2, 9.4 |
+| FIND-232 | Fenstergrößen-Matrix um FM-6 (1920 × 950, `full` mit viel Platz) und FM-7 (480 × 1000, schmale Ansicht mit viel Höhe) ergänzt, beide bindend, mit Prüfung der Lage des Hinweises | 6.3, CU-062, Briefing |
+| FIND-233 | Stop über die Pipe in jedem Zustand der Überwachung festgelegt: aus `crash_grace` ohne Server `stopped` (Exit-Code 0 für `stop --for-update`), aus `starting` über `stop_pending`; Zustandsdiagramm ergänzt; Test | 2.18, 6.2 (e) |
+| Hinweis S-8 (Review R2, 4.2) | Rückfallweg über `cmd.exe /c start` statt `explorer.exe <chrome> <url>`, Prüfung der Parameterübergabe in der Windows-CI | 9.2 |
+
+**Eigene Befunde aus MAR-158:** Überschrift von UI-044 mit Symbol 14 px (genau 170 px) und Pfadumbruch `word-break: break-all` (Kap. 2.17).
+
+**Änderungsliste v0.3 → v0.4 (Fundstellen):**
+
+| Nr. | Fundstelle | Änderung | Grund |
+| --- | --- | --- | --- |
+| 1 | Metadaten (Version, Design-Entwurf, Eingaben, Architecture Review, Windows-Spike), Lesehilfe, Kap. 1.2 | Version 0.4; Design-Entwurf v0.6.1 `3d418bd` statt v0.6 `4fee15c`, Teil B gilt nach Kap. 8.2; MAR-176 und MAR-174 als Eingaben; Review R3 `pass`; Spike: S-1 bis S-3, S-5, S-7 „durch Spike zu belegen“, Delta v0.5 | Auftrag Punkte 4, 5 |
+| 2 | Freigabe-Briefing | neu gefasst: Auslegungen K-02, K-04, K-06, K-07 mit Beispiel unter „So haben wir dich verstanden“; vorläufige Zeile zu K-03 und die Agenten-Entscheidung „Lückenschlüsse … vorläufig“ entfernt; neue Agenten-Entscheidung Startgrenze 10 min; „Was sich geändert hat“ mit den Wortlaut-Punkten K-01, K-03, K-05 und deren Folge; E-1 mit Empfehlung, Standard, Beispiel und Aufwand; interne Kürzel entfernt; Lesetipps auf 5 | Auftrag Punkt 6, MAR-176 Abschnitt 3 „Gesamt“ |
+| 3 | 2.0.5 (Beispiel und Regel „Sammeltext“) | `message` bei `validation_failed` leer, kein Katalogeintrag, nur Feldfehler; M-23 entfallen | K-07 (M-23) |
+| 4 | 2.0.6 (`variant_flag_would_merge_listings`) | nur Verwendung `.flag`, `.deactivate` entfällt | K-03 |
+| 5 | 2.1 (Regeln Merkmal, „variantenbildend“, neue Regel „Deaktivieren“, Zustände) | Vergleichsmenge = aktive und deaktivierte Variantenmerkmale; nur das Entfernen des Kennzeichens wird geprüft; Deaktivieren nie abgelehnt, mit Beispiel; kein Fehlerbanner in UI-027; M-04 nach Design | K-03, K-07 |
+| 6 | 2.2 (Textbaustein, Feldfehler) | ein Text M-24 für fehlendes Datum, fehlende Stelle oder beides, einmal angezeigt, beide Felder markiert; „Prüfende Stelle fehlt“ entfällt | K-05, Design v0.6.1 UI-030 |
+| 7 | 2.5 (Variantenangabe ändern, Kontext B) | Zielabweichung führt zu `UI-005.ziel-abweichung`; Alternative gestrichen | K-04 |
+| 8 | 2.6 (Vergleichsregel, Umbuchen, neuer Absatz „Umbuchungsziel weicht ab“, Zustände) | Vergleich auch deaktivierter Variantenmerkmale; Ablauf des zweiten Dialogschritts mit Fokus, `speichert`, erneuter Abweichung und Beispiel; „inline“-Variante gestrichen | K-03, K-04 |
+| 9 | 2.8.2 (Zeile Titel) | Randfall erstes Wort: bleibt ganz, `truncation: word`, `title_too_long`, Beispiel 70 Zeichen bei 65; Alternative gestrichen | K-02 |
+| 10 | 2.8.3 (Kennzeichnung „geändert seit Freigabe“), 3.3 (Feld `flag_changed_since_release`) | Vermerk „vorläufig“ entfernt; nur Freigabe beendet die Kennzeichnung | K-01 |
+| 11 | 2.12 (Übernahme-Markierungen) | `valueHash` endgültig, mit Beispiel „9 von 9“ → „8 von 9“; Alternative gestrichen | K-06 |
+| 12 | 2.18 (Befehl `stop`, `stop --for-update`, Pipe-Ereignisse) | Zustand `stopping`: `503 shutting_down` = Beenden läuft schon, jedes Prozessende → `stopped` ohne Neustart, `stop_crash` bei Code ≠ 0, `error` nur bei `500` oder nach 30 s; `stop_pending` mit Exit-Code 11 → `already_running`, `stop` beendet direkt | FIND-234, Hinweis 5.1 |
+| 13 | 2.18 (Ablauf `open` Schritte 4 bis 6, Startgrenze, Seitenwechsel, Zustände, Sequenzdiagramm, Zustandsdiagramm der Überwachung) | nach 120 s `start_timeout` und `LP-02.zeitueberschreitung`, `open` wartet weiter; Startgrenze 10 min in CU-264 mit `start_aborted` und eigener Nummer; Rückfall S-7; LP-02 mit zwei Zuständen; Diagramme ergänzt | K-07, FIND-234, Hinweis 5.2 |
+| 14 | 3.8 (Umbau-Migrationen) | Satz zu Kaskaden im Migrationslauf | Hinweis 5.3 |
+| 15 | 4.4 Karte: CU-012, CU-062, CU-075, CU-119, CU-135, CU-145, CU-167, CU-218, CU-259, CU-260, CU-261, CU-264, CU-268, CU-271, CU-296 | Verantwortungen präzisiert bzw. erweitert (Nachtrag unten); keine neue Einheit | K-01 bis K-07, FIND-234, FIND-235 |
+| 16 | 6.2 (Betriebsrobustheit e, neu g; neuer Punkt „Entscheidungen K-01 bis K-07“) | Tests für `stopping`, `stop_pending`, Startgrenze und je einen Test je K-Punkt | FIND-234, K-01 bis K-07 |
+| 17 | 6.3 (Zeile AC-REQ-104-01, FM-7, Ablauf, neuer Punkt „Testdaten“) | bedingte Regel für die Lage des Streifens; Testdaten mit 9 und 18 Feldern; Fall „unten“ mit gemessener Höhe, Fall „nach den Aktionen“ in FM-5 | FIND-235 |
+| 18 | 7.1 (REQ-004 bis REQ-007, REQ-020, REQ-034 bis REQ-041, REQ-044/045, REQ-049, REQ-053/054, REQ-073) | Kern der Umsetzung um die Entscheidungen ergänzt | MAR-176 Abschnitt 3 |
+| 19 | 7.3 (UI-005, UI-027, LP-02) | `UI-005.ziel-abweichung` und `.ziel-abweichung.speichert`; UI-027 ohne Fehlerbanner; `LP-02.zeitueberschreitung` statt `LP-02.timeout` | K-03, K-04, K-07 |
+| 20 | 8.1 (Einleitung, DG-03, DG-07, DG-08, DG-10, DG-11) | DG-03 (b), DG-07, DG-08, DG-10 gelöst; DG-11 entfallen | K-03, K-05, K-06, K-07 |
+| 21 | 8.2 | Entscheidungsprotokoll „verbindlich nach MAR-176“ ohne Alternativen; Tabelle „Meldungstexte“ verbindlich nach Design v0.6.1 (M-04, M-22 neu, M-23 entfallen, LP-02 nach Design) | Auftrag Punkt 1, K-07 |
+| 22 | 8.3 | E-1 mit Empfehlung und Standard A; Aufwand B berichtigt (keine neue Migrationsdatei, Änderung in CU-030; Feldliste 2.12, Kanal-Schnittstelle 2.3, Tests; Gestaltung UI-036/UI-019 als größter Posten); beide Fälle vorbereitet, Specification nur bei A unverändert | Auftrag Punkt 3, MAR-176 Abschnitt 4 |
+| 23 | 9.1, 9.2 (S-1 bis S-3, S-5, S-7; Rückfall S-7), 9.3 (Einleitung, RQ-05, RQ-14, neu RQ-18), 9.4 (Spike, Design v0.6.1, K-Zeile entfernt, E-1) | Annahmen gekennzeichnet; Auslegungen endgültig; neue Auslegung RQ-18 zu K-02 | Auftrag Punkte 1, 4; K-02, K-03, K-06 |
+| 24 | 2.0.10 | Bezug auf v0.6.1 (Teil A unverändert) | Auftrag Punkt 5 |
+
+**Änderungsliste v0.4 → v0.4.1 (Fundstellen):**
+
+| Nr. | Fundstelle | Änderung | Grund |
+| --- | --- | --- | --- |
+| 1 | Metadaten (Version, Datum, Design-Entwurf, Eingaben, Architecture Review) | Version 0.4.1; Design-Entwurf v0.6.1 @ `894d49e` einschließlich MAR-182 statt `3d418bd`; MAR-183, MAR-184, Spike-Auftrag v1.2 und MAR-187 als Eingaben; Ergebnis Review v0.4 Runde 1 | FIND-237, Auftrag Punkt 2 |
+| 2 | Briefing, Kurzfassung | „Fassung 0.4 übernimmt“ → „Sie übernimmt“, „weiter“ und „kleine“ gestrichen, damit das Briefing nicht länger wird | Auftrag Punkt 4 |
+| 3 | Briefing, „So haben wir dich verstanden“, Zeile Meldungstexte | „kein Sammelhinweis, nur die Meldung am Feld“ ersetzt durch „kein eigener Sammeltext; die Fehlerzusammenfassung beim Gerät-Einbuchen aus dem Design bleibt“; Beispiel Excel-Datei durch Beispiel „WI-Nr 62-61 und Akkukapazität 101“ ersetzt | FIND-236 |
+| 4 | Briefing, kritische Annahme 1 | „ohne Virenschutz-Befund“ ergänzt | Nachtrag Kap. 6.4, F3 |
+| 5 | 1.2 (Zeile Design-Entwurf v0.6.1) | Commit `894d49e`, einschließlich MAR-182 | FIND-237 |
+| 6 | 2.0.5 (Regel „Sammeltext“, neue Regel „Fehlerzusammenfassung“) | kein Sammeltext bleibt; Fehlerzusammenfassung in UI-003 bei „Gerät speichern“ und „Speichern und zuordnen“ aus den Feldfehlern, ohne Katalogtext, Gestaltung nach Design; Freigabe-Ablehnung (`release_conditions_violated`) nicht berührt | FIND-236 |
+| 7 | 2.0.10 (Grundlage) | Commit `894d49e` | FIND-237 |
+| 8 | 2.5 (Zustände, Besonderheiten) | `UI-003.validation` mit Fehlerzusammenfassung | FIND-236 (weitere Stelle) |
+| 9 | 6.2 (Entscheidungen K-01 bis K-07, Test K-07) | „kein Sammeltext oben im Formular“ ersetzt durch „kein Sammeltext ‚Bitte die markierten Felder prüfen.‘“; neuer Komponententest UI-003 mit zwei Feldfehlern und Zusammenfassung (Browser und `422`) | FIND-236 |
+| 10 | 6.4 | Defender-Scan bei der Abnahme mit Aufruf aus P2.4, Kriterium, Verhalten bei Befund und bei P2.4 „nicht aussagekräftig“ | MAR-184 Hinweis B, Ankündigung MAR-177 |
+| 11 | 7.3 (Zeile UI-003) | `validation` mit Fehlerzusammenfassung | FIND-236 |
+| 12 | 8.1 (Einleitung, DG-08) | Klarstellung MAR-182; DG-08: Zusammenfassung in UI-003 bleibt | FIND-236 |
+| 13 | 8.2 (K-07, Designstand, Zeile M-23) | Zusammenfassung bleibt (MAR-182 FIND-1), Umsetzung um 6.2 und 7.3 UI-003 ergänzt; Designstand `894d49e` mit Regel zum Angleichen | FIND-236, FIND-237 |
+| 14 | 9.2 (S-2: Prüfung und Rückfallspalte) | Verweis auf Spike-Prüfungen P2.1 und P2.4 (Spike-Auftrag v1.2), Regel „nicht aussagekräftig“ → Abnahme Kap. 6.4, Befund nur im Installer → Eskalation | MAR-184 Hinweis B |
+| 15 | 9.4 (Owner-Bestätigung Design v0.6.1) | Commit `894d49e`, einschließlich MAR-182 | FIND-237 |
+| 16 | 9.5 (TR-05), 11 (ADR-008, Folgen) | Abnahme-Scan mit Verweis Kap. 6.4 | MAR-184 Hinweis B |
+| 17 | 10.2, 10.3 | Zeile 0.4.1, diese Liste, Behandlung FIND-236/237, Nachtrag Code-Struktur, Mermaid-Prüfung | D4 |
+
+Unverändert und bewusst nicht in v0.4.1: die Hinweise 5.1 bis 5.4 aus MAR-183 (Auftrag MAR-187: nur FIND-236, FIND-237 und die Defender-Nachträge). Sie werden mit dem Spike-Delta v0.5 bearbeitet. Die Verweise auf `3d418bd` in den Zeilen 0.4 und in der Änderungsliste v0.3 → v0.4 beschreiben den damaligen Stand und bleiben.
+
+**Änderungsliste v0.4.1 → v0.5 (Fundstellen):**
+
+| Nr. | Fundstelle | Änderung | Grund |
+| --- | --- | --- | --- |
+| 1 | Metadaten (Version, Eingaben, Architecture Review, Windows-Spike) | Version 0.5; Spike-Ergebnis, Lauf, Artefakt, Meldung, Spike-Auftrag v1.2, MAR-189 und MAR-191 als Eingaben; Ergebnis Delta-Review v0.4.1 `pass`; Zeile „Windows-Spike“: Ergebnis liegt vor, S-1, S-2, S-3, S-5, S-7 bestätigt, Grenzen | Auftrag Punkte 2, 5 |
+| 2 | Briefing, Kurzfassung | Windows-Prüfung hat alle Hauptwege bestätigt, auf Windows Server statt Windows 11; Rest bei der Abnahme | Auftrag Punkt 4 |
+| 3 | Briefing, kritische Annahme 1 | Spike-Ergebnis mit Grenzen (Windows Server 2025, nicht geprüfte Punkte) und Beispiel aus dem Lauf; „Die Prüfung läuft gerade“ und „Das Ergebnis liegt vor deiner Freigabe vor“ entfallen; „Wenn falsch“: Rückfall nach der Abnahme verzögert den letzten Bauschritt | Auftrag Punkte 2, 4; MAR-183 Hinweis 5.4; MAR-189 Hinweis 5.2 |
+| 4 | Briefing, „Was sich geändert hat“ | neuer Punkt „Windows-Prüfung“; gekürzt ohne Inhaltsverlust: Einleitung, Folge K-03, „Betrieb“ ohne „Chrome bleibt offen“ (jetzt kritische Annahme 1), „Aufräumen“ ohne 24 h (steht unter Entscheidungen), „Keine Messung“ ohne Beispiel 125 % (kritische Annahme 2 hat 150 %), „Anpassendes Fenster“ ohne Navigationsspalte (kritische Annahme 2) | Auftrag Punkt 4, F6 |
+| 5 | Briefing, „So haben wir dich verstanden“ (Umbuchen), „Weitere Annahmen“ (Zahlenwerte), „Entscheidungen“ (Startgrenze), „Lesetipps“ | nur gekürzt: Beispiel Umbuchen ohne Aufzählung der Schaltflächen; Zahlenwerte als Beispiele, vollständige Liste in Kap. 8.2; Begründung Startgrenze in einem Satz; Lesetipp Kap. 9.2 und 6.4 auf das Spike-Ergebnis | Auftrag Punkt 4, F6 (Briefing 2.002 Wörter, v0.4.1: 2.003) |
+| 6 | 2.5, Sequenzdiagramm „Gerät einbuchen“ | Beschriftung `UI-003.validation am Feld und oben zusammengefasst` | MAR-189 Hinweis 5.1 |
+| 7 | 6.4 | neuer Absatz „Grenzen des Windows-Spikes, die hier geschlossen werden“; Prüfliste um „Smart App Control Aus“ (OD-09) und „resellr beenden über das Startmenü, danach Chrome offen“ ergänzt; Defender-Scan: „Befund“ festgelegt, anderer Exit-Code oder abgelehnter Aufruf → einmal wiederholen, sonst Eskalation an den Software Architect; Satz zu P2.4 „nicht aussagekräftig“ ersetzt durch das Spike-Ergebnis | Auftrag Punkte 2, 3; MAR-189 Hinweis 5.3 |
+| 8 | 9.1 | Spike-Annahmen bestätigt, Grenzen nach 9.2, Abnahme nach 6.4 | Auftrag Punkt 2 |
+| 9 | 9.2 | neue Absätze „Ergebnis des Windows-Spikes“ (Quelle, Lauf, Umgebung, Verbrauch), „Prüfung des Ergebnisses durch den Software Architect“ (Korrekturen am Prüfskript, zwei Abweichungen ohne Wirkung) und „Grenzen der Aussage“; S-1, S-2, S-3, S-5, S-7 „bestätigt“ mit Prüfungen und Messwerten; Rückfallwege „nicht ausgelöst“ und für Abnahme und Windows-CI stehen gelassen; Satz unter der Tabelle neu | Auftrag Punkte 1, 2 |
+| 10 | 9.4 | Zeile „Ergebnis des Windows-Spikes“ erledigt | Auftrag Punkt 2 |
+| 11 | 9.5 (TR-01, TR-05) | TR-05: Scan ohne Befund mit Signaturstand und Lauf, verbleibendes Risiko; TR-01: Spike bestanden, Rest-Risiko aus den Grenzen über Windows-CI und Abnahme | Auftrag Punkt 2 |
+| 12 | 11 (ADR-008: Status, Entscheidung, Begründung, Konsequenzen, Referenzen) | Hauptwege (A) und (S1) im Spike bestätigt, Abnahme unter Windows 11; Rückfall (S2) nur noch bei Abnahme, Windows-CI oder Virenschutz; Begründung „zwei Bytes“ berichtigt (Teilsystem, Prüfsumme, Signatureintrag: 14 Bytes, plus Abschneiden der Signatur, seit FIND-219; belegt durch P2.1); Spike-Scan ohne Befund; Spike-Ergebnis als Referenz | Auftrag Punkt 2 |
+| 13 | 10.2, 10.3 | Zeile 0.5, diese Liste, Behandlung der Hinweise, Nachtrag Code-Struktur, Mermaid-Prüfung | D4 |
+
+Unverändert und bewusst nicht in v0.5: die Dateiliste des Abnahme-Scans in 6.4 (Rückfall S2 nicht ausgelöst, MAR-189 Hinweis 5.4); der optionale Teil von MAR-189 Hinweis 5.3 (Prüfung auf veraltete Schutzupdates) und die Hinweise 5.1 bis 5.3 aus MAR-183, weil der Auftrag MAR-191 v0.5 auf das Spike-Delta und die genannten Hinweise beschränkt. Kap. 2.18 und 2.19 bleiben unverändert: Der Spike bestätigt ihre Hauptwege, ohne einen Wert zu ändern.
+
+**Änderungsliste v0.5 → v0.5.1 (Fundstellen):**
+
+| Nr. | Fundstelle | Änderung | Grund |
+| --- | --- | --- | --- |
+| 1 | Metadaten (Version, Eingaben, Architecture Review), Dokumenttitel | Version 0.5.1; MAR-192 und MAR-193 als Eingaben; Ergebnis Review v0.5 `pass` | D4 |
+| 2 | Briefing, Kurzfassung | „bestätigte alle Hauptwege“ → „bestätigte alle geprüften Hauptwege“, wie Kap. 9.2 | FIND-238 (a) |
+| 3 | Briefing, kritische Annahme 1, „Wenn falsch“ | „Ein vorbereiteter Rückfallweg greift“ → „Meist greift …“; neuer Satz: Steht Smart App Control nicht auf „Aus“, blockiert Windows resellr, kein Rückfallweg hilft, kostenpflichtige Code-Signierung nötig; Verweis Baseline AR-13 (Briefing 2.027 Wörter, v0.5: 2.002) | FIND-238 (b) |
+| 4 | 9.2, Absatz „Prüfung des Ergebnisses durch den Software Architect“, Randnotiz | ergänzt: Fensterbeobachtung begann 0,46 s statt 1 s vor „Start“; vorher lief kein `resellr-node.exe` | FIND-239 |
+| 5 | 9.2, Zeile S-2, Spalte „Prüfung“ | „Aufzählung alle 10 ms“ → „Fensteraufzählung im Mittel alle 16 ms, in einzelnen Sekunden bis 32 ms, wegen der Timer-Auflösung von Windows“; „bei 123 Starts“ ergänzt; Satz, dass kurze Fenster über das Kriterium „kein Konsolen-Host“ abgedeckt sind (ereignisbasierter Prozessbeobachter). Aussage und Status von S-2 unverändert | FIND-239 |
+| 6 | 9.2, Zeile S-8, Spalte „Prüfung“ (Windows-CI CU-278) | „Fensteraufzählung wie S-2“ → maßgeblich wie bei S-2 „kein `conhost.exe`/`OpenConsole.exe` als Kind von `resellr-node.exe`“, ereignisbasiert; Fensteraufzählung nur Ergänzung (im Spike im Mittel 16 ms, nicht 10 ms); Technik der Beobachtung bleibt der Umsetzung überlassen. Verantwortung von CU-278 in Kap. 4.4 unverändert | FIND-239 |
+| 7 | 10.2, 10.3 | Zeile 0.5.1, diese Liste, Behandlung FIND-238/239, Nachtrag Code-Struktur, Mermaid-Prüfung | D4 |
+
+Unverändert und bewusst nicht in v0.5.1: die Hinweise 5.1 bis 5.3 aus MAR-183 (`stop_pending`, Risikozeile hängender Start, `rebookTargets[].deviations`); laut Architecture Reviewer nicht blockierend, sie kommen mit dem nächsten Delta, spätestens vor der Zerlegung von S10 (Auftrag MAR-193). Die Zeile „Windows-Prüfung: alles bestanden“ unter „Was sich geändert hat“ bleibt: Sie meint die 22 Prüfungen des Spikes, die alle bestanden haben. Kap. 6.4 bleibt unverändert; es sieht für Smart App Control schon eine Eskalation vor.
+
+**Behandlung je Finding (v0.5.1, Review v0.5 Runde 1):**
+
+| Finding | Behandlung | Stelle |
+| --- | --- | --- |
+| FIND-238 (a) | Kurzfassung sagt wie Kap. 9.2 „alle geprüften Hauptwege“ | Briefing, Kurzfassung |
+| FIND-238 (b) | „Wenn falsch“ nennt Smart App Control als Ausnahme ohne Rückfallweg, mit der Folge kostenpflichtige Code-Signierung (Baseline AR-13) | Briefing, kritische Annahme 1 |
+| FIND-239 | Gemessene Abtastrate (im Mittel 16 ms, bis 32 ms, Timer-Auflösung) statt 10 ms; Abdeckung kurzer Fenster über „kein Konsolen-Host als Kind“ ausdrücklich; Beginn 0,46 s vor „Start“ in der Randnotiz; S-8 für CU-278 mit dem Konsolen-Host-Kriterium als maßgeblich, Fensteraufzählung als Ergänzung | 9.2 (Randnotiz, S-2, S-8) |
+
+**Behandlung der Hinweise (v0.5, Delta-Review v0.4.1 MAR-189 Abschnitt 5, und MAR-183):**
+
+| Hinweis | Behandlung | Stelle |
+| --- | --- | --- |
+| MAR-189 5.1 (Beschriftung Sequenzdiagramm „Gerät einbuchen“) | übernommen | 2.5 |
+| MAR-189 5.2 (Briefing-Satz bei P2.4 „nicht aussagekräftig“) | Fall nicht eingetreten (P2.4 bestanden); die kritische Annahme 1 ist wegen des Spike-Ergebnisses ohnehin neu gefasst, der Satz entfällt | Briefing |
+| MAR-189 5.3 (Abnahme-Scan bei anderem Exit-Code) | übernommen: einmal wiederholen, sonst Eskalation an den Software Architect; „Befund“ ausdrücklich festgelegt. Optionaler Teil (veraltete Schutzupdates) nicht übernommen, außerhalb des Auftrags | 6.4 |
+| MAR-189 5.4 (Dateiliste bei Rückfall S2) | Fall nicht eingetreten (P2.R nicht ausgelöst); keine Änderung | – |
+| MAR-189 5.5 (Auslegung „bei Speichern“) | kein Finding, keine Änderung; Mitbestätigung durch den Product Owner bei der Owner-Bestätigung von v0.6.1 liegt beim CEOrchestrator | – |
+| MAR-183 5.4 („Die Prüfung läuft gerade“) | mit der neuen kritischen Annahme 1 erledigt | Briefing |
+
+**Behandlung je Finding (v0.4.1, Review v0.4 Runde 1):**
+
+| Finding | Behandlung | Stelle |
+| --- | --- | --- |
+| FIND-236 | Fehlerzusammenfassung des freigegebenen Designs in UI-003 bei „Speichern“ abgebildet, aus den Feldfehlern, ohne eigenen Text; nur der Sammeltext M-23 entfällt; Test „kein Sammeltext ‚Bitte die markierten Felder prüfen.‘“ statt „kein Sammeltext oben im Formular“, neuer Test der Zusammenfassung; Briefing berichtigt. Weitere Stelle mit derselben Aussage gefunden und berichtigt: 2.5 (Zustände). Ohne Aussage zur Zusammenfassung und deshalb unverändert: CU-012 (kein Katalogtext), CU-132 (rendert UI-003 einschließlich seiner Zustände) und das Sequenzdiagramm „Gerät einbuchen“ | Briefing, 2.0.5, 2.5, 6.2, 7.3, 8.1 (DG-08), 8.2 |
+| FIND-237 | Alle gültigen Verweise auf Design-Entwurf v0.6.1 auf `894d49e` „einschließlich MAR-182“ gehoben; historische Changelog-Zeilen unverändert | Metadaten, 1.2, 2.0.10, 8.2, 9.4 |
+| Hinweis B (MAR-184) | Defender-Scan bei der Abnahme in Kap. 6.4, Verweis auf P2.4 in Kap. 9.2 (angekündigt im Kommentar an MAR-177, in v0.4 vergessen) | 6.4, 9.2, 9.5, ADR-008 |
+
+**Behandlung je Finding (v0.4, Review Runde 3):**
+
+| Finding | Behandlung | Stelle |
+| --- | --- | --- |
+| FIND-234 (a) | Jedes Prozessende in `stopping` → `ended`, kein Neustart, Meldung `stopped`; bei Code ≠ 0 zusätzlich `stop_crash` mit Referenznummer im Betriebsprotokoll; `stop --for-update` dann Exit-Code 0 | 2.18 (Befehle, Zustandsdiagramm), CU-261, CU-296, 6.2 (e) |
+| FIND-234 (b) | `503 shutting_down` in `stopping` heißt „Beenden läuft schon“: weiter warten, kein `error`; `error` nur bei `500` oder wenn der Prozess nach 30 s noch läuft | 2.18, CU-261, 6.2 (e) |
+| FIND-235 | Bedingte Regel für den Streifen in UI-019 schmal als bindendes Kriterium; feste Testdaten (9 und 18 Felder); beide Fälle sicher geprüft (gemessene Höhe + 200 px bzw. FM-5) | 6.3, CU-062 |
+| Hinweis 5.1 (R3) | Exit-Code 11 in `stop_pending` → `already_running`, `stop` beendet den laufenden Server direkt | 2.18, CU-260, 6.2 (e) |
+| Hinweis 5.2 (R3) | Zustandsliste in 2.18 nennt `LP-02.zeitueberschreitung` wie Kap. 7.3 | 2.18, 7.3 |
+| Hinweis 5.3 (R3) | Satz zu `ON DELETE CASCADE` bei ausgeschalteten Fremdschlüsseln | 3.8 |
+
+**Hinweis zu früheren Zeilen:** Die Behandlung von FIND-206, FIND-208, FIND-210 und FIND-230 in den Tabellen oben beschreibt den Stand von v0.2/v0.3 mit vorläufigem MAR-164. Mit v0.4 gilt für K-03, K-04 und K-07 die Entscheidung MAR-176 (Kap. 8.2); insbesondere prüft `variant-flag-guard` das Deaktivieren nicht mehr, und die „inline“-Variante von UI-005 und `LP-02.timeout` entfallen.
+
+**Code-Struktur-Nachtrag v0.2 (Kap. 4.7):** Alle Änderungen bleiben innerhalb der Komponenten der Baseline; neu ist nur die ausdrückliche Ausnahme für die Dateidienste von `media` (Kap. 4.1).
+- **Neu:** CU-285 `db/app-meta-repository.ts`, CU-286 `media/media-file-repository.ts`, CU-287 `media/media-reader.ts`, CU-288 `settings/profile-repository.ts`, CU-289 `listing-content/category-warning.ts`, CU-290 `inventory/inventory-checks.ts`, CU-291 `listing-content/listing-content-reader.ts`, CU-292 `inventory/listing-detail-query.ts`, CU-293 `inventory/device-prefill-query.ts`, CU-294 `inventory/listing-choice-query.ts`, CU-295 `inventory/model-template-usage-query.ts`, CU-296 `tools/launcher/src/launcher-log.ts`, CU-297 `apps/web/src/api/excel-import.api.ts`, CU-298 `tools/packaging/collect-licenses.mjs`, CU-299 `tools/qa/ac-steps.json`, CU-300 `settings/supplier-repository.ts`, CU-301 `listing-content/channel-comparison-query.ts`, CU-302 `settings/condition-code-repository.ts`, CU-303 `excel-import/label-synonyms.ts`, CU-304 `excel-import/excel-import.routes.ts`, CU-305 `prestashop-export/prestashop-export.routes.ts`. Grund: FIND-201 bis FIND-203, FIND-222, FIND-223.
+- **Ort oder Verantwortung geändert:** CU-090 `media/logo-service.ts` → `media/media-file-intake.ts` (Dateidienst für Logo und Fotos); CU-156 `channels/price-rule-graph.ts` → `packages/domain/src/pricing/price-rule-graph.ts`; CU-162 `channels/preview-service.ts` → `listing-content/preview-service.ts`; CU-211 `ops/desktop-shell.ts` → `shared/desktop-shell.ts`; CU-029 eigener Migrationslauf statt Kysely-`Migrator`; CU-075 meldet nur noch `VariantSetChanging`; CU-159 heißt „Kanal-Zuordnungen-Dienst“.
+- **Schritt geändert:** CU-119 S4 → S2; CU-156 S5 → S4; CU-160, CU-161 S5 → S2; CU-127 S4 → S5; CU-234 S9 → S10.
+
+**Code-Struktur-Nachtrag 07.11.2026 (MAR-162):** CU-062 bekommt die Datei `e2e/fixtures/reachability.ts` (Erreichbarkeitsprüfung) und ein Playwright-Projekt je Zeile FM-1 bis FM-5 statt eines festen Viewports. Grund: Owner-Entscheid MAR-162. Keine neue Einheit, keine Komponentengrenze berührt.
+
+**Code-Struktur-Nachtrag 07.11.2026 (Design v0.6 Teil A):** keine neue Einheit, Verantwortung erweitert: CU-044 (scrollender Bereich der Navigationsspalte), CU-058 (neu `Sheet`; Regeln für `Dialog` und `Table`), CU-059 (Bruchstelle `full`), CU-217 (Hinweis am Ende der scrollenden Fläche). Grund: Owner-Entscheid MAR-168, Design v0.6. Keine Komponentengrenze berührt.
+
+**Code-Struktur-Nachtrag v0.3 (Review Runde 2, Kap. 4.7):** Alle Änderungen bleiben innerhalb der Komponenten der Baseline.
+- **Neu:** CU-306 `datasheet/preview-device-query.ts` (S8; FIND-227 a); CU-307 `media/orphan-file-service.ts` (S10; FIND-226, FIND-227 c).
+- **Verantwortung geändert:** CU-088 Sperre je Hash; CU-090 setzt `unreferenced_since` zurück; CU-102 Vorschau-Link ab S8; CU-130 ohne `/api/devices/{id}/datasheet`; CU-164 exportiert `rebuildAll`; CU-167 gespeicherte Kennzeichnungen; CU-173 ruft `rebuildAll`; CU-224 zusätzlich `GET /api/datasheets/preview-device`; CU-226 Hook Beispielgerät; CU-251 schreibt nicht mehr selbst; CU-252 verankertes ZIP-Muster; CU-028, CU-286 Spalte `unreferenced_since`; CU-029 Fremdschlüssel beim Migrieren; CU-062 FM-6 und FM-7.
+- **Pfad geändert:** `GET /api/datasheet-layout/preview-device` → `GET /api/datasheets/preview-device` (vor Implementierungsbeginn, keine Auswirkung auf Code).
+
+**Code-Struktur-Nachtrag v0.4 (MAR-176, Review Runde 3, Kap. 4.7):** keine neue Einheit, keine Komponentengrenze berührt, keine neue Migration.
+- **Verantwortung geändert:** CU-075 prüft nur noch das Entfernen des Kennzeichens „variantenbildend“ (K-03); CU-119 vergleicht aktive und deaktivierte Variantenmerkmale (K-03); CU-135 mit Schritt 2 `UI-005.ziel-abweichung` (K-04); CU-145 Randfall erstes Wort (K-02); CU-012 ohne Sammeltext, Texte nach Kap. 8.2 (K-05, K-07); CU-259 wartet nach 120 s weiter und schreibt `timeout` (K-07); CU-264 Startgrenze 10 min (K-07); CU-268 Phase `timeout`; CU-271 Zustand `zeitueberschreitung`; CU-296 Ereignisse `start_aborted` (`launcher.start_limit`) und `stop_crash`; CU-261 Zustand `stopping` (FIND-234); CU-260 `already_running` aus `stop_pending` (Hinweis 5.1); CU-062 Testdaten für FM-7 (FIND-235).
+- **Bestätigt ohne Änderung:** CU-167 (nur Freigabe beendet „geändert seit Freigabe“, K-01), CU-218 (`valueHash`, K-06), CU-290.
+
+**Code-Struktur-Nachtrag v0.4.1 (MAR-183, MAR-184):** keine neue Einheit, keine geänderte Verantwortung, keine Komponentengrenze berührt, keine neue Migration. Die Fehlerzusammenfassung in UI-003 gehört zu CU-132 (Screen UI-003), der Abnahme-Scan ist eine manuelle Prüfung ohne Code.
+
+**Code-Struktur-Nachtrag v0.5 (Spike-Ergebnis, MAR-189):** keine neue Einheit, keine geänderte Verantwortung, keine Komponentengrenze berührt, keine neue Migration. Der Spike-Prototyp unter `spike/` ist Wegwerf-Code und keine Einheit der Karte; die Produkt-Einheiten CU-258 bis CU-279 bleiben wie in S10 beschrieben. Die Ergänzungen in 6.4 sind manuelle Prüfungen ohne Code.
+
+**Code-Struktur-Nachtrag v0.5.1 (MAR-192):** keine neue Einheit, keine geänderte Verantwortung, keine Komponentengrenze berührt, keine neue Migration. CU-278 bleibt „Installer bauen, als Standardbenutzer installieren, Launcher- und Betriebstests“; geändert ist nur das in 9.2 (S-8) genannte Prüfkriterium.
+
+Weitere Code-Struktur-Nachträge (Kap. 4.7) werden hier mit Datum, Einheit und Grund ergänzt.
+
+### 10.3 Mermaid-Prüfung
+
+Mermaid-Prüfung: **24/24 Diagramme gültig** (`validate-mermaid.mjs` aus dem Skill `architecture-diagrams`, mermaid 11, ausgeführt am 08.11.2026 auf Fassung 0.5.1). In v0.5.1 ist kein Diagramm geändert. In v0.5 geändert: Sequenzdiagramm „Gerät einbuchen“ (Kap. 2.5), nur die Beschriftung der Antwort im Fall „Feldregel verletzt“ (MAR-189 Hinweis 5.1). In v0.4.1 ist kein Diagramm geändert. In v0.4 geändert: Sequenzdiagramm „resellr starten über die Verknüpfung“ (Weiterwarten nach 120 s, `LP-02.zeitueberschreitung`, Startgrenze; K-07) und Zustandsdiagramm „Lebenszyklus der Überwachung“ (Startgrenze in `starting` und `stop_pending`, jedes Prozessende und `503` in `stopping`, Exit-Code 11 in `stop_pending`; FIND-234, K-07, Hinweis 5.1). In v0.3 geändert: Zustandsdiagramm „Lebenszyklus der Überwachung“ (Stop über die Pipe aus `crash_grace`, `starting` und `ready`, Zustände `stop_pending` und `stopping`; FIND-233) und ER-Diagramm Kap. 3.1 (`MEDIA_FILE.unreferenced_since`; FIND-226). Alle übrigen Blöcke sind gegenüber v0.2 Rev. 4 unverändert. Enthalten: 16 Sequenzdiagramme (F-01, F-03 bis F-13, F-17, F-18, F-21), 5 Zustandsdiagramme (Überwachung, Kanal-Inhalt, Gerät, Prüfstatus Textbaustein, Betriebszustand Server), 3 ER-Diagramme (Kap. 3.1 bis 3.3) und das Vorher/Nachher-Diagramm zu ADR-008. Kein Sequenzdiagramm haben F-02 (Ablauf in F-08), F-14, F-15, F-16, F-19 und F-20, jeweils mit Begründung im Abschnitt. Die ER-Diagramme und die Feldtabellen werden aus derselben Definition erzeugt und stimmen deshalb in Namen, Typen und Schlüsseln überein. Die Zustandsdiagramme enthalten genau die Werte der Felder `status`, `stock_status` und `legal_status` aus Kap. 3. Die Prüfung umfasst nur die Syntax; den Inhalt habe ich nach der Selbstprüfliste des Skills abgeglichen.
+
+---
+
+## 11. Architecture Decision Records
+
+### ADR-008 – Installationspaket und Start ohne Konsolenfenster unter Windows
+
+- **Status:** approved (Owner-Freigabe 2026-11-08 mit Technical Specification v0.5.1, Revision `d94988cb-76ee-4d24-a7bc-e9ee6d21fe8d`, [MAR-111](/MAR/issues/MAR-111#document-owner-freigabeanfrage-spec-v051)). Hauptwege (A) und (S1) im Windows-Spike bestätigt (S-1, S-2; Lauf 42475377911, Windows Server 2025, Kap. 9.2); Anmelde-Start, Sichtprüfung und Defender-Scan unter Windows 11 folgen bei der Abnahme (Kap. 6.4)
+- **Kontext:** ADR-006 legt den Betrieb mit Autostart-Eintrag, Überwachung in `resellr-launcher` und Installation im Benutzerprofil ohne Adminrechte fest und überlässt Installer-Technik und Mechanismus des unsichtbaren Starts der Technical Specification (Baseline 3, 10.2). `node.exe` ist ein Konsolenprogramm; ohne Vorkehrung öffnet Windows ein Konsolenfenster, dessen Schließen resellr ungeordnet beendet. VBScript scheidet aus (abgekündigt). Smart App Control ist aus (OD-09), eine Code-Signierung ist nicht vorgesehen. Container auf dem Arbeitsplatzrechner sind ausgeschlossen (Owner-Kommentar `bdc2d18b`, Kap. 2.18).
+- **Betroffene Anforderungen:** REQ-065, REQ-073, REQ-104 bis REQ-106; Baseline 10.2, 10.6, AR-13, AR-15.
+- **Optionen Installer:**
+  - (A) Inno Setup 6: Installation pro Benutzer (`PrivilegesRequired=lowest`), Registry-Einträge unter `HKCU`, Verknüpfungen, Skriptschritt vor dem Ersetzen der Dateien, kostenlos, im Windows-Runner verfügbar.
+  - (B) NSIS: gleichwertig, aber Skriptsprache aufwendiger.
+  - (C) WiX/MSI: Benutzerinstallation möglich, deutlich mehr Aufwand, MSI-Regeln für Benutzerprofile umständlich.
+  - (D) MSIX: Paketidentität und Signierung nötig, Autostart nur über Paketerweiterungen; mit unsigniertem Paket praktisch nicht nutzbar.
+- **Optionen unsichtbarer Start:**
+  - (S1) Kopie von `node.exe` mit Teilsystem „Windows-GUI“ im PE-Kopf (`resellr-node.exe`), beim Bauen erzeugt; Launcher und Server laufen damit ohne Konsole.
+  - (S2) kleiner Start-Baustein (z. B. in C oder Rust) mit GUI-Teilsystem, der `node.exe` mit `CREATE_NO_WINDOW` startet.
+  - (S3) Windows-Dienst oder Aufgabenplanung: verworfen in ADR-006 (H1, H3).
+- **Entscheidung (Vorschlag):** Installer **(A)**, Start **(S1)**; Rückfall **(S2)**, falls die Abnahme, die Windows-CI oder ein Virenschutz (TR-05) gegen S1 spricht. Im Spike war der Rückfall nicht nötig (P2.R nicht ausgelöst).
+- **Begründung:** (A) deckt alle Anforderungen aus Baseline 10.2 und 10.6 ohne Zusatzprogramme ab. (S1) braucht keinen zusätzlichen kompilierten Code und keine weitere Toolchain in der CI; die Umstellung betrifft nur Teilsystem, Prüfsumme und Signatureintrag im Programmkopf (14 Bytes) und das Abschneiden der Signatur am Dateiende und ist automatisch prüfbar (Spike P2.1).
+- **Konsequenzen:**
+  - Das Umstellen macht die Authenticode-Signatur von `node.exe` ungültig; der Build entfernt sie deshalb (Kap. 2.19), `resellr-node.exe` ist also unsigniert statt ungültig signiert. Ob ein Virenschutz die Datei trotzdem beanstandet, prüft ein Defender-Scan im Spike, in der Windows-CI und bei der Abnahme (S-2, TR-05, Kap. 6.4). Der Spike-Scan unter Windows Server 2025 fand nichts (P2.4); für den Arbeitsplatzrechner bleibt „unschädlich“ bis zur Abnahme eine Annahme (FIND-219). SmartScreen prüft nur das heruntergeladene Installationspaket: eine Warnung bei der Installation und bei jedem Update (AR-13).
+  - Launcher und Server haben keine Standardausgabe; alles Protokollieren läuft über Dateien (Kap. 2.19).
+  - Der Build braucht einen Windows-Runner (`release.yml`, `windows.yml`); Linux-CI bleibt für alle übrigen Tests.
+  - Wechsel auf (S2) ändert nur Packaging-Einheiten (CU-273, CU-274, CU-276), nicht Launcher oder Server.
+- **Risiken:** TR-05, AR-13, AR-15.
+- **Referenzen:** Baseline v0.3.2 Kap. 10.2, 10.6, ADR-006; Architecture Review Runde 2 H-13, H-14; Delta-Review MAR-146; Kommentar `1d050fcf` an MAR-153 (Spike-Weg); Spike-Ergebnis `spike/ERGEBNIS.md` (Branch `spike/windows-hosting`, Commit `ad17ab2`), Lauf 42475377911 auf Commit `9428f22`; Freigabe pending.
+
+**Vorher/Nachher** (Frage: Was legt ADR-008 gegenüber ADR-006 zusätzlich fest? Nur die Packaging-Teile sind neu.)
+
+```mermaid
+flowchart LR
+  classDef container fill:#438dd5,stroke:#2e6295,color:#ffffff
+  classDef external fill:#999999,stroke:#6b6b6b,color:#ffffff
+
+  setup["resellr-setup.exe<br/>[Inno Setup, ohne Adminrechte]<br/>installiert ins Benutzerprofil"]:::container
+  runKey["Autostart-Eintrag HKCU Run<br/>[Windows]"]:::external
+  links["Verknüpfungen resellr, resellr beenden<br/>[Startmenü, Desktop]"]:::external
+  rnode["resellr-node.exe<br/>[Node.js, GUI-Teilsystem]<br/>ohne Konsolenfenster"]:::container
+  launcher["resellr-launcher<br/>[launcher.mjs]<br/>open, stop, supervise"]:::container
+  server["resellr-server<br/>[server.mjs, Kindprozess]"]:::container
+
+  setup -->|"legt an"| runKey
+  setup -->|"legt an"| links
+  setup -->|"vor Update: stop --for-update"| launcher
+  runKey -->|"bei Anmeldung: supervise"| rnode
+  links -->|"open oder stop"| rnode
+  rnode -->|"führt aus"| launcher
+  launcher -->|"startet mit resellr-node.exe, IPC"| server
+```
+
