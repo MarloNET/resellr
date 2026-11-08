@@ -4,7 +4,7 @@
 - Flows: FLOW-03 (Schritt 2), FLOW-06
 - Anforderungen: REQ-052, REQ-046, REQ-045, REQ-090; AC-REQ-046-07
 - Rollen: Nutzer (einzige Rolle, alle Funktionen)
-- Gerät(e): PC, ab 1366 × 768
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077)
 - Artefakte: default.png (Stitch-Screen 12c22468330840bcbcc2ee31ac74efb0, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
@@ -42,7 +42,7 @@
 | validation | – | n/a | Suche mit < 2 Zeichen filtert nicht, kein Fehler |
 
 ## Fenstergröße und Bedienung
-Fenster ab 1366 px (nutzbar etwa 1350 × 630 px); Titelspalte nimmt Restbreite. Fokus startet im Suchfeld; Pfeil auf/ab wählt Zeile, Enter öffnet. Keine Barrierefreiheitsanforderung (E-3).
+Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077, keine feste Planungsgröße); Titelspalte nimmt Restbreite. Fokus startet im Suchfeld; Pfeil auf/ab wählt Zeile, Enter öffnet. Keine Barrierefreiheitsanforderung (E-3). Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 Untertitel „Business Portal“ unter „resellr“ (von Stitch erzeugt, kein Teil des Designs); Platzhaltertext „Modell, Spezifikation…“ im Suchfeld (nicht in screen.md, entfällt); Titelspalte im Mockup zu schmal (7 Zeilen), Soll siehe „Hinweise“; Beispielzeilen 4/5 zeigen „Notebook“ als Geräteart für PC/Tablet (nur Beispieldaten); Navigationssymbole von Stitch gewählt (Symbolwahl offen, nicht verbindlich).
@@ -51,4 +51,4 @@ Untertitel „Business Portal“ unter „resellr“ (von Stitch erzeugt, kein T
 - Annahme: Seiten à 50 Zeilen ab 200 Treffern (Datenvolumen A-12: bis 3.000 Modell-Inserate).
 - Annahme: Sortierung nach letzter Änderung absteigend; keine Spaltensortierung in Release 0.1.
 
-- **Mockup `hinweis.png` (v0.4.1, UI-044 im Rahmen):** zeigt den Hinweis unten in der linken Spalte. Abweichungen (Stitch-Zusätze, kein Teil des Designs): Zusatz „BUSINESS PORTAL“ am Kopf, Untertitel „Übersicht aller erfassten …“, Fußzeile „4 Datensätze geladen / Automatische Synchronisation aktiv“, Navigationseinträge höher als 28 px, Pfad in Monospace mit Zeilenumbruch mitten im Wort (4 Zeilen, entspricht dem Fall Pfad etwa 80 Zeichen), Warnzeile „Wichtig“ gelb hinterlegt (Gestaltungsvariante, nicht verbindlich). Abstände (v0.5.2): das Mockup zeigt noch die früheren Abstände (12 px Rand, 12 px Innenabstand); verbindlich sind 8 px/8 px und die Rechnung in `screen.md` von UI-044 (588 px bei Pfad 100 Zeichen). Verbindlich sind `screen.md` von UI-044 und die Rechnung dort. Kein „×“, kein Schließen, keine weiteren Elemente im Hinweis.
+- **Mockup `hinweis.png` (v0.4.1, UI-044 im Rahmen):** zeigt den Hinweis unten in der linken Spalte. Abweichungen (Stitch-Zusätze, kein Teil des Designs): Zusatz „BUSINESS PORTAL“ am Kopf, Untertitel „Übersicht aller erfassten …“, Fußzeile „4 Datensätze geladen / Automatische Synchronisation aktiv“, Navigationseinträge höher als 28 px, Pfad in Monospace mit Zeilenumbruch mitten im Wort (4 Zeilen, entspricht dem Fall Pfad etwa 80 Zeichen), Warnzeile „Wichtig“ gelb hinterlegt (Gestaltungsvariante, nicht verbindlich). Abstände (v0.5.2): das Mockup zeigt noch die früheren Abstände (12 px Rand, 12 px Innenabstand); verbindlich sind 8 px/8 px und die Rechnung in `screen.md` von UI-044 (588 px bei Pfad 100 Zeichen). Verbindlich sind `screen.md` von UI-044 und das dortige Abnahmekriterium. **Seit v0.6 nicht mehr verbindlich:** die festen Maße im Mockup und die frühere Pixelrechnung (588 px, Fenster 1366 × 768); das Fenster ist in der Größe frei, bei wenig Höhe scrollt die Navigationsspalte unter dem festen Kopf. Kein „×“, kein Schließen, keine weiteren Elemente im Hinweis.

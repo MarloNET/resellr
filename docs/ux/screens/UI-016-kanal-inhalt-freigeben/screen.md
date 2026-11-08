@@ -4,7 +4,7 @@
 - Flows: FLOW-01 (Schritt 6), FLOW-04 (Schritt 3)
 - Anforderungen: REQ-034–044, REQ-045, REQ-086, REQ-087, REQ-043, REQ-053, REQ-059 (Could); AC-REQ-044-01 bis -03, AC-REQ-045-01, AC-REQ-089-02
 - Rollen: Nutzer
-- Gerät(e): PC, Fenster ab 1366 × 768 (nutzbar etwa 1350 × 630 px, Ä-28)
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077, Ä-28)
 - Artefakte: default.png (Stitch d7ec8b5e63924f6e8bfb298d11121f62, DESKTOP, 06.11.2026; ersetzt Stand a88484966822498492facf1aab70cf6d, der mit der Spezifikation kollidierte)
 
 ## Angezeigte Daten
@@ -29,7 +29,7 @@
 |---|---|---|---|---|
 | Kategorie (überschreiben) | Text | nein | 1–255 Zeichen; „Verwerfen“ stellt Vorschlag wieder her | „Kategorie: 1 bis 255 Zeichen“ |
 | Titel (manuell) | Text | nein | höchstens Höchstlänge des Kanals; „Anpassung speichern“ ist erst aktiv, wenn sich der Text vom gespeicherten Stand unterscheidet | „Titel zu lang: höchstens <n> Zeichen“ |
-| Beschreibung (manuell) | Mehrzeilentext | nein | Bestandsplatzhalter bleiben als Platzhalter erhalten; „Anpassung speichern“ erst aktiv, wenn der Text vom gespeicherten Stand abweicht | „Unbekannter Platzhalter {…}“ |
+| Beschreibung (manuell) | Mehrzeilentext | nein | Bestandsplatzhalter bleiben als Platzhalter erhalten; „Anpassung speichern“ erst aktiv, wenn der Text vom gespeicherten Stand abweicht | „Beschreibung: 1 bis 20.000 Zeichen“; „Unbekannter Platzhalter {…}“ (v0.6, M-16) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
@@ -66,7 +66,7 @@
 | ausgang-unbekannt (K-6) | „Freigeben“ und „Anpassung speichern“ ohne Antwort: beide Aktionen bleiben bis zum Neuladen gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; nach dem Neuladen prüfen, ob freigegeben bzw. gespeichert wurde. Ablehnung „resellr wird beendet“: P-07 | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
-Zwei Spalten (Inhalt 8/12, Bedingungen 4/12), Bedingungen bleiben beim Scrollen sichtbar. Der Inhalt scrollt; Kanal-Tabs und die Leiste mit „Freigeben“ bleiben bei der nutzbaren Höhe von etwa 630 px (Ä-28) fest sichtbar. Tab-Reihenfolge: Tabs → Felder → Anpassung speichern / Eingabe verwerfen → Bedingungen → Freigeben.
+Zwei Spalten (Inhalt 8/12, Bedingungen 4/12), Bedingungen bleiben beim Scrollen sichtbar. Der Inhalt scrollt; Kanal-Tabs und die Leiste mit „Freigeben“ bleiben bei jeder Fensterhöhe fest sichtbar (Titel und Aktionsleiste fest, Inhalt scrollt; keine feste Planungshöhe). Tab-Reihenfolge: Tabs → Felder → Anpassung speichern / Eingabe verwerfen → Bedingungen → Freigeben. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ### Ungespeicherte Anpassung (K-3)
 Eine Anpassung ist „ungespeichert“, solange der Text im Bearbeitungsmodus vom gespeicherten Stand abweicht. (1) **Kanalwechsel:** der Entwurf bleibt je Kanal im Browser erhalten (solange die Seite geöffnet ist), kein Dialog; der Kanal-Reiter trägt „Anpassung nicht gespeichert“. (2) **Verlassen** über „Zurück“, Navigation oder Fensterschließen: Rückfrage „Ungespeicherte Eingabe verwerfen?“ mit „Verwerfen“ / „Weiter bearbeiten“; beim Schließen des Fensters zeigt der Browser seinen eigenen Hinweis (nicht gestaltet). (3) **Freigeben:** siehe `UI-016.ungespeichert-hinweis`. (4) **Speichern:** `UI-016.speichert`, Ergebnis je Status nach REQ-043, bei Konflikt `UI-016.conflict`. Beziehung zu UI-014/UI-018/UI-002: UI-014 zeigt in der Kanal-Karte „manuell angepasst“; bei Veröffentlicht/Beendet entsteht der Änderungsentwurf, den UI-018 mit Chip „manuell angepasst“ zeigt; UI-002 zeigt „manuell angepasst“ und je Zeile „Daten geändert, manuell angepassten Text prüfen“ (REQ-052, Kap. 9.4).

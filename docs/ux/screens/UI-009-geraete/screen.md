@@ -31,7 +31,7 @@
 | validation, success, disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Enter öffnet die erste Zeile, wenn genau ein Treffer.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Enter öffnet die erste Zeile, wenn genau ein Treffer. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

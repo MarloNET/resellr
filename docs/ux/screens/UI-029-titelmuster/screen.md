@@ -4,7 +4,7 @@
 - Flows: FLOW-05
 - Anforderungen: REQ-030, REQ-034, REQ-035; Kap. 9.7
 - Rollen: Nutzer
-- Gerät(e): PC, ab 1366 × 768
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077)
 - Artefakte: default.png (Stitch 877d32da24214ae9970d9047237ec7d6, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
@@ -19,8 +19,8 @@
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
 | Platzhalter | Auswahl nach Gruppen (Modelldaten, Inseratswerte; ohne Bestand, Kanal, Händler, Zusammenstellungen) | ja | muss Hersteller und Modellbezeichnung enthalten, beide Priorität 1 | „Das Titelmuster muss {Hersteller} und {Modellbezeichnung} mit Kürzungspriorität 1 enthalten“ |
-| Fester Text | Text | ja bei Festtext-Bestandteil | | – |
-| Präfix, Suffix | Text | nein | Leerzeichen erlaubt, werden sichtbar als „␣“ | – |
+| Fester Text | Text | ja bei Festtext-Bestandteil | 1–100 Zeichen | „Fester Text: 1 bis 100 Zeichen“ (v0.6, M-19) |
+| Präfix, Suffix | Text | nein | je 0–50 Zeichen; Leerzeichen erlaubt, werden sichtbar als „␣“ | „Präfix: höchstens 50 Zeichen“; „Suffix: höchstens 50 Zeichen“ (v0.6, M-17/M-18) |
 | Kürzungspriorität | Ganzzahl ≥ 1 | ja | | „Kürzungspriorität: ganze Zahl ab 1“ |
 | Platzhalter-Gültigkeit | – | – | Bestandsplatzhalter und unbekannte Platzhalter unzulässig | „Platzhalter {Stückzahl} ist im Titelmuster nicht zulässig.“ |
 
@@ -46,7 +46,7 @@
 | disabled | „Titelmuster speichern“ deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Tabelle und Vorschau untereinander; Vorschau nach jeder Änderung neu berechnet (kurz verzögert).
+Tabelle und Vorschau untereinander; Vorschau nach jeder Änderung neu berechnet (kurz verzögert). Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Seiten-ID „UI-029“ und Untertitel „Regelbasierte Zusammensetzung und automatische Zeichenkürzung für Verkaufsplattformen“ (von Stitch, entfällt); Vorschau Kleinanzeigen zeigt „72 / 65“ in Rot mit „zu lang …“ — nach Regel kürzt das System; maßgeblich: gekürzter Titel ≤ Höchstlänge, Chip „Titel gekürzt, bitte prüfen“ nur bei Kürzung am Wortende; das Mockup illustriert nur eine Fehlerdarstellung.

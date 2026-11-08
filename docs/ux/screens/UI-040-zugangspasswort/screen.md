@@ -29,7 +29,7 @@ Felder und Hinweis „Mindestens 12 Zeichen.“ Nach Erfolg Banner „Zugangspas
 | loading, empty, disabled | n/a (Screen existiert nur im Netzbetrieb) | – | – |
 
 ## Fenstergröße und Bedienung
-Karte 480 px; Anzeige-Umschalter „Anzeigen“ je Feld.
+Karte 480 px (Höhe nie größer als die Fensterhöhe, Aktionen erreichbar, Inhalt scrollt); Anzeige-Umschalter „Anzeigen“ je Feld.
 
 ## Bekannte Abweichungen im Mockup
 Gezeigt ist der Zustand success. Nach dem Speichern sind die Felder in `screen.md` leer; im Mockup stehen noch Punkte (Darstellung nur zur Illustration). Der Link „← Zurück zu Einstellungen“ ist grau statt blau.

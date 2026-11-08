@@ -32,7 +32,7 @@ Keine.
 | `.wird-beendet` (anderes Fenster) | siehe Muster P-07 | – | – |
 
 ## Fenstergröße und Bedienung
-Modal, Breite 480 px, mittig; im schmalen Fenster (480 px) volle Breite abzüglich 16 px Rand. Enter bestätigt nur, wenn der Fokus auf „resellr beenden“ liegt.
+Modal, Breite 480 px, mittig; im schmalen Fenster (480 px) volle Breite abzüglich 16 px Rand; Höhe nie größer als die Fensterhöhe (Titel und Aktionsleiste sichtbar, Inhalt scrollt). Enter bestätigt nur, wenn der Fokus auf „resellr beenden“ liegt.
 
 ## Annahmen und offene Fragen
 - Dialogbuttons-Reihenfolge und Fokus auf „Abbrechen“: Design-Entscheidung, keine Anforderung.

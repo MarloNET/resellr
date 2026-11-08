@@ -43,7 +43,7 @@ Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegun
 | disabled | Geräteart gesperrt | nur Text | |
 
 ## Fenstergröße und Bedienung
-Zweispaltiges Formular ab 1366 px, Modell- und Vorbelegungsbereich getrennt.
+Zweispaltiges Formular ab 1366 px, Modell- und Vorbelegungsbereich getrennt. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 Das Mockup zeigt den Zustand „ändern“ mit gesperrter Geräteart. „Betroffene Modell-Inserate: 3“ steht im Hinweisbanner (Anzahl laut `screen.md`). Die Beispielwerte der Merkmale (Bildschirmdiagonale, Auflösung) sind fiktiv und hängen von den Merkmalsdefinitionen der Geräteart ab. Bereich unterhalb „Auflösung“ liegt hinter der Sticky-Leiste (Scrollbereich).

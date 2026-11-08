@@ -4,7 +4,7 @@
 - Flows: FLOW-04, FLOW-06 (Schritt 3)
 - Anforderungen: REQ-045, REQ-089, REQ-087, REQ-044; AC-REQ-089-01 bis -03, AC-REQ-046-04
 - Rollen: Nutzer
-- Gerät(e): PC, Fenster ab 1366 × 768 (nutzbar etwa 1350 × 630 px)
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077)
 - Artefakte: default.png (Stitch fd8edac267244e5cb1582dda6b85f654, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
@@ -41,7 +41,7 @@ Keine Eingabefelder. Freigabebedingungen wie REQ-044 werden bei der Freigabe gep
 | ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
-Zwei gleich breite Spalten; lange Texte brechen um (kein Abschneiden). Beschreibung zeigt Zeilen unverändert; geänderte Zeilen ganz hinterlegt.
+Fenstergröße frei (Untergrenze REQ-077); Titel und Aktionsleiste bleiben sichtbar, der Inhalt scrollt. Zwei gleich breite Spalten; lange Texte brechen um (kein Abschneiden). Beschreibung zeigt Zeilen unverändert; geänderte Zeilen ganz hinterlegt. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Diff-Hervorhebung im Titel markiert „512 GB Space Gray“ statt nur „Space Gray“ (Wortgenauigkeit, maßgeblich: nur geänderte Wörter); Chip-Kontrast kleiner Pillen; Beispieltitel in Zeile 1 weicht vom Titelmuster ab (Beispieldaten).

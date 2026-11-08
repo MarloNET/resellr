@@ -4,7 +4,7 @@
 - Flows: FLOW-05
 - Anforderungen: REQ-004, REQ-005, REQ-006, REQ-076; AC zu REQ-004/005
 - Rollen: Nutzer
-- Gerät(e): PC, ab 1366 × 768
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077)
 - Artefakte: default.png (Stitch 81e728c27f964e70b2e78954255f0725, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | Geräteart: Name | Text | ja | 1–50 Zeichen, eindeutig ohne Groß-/Kleinschreibung | „Name ist bereits vergeben“ / „Name: 1 bis 50 Zeichen“ |
 | Geräteart: Status | Umschalter | ja | aktiv/deaktiviert | – |
-| Merkmal: Bezeichnung | Text | ja | eindeutig je Geräteart | „Bezeichnung ist bei dieser Geräteart bereits vergeben“ |
+| Merkmal: Bezeichnung | Text | ja | 1–100 Zeichen, ohne { }, nicht gleich einem festen Platzhalternamen, eindeutig je Geräteart | „Bezeichnung ist bei dieser Geräteart bereits vergeben“; „Bezeichnung: 1 bis 100 Zeichen“; „Bezeichnung darf { und } nicht enthalten“; „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ (v0.6, meldungskatalog.md M-02 bis M-04) |
 | Datentyp | Auswahl | ja | Text, Ganzzahl, Dezimalzahl, Ja/Nein, Auswahl aus Liste, Mehrfachangabe Anzahl × Typ | – |
 | Einheit, Schreibweise | Text, Auswahl | nein | Schreibweise „mit/ohne Leerzeichen“ | – |
 | Mindest-/Höchstwert | Zahl | nein | nur bei Zahlen; Min ≤ Max | „Mindestwert darf nicht größer als Höchstwert sein“ |
@@ -53,7 +53,7 @@
 | disabled | Ebene/Datentyp gesperrt bei gespeicherten Werten | default.png | |
 
 ## Fenstergröße und Bedienung
-Drei Bereiche (Geräteart-Liste, Merkmal-Tabelle, Seitenpanel) ab 1366 px; Seitenpanel überlagert bei schmaler Breite die Tabelle. Hoch/Runter-Buttons als Tastaturalternative zum Ziehen.
+Drei Bereiche (Geräteart-Liste, Merkmal-Tabelle, Seitenpanel) ab 1366 px; Seitenpanel überlagert bei schmaler Breite die Tabelle. Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Stitch ergänzt Kopfzähler und Statuschips „aktiv“ (aus Requirements ableitbar, übernommen); Untertitel „Konfiguration“ in der zweiten Navigation (nicht Teil des Designs); Panel zeigt „RAM“ auf Ebene Gerät als Beispiel; Hinweistext der Sperrung als Fehlerbox (maßgeblich: Inline am Feld).

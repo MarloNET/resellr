@@ -9,7 +9,7 @@ Matrix Geräteart (Zeilen) × Kanal (Spalten); Zelle zeigt Kategoriepfad und Ken
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
 | Kategoriebezeichnung/-pfad | Text | ja je gepflegter Zelle | max. 255 | „Kategorie: 1 bis 255 Zeichen“ |
-| Kategorie-Kennung | Text | nein | | – |
+| Kategorie-Kennung | Text | nein | höchstens 100 Zeichen | „Kategorie-Kennung: höchstens 100 Zeichen“ (v0.6, M-14) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
@@ -29,7 +29,7 @@ Matrix Geräteart (Zeilen) × Kanal (Spalten); Zelle zeigt Kategoriepfad und Ken
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts (unter 1366 CSS-px: Liste über dem Inhalt, Regel R-1); Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup; Muster siehe uiux-design.md Kap. 5).

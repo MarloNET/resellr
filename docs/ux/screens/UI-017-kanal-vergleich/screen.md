@@ -30,7 +30,7 @@ Keine.
 | validation, success, disabled | n/a | – | – |
 
 ## Fenstergröße und Bedienung
-Drei Spalten ab 1366 px; erste Spalte (Feldname) fixiert.
+Drei Spalten ab 1366 px; erste Spalte (Feldname) fixiert. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); Badge „UI-017“ neben dem Titel (von Stitch, entfällt); Kategorie-Werte „Computer > Notebooks/Laptops“ und Zustandswerte sind Beispieldaten je Kanal; Link „Prüfen und freigeben“ im Spaltenkopf entspricht der Aktion „Kanal prüfen und freigeben“; unter dem Spaltenkopf zeigt das Mockup farbige Kurzstatus (Text maßgeblich).

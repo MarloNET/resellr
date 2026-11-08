@@ -37,7 +37,7 @@ Gerätewerte wie UI-003 (Regeln REQ-014). Ändert der Nutzer eine Variantenangab
 | disabled | verkauft/storniert: Werte schreibgeschützt, Aktionen je Status | nur Text | „Gerät storniert“ |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px, Aktionen oben rechts.
+Ab 1366 px, Aktionen oben rechts. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

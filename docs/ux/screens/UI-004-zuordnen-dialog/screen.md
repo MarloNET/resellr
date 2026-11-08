@@ -22,7 +22,7 @@
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Zuordnen | Primärbutton | Modell-Inserat gewählt, Gerät geprüft | ohne Abweichung: Stückzahl +1, Banner „Gerät <WI-Nr> zugeordnet (Stückzahl n)“; mit Abweichung zuerst UI-005 | „Erst Werte prüfen“ mit Nennung der markierten Werte; „Gerät gehört zu anderer Modellvorlage“ | Banner in UI-003, Formular für nächstes Gerät; bei veröffentlichtem Kanal Hinweis „Bestand auf Kanal anpassen“ mit Link UI-021 |
+| Zuordnen | Primärbutton | Modell-Inserat gewählt, Gerät geprüft | ohne Abweichung: Stückzahl +1, Banner „Gerät <WI-Nr> zugeordnet (Stückzahl n)“; mit Abweichung zuerst UI-005 | „Erst Werte prüfen“ mit Nennung der markierten Werte; „Gerät gehört zu anderer Modellvorlage“; „Gerät ist bereits einem Modell-Inserat zugeordnet“ (v0.6, M-01) | Banner in UI-003, Formular für nächstes Gerät; bei veröffentlichtem Kanal Hinweis „Bestand auf Kanal anpassen“ mit Link UI-021 |
 | Neues Modell-Inserat anlegen | Sekundärbutton | Variantenangaben unterscheiden sich von allen bestehenden | Modell-Inserat mit Stückzahl 1, Kanal-Inhalte im Status Entwurf | „Gleiche Variantenangaben wie Modell-Inserat <Titel>; bitte dort zuordnen“ | UI-014 |
 | Abbrechen | Button, Esc | – | Gerät bleibt nicht zugeordnet | – | UI-003 |
 
@@ -39,7 +39,7 @@
 | ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
-Dialogbreite 720 px; Pfeiltasten wählen Optionsfeld; Enter = Zuordnen.
+Dialogbreite 720 px (bei schmalerem Fenster Fensterbreite abzüglich 16 px Rand), Dialoghöhe nie größer als das Fenster: Titel und Aktionsleiste bleiben sichtbar, der Inhalt scrollt. Weitere Bedienung: Pfeiltasten wählen Optionsfeld; Enter = Zuordnen.
 
 ## Bekannte Abweichungen im Mockup
 keine (kein Mockup).

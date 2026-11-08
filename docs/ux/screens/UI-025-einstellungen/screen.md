@@ -18,7 +18,7 @@ Keine.
 default: Beim Aufruf von „Einstellungen“ wird der zuletzt genutzte Bereich geöffnet, beim ersten Mal „Händlermarke“. Alle anderen Zustände: n/a (reine Navigation).
 
 ## Fenstergröße und Bedienung
-Pfeil auf/ab in der Liste, Enter öffnet.
+Pfeil auf/ab in der Liste, Enter öffnet. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 Im Mockup zeigt Stitch die Überschrift „Konfiguration“ über der Liste (nicht Teil des Designs).

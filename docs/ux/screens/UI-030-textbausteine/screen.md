@@ -14,8 +14,8 @@ Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (n
 | Text | Mehrzeilentext | ja | max. 5.000 Zeichen; nur zulässige Platzhalter | „Unbekannter Platzhalter {…}“; „{Baustein:Name} ist im Textbaustein nicht zulässig“ |
 | Geltungsbereich | Mehrfachauswahl Gerätearten, Kanäle (oder „alle“) | ja | | – |
 | Prüfstatus | Auswahl | nur Rechtliches/Akku-Hinweis | neue Bausteine „rechtlich ungeprüft“; Textänderung setzt zurück | – |
-| Prüfdatum | Datum | ja bei „rechtlich geprüft“ | nicht in der Zukunft | „Prüfdatum darf nicht in der Zukunft liegen“ |
-| Prüfende Stelle | Text | ja bei „rechtlich geprüft“ | max. 100 | „Prüfende Stelle fehlt“ |
+| Prüfdatum | Datum | ja bei „rechtlich geprüft“ | nicht in der Zukunft | „Prüfdatum und prüfende Stelle erforderlich“ (v0.6.1, M-24, AC-REQ-054-03; derselbe eine Text wie bei „Prüfende Stelle“, siehe dort); „Prüfdatum darf nicht in der Zukunft liegen“ |
+| Prüfende Stelle | Text | ja bei „rechtlich geprüft“ | max. 100 | „Prüfdatum und prüfende Stelle erforderlich“ (v0.6.1, M-24): **ein** Text für alle drei Fälle (nur Datum fehlt, nur Stelle fehlt, beide fehlen); er erscheint einmal, beide betroffenen Felder sind markiert; es gibt keinen zweiten Text „Prüfende Stelle fehlt“ |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
@@ -36,7 +36,7 @@ Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (n
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts (unter 1366 CSS-px: Liste über dem Inhalt, Regel R-1); Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
 Von Stitch erzeugt, nicht Teil des Designs: **Schaltfläche „Löschen“ je Zeile** (REQ-026 kennt nur anlegen, ändern, deaktivieren; maßgeblich ist „Deaktivieren"; Löschen wäre eine Scope-Frage für den Owner); Kartenüberschrift „Verfügbare Bausteine (5)“ links neben „Neuer Textbaustein“; Pluszeichen im Button. Die Tabelle ist rechts abgeschnitten: Spalte „Prüfstatus“ und das Ende von „Geltungsbereich“ sind im Mockup nicht lesbar; maßgeblich sind die Spalten laut „Angezeigte Daten“ (inkl. Prüfstatus-Chip). Platzhalter-Chips sind eine Darstellungsform der Platzhalterliste.

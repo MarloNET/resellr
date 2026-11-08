@@ -4,7 +4,7 @@
 - Flows: FLOW-01 (Schritte 2–3), FLOW-02 (Schritte 1–2)
 - Anforderungen: REQ-012, REQ-013, REQ-014, REQ-015, REQ-009, REQ-062; Kap. 6.0 Schritt 2, Kap. 9.6
 - Rollen: Nutzer
-- Gerät(e): PC, ab 1366 × 768
+- Gerät(e): PC, Fenster frei in der Größe, Untergrenze 1366 × 768 (REQ-077)
 - Artefakte: default.png (Stitch e049255c8296451297cb58145dbcf2d2, DESKTOP, 06.11.2026)
 
 ## Angezeigte Daten
@@ -53,7 +53,7 @@
 | ausgang-unbekannt (K-6) | Schreibende Aktion ohne Antwort (Verbindungsverlust): Aktion bleibt bis zum Neuladen der Seite gesperrt, Banner „Ausgang unbekannt, bitte neu laden“ (Muster P-08, uiux-design.md Kap. 5), Eingaben bleiben sichtbar, **kein „Erneut versuchen“**; es wird nicht von „noch nicht gespeichert“ ausgegangen. Ablehnung „resellr wird beendet“: P-07 (nicht gespeichert) | nur Text | „Ausgang unbekannt, bitte neu laden.“ |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px dreispaltiges Raster, Info-Panel rechts. Fokusreihenfolge siehe uiux-design.md Kap. 5. Beim Öffnen Fokus in WI-Nr; Enter in WI-Nr springt zu Lieferant.
+Ab Fensterbreite 1366 px dreispaltiges Raster, Info-Panel rechts. Fokusreihenfolge siehe uiux-design.md Kap. 5. Beim Öffnen Fokus in WI-Nr; Enter in WI-Nr springt zu Lieferant. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ unter „resellr“ (Stitch); Platzhalter „Modellname, Typ-Nummer oder Herstellernummer eingeben…“ im Suchfeld (entfällt); Hinweis „Stammdaten aus Bibliotheksmodell fest verknüpft“ im Info-Panel (nicht Teil des Designs); der Fehlerzustand an Akkukapazität „87“ ist nur Beispiel einer Validierungsmeldung (87 ist gültig); Zustandsliste im Mockup zeigt Beispiel-Optionen, maßgeblich Kap. 9.2; Zustandscode-Feld in Monospace (nicht Teil des Designs).

@@ -41,7 +41,7 @@ Keine. Voraussetzungen werden beim Öffnen geprüft:
 | disabled | Buttons deaktiviert bei Voraussetzungs-Meldung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Einspaltige Seite ohne Vorschau. Das Layout des PDFs ist inhaltlich gleichwertig zu `Datenblatt.xlsx` (Annahme A-10/OP-01, nicht pixelgenau).
+Einspaltige Seite ohne Vorschau. Das Layout des PDFs ist inhaltlich gleichwertig zu `Datenblatt.xlsx` (Annahme A-10/OP-01, nicht pixelgenau). Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 „Business Portal“ (Stitch); im Blatt hat Stitch die Blöcke teils zweispaltig gesetzt und den Akku-Hinweis kursiv hervorgehoben (maßgeblich: zweispaltig Bezeichnung | Wert je Block, einheitlich); Schreiblinien zeigen „Shop:“ usw. wie in Requirements (die Excel schreibt „shop:“, „ebay:“, „Kleinenzeigen:“); Logo-Platzhalterbox nur Platzhalter (Logo liefert der Pilotkunde, OP-13).

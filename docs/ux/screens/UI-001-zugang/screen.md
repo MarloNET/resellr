@@ -35,7 +35,7 @@ Titel „resellr“, Feld „Zugangspasswort“, Button „Öffnen“. Kein Benu
 | erneute Abfrage | [v0.3.1] Wird in einem anderen Programm das Passwort geändert, erscheint hier beim nächsten Aufruf die Abfrage | nur Text | „Bitte Zugangspasswort eingeben“ |
 
 ## Fenstergröße und Bedienung
-Zentrierte Karte, Fokus im Feld. Enter sendet.
+Zentrierte Karte, Fokus im Feld. Enter sendet. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
 Im Mockup ist das Passwortfeld mit Beispielpunkten gefüllt und fokussiert dargestellt (reine Illustration des Fokusrings). Sonst keine Abweichung.

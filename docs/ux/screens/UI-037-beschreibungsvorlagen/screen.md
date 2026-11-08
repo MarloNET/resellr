@@ -8,8 +8,8 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
-| Überschrift | Text | nein | | – |
-| Inhalt | Zeilen aus Text und Platzhaltern | ja | alle Platzhalter zulässig; Zeile mit nur leeren Platzhaltern entfällt samt festem Text; Abschnitt mit nur leeren Platzhaltern/Bausteinen entfällt samt Überschrift | „Unbekannter Platzhalter {…}“ |
+| Überschrift | Text | nein | höchstens 100 Zeichen | „Überschrift: höchstens 100 Zeichen“ (v0.6, M-20) |
+| Inhalt | Zeilen aus Text und Platzhaltern | ja | je Zeile höchstens 1.000 Zeichen („Zeile: höchstens 1.000 Zeichen“, v0.6, M-21); alle Platzhalter zulässig; Zeile mit nur leeren Platzhaltern entfällt samt festem Text; Abschnitt mit nur leeren Platzhaltern/Bausteinen entfällt samt Überschrift | „Unbekannter Platzhalter {…}“ |
 | Textbaustein-Element | Auswahl | nein | aktive Textbausteine | – |
 | Geltung | Mehrfachauswahl | nein | | – |
 
@@ -32,7 +32,7 @@ Kanal-Auswahl; Abschnittsliste: optionale Überschrift, Inhaltselemente (fester 
 | disabled | Speichern deaktiviert ohne Änderung | nur Text | |
 
 ## Fenstergröße und Bedienung
-Ab 1366 px; Einstellungs-Liste (240 px) links, Inhalt rechts; Tastaturalternativen zum Ziehen.
+Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts (unter 1366 CSS-px: Liste über dem Inhalt, Regel R-1); Tastaturalternativen zum Ziehen.
 
 ## Bekannte Abweichungen im Mockup
 Von Stitch erzeugt, nicht Teil des Designs: Untertitel „Konfiguration dynamischer Textbausteine für Marktplatz-Inserate“; Zusatzzeile „Reihenfolge und Felder der generierten Beschreibungsteile festlegen“; Kennzeichnung „3 Abschnitte aktiv“; Chip „Live synchronisiert“ mit Zusatzzeile „Echtzeit-Generierung basierend auf Referenzgerät“; Infobox „Variablen ohne hinterlegte Bestandsdaten werden …“; Abschnittsnamen („Basisdaten“, „Zustandsbeschreibung“, „Zubehör & Lieferumfang“); Ziehgriffe und Löschen-Symbole an Inhaltszeilen. Das Auswahlfeld „Textbausteine der Art“ ist im Mockup leer (maßgeblich: Wert „Akku-Hinweis“). Abschnitt 3 liegt hinter der Sticky-Leiste. Die durchgestrichene Vorschauzeile „entfällt“ ist die Darstellung für entfallende Zeilen.
