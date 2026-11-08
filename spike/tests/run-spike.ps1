@@ -94,14 +94,34 @@ function Start-Observers {
     $procReady = Join-Path $script:WorkDir 'process.ready'
     Remove-Item -Force -ErrorAction SilentlyContinue $script:ObsStop, $winReady, $procReady
     $wwScript = Join-Path $script:WorkDir 'window-watch.ps1'
-    $cl = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$wwScript`" -OutCsv `"$script:WinCsv`" -StopFile `"$script:ObsStop`" -ReadyFile `"$winReady`""
-    $script:WinWatcher = Start-AsSpike -CommandLine $cl -Flags ([SpikeNative]::CREATE_NO_WINDOW)
+    $script:WinLog = Join-Path $script:WorkDir 'window-watch.log'
+    Remove-Item -Force -ErrorAction SilentlyContinue $script:WinLog
+    # Batch wrapper so stdout/stderr of the spikeuser watcher land in a log (diagnosis if it never gets ready).
+    $wwBat = Join-Path $script:WorkDir 'window-watch.cmd'
+    $ps = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$wwScript`" -OutCsv `"$script:WinCsv`" -StopFile `"$script:ObsStop`" -ReadyFile `"$winReady`""
+    Set-Content -Path $wwBat -Value "@echo off`r`n$ps > `"$script:WinLog`" 2>&1`r`nexit /b %ERRORLEVEL%" -Encoding ascii
+    $script:WinWatcher = Start-AsSpike -CommandLine "cmd.exe /d /s /c `"$wwBat`"" -Flags ([SpikeNative]::CREATE_NO_WINDOW)
     $script:ProcWatcher = Start-Process powershell -PassThru -WindowStyle Hidden -ArgumentList @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'process-watch.ps1'),
         '-OutCsv', $script:ProcCsv, '-StopFile', $script:ObsStop, '-ReadyFile', $procReady)
-    if (-not (Wait-For { (Test-Path $winReady) -and (Test-Path $procReady) } 30000 1000)) {
-        throw 'observers did not become ready within 30 s'
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    Wait-For { (Test-Path $winReady) -and (Test-Path $procReady) } 90000 500 | Out-Null
+    # A watcher that never gets ready no longer aborts the run: the other checks still run and P2.3
+    # reports the harness error with this diagnosis.
+    $script:ObserverError = $null
+    $errors = @()
+    if (-not (Test-Path $winReady)) {
+        $code = $script:WinWatcher.WaitExit(0)
+        $log = if (Test-Path $script:WinLog) { Get-Content -Raw -Path $script:WinLog } else { '(kein Log)' }
+        $state = if ($null -eq $code) { 'läuft noch' } else { "Exit-Code $code" }
+        $errors += "Fensterbeobachter nicht bereit nach 90 s ($state); Log: $log"
     }
+    if (-not (Test-Path $procReady)) { $errors += 'Prozessbeobachter nicht bereit nach 90 s' }
+    if ($errors.Count) {
+        $script:ObserverError = $errors -join '; '
+        Write-Host "::warning::$($script:ObserverError)"
+    }
+    else { Write-Host "observers ready after $($sw.ElapsedMilliseconds) ms" }
 }
 
 function Stop-Observers {
@@ -531,6 +551,7 @@ function Check-P38 {
 # --- P2.3 (observers) ---------------------------------------------------------------------------
 
 function Check-P23 {
+    if ($script:ObserverError) { throw $script:ObserverError }
     $winRows = @(Import-Csv -Path $script:WinCsv)
     $procRows = @(Import-Csv -Path $script:ProcCsv)
     $watched = @('resellr-node.exe', 'node.exe', 'resellr-start.exe')
@@ -747,6 +768,7 @@ Invoke-Check 'P1.5' { Check-P15 }
 
 # Evidence from the spikeuser profile for the artifact.
 Save-Evidence $script:OpsLog 'operations.jsonl'
+Save-Evidence $script:WinLog 'window-watch.log'
 Save-Evidence $script:StartResultFile 'start-result.json'
 
 Write-Host '--- summary ---'
