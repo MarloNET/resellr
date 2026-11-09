@@ -2686,7 +2686,7 @@ Verfeinert Baseline 12.1 (Vorschlag). Abweichung: Die Startbelegung liegt in ein
 ```text
 resellr/
 ├─ package.json                 npm-Workspaces, Skripte
-├─ tsconfig.base.json, eslint.config.mjs, .prettierrc, .nvmrc, vitest.workspace.ts, playwright.config.ts
+├─ tsconfig.base.json, eslint.config.mjs, .prettierrc, .nvmrc, vitest.config.ts, playwright.config.ts
 ├─ apps/
 │  ├─ server/                   resellr-server (Node.js, Fastify)
 │  │  ├─ src/
@@ -2767,10 +2767,13 @@ Exakte Versionen legt das Lockfile im Walking Skeleton fest (neueste stabile Min
 | Gestaltung | Tailwind CSS, shadcn/ui (Radix-Primitives), `lucide-react` | 4.x | MIT, ISC |
 | Textdifferenz | `diff` (jsdiff) | 8.x | BSD-3-Clause |
 | Build | Vite, esbuild | 7.x, 0.25.x | MIT |
-| Tests | Vitest, Playwright (Kanal `chrome`) | 3.x, 1.x | MIT, Apache-2.0 |
+| Tests | Vitest, Playwright (Kanal `chrome`) | 5.x (Nachtrag MAR-213, vorher 3.x), 1.x | MIT, Apache-2.0 |
+| Lint und Format (Build-Werkzeuge, nicht ausgeliefert; Nachtrag MAR-213) | ESLint, `@eslint/js`, `typescript-eslint`, `eslint-plugin-boundaries`, `eslint-import-resolver-typescript`, Prettier, `eslint-plugin-prettier`, `eslint-config-prettier` | 10.x, 10.x, 8.x, 7.x, 4.x, 3.x, 5.x, 10.x | MIT |
 | Schrift | Inter | 4.1 (fest, Zeichenbreiten für UI-044) | OFL-1.1 |
 | Installer | Inno Setup | 6.x (Build-Werkzeug, nicht ausgeliefert) | Inno-Setup-Lizenz (frei) |
 | Could | `exceljs` | 4.x | MIT |
+
+**Sicherheitshinweise der Abhängigkeiten (TH-07, Nachtrag MAR-213).** Die CI prüft in zwei Schritten: (1) `npm audit --omit=dev --audit-level=high` für alles, was ausgeliefert wird, ohne Ausnahme; (2) `npm audit --audit-level=high` für alle Abhängigkeiten einschließlich Test-, Lint- und Build-Werkzeugen, weil diese auf dem Entwicklerrechner und in der CI Code ausführen. Meldet Schritt (2) einen Befund ohne Fix innerhalb der hier genannten Hauptversion, entscheidet der Software Architect: Hauptversion in dieser Tabelle anheben (Nachtrag nach Kap. 4.7) oder befristete, im Änderungsprotokoll (Kap. 10.2) begründete Ausnahme. Befunde unterhalb `high` in Werkzeugen werden über die Dependabot-Vorschläge behoben, sobald ein Fix vorliegt.
 
 ### 4.4 Karte der Code-Einheiten
 
@@ -2800,9 +2803,9 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 
 | Nr. | Einheit | Ort | Verantwortung | Features |
 | --- | --- | --- | --- | --- |
-| CU-001 | Workspace-Wurzel | `package.json`, `tsconfig.base.json`, `.nvmrc` | Workspaces, gemeinsame TypeScript-Optionen (strict), Node-Version, Skripte `build`, `test`, `e2e`, `lint`, `typecheck`, `demo` | alle |
-| CU-002 | Lint-Regeln | `eslint.config.mjs` | Codeformat, Importgrenzen zwischen Komponenten (Kap. 4.1) | alle |
-| CU-003 | Linux-CI | `.github/workflows/ci.yml` | Lint, Typprüfung, Unit-, Integrations- und E2E-Tests unter Linux mit Google Chrome | alle |
+| CU-001 | Workspace-Wurzel | `package.json`, `tsconfig.base.json`, `.nvmrc`, `vitest.config.ts` | Workspaces, gemeinsame TypeScript-Optionen (strict), Node-Version, Skripte `build`, `test`, `e2e`, `lint`, `typecheck`, `demo`; Vitest-Projekte je Workspace über `test.projects` (Nachtrag MAR-213) | alle |
+| CU-002 | Lint-Regeln | `eslint.config.mjs`, `.prettierrc` | Codeformat (Prettier, über ESLint geprüft), Importgrenzen zwischen Komponenten (Kap. 4.1) | alle |
+| CU-003 | Linux-CI | `.github/workflows/ci.yml` | Lint, Typprüfung, Unit-, Integrations- und E2E-Tests unter Linux mit Google Chrome; `npm audit` in zwei Schritten (Kap. 4.3, TH-07) | alle |
 | CU-004 | Demo-Start | `tools/demo/run-demo.ts` | `npm run demo`: bauen, temporären Datenordner anlegen, Beispieldaten einspielen, Server auf `127.0.0.1:${PORT:-4310}` starten (Baseline 11.3); die Startbelegung kommt erst mit S2 über CU-071 (FIND-223) | O5 |
 | CU-005 | Laufzeitpfade | `packages/runtime-shared/src/paths.ts` | Pfade von Daten-, Protokoll-, Übergabe- und Update-Kopie-Ordner aus Umgebung bzw. `%LOCALAPPDATA%` | F-19 |
 | CU-006 | Exit-Codes | `packages/runtime-shared/src/exit-codes.ts` | Konstanten 0, 10, 11, 12 und ihre Bedeutung | F-18 |
@@ -3216,7 +3219,7 @@ Fehlt eine Einheit oder ist eine Verantwortung unklar, fragt der Entwickler den 
 | **REQ-104** bis **REQ-106** | Kap. 2.17 bis 2.19 | E2E, Betriebstests, AC-REQ-106-01 vor Pilotstart |
 | Barrierefreiheit | nicht anwendbar (E-3, REQ-071 zurückgezogen) | – |
 
-**Sicherheitsbedrohungen (Baseline 8.3):** TH-01 Bindung an Loopback (CU-020); TH-02 `local-guard` G-1 bis G-6 (CU-021); TH-03 React-Escaping, kein `dangerouslySetInnerHTML`, CSP ohne Inline-Skripte (CU-022), Launcher-Seiten mit `textContent` (H-11); TH-04 Upload-Prüfung (CU-089, CU-204), feste Inhaltstypen, `nosniff`; TH-05 Owner-Risiko (E-7), BitLocker-Empfehlung im Betriebshandbuch; TH-06 wie REQ-079; TH-07 Lockfile, `npm audit` in der CI, Dependabot-Vorschläge; TH-08 akzeptiert.
+**Sicherheitsbedrohungen (Baseline 8.3):** TH-01 Bindung an Loopback (CU-020); TH-02 `local-guard` G-1 bis G-6 (CU-021); TH-03 React-Escaping, kein `dangerouslySetInnerHTML`, CSP ohne Inline-Skripte (CU-022), Launcher-Seiten mit `textContent` (H-11); TH-04 Upload-Prüfung (CU-089, CU-204), feste Inhaltstypen, `nosniff`; TH-05 Owner-Risiko (E-7), BitLocker-Empfehlung im Betriebshandbuch; TH-06 wie REQ-079; TH-07 Lockfile, `npm audit` in der CI in zwei Schritten (Kap. 4.3), Dependabot-Vorschläge; TH-08 akzeptiert.
 
 ---
 
@@ -3665,6 +3668,7 @@ Die Architekturrisiken AR-01 bis AR-15 der Baseline gelten weiter. Ihre Bewertun
 | 0.4.1 | 08.11.2026 | Kleine Revision nach Architecture Review v0.4 Runde 1 ([MAR-183](/MAR/issues/MAR-183#document-architecture-review-techspec-v04-r1), Rev. `aa3a061a`, `changes_requested`), Korrekturrunde 2 von 3 des Zyklus: Fehlerzusammenfassung in UI-003 wieder abgebildet; Bezug auf Design-Entwurf v0.6.1 @ `894d49e` (einschließlich MAR-182); Nachtrag Defender-Scan bei der Abnahme (Kap. 6.4) und Verweis auf Spike-Prüfung P2.4 (Kap. 9.2) nach Backlog-Review [MAR-184](/MAR/issues/MAR-184#document-backlog-review-spike-2-r2), Hinweis B; Briefing nachgezogen; Auftrag [MAR-187](/MAR/issues/MAR-187). Keine neue Code-Einheit, keine neue Migration, keine geänderte Verantwortung | FIND-236, FIND-237 (Tabelle unten) |
 | 0.5 | 08.11.2026 | Spike-Delta: Ergebnis des Windows-Spikes (GitHub-Issue #2, [MAR-188](/MAR/issues/MAR-188); `spike/ERGEBNIS.md` @ `ad17ab2`, maßgeblicher Lauf 42475377911 auf `9428f22`) nach eigener Prüfung gegen Spike-Auftrag v1.2 eingearbeitet: S-1, S-2 (einschließlich Defender), S-3, S-5, S-7 bestätigt, kein Rückfallweg; Grenzen (Windows Server 2025 statt Windows 11, nicht geprüfte Punkte) in Kap. 9.2, Abnahme Kap. 6.4 und Briefing; Hinweise 5.1 und 5.3 aus dem Delta-Review v0.4.1 ([MAR-189](/MAR/issues/MAR-189#document-architecture-review-techspec-v041-r2), Rev. `fc901cae`, `pass`); Briefing nicht verlängert (F6); Auftrag [MAR-191](/MAR/issues/MAR-191). Keine neue Code-Einheit, keine neue Migration, keine geänderte Verantwortung | keine Findings; Hinweise MAR-189 5.1 bis 5.5 und MAR-183 5.4 (Tabelle unten) |
 | 0.5.1 | 08.11.2026 | Redaktionelle Korrektur nach Architecture Review v0.5 ([MAR-192](/MAR/issues/MAR-192#document-architecture-review-techspec-v05-r1), Rev. `c2f0ca05`, `pass`, 0 blocker, 0 major, 2 minor); nur Text, keine inhaltliche Änderung an Schnittstelle, Datenmodell, Code-Struktur oder Prüfungen; Auftrag [MAR-193](/MAR/issues/MAR-193). Keine neue Code-Einheit, keine neue Migration, keine geänderte Verantwortung | FIND-238, FIND-239 (Tabelle unten) |
+| 0.5.1, Nachtrag 1 | 09.11.2026 | Code-Struktur-Nachtrag nach Kap. 4.7 auf Rückfrage [MAR-213](/MAR/issues/MAR-213) aus der Umsetzung von GitHub-Issue #107 (Walking Skeleton Teil 1, PR #276): Lint- und Format-Bibliotheken in Kap. 4.3 ergänzt; Vitest-Hauptversion 3.x → 5.x wegen kritischer Sicherheitshinweise in Vitest 3.x (`tinypool` GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr; `@vitest/mocker`), Fix erst ab 4.1.12; `vitest.workspace.ts` → `vitest.config.ts` mit `test.projects`; `npm audit` der CI in zwei Schritten (TH-07). Nur Entwicklungswerkzeuge, nichts davon wird ausgeliefert; keine Komponentengrenze, Schnittstelle oder freigegebenes Verhalten berührt, daher keine neue Owner-Freigabe (Kap. 4.7) | – |
 
 **Behandlung je Finding (alle in v0.2):**
 
@@ -3865,6 +3869,12 @@ Unverändert und bewusst nicht in v0.5.1: die Hinweise 5.1 bis 5.3 aus MAR-183 (
 **Code-Struktur-Nachtrag v0.5 (Spike-Ergebnis, MAR-189):** keine neue Einheit, keine geänderte Verantwortung, keine Komponentengrenze berührt, keine neue Migration. Der Spike-Prototyp unter `spike/` ist Wegwerf-Code und keine Einheit der Karte; die Produkt-Einheiten CU-258 bis CU-279 bleiben wie in S10 beschrieben. Die Ergänzungen in 6.4 sind manuelle Prüfungen ohne Code.
 
 **Code-Struktur-Nachtrag v0.5.1 (MAR-192):** keine neue Einheit, keine geänderte Verantwortung, keine Komponentengrenze berührt, keine neue Migration. CU-278 bleibt „Installer bauen, als Standardbenutzer installieren, Launcher- und Betriebstests“; geändert ist nur das in 9.2 (S-8) genannte Prüfkriterium.
+
+**Code-Struktur-Nachtrag 09.11.2026 (MAR-213, GitHub-Issue #107):** keine neue Einheit, keine Komponentengrenze berührt, keine neue Migration.
+- **Ort erweitert:** CU-001 um `vitest.config.ts` (ersetzt `vitest.workspace.ts` aus Kap. 4.1; Vitest meldet die Workspace-Datei ab 3.2 als veraltet, in 5.x entfällt sie); CU-002 um `.prettierrc`.
+- **Verantwortung erweitert:** CU-001 Vitest-Projekte je Workspace über `test.projects`; CU-003 `npm audit` in zwei Schritten (Kap. 4.3).
+- **Bibliotheken (Kap. 4.3):** Zeile „Lint und Format“ neu (Kap. 4.1 verlangte `eslint-plugin-boundaries`, die Tabelle nannte es nicht); `eslint-import-resolver-typescript` ist nötig, damit `eslint-plugin-boundaries` Workspace-Pakete über `exports` auflöst. Vitest 5.x statt 3.x: Vitest 3.2.7, die letzte 3.x, enthält `tinypool` ≤ 2.1.1 (Prototype Pollution bis zur Codeausführung) und `@vitest/mocker` < 4.1.12 (Path Traversal, Code-Injektion über die Mock-Registrierung), beide kritisch; 4.1.12 und 5.1.0 sind mit Vite 7 nach `npm audit` frei (geprüft am 09.11.2026). 5.x statt 4.x, weil 5.x die aktuelle Hauptversion ist und Kap. 4.3 die neueste stabile Minor-Version wählt; beide unterstützen Vite 7 und Node.js 26.
+- **Bewusst hingenommen:** `minimatch` 10.x (GHSA-g3hv-75wg-m249, mittel, DoS) über ESLint 10 und `typescript-eslint`; ohne Fix innerhalb ESLint 10, nur Lint-Werkzeug, Eingaben sind die eigenen Glob-Muster der Konfiguration. Behebung über Dependabot, sobald ein Fix vorliegt.
 
 Weitere Code-Struktur-Nachträge (Kap. 4.7) werden hier mit Datum, Einheit und Grund ergänzt.
 
