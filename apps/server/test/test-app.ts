@@ -2,7 +2,11 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildApp } from '../src/app.ts';
+import type { Kysely } from 'kysely';
+
+import { type AppDeps, buildApp } from '../src/app.ts';
+import { openDatabase } from '../src/db/database.ts';
+import type { DB } from '../src/db/schema.ts';
 import { createErrorLog, createLifecycleState } from '../src/ops/index.ts';
 
 export const TEST_PORT = 4310;
@@ -16,6 +20,8 @@ export const SAME_ORIGIN_WRITE = {
   'sec-fetch-site': 'same-origin',
   'content-type': 'application/json',
 } as const;
+
+export const TEST_APP_VERSION = '0.1.0-test';
 
 export const INDEX_HTML = '<!doctype html><title>resellr</title>';
 export const ASSET_JS = 'console.log("resellr");';
@@ -33,9 +39,21 @@ export function createTestApp() {
   writeFileSync(join(webRoot, 'assets', 'app.js'), ASSET_JS);
   writeFileSync(join(webRoot, 'assets', '.hidden'), 'not served');
 
-  const errorLog = createErrorLog({ dir: logDir, appVersion: '0.1.0-test', startId: null });
+  const dataDir = join(root, 'Daten');
+  mkdirSync(dataDir);
+  // An empty database: the HTTP core needs none of its tables.
+  const database = openDatabase<DB>(join(dataDir, 'resellr.db'));
+
+  const errorLog = createErrorLog({ dir: logDir, appVersion: TEST_APP_VERSION, startId: null });
   const lifecycle = createLifecycleState('ready');
-  const { app, writeGate } = buildApp({ port: TEST_PORT, webRoot, errorLog, lifecycle });
+  const { app, writeGate } = buildApp({
+    port: TEST_PORT,
+    webRoot,
+    errorLog,
+    lifecycle,
+    db: database.db,
+    ops: { startId: null, dataDirPath: dataDir, appVersion: TEST_APP_VERSION },
+  });
 
   /** All entries of the error log, oldest first. */
   const readErrorLog = (): Record<string, unknown>[] => {
@@ -55,8 +73,14 @@ export function createTestApp() {
 
   const close = async () => {
     await app.close();
+    await database.close();
     rmSync(root, { recursive: true, force: true });
   };
 
-  return { app, lifecycle, writeGate, webRoot, readErrorLog, close };
+  return { app, lifecycle, writeGate, dataDir, webRoot, readErrorLog, close };
+}
+
+/** `buildApp` of CU-019 in the form the startup sequence (CU-040) takes, as `main.ts` passes it. */
+export function appFactory(deps: Omit<AppDeps, 'port' | 'db'>) {
+  return ({ port, db }: { port: number; db: Kysely<DB> }) => buildApp({ ...deps, port, db }).app;
 }
