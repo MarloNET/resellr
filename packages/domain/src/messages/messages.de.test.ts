@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { ERROR_MESSAGES, FIXED_TEXTS, MESSAGES } from './messages.de.ts';
+import { ERROR_MESSAGES, type ErrorMessageUsage, FIXED_TEXTS, MESSAGES } from './messages.de.ts';
 
 // Table "Meldungstexte" in Technical Specification 8.2; M-05 to M-13 per field as in the
 // message catalog of the design (docs/ux/meldungskatalog.md), which 8.2 refers to.
@@ -70,6 +70,12 @@ describe('message catalog (E1)', () => {
 
   it('uses M-15 for not_found', () => {
     expect(ERROR_MESSAGES['not_found.default']).toBe('Dieser Eintrag ist nicht mehr vorhanden.');
+  });
+
+  it('derives the usages of a code from the catalog keys', () => {
+    expectTypeOf<ErrorMessageUsage<'not_found'>>().toEqualTypeOf<'default'>();
+    // No text in S1, so no usage can be set (MAR-239, F-1).
+    expectTypeOf<ErrorMessageUsage<'internal_error'>>().toEqualTypeOf<never>();
   });
 });
 

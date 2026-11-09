@@ -50,6 +50,16 @@ describe('import boundaries from Technical Specification 4.1 (E2)', () => {
     ]);
   });
 
+  it('lets main.ts build the app from app.ts', async () => {
+    expect(await boundaryErrors('apps/server/src/main.ts')).toEqual([]);
+  });
+
+  it('fails on an import of main.ts from app.ts (no cycle, Nachtrag MAR-240)', async () => {
+    expect(await boundaryErrors('entry-cycle/apps/server/src/app.ts')).toEqual([
+      expect.stringContaining('server-entry'),
+    ]);
+  });
+
   it('makes the lint run fail on a boundary violation', async () => {
     const results = await eslint.lintFiles([
       join(FIXTURES, 'apps/server/src/inventory/cross-component-internal.ts'),
