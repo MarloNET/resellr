@@ -20,8 +20,10 @@ function ListingOverviewPlaceholder() {
 
 /**
  * Routes of the UI (CU-043, hotspot; paths only after Technical Specification 4.2). Each
- * task that builds a screen adds its route here. Until then a path without route keeps the
- * frame with an empty content area, so the navigation stays usable.
+ * task that builds a screen adds its route here, before the fallback route `*`. The fallback
+ * route stays the last entry permanently (Technical Specification 4.2, DG-18): every path
+ * without its own route shows the frame with navigation and an empty content area, without
+ * text, redirect or change of the address.
  */
 export const routes: RouteObject[] = [
   {

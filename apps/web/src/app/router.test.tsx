@@ -116,6 +116,21 @@ describe('router and application frame', () => {
     expect(screen.getByText('Noch keine Modell-Inserate')).toBeTruthy();
   });
 
+  it('fallback route * keeps frame and navigation for a path outside Technical Specification 4.2', () => {
+    const router = renderAt('/unbekannt');
+
+    expect(router.state.location.pathname).toBe('/unbekannt');
+    expect(within(screen.getByTestId('navigation-column')).getByText('resellr')).toBeTruthy();
+    const nav = screen.getByRole('navigation', { name: 'Hauptnavigation' });
+    const links = within(nav).getAllByRole('link');
+    expect(links).toHaveLength(NAVIGATION_ENTRIES.length);
+    expect(links.filter((link) => link.hasAttribute('aria-current'))).toEqual([]);
+    expect(links.filter((link) => link.className.includes('text-primary'))).toEqual([]);
+    const content = screen.getByTestId('content-area');
+    expect(content.childElementCount).toBe(0);
+    expect(content.textContent).toBe('');
+  });
+
   it('E8 the frame never scrolls horizontally: content area with min-width 0 and no x-overflow', () => {
     renderAt('/inserate');
 
