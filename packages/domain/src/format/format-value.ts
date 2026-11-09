@@ -26,10 +26,14 @@ export function formatMoney(cents: number): string {
 }
 
 /**
- * Number with decimal comma and without thousands separators ("13,3", "1234"). Takes a number
- * or the canonical decimal string of an attribute value.
+ * Number with decimal comma and without thousands separators ("13,3", "1234"). Takes a whole
+ * number or the canonical decimal string of an attribute value; a fractional number has no
+ * defined rounding and is rejected, as are numbers that would print in exponent notation.
  */
 export function formatNumber(value: number | string): string {
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+    throw new RangeError(`Not a whole number: ${value}`);
+  }
   return String(value).replace('.', ',');
 }
 
@@ -48,11 +52,22 @@ export function formatYesNo(value: boolean): string {
 /** Calendar date `YYYY-MM-DD` as `TT.MM.JJJJ`. */
 export function formatDate(date: string): string {
   const match = CALENDAR_DATE.exec(date);
-  const [, year, month, day] = match ?? [];
-  if (!match || Number(month) < 1 || Number(month) > 12) {
+  const [, year = '', month = '', day = ''] = match ?? [];
+  if (!match || !isExistingDate(Number(year), Number(month), Number(day))) {
     throw new RangeError(`Not a calendar date: ${date}`);
   }
   return `${day}.${month}.${year}`;
+}
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isExistingDate(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12) {
+    return false;
+  }
+  const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const daysInMonth = month === 2 && isLeapYear ? 29 : (DAYS_IN_MONTH[month - 1] ?? 0);
+  return day >= 1 && day <= daysInMonth;
 }
 
 /** UTC timestamp as `TT.MM.JJJJ HH:MM` in Europe/Berlin. */

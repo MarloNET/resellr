@@ -49,4 +49,16 @@ describe('decimal input (E3)', () => {
   ])('rejects %j as format error', (input) => {
     expect(parseDecimal(input)).toBeNull();
   });
+
+  // Regression for FIND-247: removing the zeros must take linear time. A quadratic
+  // implementation needs several seconds for these inputs; a linear one a few milliseconds.
+  it.each([
+    ['trailing zeros', `1,${'0'.repeat(200_000)}`, '1'],
+    ['zeros before a last digit', `1,${'0'.repeat(200_000)}1`, `1.${'0'.repeat(200_000)}1`],
+    ['leading zeros', `${'0'.repeat(200_000)}7,5`, '7.5'],
+  ])('handles very long runs of %s in linear time', (_, input, expected) => {
+    const start = performance.now();
+    expect(parseDecimal(input)).toBe(expected);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
 });

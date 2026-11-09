@@ -30,12 +30,21 @@ describe('output formats (E4)', () => {
     ['13.3', '13,3'],
     ['14.01', '14,01'],
     ['1234', '1234'],
-    [13.3, '13,3'],
     [16, '16'],
+    [-2, '-2'],
     [1234, '1234'],
   ])('formats the number %j as %j', (value, expected) => {
     expect(formatNumber(value)).toBe(expected);
   });
+
+  // FIND-250: a fractional number has no defined rounding and large numbers would turn into
+  // exponent notation, so fractional values come as canonical decimal strings.
+  it.each([13.3, 0.1 + 0.2, 1e21, 1e-7, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects the number %d',
+    (value) => {
+      expect(() => formatNumber(value)).toThrow(RangeError);
+    },
+  );
 
   it.each([
     ['16', 'GB', false, '16GB'],
@@ -53,16 +62,26 @@ describe('output formats (E4)', () => {
   it.each([
     ['2026-11-07', '07.11.2026'],
     ['2027-01-31', '31.01.2027'],
+    ['2028-02-29', '29.02.2028'],
+    ['2000-02-29', '29.02.2000'],
   ])('formats the date %j as %j', (date, expected) => {
     expect(formatDate(date)).toBe(expected);
   });
 
-  it.each(['07.11.2026', '2026-11-07T16:05:12.345Z', '2026-13-01', ''])(
-    'rejects %j as calendar date',
-    (date) => {
-      expect(() => formatDate(date)).toThrow(RangeError);
-    },
-  );
+  it.each([
+    '07.11.2026',
+    '2026-11-07T16:05:12.345Z',
+    '2026-13-01',
+    '2026-00-10',
+    '2026-02-30',
+    '2026-02-29',
+    '2100-02-29',
+    '2026-04-31',
+    '2026-01-00',
+    '',
+  ])('rejects %j as calendar date', (date) => {
+    expect(() => formatDate(date)).toThrow(RangeError);
+  });
 
   it.each([
     ['winter time', '2026-11-07T16:05:12.345Z', '07.11.2026 17:05'],

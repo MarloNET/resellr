@@ -15,7 +15,13 @@ export function parseDecimal(input: string): string | null {
   }
   const [, sign, integerDigits = '', fractionDigits = ''] = match;
   const integerPart = integerDigits.replace(/^0+(?=[0-9])/, '');
-  const fractionPart = fractionDigits.replace(/0+$/, '');
+  // A loop instead of `/0+$/`: that pattern is not anchored at the start and takes quadratic
+  // time on long runs of zeros (FIND-247).
+  let fractionEnd = fractionDigits.length;
+  while (fractionEnd > 0 && fractionDigits[fractionEnd - 1] === '0') {
+    fractionEnd -= 1;
+  }
+  const fractionPart = fractionDigits.slice(0, fractionEnd);
   const absolute = fractionPart ? `${integerPart}.${fractionPart}` : integerPart;
   return sign && absolute !== '0' ? `-${absolute}` : absolute;
 }
