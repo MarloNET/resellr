@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useRef, useState, type RefObject } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { Badge } from './Badge.tsx';
@@ -6,6 +7,7 @@ import { Button } from './Button.tsx';
 import {
   Dialog,
   DialogBody,
+  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -13,6 +15,49 @@ import {
 } from './Dialog.tsx';
 import { Sheet, SheetContent, SheetTrigger } from './Sheet.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './Table.tsx';
+
+/** A screen that opens a dialog from a button without `DialogTrigger`, like the feature screens. */
+function DialogScreen({ useOtherTarget = false }: { useOtherTarget?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const otherTargetRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef: RefObject<HTMLElement | null> | undefined = useOtherTarget
+    ? otherTargetRef
+    : undefined;
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Als beendet melden
+      </button>
+      <button type="button" ref={otherTargetRef}>
+        Statusanzeige
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent width={480} returnFocusRef={returnFocusRef}>
+          <DialogHeader>
+            <DialogTitle>Als beendet melden</DialogTitle>
+          </DialogHeader>
+          <DialogBody>Inhalt</DialogBody>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button>Abbrechen</Button>
+            </DialogClose>
+            <Button variant="primary" onClick={() => setOpen(false)}>
+              Melden
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function openDialogFromFocusedButton(): HTMLElement {
+  const opener = screen.getByRole('button', { name: 'Als beendet melden' });
+  opener.focus();
+  fireEvent.click(opener);
+  return screen.getByRole('dialog', { name: 'Als beendet melden' });
+}
 
 describe('UI building blocks (Technical Specification 2.0.10)', () => {
   afterEach(cleanup);
@@ -38,6 +83,60 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     expect(dialog.style.maxHeight).toBe('calc(100dvh - 16px)');
     expect(dialog.className).toContain('flex-col');
     expect(screen.getByText('Inhalt').className).toContain('overflow-y-auto');
+  });
+
+  it('E1 Dialog returns the focus to the opening element after Esc', async () => {
+    render(<DialogScreen />);
+    const dialog = openDialogFromFocusedButton();
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Als beendet melden' }),
+      ),
+    );
+  });
+
+  it('E1 Dialog returns the focus to the opening element after "Abbrechen"', async () => {
+    render(<DialogScreen />);
+    openDialogFromFocusedButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Als beendet melden' }),
+      ),
+    );
+  });
+
+  it('E1 Dialog returns the focus to the opening element after the action', async () => {
+    render(<DialogScreen />);
+    openDialogFromFocusedButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Melden' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Als beendet melden' }),
+      ),
+    );
+  });
+
+  it('E1 Dialog moves the focus to the target the screen sets instead', async () => {
+    render(<DialogScreen useOtherTarget />);
+    openDialogFromFocusedButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Melden' }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Statusanzeige' })),
+    );
   });
 
   it('Sheet overlays with "Schließen" and closes with it and with Esc', () => {

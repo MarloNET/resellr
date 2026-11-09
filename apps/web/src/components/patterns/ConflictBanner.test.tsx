@@ -24,7 +24,7 @@ describe('ConflictBanner (CU-052, P-05)', () => {
     const banner = screen.getByRole('alert');
     expect(banner.textContent).toBe(`${FIXED_TEXTS.conflictBanner}Neu laden`);
     expect(screen.getByRole('button', { name: 'Neu laden' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '×' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Meldung schließen' })).toBeNull();
     expect(banner.className).toContain('bg-flag-warn-bg');
   });
 

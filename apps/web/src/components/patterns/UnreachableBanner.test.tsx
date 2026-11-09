@@ -68,7 +68,7 @@ describe('UnreachableBanner (CU-053, P-06)', () => {
     const banner = await screen.findByRole('alert');
     expect(banner.textContent).toBe(`${FIXED_TEXTS.unreachableBanner}Erneut versuchen`);
     expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '×' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Meldung schließen' })).toBeNull();
     expect(banner.textContent).not.toMatch(/R-[0-9A-Z]{4}-[0-9A-Z]{4}/);
     expect(banner.className).toContain('bg-flag-warn-bg');
   });

@@ -1,5 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import type { ComponentProps, HTMLAttributes } from 'react';
+import { useRef, type ComponentProps, type HTMLAttributes, type RefObject } from 'react';
 
 import { cn } from './cn.ts';
 
@@ -7,6 +7,8 @@ import { cn } from './cn.ts';
  * Modal dialog (CU-058, Technical Specification 2.0.10, DESIGN.md "Dialoge"): width
  * `min(<design width>, 100vw − 16px)`, height at most `100dvh − 16px`; a column of title,
  * scrolling content and action bar, so title and actions always stay visible. Esc closes.
+ * After closing (Esc, "Abbrechen", action) the focus returns to the element that had it when the
+ * dialog opened, also without `DialogTrigger` (#285).
  */
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -15,9 +17,26 @@ export const DialogClose = DialogPrimitive.Close;
 export interface DialogContentProps extends ComponentProps<typeof DialogPrimitive.Content> {
   /** Design width of the dialog in px, e.g. 720 for UI-004, 800 for UI-005. */
   width: number;
+  /**
+   * Focus target after closing instead of the opening element, e.g. the cell after success
+   * (UI-035). Read when the dialog closes, so the screen can set it right before closing.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
-export function DialogContent({ width, className, style, children, ...props }: DialogContentProps) {
+export function DialogContent({
+  width,
+  returnFocusRef,
+  className,
+  style,
+  children,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
+  ...props
+}: DialogContentProps) {
+  // Radix returns the focus only to a `DialogTrigger`; the screens open their dialogs via `open`.
+  const openerRef = useRef<HTMLElement | null>(null);
+
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 bg-text/40" />
@@ -32,6 +51,17 @@ export function DialogContent({ width, className, style, children, ...props }: D
           width: `min(${width}px, 100vw - 16px)`,
           maxHeight: 'calc(100dvh - 16px)',
           ...style,
+        }}
+        onOpenAutoFocus={(event) => {
+          openerRef.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          if (event.defaultPrevented) return;
+          event.preventDefault();
+          (returnFocusRef?.current ?? openerRef.current)?.focus();
         }}
         {...props}
       >

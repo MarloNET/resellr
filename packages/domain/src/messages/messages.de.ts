@@ -76,6 +76,8 @@ export const FIXED_TEXTS = {
   shuttingDownBanner:
     'resellr wird gerade beendet. Ihre Eingabe wurde nicht gespeichert. Warten Sie, bis ' +
     'resellr beendet ist, und starten Sie es dann über die Verknüpfung „resellr“ im Startmenü.',
+  /** Accessible name of "×" in the page banner (design chapter 5 "Feedback", MAR-283). */
+  closeBanner: 'Meldung schließen',
   outcomeUnknownBanner: 'Ausgang unbekannt, bitte neu laden.',
   outcomeUnknownHint:
     'Ob Ihre Aktion gespeichert wurde, ist unklar. Laden Sie die Seite neu ' +

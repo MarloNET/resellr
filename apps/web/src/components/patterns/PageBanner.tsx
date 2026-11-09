@@ -1,3 +1,4 @@
+import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
 import { useEffect, useRef, type ReactNode } from 'react';
 
 import type { ApiError } from '../../api/api-client.ts';
@@ -51,12 +52,26 @@ export function PageBanner(props: PageBannerProps) {
   const onCloseRef = useRef(props.onClose);
   onCloseRef.current = props.onClose;
 
+  // `.success` closes 5 s after its text was shown; a changed text starts the 5 s again, a
+  // re-render with the same text does not (#285).
   const autoClose = props.variant === 'success';
+  const contentRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<{ id: ReturnType<typeof setTimeout>; text: string } | null>(null);
   useEffect(() => {
-    if (!autoClose) return;
-    const timer = setTimeout(() => onCloseRef.current?.(), PAGE_BANNER_SUCCESS_MS);
-    return () => clearTimeout(timer);
-  }, [autoClose]);
+    const text = contentRef.current?.textContent ?? '';
+    if (autoClose && timerRef.current?.text === text) return;
+    if (timerRef.current) clearTimeout(timerRef.current.id);
+    timerRef.current = autoClose
+      ? { id: setTimeout(() => onCloseRef.current?.(), PAGE_BANNER_SUCCESS_MS), text }
+      : null;
+  });
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current.id);
+      timerRef.current = null;
+    },
+    [],
+  );
 
   const content =
     props.variant === 'success'
@@ -68,11 +83,17 @@ export function PageBanner(props: PageBannerProps) {
       role={props.variant === 'success' ? 'status' : 'alert'}
       className={bannerClassName(props.variant)}
     >
-      <div className="min-w-0 flex-1">{content}</div>
+      <div ref={contentRef} className="min-w-0 flex-1">
+        {content}
+      </div>
       {props.onClose && (
         <button
           type="button"
-          className="shrink-0 cursor-pointer px-2 font-semibold"
+          aria-label={FIXED_TEXTS.closeBanner}
+          className={cn(
+            'inline-flex min-h-[32px] min-w-[32px] shrink-0 cursor-pointer items-center',
+            'justify-center font-semibold',
+          )}
           onClick={props.onClose}
         >
           ×
