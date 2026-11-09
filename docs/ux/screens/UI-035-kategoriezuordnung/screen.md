@@ -15,6 +15,14 @@ Matrix Geräteart (Zeilen) × Kanal (Spalten); Zelle zeigt Kategoriepfad und Ken
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
 | Zelle bearbeiten, Speichern | Klick, Primärbutton | gültig | gespeichert; Kategorien der Kanäle werden von Hand gepflegt (keine Abfrage beim Kanal) | Feldfehler | bleibt |
+| Zuordnung entfernen (v0.6.2, O-1, REQ-024) | Textbutton (destruktiv) im Bearbeitungsbereich der Zelle; **sichtbar nur, wenn die Zelle eine Zuordnung hat** (bei leerer Zelle und beim Anlegen nicht angeboten) | Zelle belegt | Rückfrage `UI-035.entfernen-rueckfrage`; nach „Zuordnung entfernen“ im Dialog ist die Zelle leer („fehlt“), Banner „Zuordnung entfernt“, protokolliert (REQ-072) | siehe „Entfernen: Rückfrage und Fehler“ | bleibt (UI-035) |
+
+### Entfernen: Rückfrage und Fehler (v0.6.2, O-1)
+- **Rückfrage (Muster P-04, modal, Breite 480 px, Dialoghöhe nie größer als das Fenster):** Titel „Zuordnung entfernen“. Text: „Die Kategorie-Zuordnung „<Kategoriepfad>“ für <Geräteart> bei <Kanal> wird entfernt. Ohne Zuordnung zeigt der Kanal-Inhalt „Kategorie fehlt“.“ Knöpfe: „Abbrechen“ (links), „Zuordnung entfernen“ (rechts, destruktiv). Fokus beim Öffnen auf „Abbrechen“; Esc = Abbrechen, danach Fokus zurück auf den Textbutton „Zuordnung entfernen“.
+- **Erfolg:** Dialog schließt, Zelle zeigt „fehlt“, Banner „Zuordnung entfernt“ (5 s, Kap. 5 „Feedback“); der Fokus liegt auf der Zelle. Der Textbutton verschwindet (Zelle leer).
+- **Fehler:** `not_found` (Zelle inzwischen von anderswo entfernt): Banner M-15 „Dieser Eintrag ist nicht mehr vorhanden.“ im Dialog, „Abbrechen“ als einzige Aktion (Meldungskatalog Abschnitt 2). Zelle inzwischen geändert (`version_conflict`): Konflikt P-05. Sonstiger Fehler: Banner im Dialog „Zuordnung konnte nicht entfernt werden. Referenz: <Nr>“, Dialog bleibt, nichts entfernt. Ohne Antwort: `.ausgang-unbekannt` (P-08).
+- **Während der Aktion (`UI-035.speichert`, P-08):** beide Knöpfe und alle Eingaben gesperrt bis zur Antwort, kein festes Timeout.
+- Die Specification (DELETE auf die Zelle, Fehler `version_conflict`) nennt keinen eigenen Wortlaut; die Texte oben sind vom Designer formuliert, ein Widerspruch zur Specification besteht nicht.
 
 ## Zustände
 | Zustand | Darstellung | Artefakt | Text |
@@ -26,7 +34,7 @@ Matrix Geräteart (Zeilen) × Kanal (Spalten); Zelle zeigt Kategoriepfad und Ken
 | error | Banner | nur Text | „Einstellungen konnten nicht gespeichert werden. Referenz: <Nr>“ |
 | validation | Feldfehler | nur Text | siehe Eingaben |
 | success | Banner | nur Text | „Gespeichert“ |
-| disabled | Speichern deaktiviert ohne Änderung | nur Text | |
+| disabled | Speichern deaktiviert ohne Änderung; „Zuordnung entfernen“ nicht sichtbar bei leerer Zelle | nur Text | |
 
 ## Fenstergröße und Bedienung
 Fenster frei in der Größe, Untergrenze 1366 px (REQ-077); Einstellungs-Liste (240 px) links, Inhalt rechts (unter 1366 CSS-px: Liste über dem Inhalt, Regel R-1); Tastaturalternativen zum Ziehen.

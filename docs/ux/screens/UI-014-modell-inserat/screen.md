@@ -31,6 +31,7 @@
 | Änderungsentwurf prüfen | Button bei „geändert seit Freigabe“ (Veröffentlicht/Beendet) | – | – | – | UI-018 |
 | Kopier-Assistent | Button bei Freigegeben/Veröffentlicht/Beendet | – | – | – | UI-019 |
 | Als veröffentlicht melden | Button bei Freigegeben | – | – | – | UI-020 |
+| Als beendet melden (v0.6.2, O-11, REQ-046) | Sekundärbutton in der Kanal-Karte, in der Aktionszeile hinter „Kopier-Assistent“; **sichtbar nur bei Status Veröffentlicht** (auch mit „geändert seit Freigabe“, AC-REQ-046-08); bei Entwurf, Freigegeben und Beendet nicht angeboten | Status Veröffentlicht | öffnet UI-020 (Titel „Als beendet melden“, Hinweis „Die Kennzeichnungen ‚Bestand auf Kanal anpassen‘ und ‚Änderung auf Kanal übertragen‘ entfallen.“); „Als beendet melden“ im Dialog setzt den Status Beendet; Banner „Kanal-Inhalt ist jetzt beendet“, die Karte zeigt den Status-Chip „Beendet“ ohne diese beiden Kennzeichnungen; Knopf verschwindet | Fehler im Dialog (Wortlaut UI-020): „Status konnte nicht geändert werden. Referenz: <Nr>“; Konflikt P-05; Ausgang unbekannt P-08 | UI-020, danach zurück zu UI-014 |
 | Abgleich bestätigen | Textlink bei „Bestand auf Kanal anpassen“/„Änderung auf Kanal übertragen“ | Status Veröffentlicht | – | – | UI-021 |
 | Kanäle vergleichen | Link | – | – | – | UI-017 |
 | Bearbeiten (Inseratswerte) | Sekundärbutton | – | – | – | Bearbeitungsansicht (Teil von UI-014, Zustand `UI-014.edit`) |
@@ -49,6 +50,7 @@
 | loading | Platzhalterblöcke | nur Text | „Lade Modell-Inserat …“ |
 | empty | n/a; Fotos leer: „Noch keine Fotos“ + Button „Fotos verwalten“; Lieferumfang leer: „–“ | nur Text | |
 | `abweichung-bestaetigen` | Modaler Dialog, Breite 800 px. Titel „Zugeordnete Geräte weichen ab“. Text: „Nach dieser Änderung weichen <n> zugeordnete Geräte vom Modell-Inserat ab:“. Tabelle: WI-Nr, Merkmal, „Gerät <Wert>, Modell-Inserat <Wert>“ (z. B. „Optik-Note: Gerät 2, Modell-Inserat 3“). Hinweis: „Die Bestätigung wird im Änderungsprotokoll festgehalten.“ Buttons „Änderung trotzdem speichern“ (primär), „Abbrechen“ | nur Text | siehe links (REQ-088, AC-REQ-088-03) |
+| „Als beendet melden“ (v0.6.2, O-11) | **Nicht sichtbar** außerhalb von Veröffentlicht (unzulässige Übergänge werden nicht angeboten, kein deaktivierter Zustand). Lade-/Fehlerzustand liegen im Dialog UI-020 (P-08). **Tastatur/Fokus:** Enter/Leertaste öffnet UI-020, Fokus dort auf „Abbrechen“; nach Abbrechen oder Esc zurück auf „Als beendet melden“; nach Erfolg auf den Kanalnamen der Karte (Knopf ist weg) | nur Text | – |
 | Shop-Karte ohne Freigabe (Could) | „Importdatei erzeugen“ deaktiviert | nur Text | Tooltip „Erst Shop-Kanal-Inhalt freigeben“ |
 | `UI-014.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Das Modell-Inserat konnte nicht geladen/gespeichert werden. Referenz: <Nr>“ |
@@ -57,10 +59,10 @@
 | disabled | „Datenblatt“-Auswahl deaktiviert, wenn kein Gerät geprüft/zugeordnet: Tooltip „Gerät noch zu prüfen“ | nur Text | |
 
 ## Fenstergröße und Bedienung
-Drei Kanal-Karten gleich breit ab Fensterbreite 1366 px. Höhe frei: Kopfaktionen und Aktionsleiste bleiben sichtbar, der Inhalt scrollt; der Dialog `abweichung-bestaetigen` (Breite 800 px, bei schmalerem Fenster Fensterbreite abzüglich 16 px) ist nie höher als das Fenster, Titel und Aktionen bleiben sichtbar, die Tabelle scrollt. Tab-Reihenfolge: Kopfaktionen → Kanal-Karten → Inseratswerte → Fotos → Geräte. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
+Drei Kanal-Karten gleich breit ab Fensterbreite 1366 px. Höhe frei: Kopfaktionen und Aktionsleiste bleiben sichtbar, der Inhalt scrollt; der Dialog `abweichung-bestaetigen` (Breite 800 px, bei schmalerem Fenster Fensterbreite abzüglich 16 px) ist nie höher als das Fenster, Titel und Aktionen bleiben sichtbar, die Tabelle scrollt. Tab-Reihenfolge: Kopfaktionen → Kanal-Karten (je Karte: Aktionen in der Reihenfolge der Tabelle, „Als beendet melden“ nach „Kopier-Assistent“) → Inseratswerte → Fotos → Geräte. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
 
 ## Bekannte Abweichungen im Mockup
-„Business Portal“ (Stitch); Lieferumfang-Beispiel „Netzteil, Handbuch“ entspricht Textbausteinen, nur Beispiel; kleine Status-Pille „verfügbar“ in grün (Farbe nicht in DESIGN.md definiert, Text maßgeblich); Hinweis „Vorschlag nach Preisregel“ nicht im Mockup.
+„Business Portal“ (Stitch); Lieferumfang-Beispiel „Netzteil, Handbuch“ entspricht Textbausteinen, nur Beispiel; kleine Status-Pille „verfügbar“ in grün (Farbe nicht in DESIGN.md definiert, Text maßgeblich); Hinweis „Vorschlag nach Preisregel“ nicht im Mockup; der Knopf „Als beendet melden“ (v0.6.2) ist im Mockup nicht dargestellt, maßgeblich ist `screen.md`.
 
 ## Annahmen und offene Fragen
 - Design-Annahme, keine Anforderung: Gerätewahl per Dialog für das Datenblatt und Hinweis „Vorschlag nach Preisregel“ (vom Product Owner bestätigt).

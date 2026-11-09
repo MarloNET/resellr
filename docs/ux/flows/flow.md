@@ -13,7 +13,7 @@ Variante (REQ-088): Inseratswerte ändern in [UI-014] (Bearbeiten) → {zugeordn
 Variante (REQ-014/REQ-020): Variantenangabe eines zugeordneten Geräts ändern in [UI-010]/[UI-003] → [UI-005] im Kontext „Gerät bereits zugeordnet“ (Zuordnung behalten | Neues Modell-Inserat anlegen | Umbuchen).
 
 ## FLOW-03 Verkauf erfassen (J-03)
-[UI-009] (WI-Nr suchen) → [UI-010] → [UI-011] (Kanal, Datum) → [UI-002] (Kennzeichnung „Bestand auf Kanal anpassen“) → anderen Kanal anpassen → [UI-021] {Stückzahl 0 „ausverkauft“} → [UI-020] (Beendet je veröffentlichtem Kanal).
+[UI-009] (WI-Nr suchen) → [UI-010] → [UI-011] (Kanal, Datum) → [UI-002] (Kennzeichnung „Bestand auf Kanal anpassen“) → anderen Kanal anpassen → [UI-021] {Stückzahl 0 „ausverkauft“} → Kanal-Karte in [UI-014] oder [UI-019] (Als beendet melden, nur bei Status Veröffentlicht; v0.6.2, O-11) → [UI-020] (Beendet je veröffentlichtem Kanal; Rückfrage mit Hinweis) → zurück zur Aufrufseite mit Banner „Kanal-Inhalt ist jetzt beendet“.
 Fehlerpfad: irrtümlich verkauft → [UI-010] (Verkauf zurücknehmen).
 
 ## FLOW-04 Textbaustein oder GPSR ändern (J-04)
@@ -34,7 +34,7 @@ Programmstart ohne Zugang → [UI-001] (Passwort) → [UI-002]. Passwort ändern
 [UI-010] → [UI-013] (WI-Nr korrigieren) | [UI-012] (Storno) | Verkauf zurücknehmen. Löschen: [UI-014]/[UI-007] → [UI-041].
 
 ## FLOW-09 Kopier-Assistent nutzen
-[UI-014] → [UI-019] (Vollfenster; „Schmale Ansicht“ → compact neben dem Kanal-Formular) → je Feld (Kopieren) im Kanal-Formular einfügen → „Foto-Ordner öffnen“ bzw. „Fotos als ZIP herunterladen“ → [UI-020] (Veröffentlicht) bzw. [UI-021] (Abgleich).
+[UI-014] → [UI-019] (Vollfenster; „Schmale Ansicht“ → compact neben dem Kanal-Formular) → je Feld (Kopieren) im Kanal-Formular einfügen → „Foto-Ordner öffnen“ bzw. „Fotos als ZIP herunterladen“ → [UI-020] (Veröffentlicht) bzw. [UI-021] (Abgleich). Bei Status Veröffentlicht zusätzlich „Als beendet melden“ in [UI-019] (v0.6.2, O-11) → [UI-020] (Beendet) → zurück zu [UI-019].
 
 ## FLOW-10 Sicherung anlegen (Hinweis „Sicherung einrichten“, E-7)
 Jeder Screen mit Anwendungsrahmen zeigt den Hinweis [UI-044] (ohne Aktion des Nutzers). Nutzer liest Hinweis → (resellr beenden) → [UI-045] Rückfrage → (resellr beenden) → Wartezustand → [UI-046] Endzustand (`success`: Speicherort) → Datenordner im Windows-Explorer kopieren (**außerhalb von resellr, nicht gestaltet**) → Neustart über Verknüpfung „resellr“ → [LP-01] bei längerem Start → [UI-002].
