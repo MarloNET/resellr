@@ -1,0 +1,66 @@
+/*
+ * Design tokens from docs/ux/DESIGN.md (CU-059). Colours with "fg auf bg" in DESIGN.md
+ * have a foreground token and a `-bg` token. tokens.test.ts compares this file with DESIGN.md.
+ */
+
+/* Inter 4.1, bundled locally (CU-060, REQ-079): no request leaves 127.0.0.1. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../assets/fonts/Inter-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url('../assets/fonts/Inter-SemiBold.woff2') format('woff2');
+}
+
+:root {
+  /* Colours */
+  --resellr-bg: #f6f7f9;
+  --resellr-surface: #ffffff;
+  --resellr-border: #d1d5db;
+  --resellr-border-input: #9ca3af;
+  --resellr-text: #1f2937;
+  --resellr-text-secondary: #4b5563;
+  --resellr-primary: #1d4ed8;
+  --resellr-on-primary: #ffffff;
+  --resellr-status-draft: #374151;
+  --resellr-status-draft-bg: #e5e7eb;
+  --resellr-status-approved: #1e40af;
+  --resellr-status-approved-bg: #dbeafe;
+  --resellr-status-published: #166534;
+  --resellr-status-published-bg: #dcfce7;
+  --resellr-flag-warn: #92400e;
+  --resellr-flag-warn-bg: #fef3c7;
+  --resellr-error: #b42318;
+  --resellr-error-bg: #fee4e2;
+
+  /* Typography: size / line height; minimum 12 px (R-1 (5)) */
+  --resellr-font-family: 'Inter', sans-serif;
+  --resellr-text-page-title: 22px;
+  --resellr-text-page-title-line-height: 28px;
+  --resellr-text-section: 16px;
+  --resellr-text-section-line-height: 24px;
+  --resellr-text-body: 14px;
+  --resellr-text-body-line-height: 20px;
+  --resellr-text-label: 12px;
+  --resellr-text-label-line-height: 16px;
+  --resellr-font-weight-regular: 400;
+  --resellr-font-weight-semibold: 600;
+
+  /* Shape and density */
+  --resellr-radius-control: 6px;
+  --resellr-radius-chip: 4px;
+  --resellr-grid: 8px;
+  --resellr-control-height: 36px;
+  --resellr-table-row-height: 36px;
+  --resellr-nav-width: 208px;
+  --resellr-nav-header-height: 40px;
+  --resellr-nav-item-height: 28px;
+}
