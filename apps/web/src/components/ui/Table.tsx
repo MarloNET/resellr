@@ -42,7 +42,7 @@ export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowEle
 export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn('px-3 text-left align-middle font-semibold text-text-secondary', className)}
+      className={cn('px-2 text-left align-middle font-semibold text-text-secondary', className)}
       {...props}
     />
   );
@@ -50,6 +50,6 @@ export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCel
 
 export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td className={cn('px-3 py-2 align-top [overflow-wrap:anywhere]', className)} {...props} />
+    <td className={cn('px-2 py-2 align-top [overflow-wrap:anywhere]', className)} {...props} />
   );
 }

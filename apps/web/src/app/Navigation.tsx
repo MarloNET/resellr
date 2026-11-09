@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 
 interface NavigationEntry {
   label: string;
@@ -42,7 +42,7 @@ export function Navigation() {
           const current = entry.isCurrent(pathname);
           return (
             <li key={entry.to}>
-              <NavLink
+              <Link
                 to={entry.to}
                 aria-current={current ? 'page' : undefined}
                 className={
@@ -51,7 +51,7 @@ export function Navigation() {
                 }
               >
                 {entry.label}
-              </NavLink>
+              </Link>
             </li>
           );
         })}

@@ -7,7 +7,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cn(
-        'h-control w-full min-w-0 rounded-control border border-border-input bg-surface px-3',
+        'h-control w-full min-w-0 rounded-control border border-border-input bg-surface px-2',
         'text-body text-text aria-invalid:border-error disabled:bg-bg',
         className,
       )}

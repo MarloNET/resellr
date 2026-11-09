@@ -91,6 +91,7 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       : timeout.signal;
 
     let response: Response;
+    let text: string;
     try {
       response = await doFetch(path, {
         method,
@@ -98,9 +99,11 @@ export function createApiClient(deps: ApiClientDeps = {}) {
         headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
+      // The body is read within the time limit: an answer cut off while reading counts as none.
+      text = await response.text();
     } catch (cause) {
       if (options.signal?.aborted && !timeout.signal.aborted) throw cause;
-      // No HTTP answer: connection lost or time limit exceeded.
+      // No (complete) HTTP answer: connection lost or time limit exceeded.
       if (kind === 'read') throw new ApiError('unreachable', null, null);
       store.lock();
       throw new ApiError('outcome-unknown', null, null);
@@ -109,10 +112,14 @@ export function createApiClient(deps: ApiClientDeps = {}) {
     }
 
     if (response.ok) {
-      const text = await response.text();
-      return (text === '' ? undefined : JSON.parse(text)) as T;
+      if (text === '') return undefined as T;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new ApiError('error', response.status, null);
+      }
     }
-    throw await toApiError(response, kind);
+    throw toApiError(response.status, text, kind);
   }
 
   return {
@@ -132,9 +139,8 @@ function defaultTimeout(kind: RequestKind): number | null {
   return kind === 'read' ? READ_TIMEOUT_MS : null;
 }
 
-async function toApiError(response: Response, kind: RequestKind): Promise<ApiError> {
-  const error = await readErrorBody(response);
-  const { status } = response;
+function toApiError(status: number, text: string, kind: RequestKind): ApiError {
+  const error = parseErrorBody(text);
   const code = error?.code;
 
   if (status === 503 && code === 'shutting_down') {
@@ -155,9 +161,9 @@ async function toApiError(response: Response, kind: RequestKind): Promise<ApiErr
   return new ApiError('error', status, error);
 }
 
-async function readErrorBody(response: Response): Promise<ErrorResponse['error'] | null> {
+function parseErrorBody(text: string): ErrorResponse['error'] | null {
   try {
-    const parsed = errorResponseSchema.safeParse(await response.json());
+    const parsed = errorResponseSchema.safeParse(JSON.parse(text));
     return parsed.success ? parsed.data.error : null;
   } catch {
     return null;

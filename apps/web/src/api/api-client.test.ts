@@ -186,6 +186,31 @@ describe('api-client', () => {
       expect((await rejectionOf(client().get('/api/x'))).kind).toBe('unreachable');
     });
 
+    it('a 2xx answer with a body that is not JSON → .error', async () => {
+      fetchMock.mockResolvedValue(new Response('<html>', { status: 200 }));
+
+      const error = await rejectionOf(client().get('/api/x'));
+
+      expect(error.kind).toBe('error');
+      expect(error.status).toBe(200);
+    });
+
+    it('connection loss while reading the body of a write → .ausgang-unbekannt', async () => {
+      fetchMock.mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            pull: (controller) => controller.error(new TypeError('network error')),
+          }),
+          { status: 201 },
+        ),
+      );
+
+      const error = await rejectionOf(client().post('/api/x', {}));
+
+      expect(error.kind).toBe('outcome-unknown');
+      expect(store.isLocked()).toBe(true);
+    });
+
     it('a POST marked as read (preview, count) is classified like a read', async () => {
       fetchMock.mockResolvedValue(jsonResponse(503, errorBody('shutting_down')));
 
@@ -207,6 +232,27 @@ describe('api-client', () => {
       await vi.advanceTimersByTimeAsync(4999);
       expect(fetchMock.mock.calls[0]![1]?.signal?.aborted).toBe(false);
       await vi.advanceTimersByTimeAsync(1);
+
+      expect((await result).kind).toBe('unreachable');
+    });
+
+    it('the time limit also covers reading the body of a read', async () => {
+      fetchMock.mockImplementation((_input, init) =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start: (controller) =>
+                init?.signal?.addEventListener('abort', () =>
+                  controller.error(new DOMException('The operation was aborted.', 'AbortError')),
+                ),
+            }),
+            { status: 200 },
+          ),
+        ),
+      );
+      const result = rejectionOf(client().get('/api/x'));
+
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect((await result).kind).toBe('unreachable');
     });

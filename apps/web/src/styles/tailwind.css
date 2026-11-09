@@ -46,7 +46,7 @@
 
   /* Spacing step 4 px: the 8 px grid is every second step (p-2 = 8 px); 4 px is needed
      for the gaps that DESIGN.md names (nav entries 28 px, gap to the notice 4 px). */
-  --spacing: 4px;
+  --spacing: calc(var(--resellr-grid) / 2);
   --spacing-control: var(--resellr-control-height);
   --spacing-table-row: var(--resellr-table-row-height);
   --spacing-nav: var(--resellr-nav-width);

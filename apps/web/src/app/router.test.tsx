@@ -86,6 +86,24 @@ describe('router and application frame', () => {
     );
   });
 
+  it.each([
+    ['/geraete/neu', 'Gerät einbuchen'],
+    ['/geraete/17', 'Geräte'],
+    ['/einstellungen/lieferanten', 'Einstellungen'],
+  ])('E2 renders aria-current and the marking on exactly one entry for %s', (path, label) => {
+    renderAt(path);
+
+    const nav = screen.getByRole('navigation', { name: 'Hauptnavigation' });
+    const current = within(nav)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('aria-current') === 'page');
+    expect(current.map((link) => link.textContent)).toEqual([label]);
+    const marked = within(nav)
+      .getAllByRole('link')
+      .filter((link) => link.className.includes('text-primary'));
+    expect(marked.map((link) => link.textContent)).toEqual([label]);
+  });
+
   it('E2 an entry whose screen does not exist yet keeps the frame and the navigation', () => {
     const router = renderAt('/inserate');
 
