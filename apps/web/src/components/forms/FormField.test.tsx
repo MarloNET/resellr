@@ -125,4 +125,17 @@ describe('FormField (CU-057, design chapter 5)', () => {
 
     expect(document.activeElement).toBe(note);
   });
+
+  it('E5 (#285) an error text without spaces wraps instead of overflowing the field', () => {
+    const longWord = 'https://www.example.com/' + 'a'.repeat(200);
+    render(
+      <FormField label="Shop-Adresse" error={longWord}>
+        {(control) => <Input {...control} />}
+      </FormField>,
+    );
+
+    const text = screen.getByText(longWord);
+    expect(text.className).toContain('[overflow-wrap:anywhere]');
+    expect(text.className).toContain('min-w-0');
+  });
 });

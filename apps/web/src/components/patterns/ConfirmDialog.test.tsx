@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog.tsx';
@@ -23,6 +24,45 @@ function renderDialog(props: Partial<ConfirmDialogProps> = {}) {
   return { dialog: screen.getByRole('dialog', { name: title }), onOpenChange, onConfirm };
 }
 
+/** A screen opening the dialog from a focused button; after success the focus may move elsewhere. */
+function ConfirmScreen({ focusCellOnSuccess = false }: { focusCellOnSuccess?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const cellRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Kopie entfernen
+      </button>
+      <button type="button" ref={cellRef}>
+        Zelle
+      </button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        onConfirm={() => {
+          if (focusCellOnSuccess) returnFocusRef.current = cellRef.current;
+          setOpen(false);
+        }}
+        returnFocusRef={returnFocusRef}
+        title="Kopie entfernen"
+        confirmLabel="Entfernen"
+        width={480}
+      >
+        Die Kopie wird entfernt.
+      </ConfirmDialog>
+    </>
+  );
+}
+
+function openFromFocusedButton(): HTMLElement {
+  const opener = screen.getByRole('button', { name: 'Kopie entfernen' });
+  opener.focus();
+  fireEvent.click(opener);
+  return screen.getByRole('dialog', { name: 'Kopie entfernen' });
+}
+
 describe('ConfirmDialog (CU-056, P-04)', () => {
   afterEach(cleanup);
 
@@ -35,6 +75,44 @@ describe('ConfirmDialog (CU-056, P-04)', () => {
     );
     const buttons = within(dialog).getAllByRole('button');
     expect(buttons.map((button) => button.textContent)).toEqual(['Abbrechen', 'Stornieren']);
+  });
+
+  it('E4 links the content naming the effect as description of the dialog', () => {
+    const { dialog } = renderDialog();
+
+    const describedBy = dialog.getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    const description = document.getElementById(describedBy ?? '');
+    expect(description?.textContent).toBe(
+      'Das Gerät 626198 wird storniert und zählt nicht mehr zum Bestand.',
+    );
+  });
+
+  it('E1 returns the focus to the opening button after Esc, "Abbrechen" and the action', async () => {
+    render(<ConfirmScreen />);
+    const opener = screen.getByRole('button', { name: 'Kopie entfernen' });
+
+    fireEvent.keyDown(openFromFocusedButton(), { key: 'Escape' });
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+
+    openFromFocusedButton();
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+
+    openFromFocusedButton();
+    fireEvent.click(screen.getByRole('button', { name: 'Entfernen' }));
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it('E1 moves the focus to the target the screen sets after success', async () => {
+    render(<ConfirmScreen focusCellOnSuccess />);
+
+    openFromFocusedButton();
+    fireEvent.click(screen.getByRole('button', { name: 'Entfernen' }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Zelle' })),
+    );
   });
 
   it('E7 keeps title and actions visible in a low window while the content scrolls', () => {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 
 import { Button } from '../ui/Button.tsx';
 import {
@@ -6,6 +6,7 @@ import {
   DialogBody,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,12 +30,15 @@ export interface ConfirmDialogProps {
   destructive?: boolean;
   /** Disables the action, e.g. while the write runs or writes are locked (P-08). */
   confirmDisabled?: boolean;
+  /** Focus target after closing instead of the opening element (`DialogContent`, CU-058). */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /**
  * Confirmation dialog P-04 (CU-056, design chapter 5): the title is the action, the content
  * names its effect, "Abbrechen" on the left, the action on the right. Title and action bar stay
- * visible and only the content scrolls (Technical Specification 2.0.10).
+ * visible and only the content scrolls (Technical Specification 2.0.10). The content is the
+ * description of the dialog (`aria-describedby`).
  */
 export function ConfirmDialog({
   open,
@@ -46,14 +50,17 @@ export function ConfirmDialog({
   width,
   destructive = false,
   confirmDisabled = false,
+  returnFocusRef,
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent width={width}>
+      <DialogContent width={width} returnFocusRef={returnFocusRef}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <DialogBody>{children}</DialogBody>
+        <DialogDescription asChild>
+          <DialogBody>{children}</DialogBody>
+        </DialogDescription>
         <DialogFooter>
           <DialogClose asChild>
             <Button>Abbrechen</Button>

@@ -1,8 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../api/api-client.ts';
-import { PAGE_BANNER_SUCCESS_MS, PageBanner } from './PageBanner.tsx';
+import { PageBanner } from './PageBanner.tsx';
 
 function internalError(referenceNumber: string | null): ApiError {
   return new ApiError('error', 500, {
@@ -59,11 +60,11 @@ describe('PageBanner (CU-051, REQ-073)', () => {
     act(() => vi.advanceTimersByTime(60_000));
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '×' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Meldung schließen' }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('.success shows the text of the screen and closes after 5 s', () => {
+  it('E6 .success shows the text of the screen and closes after 5 s (5000 ms)', () => {
     vi.useFakeTimers();
     const onClose = vi.fn();
     render(
@@ -76,10 +77,60 @@ describe('PageBanner (CU-051, REQ-073)', () => {
     expect(banner.textContent).toContain('Zugangspasswort geändert');
     expect(banner.className).toContain('bg-status-published-bg');
 
-    act(() => vi.advanceTimersByTime(PAGE_BANNER_SUCCESS_MS - 1));
+    act(() => vi.advanceTimersByTime(4999));
     expect(onClose).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(1));
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('E3 .success starts the 5 s again when the screen changes the text', () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    const banner = (text: ReactNode) => (
+      <PageBanner variant="success" onClose={onClose}>
+        {text}
+      </PageBanner>
+    );
+    const { rerender } = render(banner('Kanal gespeichert'));
+
+    act(() => vi.advanceTimersByTime(3000));
+    rerender(banner('Zugangspasswort geändert'));
+    act(() => vi.advanceTimersByTime(4900));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toContain('Zugangspasswort geändert');
+
+    act(() => vi.advanceTimersByTime(100));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('E3 .success keeps its 5 s when the screen renders the same text again', () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    const banner = () => (
+      <PageBanner variant="success" onClose={onClose}>
+        <span>Gespeichert</span>
+      </PageBanner>
+    );
+    const { rerender } = render(banner());
+
+    act(() => vi.advanceTimersByTime(3000));
+    rerender(banner());
+    act(() => vi.advanceTimersByTime(2000));
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('E2 "×" has the accessible name "Meldung schließen", shows "×" and is at least 32 × 32 px', () => {
+    render(
+      <PageBanner variant="success" onClose={vi.fn()}>
+        Gespeichert
+      </PageBanner>,
+    );
+
+    const close = screen.getByRole('button', { name: 'Meldung schließen' });
+    expect(close.textContent).toBe('×');
+    expect(close.className).toContain('min-h-[32px]');
+    expect(close.className).toContain('min-w-[32px]');
   });
 
   it('.success closes with "×" before the 5 s are over', () => {
@@ -90,7 +141,7 @@ describe('PageBanner (CU-051, REQ-073)', () => {
       </PageBanner>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '×' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Meldung schließen' }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
