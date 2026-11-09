@@ -20,9 +20,13 @@ describe('listen address (E1)', () => {
 
   it('is the only host the server entry listens on', () => {
     const main = readFileSync(new URL('../main.ts', import.meta.url), 'utf8');
+    // The startup sequence (CU-040) listens on the host the server entry passes.
+    const startup = readFileSync(new URL('../ops/startup.ts', import.meta.url), 'utf8');
 
-    expect(main).toMatch(/listen\(\{ host: LISTEN_HOST, port/);
+    expect(main).toMatch(/host: LISTEN_HOST,/);
     expect(main).not.toMatch(/0\.0\.0\.0|'::'|localhost/);
+    expect(startup).toMatch(/listen\(\{ host, port: config\.port \}\)/);
+    expect(startup).not.toMatch(/0\.0\.0\.0|'::'|localhost/);
   });
 
   it('the app listens on 127.0.0.1 only', async () => {

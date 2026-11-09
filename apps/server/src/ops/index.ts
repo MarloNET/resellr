@@ -5,3 +5,5 @@ export {
   type LifecycleState,
   type LifecycleStateName,
 } from './lifecycle-state.ts';
+export { opsRoutes, type OpsRoutesOptions } from './ops.routes.ts';
+export { runStartup, type StartupOptions, type StartupResult } from './startup.ts';

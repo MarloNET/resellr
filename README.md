@@ -14,10 +14,13 @@ npm test            # Unit- und Integrationstests (Vitest)
 npm run build       # u. a. Oberfläche bauen (apps/web/dist)
 ```
 
-Den Server startet `node apps/server/src/main.ts` (optional `--test-clock`). Er lauscht nur auf
-`http://127.0.0.1:4310`; die Ordner kommen aus `RESELLR_DATA_DIR`, `RESELLR_LOG_DIR`,
-`RESELLR_HANDOVER_DIR` und `RESELLR_UPDATE_COPY_DIR` bzw. `%LOCALAPPDATA%\resellr` (Technical
-Specification Kap. 2.19). Port aus `config.json`, Startablauf und `npm run demo` folgen mit #112.
+Den Server startet `node apps/server/src/main.ts` (optional `--test-clock`). Die Ordner kommen aus
+`RESELLR_DATA_DIR`, `RESELLR_LOG_DIR`, `RESELLR_HANDOVER_DIR` und `RESELLR_UPDATE_COPY_DIR` bzw.
+`%LOCALAPPDATA%\resellr` (Technical Specification Kap. 2.19). Der Startablauf legt beim ersten Start
+`config.json` mit `port` 4310 im Datenordner an, migriert die Datenbank `resellr.db` und lauscht
+dann nur auf `http://127.0.0.1:<port>`. `GET /api/ops/health` meldet den Betriebszustand,
+`GET /api/ops/status` den Datenordner und die Version. Ist der Port belegt, endet der Server mit
+Exit-Code 10 und einem Eintrag mit Referenznummer im Fehlerprotokoll. `npm run demo` folgt mit #115.
 
 Die Oberfläche (`apps/web`, React und Vite, ADR-001) startet zur Entwicklung mit `npm run dev -w @resellr/web` auf `127.0.0.1`; Anfragen an `/api` gehen an den Server auf `127.0.0.1:${PORT:-4310}`.
 
