@@ -1,0 +1,84 @@
+/*
+ * Tailwind theme from the design tokens (CU-059). Only the tokens of DESIGN.md exist: the
+ * default colours, font sizes, radii and breakpoints are removed, so no utility can fall
+ * back to a value outside the design system.
+ */
+@import 'tailwindcss';
+@import './tokens.css';
+
+@theme {
+  --color-*: initial;
+  --color-bg: var(--resellr-bg);
+  --color-surface: var(--resellr-surface);
+  --color-border: var(--resellr-border);
+  --color-border-input: var(--resellr-border-input);
+  --color-text: var(--resellr-text);
+  --color-text-secondary: var(--resellr-text-secondary);
+  --color-primary: var(--resellr-primary);
+  --color-on-primary: var(--resellr-on-primary);
+  --color-status-draft: var(--resellr-status-draft);
+  --color-status-draft-bg: var(--resellr-status-draft-bg);
+  --color-status-approved: var(--resellr-status-approved);
+  --color-status-approved-bg: var(--resellr-status-approved-bg);
+  --color-status-published: var(--resellr-status-published);
+  --color-status-published-bg: var(--resellr-status-published-bg);
+  --color-flag-warn: var(--resellr-flag-warn);
+  --color-flag-warn-bg: var(--resellr-flag-warn-bg);
+  --color-error: var(--resellr-error);
+  --color-error-bg: var(--resellr-error-bg);
+
+  --font-*: initial;
+  --font-sans: var(--resellr-font-family);
+
+  --text-*: initial;
+  --text-page-title: var(--resellr-text-page-title);
+  --text-page-title--line-height: var(--resellr-text-page-title-line-height);
+  --text-section: var(--resellr-text-section);
+  --text-section--line-height: var(--resellr-text-section-line-height);
+  --text-body: var(--resellr-text-body);
+  --text-body--line-height: var(--resellr-text-body-line-height);
+  --text-label: var(--resellr-text-label);
+  --text-label--line-height: var(--resellr-text-label-line-height);
+
+  --radius-*: initial;
+  --radius-control: var(--resellr-radius-control);
+  --radius-chip: var(--resellr-radius-chip);
+
+  /* Spacing step 4 px: the 8 px grid is every second step (p-2 = 8 px); 4 px is needed
+     for the gaps that DESIGN.md names (nav entries 28 px, gap to the notice 4 px). */
+  --spacing: calc(var(--resellr-grid) / 2);
+  --spacing-control: var(--resellr-control-height);
+  --spacing-table-row: var(--resellr-table-row-height);
+  --spacing-nav: var(--resellr-nav-width);
+  --spacing-nav-header: var(--resellr-nav-header-height);
+  --spacing-nav-item: var(--resellr-nav-item-height);
+
+  /* One breakpoint for all screens (Technical Specification 2.0.10): single-column layout
+     is the base form, multi-column layouts only under `full:`. */
+  --breakpoint-*: initial;
+  --breakpoint-full: 1366px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+  }
+
+  /* Focus ring: 2 px primary with 2 px offset (DESIGN.md "Fokus"). */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
