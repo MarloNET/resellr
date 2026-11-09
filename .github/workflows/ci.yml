@@ -1,0 +1,46 @@
+# Linux CI (CU-003): lint, type check, unit and integration tests.
+# The E2E step with Google Chrome is added with the E2E foundation (#115).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Lint, type check, tests (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit shipped dependencies (TH-07)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit all dependencies including dev tooling (TH-07)
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit and integration tests
+        run: npm test
