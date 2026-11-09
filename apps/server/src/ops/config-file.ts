@@ -79,11 +79,15 @@ export function checkHandoverDir(
 
 /**
  * Absolute including the drive: under Windows `C:\…` or `\\server\share\…`, not the
- * drive-relative `\…` that `isAbsolute` also accepts.
+ * drive-relative `\…` that `isAbsolute` also accepts. Device paths (`\\?\…`, `\\.\…`) are
+ * rejected too: `path.win32` reads them as UNC, so they would slip past the comparison with
+ * the protected folders (FIND-265).
  */
 function isFullyAbsolute(value: string, pathApi: PathApi): boolean {
   if (!pathApi.isAbsolute(value)) return false;
-  return pathApi.sep !== '\\' || /^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/])/.test(value);
+  if (pathApi.sep !== '\\') return true;
+  if (/^[\\/]{2}[?.][\\/]/.test(value)) return false;
+  return /^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/])/.test(value);
 }
 
 export interface LoadConfigOptions {
@@ -138,7 +142,8 @@ export function loadConfig({
 
 function readConfigFile(filePath: string): string | null {
   try {
-    return readFileSync(filePath, 'utf8');
+    // Windows editors such as Notepad may save a leading BOM, which JSON.parse rejects (FIND-267).
+    return readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;

@@ -87,6 +87,18 @@ describe('configuration file (CU-039)', () => {
     expect(warnings).toEqual([{ event: 'config_invalid', details: { reason } }]);
     expect(JSON.parse(readFileSync(join(folders.dataDir, 'config.json'), 'utf8'))).toEqual(values);
   });
+
+  it('reads a config.json that starts with a UTF-8 BOM (FIND-267)', () => {
+    const handoverDir = join(root, 'Übergabe');
+    mkdirSync(folders.dataDir, { recursive: true });
+    writeFileSync(
+      join(folders.dataDir, 'config.json'),
+      `\uFEFF${JSON.stringify({ port: 4400, handoverDir })}`,
+    );
+
+    expect(load()).toEqual({ port: 4400, handoverDir });
+    expect(warnings).toEqual([]);
+  });
 });
 
 describe('handoverDir check under Windows (E4, FIND-212)', () => {
@@ -113,6 +125,21 @@ describe('handoverDir check under Windows (E4, FIND-212)', () => {
     ['drive-relative', '\\Fotos', 'not_absolute'],
     ['without separator after the drive', 'C:Fotos', 'not_absolute'],
     ['empty', '', 'not_absolute'],
+    // FIND-265: device paths would bypass the comparison with the protected folders.
+    [
+      'the data folder as \\\\?\\ path',
+      '\\\\?\\C:\\Users\\Max\\AppData\\Local\\resellr\\Daten',
+      'not_absolute',
+    ],
+    [
+      'the data folder as \\\\.\\ path',
+      '\\\\.\\C:\\Users\\Max\\AppData\\Local\\resellr\\Daten',
+      'not_absolute',
+    ],
+    ['Desktop as \\\\?\\ path', '\\\\?\\C:\\Users\\Max\\Desktop', 'not_absolute'],
+    ['Desktop as \\\\.\\ path', '\\\\.\\C:\\Users\\Max\\Desktop', 'not_absolute'],
+    ['Desktop as //?/ path', '//?/C:/Users/Max/Desktop', 'not_absolute'],
+    ['a \\\\?\\UNC path', '\\\\?\\UNC\\nas\\share\\resellr', 'not_absolute'],
     ['the data folder', 'C:\\Users\\Max\\AppData\\Local\\resellr\\Daten', 'overlaps_app_folder'],
     [
       'the data folder in other case',
