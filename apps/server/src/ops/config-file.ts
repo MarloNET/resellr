@@ -1,13 +1,15 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import {
+  CONFIG_FILE_NAME,
+  DEFAULT_PORT,
+  parseConfigText,
+  resolvePort,
+} from '@resellr/runtime-shared/configured-port';
 import { writeFileAtomic } from '@resellr/runtime-shared/runtime-state-files';
 
 import type { OperationsLog } from './operations-log.ts';
-
-export const CONFIG_FILE_NAME = 'config.json';
-/** Standard port (Technical Specification 2.0.1, Baseline 10.1). */
-export const DEFAULT_PORT = 4310;
 
 /** The configuration that applies for this start. */
 export interface Config {
@@ -100,9 +102,9 @@ export interface LoadConfigOptions {
 
 /**
  * Reads `config.json` from the data folder, or creates it with the standard values
- * (`{ "port": 4310 }`) if it does not exist (CU-039, 2.19). An invalid `port` or a file that is
- * no JSON object falls back to the standard value with a warning, like an invalid `handoverDir`;
- * the file itself stays unchanged.
+ * (`{ "port": 4310 }`) if it does not exist (CU-039, 2.19). JSON object and `port` are checked
+ * by CU-309; an invalid `port` or a file that is no JSON object falls back to the standard value
+ * with the warning `config_invalid` (FIND-266), and the file itself stays unchanged.
  */
 export function loadConfig({
   defaultHandoverDir,
@@ -118,17 +120,14 @@ export function loadConfig({
     return { port: DEFAULT_PORT, handoverDir: defaultHandoverDir };
   }
 
-  const values = parseObject(raw);
+  const values = parseConfigText(raw);
   if (values === null) {
     operationsLog.warn('config_invalid', { reason: 'not_a_json_object' });
     return { port: DEFAULT_PORT, handoverDir: defaultHandoverDir };
   }
 
-  let port = DEFAULT_PORT;
-  if (values.port !== undefined) {
-    if (isPort(values.port)) port = values.port;
-    else operationsLog.warn('config_invalid', { reason: 'invalid_port' });
-  }
+  const { port, problem } = resolvePort(values);
+  if (problem !== null) operationsLog.warn('config_invalid', { reason: problem });
 
   let handoverDir = defaultHandoverDir;
   if (values.handoverDir !== undefined) {
@@ -142,24 +141,9 @@ export function loadConfig({
 
 function readConfigFile(filePath: string): string | null {
   try {
-    // Windows editors such as Notepad may save a leading BOM, which JSON.parse rejects (FIND-267).
-    return readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+    return readFileSync(filePath, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
   }
 }
-
-function parseObject(text: string): Record<string, unknown> | null {
-  try {
-    const value: unknown = JSON.parse(text);
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-const isPort = (value: unknown): value is number =>
-  Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 65535;

@@ -4,6 +4,8 @@ import path, { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { readConfiguredPort } from '@resellr/runtime-shared/configured-port';
+
 import { checkHandoverDir, type HandoverDirContext, loadConfig } from './config-file.ts';
 import type { OperationsEventDetails, OperationsLog } from './operations-log.ts';
 
@@ -77,15 +79,47 @@ describe('configuration file (CU-039)', () => {
     },
   );
 
+  // Technical Specification 6.2 (Betriebsrobustheit b), FIND-266.
   it.each([
-    ['an invalid port', { port: 70000 }, 'invalid_port'],
-    ['no JSON object', [4310], 'not_a_json_object'],
-  ])('falls back to the standard values on %s, warns and keeps the file', (_, values, reason) => {
-    writeConfig(values);
+    ['no valid JSON', '{ "port": 4311', 'not_a_json_object'],
+    ['an array', '[4311]', 'not_a_json_object'],
+    ['a number', '4311', 'not_a_json_object'],
+    ['null', 'null', 'not_a_json_object'],
+    ['port as text "4311"', '{ "port": "4311" }', 'invalid_port'],
+    ['port 0', '{ "port": 0 }', 'invalid_port'],
+    ['port 4310.5', '{ "port": 4310.5 }', 'invalid_port'],
+    ['port 70000', '{ "port": 70000 }', 'invalid_port'],
+  ])('falls back to 4310 on %s, warns config_invalid and keeps the file', (_, text, reason) => {
+    const filePath = join(folders.dataDir, 'config.json');
+    mkdirSync(folders.dataDir, { recursive: true });
+    writeFileSync(filePath, text);
+
+    const config = load();
+
+    expect(config.port).toBe(4310);
+    expect(config.port).toBe(readConfiguredPort(folders.dataDir).port);
+    expect(warnings).toEqual([{ event: 'config_invalid', details: { reason } }]);
+    expect(readFileSync(filePath, 'utf8')).toBe(text);
+  });
+
+  it('keeps the standard handoverDir for a file that is no JSON object', () => {
+    writeConfig([{ handoverDir: join(root, 'Übergabe') }]);
 
     expect(load()).toEqual({ port: 4310, handoverDir: DEFAULT_HANDOVER });
-    expect(warnings).toEqual([{ event: 'config_invalid', details: { reason } }]);
-    expect(JSON.parse(readFileSync(join(folders.dataDir, 'config.json'), 'utf8'))).toEqual(values);
+  });
+
+  it('applies a valid handoverDir even if the port is invalid', () => {
+    const handoverDir = join(root, 'Übergabe');
+    writeConfig({ port: '4311', handoverDir });
+
+    expect(load()).toEqual({ port: 4310, handoverDir });
+  });
+
+  it('uses 4310 without a warning when port is missing and ignores unknown keys', () => {
+    writeConfig({ theme: 'dark' });
+
+    expect(load()).toEqual({ port: 4310, handoverDir: DEFAULT_HANDOVER });
+    expect(warnings).toEqual([]);
   });
 
   it('reads a config.json that starts with a UTF-8 BOM (FIND-267)', () => {
@@ -93,10 +127,11 @@ describe('configuration file (CU-039)', () => {
     mkdirSync(folders.dataDir, { recursive: true });
     writeFileSync(
       join(folders.dataDir, 'config.json'),
-      `\uFEFF${JSON.stringify({ port: 4400, handoverDir })}`,
+      `\uFEFF${JSON.stringify({ port: 4311, handoverDir })}`,
     );
 
-    expect(load()).toEqual({ port: 4400, handoverDir });
+    expect(load()).toEqual({ port: 4311, handoverDir });
+    expect(readConfiguredPort(folders.dataDir).port).toBe(4311);
     expect(warnings).toEqual([]);
   });
 });
