@@ -277,8 +277,8 @@ describe('local-guard G-5 cross-site reads (E6)', () => {
 });
 
 describe('local-guard G-6 no CORS (E7)', () => {
-  it.each(['/api/test/items', '/', '/assets/app.js'])(
-    'OPTIONS %s is answered with 405',
+  it.each(['/api/test/items', '/api/ops/health', '/', '/assets/app.js'])(
+    'OPTIONS %s is answered with 405 method_not_allowed in the error format',
     async (url) => {
       const response = await t.app.inject({
         method: 'OPTIONS',
@@ -291,11 +291,33 @@ describe('local-guard G-6 no CORS (E7)', () => {
       });
 
       expect(response.statusCode).toBe(405);
+      expect(JSON.parse(response.body)).toEqual({
+        error: {
+          code: 'method_not_allowed',
+          message: '',
+          fields: [],
+          details: {},
+          referenceNumber: null,
+        },
+      });
       expect(
         Object.keys(response.headers).filter((name) => name.startsWith('access-control-')),
       ).toEqual([]);
+      expect(response.headers).not.toHaveProperty('allow');
+      expect(response.headers).toHaveProperty('content-security-policy');
     },
   );
+
+  it('OPTIONS with a foreign host is rejected by G-1 first', async () => {
+    const response = await t.app.inject({
+      method: 'OPTIONS',
+      url: '/api/ops/health',
+      headers: { host: 'localhost:4310' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(errorCode(response.body)).toBe('forbidden_host');
+  });
 
   it('answers without CORS headers, also to a request with a foreign Origin', async () => {
     const response = await t.app.inject({

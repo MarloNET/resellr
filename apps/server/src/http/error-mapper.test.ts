@@ -240,3 +240,24 @@ describe('catalog text (FIND-209)', () => {
     expect(catalogMessage('validation_failed')).toBe('');
   });
 });
+
+describe('errors before routing (MAR-240)', () => {
+  it('a malformed URL answers 400 bad_request and is logged as warning without the URL', async () => {
+    const response = await t.app.inject({
+      method: 'GET',
+      url: '/api/%E0%A4%A',
+      headers: { host: HOST },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(parse(response.body)).toMatchObject({ code: 'bad_request', referenceNumber: null });
+    expect(t.readErrorLog()).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        refNo: null,
+        function: 'http GET (no route)',
+        message: 'bad_request FST_ERR_BAD_URL',
+      }),
+    ]);
+  });
+});

@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
-import { frameworkErrors, type HttpCoreDeps, registerHttpCore } from './http/index.ts';
+import { createFrameworkErrorHandler, type HttpCoreDeps, registerHttpCore } from './http/index.ts';
 
 export type AppDeps = HttpCoreDeps;
 
@@ -10,7 +10,10 @@ export type AppDeps = HttpCoreDeps;
  * `app.register(<component>Routes)` per component. Fastify logs no requests (2.19).
  */
 export function buildApp(deps: AppDeps) {
-  const app = Fastify({ logger: false, frameworkErrors }).withTypeProvider<ZodTypeProvider>();
+  const app = Fastify({
+    logger: false,
+    frameworkErrors: createFrameworkErrorHandler(deps.errorLog),
+  }).withTypeProvider<ZodTypeProvider>();
   const { writeGate } = registerHttpCore(app, deps);
 
   // Routes of the components, one line each, follow with their tasks (#112 ff.).

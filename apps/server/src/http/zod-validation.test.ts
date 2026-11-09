@@ -59,6 +59,23 @@ const post = (payload: unknown) =>
   });
 const parse = (body: string) => errorResponseSchema.parse(JSON.parse(body)).error;
 
+/** `bad_request` is logged once as a warning, without values and message texts (MAR-240). */
+const expectBadRequestWarning = (route: string, message: string | RegExp) => {
+  const entries = t.readErrorLog();
+  expect(entries).toEqual([
+    expect.objectContaining({
+      level: 'warn',
+      refNo: null,
+      function: route,
+      message: typeof message === 'string' ? message : expect.stringMatching(message),
+    }),
+  ]);
+  const logged = JSON.stringify(entries);
+  for (const content of ['626198', '62-61', 'zu lang', 'abc', '500', 'WI-Nr', 'Notiz']) {
+    expect(logged).not.toContain(content);
+  }
+};
+
 describe('Zod schemas as request validation (E13)', () => {
   it('passes a matching body to the handler', async () => {
     const response = await post({ wiNr: '626198', note: '', serial: 'A1' });
@@ -105,10 +122,14 @@ describe('Zod schemas as request validation (E13)', () => {
   });
 
   it.each([
-    ['a missing field', { wiNr: '1', note: '' }],
-    ['a field of the wrong type', { wiNr: 1, note: '', serial: 'A1' }],
-    ['an array instead of an object', []],
-  ])('%s answers 400 bad_request without fields', async (_case, payload) => {
+    ['a missing field (c)', { wiNr: '1', note: '' }, 'bad_request body: invalid_type at serial'],
+    [
+      'a field of the wrong type (c)',
+      { wiNr: 626198, note: '', serial: 'A1' },
+      'bad_request body: invalid_type at wiNr',
+    ],
+    ['an array instead of an object (d)', [], 'bad_request body: invalid_type at (root)'],
+  ])('%s answers 400 bad_request without fields', async (_case, payload, warning) => {
     const response = await post(payload);
 
     expect(response.statusCode).toBe(400);
@@ -120,6 +141,7 @@ describe('Zod schemas as request validation (E13)', () => {
       referenceNumber: null,
     });
     expect(handled).toBeUndefined();
+    expectBadRequestWarning('http POST /api/test/devices', warning);
   });
 
   it('a structural error wins over field rule violations in the same body', async () => {
@@ -127,16 +149,38 @@ describe('Zod schemas as request validation (E13)', () => {
 
     expect(response.statusCode).toBe(400);
     expect(parse(response.body).code).toBe('bad_request');
+    expectBadRequestWarning(
+      'http POST /api/test/devices',
+      'bad_request body: invalid_format at wiNr, too_big at note, invalid_type at serial',
+    );
   });
 
   it.each([
-    ['path parameter', '/api/test/devices/abc'],
-    ['query parameter', '/api/test/devices?limit=500'],
-  ])('an invalid %s answers 400 bad_request', async (_case, url) => {
+    [
+      'path parameter (a)',
+      '/api/test/devices/abc',
+      'http GET /api/test/devices/:id',
+      'bad_request params: invalid_type at id',
+    ],
+    [
+      'query parameter (a)',
+      '/api/test/devices?limit=500',
+      'http GET /api/test/devices',
+      'bad_request querystring: too_big at limit',
+    ],
+  ])('an invalid %s answers 400 bad_request', async (_case, url, route, warning) => {
     const response = await t.app.inject({ method: 'GET', url, headers: { host: HOST } });
 
     expect(response.statusCode).toBe(400);
     expect(parse(response.body).code).toBe('bad_request');
+    expectBadRequestWarning(route, warning);
+  });
+
+  it('a valid request writes nothing to the error log', async () => {
+    await post({ wiNr: '626198', note: '', serial: 'A1' });
+    await post({ wiNr: '62-61', note: '', serial: 'A1' });
+
+    expect(t.readErrorLog()).toEqual([]);
   });
 
   it('passes coerced parameters to the handler', async () => {
@@ -150,8 +194,8 @@ describe('Zod schemas as request validation (E13)', () => {
   });
 
   it.each([
-    ['malformed JSON', '{"wiNr":'],
-    ['an empty JSON body', ''],
+    ['malformed JSON (b)', '{"wiNr":"626198"'],
+    ['an empty JSON body (b)', ''],
   ])('%s answers 400 bad_request', async (_case, payload) => {
     const response = await t.app.inject({
       method: 'POST',
@@ -162,6 +206,6 @@ describe('Zod schemas as request validation (E13)', () => {
 
     expect(response.statusCode).toBe(400);
     expect(parse(response.body).code).toBe('bad_request');
-    expect(t.readErrorLog()).toEqual([]);
+    expectBadRequestWarning('http POST /api/test/devices', /^bad_request FST_ERR_CTP_[A-Z_]+$/);
   });
 });

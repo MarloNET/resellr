@@ -6,6 +6,7 @@ import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { ErrorLog } from '../ops/index.ts';
 import { DomainError } from '../shared/domain-error.ts';
+import { setSecurityHeaders } from './security-headers.ts';
 import { schemaErrorToDomainError } from './zod-validation.ts';
 
 type MessageText = string | ((...args: string[]) => string);
@@ -63,6 +64,30 @@ const sendDomainError = (reply: FastifyReply, error: DomainError) =>
     details: error.details,
   });
 
+// The route pattern, not the requested path: the path can hold search texts or values.
+const logFunction = (request: FastifyRequest) =>
+  `http ${request.method} ${request.routeOptions?.url ?? '(no route)'}`;
+
+// Only the code: Fastify's messages can quote the URL or the body.
+const fastifyErrorCode = (error: unknown) => {
+  const code = (error as Partial<FastifyError> | null)?.code;
+  return typeof code === 'string' ? code : 'unreadable request';
+};
+
+/**
+ * `400 bad_request`: a program error of the user interface. It is logged as a warning without
+ * reference number, values or message texts (Technical Specification 2.0.5, Nachtrag MAR-240).
+ */
+const sendBadRequest = (
+  errorLog: ErrorLog,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  reason: string,
+) => {
+  errorLog.warn({ function: logFunction(request), message: `bad_request ${reason}` });
+  return sendError(reply, 'bad_request');
+};
+
 /** Status of a client error raised by Fastify or a plugin, e.g. malformed JSON; else null. */
 const clientErrorStatus = (error: unknown): number | null => {
   const status = (error as Partial<FastifyError> | null)?.statusCode;
@@ -71,6 +96,7 @@ const clientErrorStatus = (error: unknown): number | null => {
     : null;
 };
 
+/** Client errors with their own code; every other one is `bad_request`. */
 const CLIENT_ERROR_CODES: Partial<Record<number, ErrorCode>> = {
   // `@fastify/static` refuses dot files and paths outside its folder with 403.
   403: 'not_found',
@@ -80,7 +106,8 @@ const CLIENT_ERROR_CODES: Partial<Record<number, ErrorCode>> = {
 };
 
 /**
- * Error handler of the app (CU-023): domain errors and schema errors become their rejection;
+ * Error handler of the app (CU-023): domain errors and schema errors become their rejection,
+ * `bad_request` additionally a warning in the error log;
  * every other error is technical: `500 internal_error` with a new reference number that is
  * written to the error log together with the function, without field values (REQ-073).
  * The error leaves the action, so its transaction is not committed (2.0.4).
@@ -90,17 +117,31 @@ export function createErrorHandler(errorLog: ErrorLog) {
     if (error instanceof DomainError) return sendDomainError(reply, error);
 
     const schemaError = schemaErrorToDomainError(error);
-    if (schemaError === 'bad_request') return sendError(reply, 'bad_request');
-    if (schemaError) return sendDomainError(reply, schemaError);
+    if (schemaError instanceof DomainError) return sendDomainError(reply, schemaError);
+    if (schemaError) return sendBadRequest(errorLog, request, reply, schemaError.badRequest);
 
     // Rejected by Fastify or a plugin, e.g. malformed JSON: not a technical error.
     const status = clientErrorStatus(error);
-    if (status !== null) return sendError(reply, CLIENT_ERROR_CODES[status] ?? 'bad_request');
+    if (status !== null) {
+      const code = CLIENT_ERROR_CODES[status];
+      if (code) return sendError(reply, code);
+      return sendBadRequest(errorLog, request, reply, fastifyErrorCode(error));
+    }
 
     const referenceNumber = createReferenceNumber();
-    // The route pattern, not the requested path: the path can hold search texts or values.
-    const route = request.routeOptions.url ?? 'unknown route';
-    errorLog.error({ refNo: referenceNumber, function: `http ${request.method} ${route}`, error });
+    errorLog.error({ refNo: referenceNumber, function: logFunction(request), error });
     return sendError(reply, 'internal_error', { referenceNumber });
+  };
+}
+
+/**
+ * Handler for the Fastify option `frameworkErrors`, i.e. errors before routing such as a
+ * malformed URL: `400 bad_request`. Such a reply skips the hooks, so it sets the security
+ * headers itself.
+ */
+export function createFrameworkErrorHandler(errorLog: ErrorLog) {
+  return (error: unknown, request: FastifyRequest, reply: FastifyReply): void => {
+    setSecurityHeaders(reply, request.url);
+    sendBadRequest(errorLog, request, reply, fastifyErrorCode(error));
   };
 }

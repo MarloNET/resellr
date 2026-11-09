@@ -30,6 +30,8 @@ const ELEMENTS = [
 // `main.ts` and `app.ts` are single files, not folders, so they are file categories.
 const FILES = [
   { category: 'server-entry', pattern: '**/apps/server/src/{main,app}.ts' },
+  { category: 'server-main', pattern: '**/apps/server/src/main.ts' },
+  { category: 'server-app', pattern: '**/apps/server/src/app.ts' },
   { category: 'test', pattern: '**/*.{test,int.test,spec}.{ts,tsx}' },
 ];
 
@@ -48,10 +50,10 @@ const POLICIES = [
   { from: { element: { type: 'server-component' } }, allow: PUBLIC_COMPONENT_API },
   { from: { file: { categories: 'server-entry' } }, allow: to(...SERVER_BASE) },
   { from: { file: { categories: 'server-entry' } }, allow: PUBLIC_COMPONENT_API },
-  // main.ts builds the app from app.ts (CU-018, CU-019).
+  // main.ts builds the app from app.ts, never the other way (CU-002, Nachtrag MAR-240).
   {
-    from: { file: { categories: 'server-entry' } },
-    allow: { to: { file: { categories: 'server-entry' } } },
+    from: { file: { categories: 'server-main' } },
+    allow: { to: { file: { categories: 'server-app' } } },
   },
   {
     from: { element: { type: 'server-db' } },
