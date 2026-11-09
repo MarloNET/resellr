@@ -109,3 +109,39 @@ describe('fixed texts of REQ-104 and REQ-105 (E1)', () => {
     );
   });
 });
+
+// Wording of design chapter 5 (docs/ux/uiux-design.md), verbatim (MAR-262).
+describe('banner texts of the patterns P-05 to P-08', () => {
+  it('has the conflict text of P-05', () => {
+    expect(FIXED_TEXTS.conflictBanner).toBe(
+      'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. ' +
+        'Bitte neu laden und erneut prüfen.',
+    );
+  });
+
+  it('has the banner text of P-06', () => {
+    expect(FIXED_TEXTS.unreachableBanner).toBe(
+      'resellr ist nicht erreichbar. Ihre Eingaben sind noch nicht gespeichert, bleiben aber ' +
+        'sichtbar, solange diese Seite offen ist. Warten Sie einen Moment und versuchen Sie es ' +
+        'erneut. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ im Startmenü.',
+    );
+  });
+
+  it('has the banner text of P-07', () => {
+    expect(FIXED_TEXTS.shuttingDownBanner).toBe(
+      'resellr wird gerade beendet. Ihre Eingabe wurde nicht gespeichert. Warten Sie, bis ' +
+        'resellr beendet ist, und starten Sie es dann über die Verknüpfung „resellr“ im Startmenü.',
+    );
+  });
+
+  it('has the fixed core and the addition of P-08', () => {
+    expect(FIXED_TEXTS.outcomeUnknownBanner).toBe('Ausgang unbekannt, bitte neu laden.');
+    expect(FIXED_TEXTS.outcomeUnknownHint).toBe(
+      'Ob Ihre Aktion gespeichert wurde, ist unklar. Laden Sie die Seite neu ' +
+        '(Browser-Aktualisierung, z. B. F5) und prüfen Sie danach, ob sie gespeichert wurde. ' +
+        'Beim Neuladen gehen Eingaben verloren: schreiben Sie sie vorher bei Bedarf ab oder ' +
+        'markieren Sie sie. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ ' +
+        'im Startmenü.',
+    );
+  });
+});

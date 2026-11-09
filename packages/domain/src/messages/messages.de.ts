@@ -51,7 +51,10 @@ export type ErrorMessageUsage<C extends ErrorCode> = keyof typeof ERROR_MESSAGES
     : never
   : never;
 
-/** Fixed texts of the backup notice and of "resellr beenden" (REQ-104, REQ-105). */
+/**
+ * Fixed texts of the backup notice and of "resellr beenden" (REQ-104, REQ-105) and the banner
+ * texts of the patterns P-05 to P-08 (design chapter 5).
+ */
 export const FIXED_TEXTS = {
   backupNoticeTitle: 'Sicherung einrichten',
   backupNoticeText: (dataDirPath: string) =>
@@ -63,4 +66,21 @@ export const FIXED_TEXTS = {
     'resellr jetzt beenden? Nicht gespeicherte Eingaben gehen verloren. ' +
     'Danach können Sie den Datenordner kopieren.',
   shutdownDone: 'resellr ist beendet. Sie können den Datenordner jetzt kopieren.',
+  conflictBanner:
+    'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. ' +
+    'Bitte neu laden und erneut prüfen.',
+  unreachableBanner:
+    'resellr ist nicht erreichbar. Ihre Eingaben sind noch nicht gespeichert, bleiben aber ' +
+    'sichtbar, solange diese Seite offen ist. Warten Sie einen Moment und versuchen Sie es ' +
+    'erneut. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ im Startmenü.',
+  shuttingDownBanner:
+    'resellr wird gerade beendet. Ihre Eingabe wurde nicht gespeichert. Warten Sie, bis ' +
+    'resellr beendet ist, und starten Sie es dann über die Verknüpfung „resellr“ im Startmenü.',
+  outcomeUnknownBanner: 'Ausgang unbekannt, bitte neu laden.',
+  outcomeUnknownHint:
+    'Ob Ihre Aktion gespeichert wurde, ist unklar. Laden Sie die Seite neu ' +
+    '(Browser-Aktualisierung, z. B. F5) und prüfen Sie danach, ob sie gespeichert wurde. ' +
+    'Beim Neuladen gehen Eingaben verloren: schreiben Sie sie vorher bei Bedarf ab oder ' +
+    'markieren Sie sie. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ ' +
+    'im Startmenü.',
 } as const;
