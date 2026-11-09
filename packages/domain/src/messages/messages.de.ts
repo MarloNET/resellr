@@ -41,6 +41,16 @@ export const ERROR_MESSAGES = {
   'not_found.default': MESSAGES['M-15'],
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
+/**
+ * Usages with a text in `ERROR_MESSAGES` for a code, e.g. `'default'` for `not_found`. A service
+ * can only set a usage the catalog has, so a typo does not silently end in an empty text.
+ */
+export type ErrorMessageUsage<C extends ErrorCode> = keyof typeof ERROR_MESSAGES extends infer K
+  ? K extends `${C}.${infer U}`
+    ? U
+    : never
+  : never;
+
 /** Fixed texts of the backup notice and of "resellr beenden" (REQ-104, REQ-105). */
 export const FIXED_TEXTS = {
   backupNoticeTitle: 'Sicherung einrichten',

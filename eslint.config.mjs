@@ -48,6 +48,11 @@ const POLICIES = [
   { from: { element: { type: 'server-component' } }, allow: PUBLIC_COMPONENT_API },
   { from: { file: { categories: 'server-entry' } }, allow: to(...SERVER_BASE) },
   { from: { file: { categories: 'server-entry' } }, allow: PUBLIC_COMPONENT_API },
+  // main.ts builds the app from app.ts (CU-018, CU-019).
+  {
+    from: { file: { categories: 'server-entry' } },
+    allow: { to: { file: { categories: 'server-entry' } } },
+  },
   {
     from: { element: { type: 'server-db' } },
     allow: to('server-shared', ...DOMAIN, 'runtime-shared'),

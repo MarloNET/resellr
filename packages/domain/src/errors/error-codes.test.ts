@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { ERROR_CODES } from './error-codes.ts';
 
-// Table "HTTP / Code" from Technical Specification 2.0.5.
+// Table "HTTP / Code" from Technical Specification 2.0.5, plus 405 for OPTIONS (G-6, 2.0.2).
 const GENERAL_CODES: [string, number][] = [
   ['bad_request', 400],
   ['forbidden_host', 403],
   ['forbidden_origin', 403],
   ['not_found', 404],
+  ['method_not_allowed', 405],
   ['version_conflict', 409],
   ['stale_content', 409],
   ['stale_stock', 409],
@@ -24,7 +25,7 @@ describe('error codes (E7)', () => {
     expect(ERROR_CODES).toHaveProperty(code, status);
   });
 
-  it('contains exactly the general codes of Technical Specification 2.0.5', () => {
+  it('contains exactly the general codes', () => {
     expect(Object.keys(ERROR_CODES).sort()).toEqual(GENERAL_CODES.map(([code]) => code).sort());
   });
 
