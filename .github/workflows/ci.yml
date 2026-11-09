@@ -33,6 +33,9 @@ jobs:
       - name: Audit shipped dependencies (TH-07)
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Audit all dependencies including dev tooling (TH-07)
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
