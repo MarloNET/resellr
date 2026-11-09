@@ -55,9 +55,10 @@ Das UI/UX-Design liegt als Nachtrag v0.6.2 vor (46 Screens, 10 Flüsse, Klassifi
    **Wenn falsch:** Sollte es nur ein Hinweisbanner ohne Bestätigung sein, passt das nicht zur Specification (`mpn_in_use` verlangt Bestätigung, AC-REQ-058-01).
 4. **Annahme (Rückfrage O-1):** Titel „Zuordnung entfernen“, Text „Die Kategorie-Zuordnung „<Pfad>“ für <Geräteart> bei <Kanal> wird entfernt. Ohne Zuordnung zeigt der Kanal-Inhalt „Kategorie fehlt“.“; Knöpfe „Abbrechen“ und „Zuordnung entfernen“, Fokus auf „Abbrechen“. Die Specification hat dafür keinen Wortlaut.
    **Wenn falsch:** Andere Texte oder ein Kontrollkästchen wie in UI-041 sind reine Textänderungen in UI-035.
-5. **Annahme (O-8):** Hat eine Modellvorlage Geräte **und** Modell-Inserate, zeigt der Dialog den einen Grund, den die Specification meldet.
-   *Beispiel:* Meldet sie „Geräte verweisen“, steht der alte Gerätetext; sonst dein Text.
-   **Wenn falsch:** Sollen beide Gründe zugleich stehen, ist das eine Frage an die Specification.
+5. **Annahme (O-8):** Hat die Modellvorlage Modell-Inserate, steht dein Text (M-29). Verweisen nur Geräte ohne Modell-Inserat, z. B. stornierte Geräte, steht der Gerätetext aus der Specification.
+   *Beispiel:* Die Modellvorlage „ThinkPad E15 Gen 2“ hat ein Modell-Inserat: Das Banner zeigt „Löschen nicht möglich: Modellvorlage wird von ein oder mehreren Inseraten genutzt“. Eine Modellvorlage, auf die nur stornierte Geräte ohne Modell-Inserat verweisen, zeigt den Gerätetext („Löschen nicht möglich: … Geräte verweisen auf die Modellvorlage“).
+   **Wenn falsch:** Akzeptierst du, dass immer der Gerätetext steht, entfällt M-29 (M-29 im Katalog und UI-041 entfallen, nur Textänderung).
+   Die Rangfolge der Gründe betrifft das Serververhalten und wird deshalb in die Specification (Nachtrag v0.5.2) übernommen; das Design beschreibt nur die Anzeige.
 
 ### Weitere Annahmen
 - Alle neuen Dialoge (UI-035, UI-007) haben den Fokus beim Öffnen auf „Abbrechen“, Esc bricht ab.
