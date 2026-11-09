@@ -76,7 +76,14 @@ export async function runMigrations<DB>(
   return db.connection().execute(async (connection) => {
     sqlite.pragma('foreign_keys = OFF');
     try {
-      sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        sqlite.exec('BEGIN IMMEDIATE');
+      } catch (error) {
+        // E.g. SQLITE_BUSY: another process holds the write lock beyond the busy timeout.
+        throw new MigrationError('Migration run could not start its transaction', {
+          cause: error,
+        });
+      }
       try {
         sqlite.exec(CREATE_MIGRATION_TABLE);
         const record = sqlite.prepare('INSERT INTO app_migration (name, applied_at) VALUES (?, ?)');

@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import BetterSqlite3 from 'better-sqlite3';
 import { sql } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -235,6 +236,28 @@ describe('migration run (CU-029)', () => {
 
     expect(statements).toEqual([]);
     expect(pragma('foreign_keys')).toBe(1);
+  });
+
+  it('throws MigrationError with the cause when BEGIN IMMEDIATE finds the database locked', async () => {
+    const other = new BetterSqlite3(join(dir, 'resellr.db'));
+    other.exec('BEGIN IMMEDIATE');
+    // Fail at once instead of waiting the 5 s busy timeout.
+    database.sqlite.pragma('busy_timeout = 0');
+
+    try {
+      const run = runMigrations(database, [listingSchema], now);
+
+      await expect(run).rejects.toBeInstanceOf(MigrationError);
+      await expect(run).rejects.toMatchObject({
+        migration: null,
+        cause: { code: 'SQLITE_BUSY' },
+      });
+      expect(pragma('foreign_keys')).toBe(1);
+    } finally {
+      other.exec('ROLLBACK');
+      other.close();
+    }
+    expect(schemaSnapshot()).toEqual([]);
   });
 
   it('E5 creates no app_migration table when there is nothing to migrate', async () => {

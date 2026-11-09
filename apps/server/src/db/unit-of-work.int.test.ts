@@ -237,6 +237,26 @@ describe('unit of work (CU-031)', () => {
     expect(titles()).toEqual([]);
   });
 
+  it('keeps the original error and stores nothing when SQLite ends the transaction itself', async () => {
+    // A full disk: SQLite rolls the transaction back on its own (SQLITE_FULL, FIND-261).
+    const pageCount = database.sqlite.pragma('page_count', { simple: true }) as number;
+    database.sqlite.pragma(`max_page_count = ${pageCount + 2}`);
+    const uow = createUnitOfWork(database.db);
+
+    const run = uow.run(async (tx) => {
+      await insertListing(tx, 'ThinkPad T14');
+      await insertListing(tx, 'x'.repeat(100_000));
+    });
+
+    await expect(run).rejects.toMatchObject({ code: 'SQLITE_FULL' });
+    expect(titles()).toEqual([]);
+    // The connection is free again for the next action.
+    await uow.run(async (tx) => {
+      await insertListing(tx, 'Latitude 5440');
+    });
+    expect(titles()).toEqual(['Latitude 5440']);
+  });
+
   it('rejects events after the action has finished', async () => {
     const uow = createUnitOfWork(database.db);
     let leaked: UnitOfWork<TestSchema> | undefined;

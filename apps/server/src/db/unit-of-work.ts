@@ -67,7 +67,10 @@ export interface UnitOfWorkRunner<DB> {
    * One action, one transaction (2.0.4, Baseline 9.3): the action, the handlers of its change
    * events and everything they write are stored together or not at all. Inside the action and
    * its handlers use only `uow.db`: the transaction holds the single connection until the commit,
-   * so a query through the outer `db` waits for it and hangs forever (2.0.4, MAR-263).
+   * so a query through the outer `db` waits for it and hangs forever (2.0.4, MAR-263). Do not
+   * swallow database errors inside the action or its handlers: after some of them (e.g.
+   * SQLITE_FULL) SQLite has already rolled the transaction back, and later writes would then run
+   * outside of it (FIND-262). Let them propagate; `run` rolls back and rethrows the original error.
    */
   run<T>(action: (uow: UnitOfWork<DB>) => Promise<T>): Promise<UnitOfWorkResult<T>>;
 }
@@ -83,50 +86,60 @@ export function createUnitOfWork<DB>(
   const checkHandlers = (handlers.check ?? {}) as Partial<Record<string, AnyCheckHandler>>;
 
   return {
-    run: (action) =>
-      db.transaction().execute(async (trx) => {
-        const pending: ChangeEvent[] = [];
-        // The first rejection of a check handler; it rolls back even if the action catches it.
-        const rejections: unknown[] = [];
-        let open = true;
-        const assertOpen = () => {
-          if (!open) throw new Error('Unit of work is already finished');
-        };
+    run: async (action) => {
+      const trx = await db.startTransaction().execute();
+      const pending: ChangeEvent[] = [];
+      // The first rejection of a check handler; it rolls back even if the action catches it.
+      const rejections: unknown[] = [];
+      let open = true;
+      const assertOpen = () => {
+        if (!open) throw new Error('Unit of work is already finished');
+      };
 
-        const uow: UnitOfWork<DB> = {
-          db: trx,
-          emit: (event) => {
-            assertOpen();
-            pending.push(event);
-          },
-          check: async (event) => {
-            assertOpen();
-            const handler = checkHandlers[event.type];
-            if (handler === undefined) return;
-            try {
-              await handler(event, uow);
-            } catch (error) {
-              rejections.push(error);
-              throw error;
-            }
-          },
-        };
-
-        try {
-          const result = await action(uow);
-          if (rejections.length > 0) throw rejections[0];
-          // Handlers may emit further events; all of them run before the commit.
-          const report = emptyChangeReport();
-          for (let event = pending.shift(); event !== undefined; event = pending.shift()) {
-            const handler = changeHandlers[event.type];
-            if (handler !== undefined) mergeReport(report, await handler(event, uow));
+      const uow: UnitOfWork<DB> = {
+        db: trx,
+        emit: (event) => {
+          assertOpen();
+          pending.push(event);
+        },
+        check: async (event) => {
+          assertOpen();
+          const handler = checkHandlers[event.type];
+          if (handler === undefined) return;
+          try {
+            await handler(event, uow);
+          } catch (error) {
+            rejections.push(error);
+            throw error;
           }
-          if (rejections.length > 0) throw rejections[0];
-          return { result, report };
-        } finally {
-          open = false;
+        },
+      };
+
+      try {
+        const result = await action(uow);
+        if (rejections.length > 0) throw rejections[0];
+        // Handlers may emit further events; all of them run before the commit.
+        const report = emptyChangeReport();
+        for (let event = pending.shift(); event !== undefined; event = pending.shift()) {
+          const handler = changeHandlers[event.type];
+          if (handler !== undefined) mergeReport(report, await handler(event, uow));
         }
-      }),
+        if (rejections.length > 0) throw rejections[0];
+        open = false;
+        await trx.commit().execute();
+        return { result, report };
+      } catch (error) {
+        open = false;
+        // SQLite may already have rolled back by itself, e.g. after a full disk (SQLITE_FULL,
+        // SQLITE_IOERR); the rollback then fails with "no transaction is active". The original
+        // error is the one that counts (FIND-261). Kysely releases the connection in any case.
+        await trx
+          .rollback()
+          .execute()
+          .catch(() => undefined);
+        throw error;
+      }
+    },
   };
 }
 
