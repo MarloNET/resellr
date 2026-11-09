@@ -18,6 +18,64 @@ const STAMPS = [
   'updated_at TEXT NOT NULL',
 ].join(',\n  ');
 
+/** Object types of 3.6. */
+const AUDIT_OBJECT_TYPES = [
+  'device_type',
+  'attribute',
+  'pick_list_value',
+  'manufacturer',
+  'supplier',
+  'condition_code',
+  'text_block',
+  'merchant_profile',
+  'datasheet_layout',
+  'channel',
+  'price_rule',
+  'title_pattern',
+  'description_template',
+  'condition_mappings',
+  'category_mapping',
+  'attribute_mapping',
+  'model_template',
+  'listing',
+  'channel_content',
+  'device',
+];
+/** All actions of 3.6. */
+const AUDIT_ACTIONS = [
+  'created',
+  'updated',
+  'activated',
+  'deactivated',
+  'reordered',
+  'legal_status_changed',
+  'deleted',
+  'values_updated',
+  'deviation_confirmed',
+  'price_updated',
+  'photo_added',
+  'photo_removed',
+  'photos_reordered',
+  'manual_title_saved',
+  'manual_title_discarded',
+  'manual_description_saved',
+  'manual_description_discarded',
+  'manual_category_saved',
+  'manual_category_discarded',
+  'released',
+  'change_draft_released',
+  'status_changed',
+  'reconciled',
+  'unchecked_legal_confirmed',
+  'assigned',
+  'assigned_despite_deviation',
+  'rebooked',
+  'sold',
+  'sale_reversed',
+  'cancelled',
+  'wi_nr_corrected',
+];
+
 const table = (name: string, ...columns: string[]) =>
   `CREATE TABLE ${name} (\n  ${columns.join(',\n  ')}\n)`;
 
@@ -392,7 +450,8 @@ const TABLES = [
     'audit_entry',
     'id INTEGER PRIMARY KEY NOT NULL',
     'occurred_at TEXT NOT NULL',
-    'object_type TEXT NOT NULL',
+    // Whether an action fits the object type is checked only by the audit writer (MAR-285).
+    `object_type TEXT NOT NULL ${oneOf('object_type', AUDIT_OBJECT_TYPES)}`,
     `object_category TEXT NOT NULL ${oneOf('object_category', [
       'settings',
       'model_template',
@@ -403,7 +462,7 @@ const TABLES = [
     ])}`,
     'object_id INTEGER',
     'object_label TEXT NOT NULL',
-    'action TEXT NOT NULL',
+    `action TEXT NOT NULL ${oneOf('action', AUDIT_ACTIONS)}`,
     jsonNull('old_value'),
     jsonNull('new_value'),
   ),

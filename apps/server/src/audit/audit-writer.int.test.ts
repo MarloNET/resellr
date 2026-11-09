@@ -9,13 +9,14 @@ import { runMigrations } from '../db/migrator.ts';
 import { migrations } from '../db/migrations/index.ts';
 import type { DB } from '../db/schema.ts';
 import { createUnitOfWork } from '../db/unit-of-work.ts';
-import { createAuditWriter, type AuditEntry } from './audit-writer.ts';
+import type { Clock } from '../shared/clock.ts';
+import { createAuditWriter, type AuditEntryInput } from './index.ts';
 
 const OCCURRED_AT = new Date('2026-11-10T09:15:00.000Z');
 const SERVER_SRC = join(import.meta.dirname, '..');
+const clock: Clock = { now: () => OCCURRED_AT, today: () => '2026-11-10' };
 
-const visualGradeChanged: AuditEntry = {
-  occurredAt: OCCURRED_AT,
+const visualGradeChanged: AuditEntryInput = {
   objectType: 'device',
   objectId: 7,
   objectLabel: 'Gerät 626198',
@@ -69,7 +70,7 @@ afterEach(async () => {
 
 describe('audit writer (CU-035)', () => {
   it('E5 inserts an entry with all fields of 2.0.9', async () => {
-    await createAuditWriter(database.db).write(visualGradeChanged);
+    await createAuditWriter({ db: database.db, clock }).write(visualGradeChanged);
 
     expect(auditRows()).toEqual([
       {
@@ -87,8 +88,7 @@ describe('audit writer (CU-035)', () => {
   });
 
   it('E5 stores missing old or new values and a missing object id as NULL', async () => {
-    await createAuditWriter(database.db).write({
-      occurredAt: OCCURRED_AT,
+    await createAuditWriter({ db: database.db, clock }).write({
       objectType: 'listing',
       objectId: null,
       objectLabel: 'Modell-Inserat NB-1',
@@ -112,13 +112,26 @@ describe('audit writer (CU-035)', () => {
     ['listing', 'deleted', 'other'],
     ['channel_content', 'unchecked_legal_confirmed', 'other'],
   ] as const)('E5 files %s %s under the category %s of 3.6', async (type, action, category) => {
-    await createAuditWriter(database.db).write({
+    await createAuditWriter({ db: database.db, clock }).write({
       ...visualGradeChanged,
       objectType: type,
       action,
-    } as AuditEntry);
+    } as AuditEntryInput);
 
     expect(auditRows()).toMatchObject([{ object_type: type, action, object_category: category }]);
+  });
+
+  it.each([
+    ['object type', { objectType: 'customer' }],
+    ['action', { action: 'printed' }],
+  ])('E5 the database rejects an unknown %s of 3.6', async (_, change) => {
+    const write = createAuditWriter({ db: database.db, clock }).write({
+      ...visualGradeChanged,
+      ...change,
+    } as AuditEntryInput);
+
+    await expect(write).rejects.toThrow(/CHECK constraint failed/);
+    expect(auditRows()).toEqual([]);
   });
 
   it('E5 no other server source file inserts into audit_entry', () => {
@@ -135,8 +148,7 @@ describe('audit writer (CU-035)', () => {
 
     await uow.run(async (tx) => {
       const { id } = await insertDeviceType(tx.db, 'Notebook');
-      await createAuditWriter(tx.db).write({
-        occurredAt: OCCURRED_AT,
+      await createAuditWriter({ db: tx.db, clock }).write({
         objectType: 'device_type',
         objectId: id,
         objectLabel: 'Geräteart Notebook',
@@ -155,8 +167,7 @@ describe('audit writer (CU-035)', () => {
 
     const run = uow.run(async (tx) => {
       const { id } = await insertDeviceType(tx.db, 'Notebook');
-      await createAuditWriter(tx.db).write({
-        occurredAt: OCCURRED_AT,
+      await createAuditWriter({ db: tx.db, clock }).write({
         objectType: 'device_type',
         objectId: id,
         objectLabel: 'Geräteart Notebook',
@@ -178,7 +189,7 @@ describe('audit writer (CU-035)', () => {
 
     const run = uow.run(async (tx) => {
       await insertDeviceType(tx.db, 'Notebook');
-      await createAuditWriter(tx.db).write({
+      await createAuditWriter({ db: tx.db, clock }).write({
         ...visualGradeChanged,
         objectLabel: null as unknown as string,
       });

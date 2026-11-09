@@ -1,6 +1,7 @@
 import type { Kysely } from 'kysely';
 
 import type { DB } from '../db/schema.ts';
+import type { Clock } from '../shared/clock.ts';
 
 // Object types and actions of Technical Specification 3.6.
 
@@ -73,10 +74,12 @@ export type AuditValue =
 /** Changed fields by their readable name, e.g. `{ "Optik-Note": 4 }` (2.0.9, 3.4). */
 export type AuditValues = Readonly<Record<string, AuditValue>>;
 
-/** One entry of 2.0.9; no user and no passwords (E-4, E-5). */
-export type AuditEntry = {
+/**
+ * One entry of 2.0.9 without `occurredAt`, which the writer takes from the clock; no user and no
+ * passwords (E-4, E-5). The action must fit the object type (3.6).
+ */
+export type AuditEntryInput = {
   [T in AuditObjectType]: {
-    occurredAt: Date;
     objectType: T;
     /** `null` if the object has no id of its own (e.g. condition mappings of a channel). */
     objectId: number | null;
@@ -89,7 +92,7 @@ export type AuditEntry = {
 }[AuditObjectType];
 
 export interface AuditWriter {
-  write(entry: AuditEntry): Promise<void>;
+  write(entry: AuditEntryInput): Promise<void>;
 }
 
 /** Category of each object type; all other object types are settings (3.6). */
@@ -101,26 +104,32 @@ const CATEGORY_BY_TYPE: Partial<Record<AuditObjectType, AuditCategory>> = {
 };
 
 /** Deletions and the confirmation of unchecked legal texts fall under `other` (3.6, UI-024). */
-function categoryOf({ objectType, action }: AuditEntry): AuditCategory {
+function categoryOf({ objectType, action }: AuditEntryInput): AuditCategory {
   if (action === 'deleted' || action === 'unchecked_legal_confirmed') return 'other';
   return CATEGORY_BY_TYPE[objectType] ?? 'settings';
 }
 
 const toJson = (values: AuditValues | null) => (values === null ? null : JSON.stringify(values));
 
+export interface AuditWriterDeps {
+  /** `tx.db` of the action, never the outer `db` (2.0.4, MAR-263). */
+  db: Kysely<DB>;
+  clock: Clock;
+}
+
 /**
  * Audit writer (CU-035, REQ-072): the only place that inserts into `audit_entry`. Create it in
- * the action with `tx.db` of the unit of work, never with the outer `db` (2.0.4, MAR-263), so
- * the entry is stored together with the change or not at all. A failing insert propagates and
- * rolls the action back: without an entry nothing is stored (2.0.4).
+ * the action with `tx.db` of the unit of work (Nachtrag MAR-285), so the entry is stored
+ * together with the change or not at all. A failing insert propagates and rolls the action back:
+ * without an entry nothing is stored (2.0.4).
  */
-export function createAuditWriter(db: Kysely<DB>): AuditWriter {
+export function createAuditWriter({ db, clock }: AuditWriterDeps): AuditWriter {
   return {
     write: async (entry) => {
       await db
         .insertInto('audit_entry')
         .values({
-          occurred_at: entry.occurredAt.toISOString(),
+          occurred_at: clock.now().toISOString(),
           object_type: entry.objectType,
           object_category: categoryOf(entry),
           object_id: entry.objectId,
