@@ -21,7 +21,12 @@ import {
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return { ...actual, renameSync: vi.fn(actual.renameSync), fsyncSync: vi.fn(actual.fsyncSync) };
+  return {
+    ...actual,
+    renameSync: vi.fn(actual.renameSync),
+    fsyncSync: vi.fn(actual.fsyncSync),
+    writeSync: vi.fn(actual.writeSync),
+  };
 });
 
 let dir: string;
@@ -33,6 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.mocked(fs.renameSync).mockClear();
   vi.mocked(fs.fsyncSync).mockClear();
+  vi.mocked(fs.writeSync).mockClear();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -53,6 +59,32 @@ describe('atomic write (E5)', () => {
     expect(vi.mocked(fs.fsyncSync).mock.invocationCallOrder[0]).toBeLessThan(
       renameMock.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it('writes the whole content when the system writes only part of it at a time', async () => {
+    const target = join(dir, STATE_FILE_NAME);
+    const content = '{"appVersion":"1.0.0","dataFolderStamp":"äöü"}';
+    const { writeSync } = await vi.importActual<typeof import('node:fs')>('node:fs');
+    // Write at most 5 bytes per call, whichever call form is used.
+    vi.mocked(fs.writeSync).mockImplementation(((
+      fd: number,
+      data: string | Uint8Array,
+      offset?: number | null,
+      length?: number | string,
+    ) => {
+      const bytes: Uint8Array = typeof data === 'string' ? Buffer.from(data, 'utf8') : data;
+      const start = typeof data === 'string' ? 0 : (offset ?? 0);
+      const rest = typeof length === 'number' ? length : bytes.byteLength - start;
+      return writeSync(fd, bytes, start, Math.min(rest, 5));
+    }) as typeof fs.writeSync);
+
+    try {
+      writeFileAtomic(target, content);
+    } finally {
+      vi.mocked(fs.writeSync).mockImplementation(writeSync);
+    }
+
+    expect(readFileSync(target, 'utf8')).toBe(content);
   });
 
   it('leaves the old file unchanged when the write is aborted before the rename', () => {

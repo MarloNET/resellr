@@ -1,10 +1,16 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import * as fs from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createDailyJsonlWriter } from './daily-jsonl-writer.ts';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, unlinkSync: vi.fn(actual.unlinkSync) };
+});
 
 let dir: string;
 let clock: Date;
@@ -22,6 +28,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.mocked(fs.unlinkSync).mockReset();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -105,6 +112,57 @@ describe('daily JSON Lines writer (E6)', () => {
     expect(readdirSync(dir).sort()).toEqual([
       'operations-2026-11-09.jsonl',
       'operations-2026-11-10.jsonl',
+    ]);
+  });
+
+  it('still writes every entry of the day when an expired file cannot be deleted', () => {
+    // A directory with a daily file name stands in for a locked file: unlink fails.
+    mkdirSync(join(dir, 'errors-2026-01-01.jsonl'));
+    writeFileSync(join(dir, 'errors-2026-01-02.jsonl'), '');
+    const writer = createDailyJsonlWriter({ dir, kind: 'errors', now });
+
+    writer.write({ refNo: 'R-7K2M-9QX4' });
+    writer.write({ refNo: 'R-0000-0001' });
+
+    expect(readLines('errors-2026-11-09.jsonl')).toEqual([
+      { ts: '2026-11-09T10:00:00.000Z', refNo: 'R-7K2M-9QX4' },
+      { ts: '2026-11-09T10:00:00.000Z', refNo: 'R-0000-0001' },
+    ]);
+    expect(readdirSync(dir).sort()).toEqual(['errors-2026-01-01.jsonl', 'errors-2026-11-09.jsonl']);
+  });
+
+  it('reports a failed deletion only after trying every expired file', () => {
+    mkdirSync(join(dir, 'errors-2026-01-01.jsonl'));
+    writeFileSync(join(dir, 'errors-2026-01-02.jsonl'), '');
+    const writer = createDailyJsonlWriter({ dir, kind: 'errors', now });
+
+    expect(() => writer.deleteExpiredFiles()).toThrow();
+    expect(readdirSync(dir)).toEqual(['errors-2026-01-01.jsonl']);
+  });
+
+  it('treats an expired file that another process deleted first as deleted', () => {
+    writeFileSync(join(dir, 'operations-2026-01-01.jsonl'), '');
+    vi.mocked(fs.unlinkSync).mockImplementationOnce((path) => {
+      rmSync(path);
+      throw Object.assign(
+        new Error(`ENOENT: no such file or directory, unlink '${String(path)}'`),
+        {
+          code: 'ENOENT',
+        },
+      );
+    });
+    const writer = createDailyJsonlWriter({ dir, kind: 'operations', now });
+
+    expect(writer.deleteExpiredFiles()).toEqual(['operations-2026-01-01.jsonl']);
+    writer.write({ event: 'server_started' });
+    expect(readdirSync(dir)).toEqual(['operations-2026-11-09.jsonl']);
+  });
+
+  it('always sets ts to the current instant, even when the entry has a ts field', () => {
+    createDailyJsonlWriter({ dir, kind: 'operations', now }).write({ ts: 'bogus', event: 'x' });
+
+    expect(readLines('operations-2026-11-09.jsonl')).toEqual([
+      { ts: '2026-11-09T10:00:00.000Z', event: 'x' },
     ]);
   });
 

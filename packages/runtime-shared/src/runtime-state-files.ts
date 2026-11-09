@@ -55,7 +55,11 @@ export function writeFileAtomic(filePath: string, content: string): void {
   try {
     const fd = openSync(tempPath, 'wx');
     try {
-      writeSync(fd, content, null, 'utf8');
+      // writeSync may write fewer bytes than requested; keep writing until all are out.
+      const bytes = Buffer.from(content, 'utf8');
+      for (let written = 0; written < bytes.length;) {
+        written += writeSync(fd, bytes, written, bytes.length - written);
+      }
       fsyncSync(fd);
     } finally {
       closeSync(fd);

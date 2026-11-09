@@ -28,9 +28,16 @@ export interface DailyJsonlWriterOptions {
 }
 
 export interface DailyJsonlWriter {
-  /** Appends the entry as one JSON line, with `ts` set to the current instant, to `<kind>-<YYYY-MM-DD>.jsonl`. */
+  /**
+   * Appends the entry as one JSON line, with `ts` set to the current instant, to `<kind>-<YYYY-MM-DD>.jsonl`.
+   * A `ts` field in the entry is replaced. A failed cleanup of expired files never prevents the write.
+   */
   write(entry: Record<string, unknown>): void;
-  /** Deletes the daily files of this kind older than 30 days and returns their names. */
+  /**
+   * Deletes the daily files of this kind older than 30 days and returns their names. A file that is
+   * already gone counts as deleted. If a file cannot be deleted, the others are still tried and the
+   * first error is thrown afterwards.
+   */
   deleteExpiredFiles(): string[];
 }
 
@@ -62,7 +69,15 @@ export function createDailyJsonlWriter({
       const day = dailyFile.exec(name)?.[1];
       return day !== undefined && day < oldestKept;
     });
-    for (const name of expired) unlinkSync(join(dir, name));
+    let firstError: unknown;
+    for (const name of expired) {
+      try {
+        unlinkSync(join(dir, name));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') firstError ??= error;
+      }
+    }
+    if (firstError !== undefined) throw firstError;
     return expired;
   };
 
@@ -71,10 +86,16 @@ export function createDailyJsonlWriter({
     const day = toDay(instant);
     if (day !== currentDay) {
       mkdirSync(dir, { recursive: true });
-      deleteExpiredFiles();
       currentDay = day;
+      try {
+        deleteExpiredFiles();
+      } catch {
+        // Losing the entry would be worse than keeping an old file; the next day retries.
+      }
     }
-    const line = JSON.stringify({ ts: instant.toISOString(), ...entry });
+    // `ts` comes first in the line and always holds the current instant.
+    const ts = instant.toISOString();
+    const line = JSON.stringify(Object.assign({ ts }, entry, { ts }));
     appendFileSync(join(dir, `${kind}-${day}.jsonl`), `${line}\n`, 'utf8');
   };
 
