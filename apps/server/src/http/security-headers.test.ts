@@ -2,6 +2,7 @@ import type { InjectOptions } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
+import { routedPath } from './security-headers.ts';
 
 // Wording of Technical Specification 2.0.2.
 const CSP =
@@ -70,9 +71,35 @@ describe('security headers (E9)', () => {
     },
   );
 
+  it.each(['/%61pi/test/items', '/a%70i/unknown', 'http://127.0.0.1:4310/api/test/items'])(
+    '%s (other spelling of /api) is not cached',
+    async (url) => {
+      const response = await t.app.inject({ method: 'GET', url, headers: { host: HOST } });
+
+      expect(response.headers['cache-control']).toBe('no-store');
+    },
+  );
+
   it.each(['/', '/assets/app.js'])('%s outside /api has no Cache-Control no-store', async (url) => {
     const response = await t.app.inject({ method: 'GET', url, headers: { host: HOST } });
 
     expect(response.headers['cache-control']).not.toBe('no-store');
+  });
+});
+
+describe('routedPath', () => {
+  it.each([
+    ['/api/test/items?q=%61pi', '/api/test/items'],
+    ['/%61pi/test/items', '/api/test/items'],
+    ['/%4D%65dia/x', '/Media/x'],
+    ['http://127.0.0.1:4310/%6Dedia/photos/abc', '/media/photos/abc'],
+    ['HTTP://127.0.0.1:4310/api', '/api'],
+    ['http://127.0.0.1:4310', '/'],
+    ['http://127.0.0.1:4310?x', '/'],
+    ['/api%2Ftest', '/api/test'],
+    ['/a%E0%A4%A', '/a%E0%A4%A'],
+    ['/caf%C3%A9#top', '/caf%C3%A9'],
+  ])('%s is matched as %s', (url, path) => {
+    expect(routedPath(url)).toBe(path);
   });
 });

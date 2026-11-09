@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import type { FastifyInstance } from 'fastify';
 
 import { sendError } from './error-mapper.ts';
+import { routedPath } from './security-headers.ts';
 
 /** Paths that never fall back to `index.html` (Technical Specification 2.0.1). */
 const NO_FALLBACK = /^\/(?:api|media|datasheets|downloads|assets)(?:\/|$)/;
@@ -23,11 +24,10 @@ export function registerStaticWeb(app: FastifyInstance, { webRoot }: { webRoot: 
   });
 
   app.setNotFoundHandler((request, reply) => {
-    const path = request.url.split('?', 1)[0] ?? '';
     // Without a built user interface the answer stays in the error format.
     if (
       request.method === 'GET' &&
-      !NO_FALLBACK.test(path) &&
+      !NO_FALLBACK.test(routedPath(request.url)) &&
       existsSync(join(webRoot, 'index.html'))
     ) {
       return reply.sendFile('index.html', webRoot);

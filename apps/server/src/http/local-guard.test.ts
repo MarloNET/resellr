@@ -14,6 +14,9 @@ beforeEach(async () => {
     return { ok: true };
   };
   t.app.get('/api/test/items', count);
+  t.app.get('/media/photos/:id', count);
+  t.app.get('/datasheets/:name', count);
+  t.app.get('/downloads/:name', count);
   t.app.post('/api/test/items', count);
   t.app.put('/api/test/items', count);
   t.app.patch('/api/test/items', count);
@@ -251,6 +254,41 @@ describe('local-guard G-5 cross-site reads (E6)', () => {
 
       expect(response.statusCode).toBe(403);
       expect(errorCode(response.body)).toBe('forbidden_origin');
+      expect(sideEffects).toBe(0);
+    },
+  );
+
+  // The router decodes the path before matching, so G-5 must not depend on the spelling.
+  it.each([
+    '/%61pi/test/items',
+    '/a%70i/test/items?q=1',
+    '/%6Dedia/photos/abc',
+    '/%64atasheets/x.pdf',
+    '/%64ownloads/x.zip',
+    'http://127.0.0.1:4310/api/test/items',
+    'http://127.0.0.1:4310/%6Dedia/photos/abc',
+  ])('GET %s (other spelling) with Sec-Fetch-Site cross-site is rejected', async (url) => {
+    const response = await t.app.inject({
+      method: 'GET',
+      url,
+      headers: { host: HOST, 'sec-fetch-site': 'cross-site' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(errorCode(response.body)).toBe('forbidden_origin');
+    expect(sideEffects).toBe(0);
+  });
+
+  it.each(['/api/test/items', '/%61pi/test/items', '/media/photos/abc'])(
+    'HEAD %s with Sec-Fetch-Site cross-site is rejected like GET',
+    async (url) => {
+      const response = await t.app.inject({
+        method: 'HEAD',
+        url,
+        headers: { host: HOST, 'sec-fetch-site': 'cross-site' },
+      });
+
+      expect(response.statusCode).toBe(403);
       expect(sideEffects).toBe(0);
     },
   );

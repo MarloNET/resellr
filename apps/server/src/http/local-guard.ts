@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { ErrorLog } from '../ops/index.ts';
 import { sendError } from './error-mapper.ts';
+import { routedPath } from './security-headers.ts';
 
 declare module 'fastify' {
   interface FastifyContextConfig {
@@ -12,6 +13,7 @@ declare module 'fastify' {
 }
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const READ_METHODS = new Set(['GET', 'HEAD']);
 const PROTECTED_READ_PATH = /^\/(?:api|media|datasheets|downloads)(?:\/|$)/;
 const SHUTDOWN_PATH = '/api/ops/shutdown';
 
@@ -29,7 +31,7 @@ const mediaType = (contentType: string | undefined) =>
  */
 function check(request: FastifyRequest, port: number): Rejection | null {
   const { headers, method } = request;
-  const path = request.url.split('?', 1)[0];
+  const rawPath = request.url.split('?', 1)[0];
   const ownHost = `127.0.0.1:${port}`;
 
   // G-1: exactly 127.0.0.1:<port>, not localhost (DNS rebinding).
@@ -40,7 +42,7 @@ function check(request: FastifyRequest, port: number): Rejection | null {
     // G-3: a request without both headers does not come from a browser.
     const fromTool =
       method === 'POST' &&
-      path === SHUTDOWN_PATH &&
+      rawPath === SHUTDOWN_PATH &&
       headers.origin === undefined &&
       fetchSite === undefined;
     // G-2: writes need the own origin, and Sec-Fetch-Site same-origin if present.
@@ -58,8 +60,13 @@ function check(request: FastifyRequest, port: number): Rejection | null {
     }
   }
 
-  // G-5: no cross-site reads of data, images, data sheets and downloads.
-  if (method === 'GET' && fetchSite === 'cross-site' && PROTECTED_READ_PATH.test(path ?? '')) {
+  // G-5: no cross-site reads of data, images, data sheets and downloads. HEAD runs the GET
+  // handler; the path is the one the router matches, whatever its spelling.
+  if (
+    READ_METHODS.has(method) &&
+    fetchSite === 'cross-site' &&
+    PROTECTED_READ_PATH.test(routedPath(request.url))
+  ) {
     return { rule: 'G-5', code: 'forbidden_origin' };
   }
 

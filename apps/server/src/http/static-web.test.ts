@@ -57,15 +57,20 @@ describe('static user interface (E12)', () => {
     expect(t.readErrorLog()).toEqual([]);
   });
 
-  it.each(['/api', '/api/unknown', '/media/photos/abc', '/datasheets/x.pdf', '/downloads/x.zip'])(
-    'GET %s answers 404 not_found, not index.html',
-    async (url) => {
-      const response = await get(url);
+  it.each([
+    '/api',
+    '/api/unknown',
+    '/media/photos/abc',
+    '/datasheets/x.pdf',
+    '/downloads/x.zip',
+    '/%61pi/unknown',
+    '/%6Dedia/photos/abc',
+  ])('GET %s answers 404 not_found, not index.html', async (url) => {
+    const response = await get(url);
 
-      expect(response.statusCode).toBe(404);
-      expect(JSON.parse(response.body)).toMatchObject({ error: { code: 'not_found' } });
-    },
-  );
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body)).toMatchObject({ error: { code: 'not_found' } });
+  });
 
   it('a write to an unknown path answers 404 not_found', async () => {
     const response = await t.app.inject({
