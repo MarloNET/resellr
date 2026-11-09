@@ -44,7 +44,7 @@ Eckenradius 6 px (Felder, Buttons, Karten), Chips 4 px. 8er-Raster. Dichte: komp
 - **Fokus:** sichtbarer 2-px-Ring primary mit 2 px Abstand.
 
 ## Barrierefreiheit
-Keine Anforderung (E-3). Gute Lesbarkeit: Kontrastziele oben (≥ 4,5:1 Text), Mindest-Klickfläche 32 × 32 px, vollständige Tastaturbedienung der Häufigkeitsabläufe (Einbuchen, Freigeben, Kopier-Assistent) als Bedienkomfort, nicht als Konformitätsaussage.
+Keine Anforderung (E-3). Gute Lesbarkeit: Kontrastziele oben (≥ 4,5:1 Text), Mindest-Klickfläche 32 × 32 px, Schaltfläche „×“ im Seitenbanner (PageBanner) hat den zugänglichen Namen (Screenreader-Text, aria-label) „Meldung schließen“ (Klarstellung MAR-283), vollständige Tastaturbedienung der Häufigkeitsabläufe (Einbuchen, Freigeben, Kopier-Assistent) als Bedienkomfort, nicht als Konformitätsaussage.
 
 ## Nicht verwenden
 - Kopf- und Navigationselemente, die nicht im Screen-Inventar stehen: Avatar/Profil, Benachrichtigungsglocke, globale Suche, Hamburger-Menü, Bottom-Navigation, Zahnrad im Kopf (Einstellungen stehen in der linken Navigation).
