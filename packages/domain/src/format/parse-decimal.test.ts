@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest';
+
+import { parseDecimal } from './parse-decimal.ts';
+
+describe('decimal input (E3)', () => {
+  it.each([
+    ['14,01', '14.01'],
+    ['14.01', '14.01'],
+    // Point and comma are always decimal separators, never thousands separators (MAR-198 Q-3).
+    ['1.234', '1.234'],
+    ['1,234', '1.234'],
+    // Never read as a date (AC-REQ-005-02).
+    ['3.4', '3.4'],
+    ['13,3', '13.3'],
+    ['16', '16'],
+    ['0', '0'],
+    ['0,5', '0.5'],
+  ])('parses %j as %j', (input, expected) => {
+    expect(parseDecimal(input)).toBe(expected);
+  });
+
+  it.each([
+    ['trailing zeros after the separator', '14,10', '14.1'],
+    ['only zeros after the separator', '14,00', '14'],
+    ['leading zeros', '007,50', '7.5'],
+    ['surrounding spaces', ' 14,01 ', '14.01'],
+    ['a minus sign', '-2,5', '-2.5'],
+    ['negative zero', '-0,0', '0'],
+  ])('returns the canonical form for %s', (_, input, expected) => {
+    expect(parseDecimal(input)).toBe(expected);
+  });
+
+  it.each([
+    '1.234,56',
+    '1.234.567',
+    '1,234.5',
+    '1,2,3',
+    '',
+    ' ',
+    'abc',
+    '14,',
+    ',5',
+    '.',
+    '14 01',
+    '1e3',
+    '+5',
+    '--5',
+    '٣',
+  ])('rejects %j as format error', (input) => {
+    expect(parseDecimal(input)).toBeNull();
+  });
+});
