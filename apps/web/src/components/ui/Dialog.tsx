@@ -19,7 +19,9 @@ export interface DialogContentProps extends ComponentProps<typeof DialogPrimitiv
   width: number;
   /**
    * Focus target after closing instead of the opening element, e.g. the cell after success
-   * (UI-035). Read when the dialog closes, so the screen can set it right before closing.
+   * (UI-035). Read when the dialog closes, so the screen can set it right before closing. If the
+   * target is no longer in the DOM then, the focus returns to the opening element instead. The
+   * screen resets the ref after closing, so a later close does not reuse an old target.
    */
   returnFocusRef?: RefObject<HTMLElement | null>;
 }
@@ -61,7 +63,9 @@ export function DialogContent({
           onCloseAutoFocus?.(event);
           if (event.defaultPrevented) return;
           event.preventDefault();
-          (returnFocusRef?.current ?? openerRef.current)?.focus();
+          // A target no longer in the DOM would leave the focus on `<body>` (#300).
+          const target = returnFocusRef?.current;
+          (target?.isConnected ? target : openerRef.current)?.focus();
         }}
         {...props}
       >

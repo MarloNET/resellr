@@ -120,6 +120,22 @@ describe('PageBanner (CU-051, REQ-073)', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('F3 .success clears its timer on unmount, so onClose never fires afterwards', () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    const { unmount } = render(
+      <PageBanner variant="success" onClose={onClose}>
+        Gespeichert
+      </PageBanner>,
+    );
+
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => vi.advanceTimersByTime(5000));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('E2 "×" has the accessible name "Meldung schließen", shows "×" and is at least 32 × 32 px', () => {
     render(
       <PageBanner variant="success" onClose={vi.fn()}>
