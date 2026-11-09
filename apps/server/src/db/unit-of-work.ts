@@ -65,7 +65,9 @@ export interface UnitOfWorkResult<T> {
 export interface UnitOfWorkRunner<DB> {
   /**
    * One action, one transaction (2.0.4, Baseline 9.3): the action, the handlers of its change
-   * events and everything they write are stored together or not at all.
+   * events and everything they write are stored together or not at all. Inside the action and
+   * its handlers use only `uow.db`: the transaction holds the single connection until the commit,
+   * so a query through the outer `db` waits for it and hangs forever (2.0.4, MAR-263).
    */
   run<T>(action: (uow: UnitOfWork<DB>) => Promise<T>): Promise<UnitOfWorkResult<T>>;
 }
