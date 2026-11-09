@@ -9,13 +9,13 @@ Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (n
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
-| Name | Text | ja | eindeutig, max. 100 | „Name ist bereits vergeben“ |
+| Name | Text | ja | eindeutig, 1 bis 100 Zeichen | „Name ist bereits vergeben“; „Name: 1 bis 100 Zeichen“ (v0.6.2, M-30, O-3; Feldfehler am Feld, Muster wie M-05; Wortlaut vom Designer, Owner bestätigt mit der Freigabe) |
 | Art | Auswahl | ja | fünf Arten | – |
 | Text | Mehrzeilentext | ja | max. 5.000 Zeichen; nur zulässige Platzhalter | „Unbekannter Platzhalter {…}“; „{Baustein:Name} ist im Textbaustein nicht zulässig“ |
 | Geltungsbereich | Mehrfachauswahl Gerätearten, Kanäle (oder „alle“) | ja | | – |
 | Prüfstatus | Auswahl | nur Rechtliches/Akku-Hinweis | neue Bausteine „rechtlich ungeprüft“; Textänderung setzt zurück | – |
 | Prüfdatum | Datum | ja bei „rechtlich geprüft“ | nicht in der Zukunft | „Prüfdatum und prüfende Stelle erforderlich“ (v0.6.1, M-24, AC-REQ-054-03; derselbe eine Text wie bei „Prüfende Stelle“, siehe dort); „Prüfdatum darf nicht in der Zukunft liegen“ |
-| Prüfende Stelle | Text | ja bei „rechtlich geprüft“ | max. 100 | „Prüfdatum und prüfende Stelle erforderlich“ (v0.6.1, M-24): **ein** Text für alle drei Fälle (nur Datum fehlt, nur Stelle fehlt, beide fehlen); er erscheint einmal, beide betroffenen Felder sind markiert; es gibt keinen zweiten Text „Prüfende Stelle fehlt“ |
+| Prüfende Stelle | Text | ja bei „rechtlich geprüft“ | max. 100 | „Prüfende Stelle: höchstens 100 Zeichen“ (v0.6.2, M-31, O-3; Feldfehler am Feld, Muster wie M-05; Wortlaut vom Designer, Owner bestätigt mit der Freigabe); „Prüfdatum und prüfende Stelle erforderlich“ (v0.6.1, M-24): **ein** Text für alle drei Fälle (nur Datum fehlt, nur Stelle fehlt, beide fehlen); er erscheint einmal, beide betroffenen Felder sind markiert; es gibt keinen zweiten Text „Prüfende Stelle fehlt“ |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |

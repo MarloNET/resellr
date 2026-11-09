@@ -6,6 +6,8 @@
 ## Angezeigte Daten
 Kanal, Titel, aktueller Status. Erlaubte Aktionen je Status: Freigegeben → „Als veröffentlicht melden“; Veröffentlicht → „Als beendet melden“; Beendet → „Wieder als veröffentlicht melden“. Hinweis bei Veröffentlicht → Beendet: „Die Kennzeichnungen ‚Bestand auf Kanal anpassen‘ und ‚Änderung auf Kanal übertragen‘ entfallen.“
 
+**Einstiege (v0.6.2, O-11):** Freigegeben → „Als veröffentlicht melden“ aus UI-014 (Kanal-Karte) und UI-019; Veröffentlicht → „Als beendet melden“ aus **UI-014 (Kanal-Karte) und UI-019** (neu, siehe dort); Beendet → „Wieder als veröffentlicht melden“ aus UI-019. Aus UI-014 und UI-019 öffnet der Knopf „Als beendet melden“ diesen Dialog mit dem Übergang Veröffentlicht → Beendet; der Dialog dient dabei als Rückfrage (Hinweis und Primärbutton „Als beendet melden“, Abbrechen links). Titel des Dialogs bei diesem Übergang: „Als beendet melden“. Es gibt keine Eingabefelder (die Felder der Tabelle gelten nur bei Veröffentlicht). Fokus beim Öffnen auf „Abbrechen“ (die Aktion lässt sich nur über „Wieder als veröffentlicht melden“ zurücknehmen).
+
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|

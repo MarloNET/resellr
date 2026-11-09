@@ -5,12 +5,12 @@
 | Feld | Wert |
 |---|---|
 | Projekt / Release | resellr (Arbeitstitel), Phase 1 / Release 0.1 |
-| Dokumentversion | **v0.6.1 (Entwurf, MAR-181 / Parent MAR-179: Textkorrektur K-05, K-06, M-23 nach Owner-Entscheidung MAR-176) auf Basis v0.6 (Entwurf, MAR-167, Parent MAR-163; zusätzlich MAR-169 / Parent MAR-168: Fenster responsiv statt fest 1366 × 768, UI-044 Variante A, UI-019 Streifen am Ende der Fläche; Ergänzungen aus dem Architecture Review der Spec: UI-005 Umbuchungsziel, LP-02 Zeitüberschreitung, Meldungskatalog `meldungskatalog.md`, UI-019 Kopierfelder; wartet auf Product-Owner-Review und Owner-Bestätigung; Änderungsliste Kap. 11)**; v0.5.3 (approved, MAR-156, reine Doku-Korrektur nach der Owner-Freigabe: Status, Quellenstand, OD-02 Variante A, Stand V-1 bis V-3 und X-8; keine Änderung an Screens, Flows oder Mockups)**; v0.5.2 (MAR-152, Commit `a9356c1`, vom Owner am 07.11.2026 inhaltlich freigegeben: Cross-Check Folgerunde 2, K-6, A-1, redaktionelle Reste, T-5-Vermerk); v0.5.1 (MAR-148, Commit `6247ce3`, Nachbesserung PO-Review Runde 1); v0.5 (MAR-147, Commit `67901a8`): Konflikte K-3, K-4, K-5, X-8 der Machbarkeitsprüfung (Kap. 6d), redaktionelle Nachführung. Vorgänger v0.4.1 (Commit `4c4e0b8`):  Cross-Check Baseline v0.3.1 (Kap. 6b), neu UI-044 bis UI-046, LP-01 bis LP-03, FLOW-10; Bereinigung UI-019/UI-023. Vorgänger v0.3 (Commit `92e018e`) |
-| Status | **v0.6.1: Entwurf, Owner-Bestätigung ausstehend.** Freigegebener Stand bleibt v0.5.2/v0.5.3: **approved** (Owner-Freigabe 07.11.2026 für den Stand v0.5.2, Commit `a9356c1`; maßgeblicher Inhalt. v0.5.3 ist eine reine Doku-Korrektur ohne inhaltliche Designänderung, der Owner gibt den neuen Head frei) |
+| Dokumentversion | **v0.6.2 (Entwurf, MAR-212 / Parent MAR-211: Design-Nachtrag nach der Fragenkarte O-1 bis O-11 des Owners: O-1, O-3, O-4, O-5, O-6, O-8, O-11 umgesetzt; O-3 mit Wortlaut M-30/M-31 nach PO-Entscheidung Review Runde 1 (die Specification enthält keinen Wortlaut); Basis v0.6.1, Commit `894d49e`, auf `main`; erneute Owner-Freigabe nötig, Änderungsliste Kap. 11)**; v0.6.1 (Entwurf, MAR-181 / Parent MAR-179: Textkorrektur K-05, K-06, M-23 nach Owner-Entscheidung MAR-176) auf Basis v0.6 (Entwurf, MAR-167, Parent MAR-163; zusätzlich MAR-169 / Parent MAR-168: Fenster responsiv statt fest 1366 × 768, UI-044 Variante A, UI-019 Streifen am Ende der Fläche; Ergänzungen aus dem Architecture Review der Spec: UI-005 Umbuchungsziel, LP-02 Zeitüberschreitung, Meldungskatalog `meldungskatalog.md`, UI-019 Kopierfelder; wartet auf Product-Owner-Review und Owner-Bestätigung; Änderungsliste Kap. 11)**; v0.5.3 (approved, MAR-156, reine Doku-Korrektur nach der Owner-Freigabe: Status, Quellenstand, OD-02 Variante A, Stand V-1 bis V-3 und X-8; keine Änderung an Screens, Flows oder Mockups)**; v0.5.2 (MAR-152, Commit `a9356c1`, vom Owner am 07.11.2026 inhaltlich freigegeben: Cross-Check Folgerunde 2, K-6, A-1, redaktionelle Reste, T-5-Vermerk); v0.5.1 (MAR-148, Commit `6247ce3`, Nachbesserung PO-Review Runde 1); v0.5 (MAR-147, Commit `67901a8`): Konflikte K-3, K-4, K-5, X-8 der Machbarkeitsprüfung (Kap. 6d), redaktionelle Nachführung. Vorgänger v0.4.1 (Commit `4c4e0b8`):  Cross-Check Baseline v0.3.1 (Kap. 6b), neu UI-044 bis UI-046, LP-01 bis LP-03, FLOW-10; Bereinigung UI-019/UI-023. Vorgänger v0.3 (Commit `92e018e`) |
+| Status | **v0.6.2: Entwurf, Owner-Bestätigung ausstehend (Delta zu v0.6.1).** v0.6.1 (Commit `894d49e`) ist auf `main` gemergt. Älterer Vermerk: Freigegebener Stand bleibt v0.5.2/v0.5.3: **approved** (Owner-Freigabe 07.11.2026 für den Stand v0.5.2, Commit `a9356c1`; maßgeblicher Inhalt. v0.5.3 ist eine reine Doku-Korrektur ohne inhaltliche Designänderung, der Owner gibt den neuen Head frei) |
 | Klassifikation | **Material** (Owner bestätigt) |
 | Autor / Datum | UI/UX Designer, 06.11.2026; v0.5.3: 07.11.2026 |
-| Paperclip-Task | MAR-128 (Parent MAR-126); v0.4: MAR-143 (Parent MAR-142); v0.5: MAR-147 (Parent MAR-145); v0.5.2: MAR-152 (Parent MAR-151); v0.5.3: MAR-156 (Parent MAR-155, Elternaufgabe MAR-154) |
-| Repository / Branch | MarloNET/resellr, `design/MAR-126` |
+| Paperclip-Task | MAR-128 (Parent MAR-126); v0.4: MAR-143 (Parent MAR-142); v0.5: MAR-147 (Parent MAR-145); v0.5.2: MAR-152 (Parent MAR-151); v0.5.3: MAR-156 (Parent MAR-155, Elternaufgabe MAR-154); v0.6.2: MAR-212 (Parent MAR-211) |
+| Repository / Branch | MarloNET/resellr, `design/MAR-126`; v0.6.2: `design/MAR-211` (Basis `origin/main`, Draft-PR; Head-Commit nennt die Freigabeanfrage) |
 | Requirements | **v0.3.3, Revision `ce76d962-cc37-46e1-9086-b2be8e08e752`, freigegeben (Owner, 07.11.2026), bindend**, `docs/product/requirements.md` auf `main`. Frühere Lesestände v0.3 `170ca77f` und v0.3.1 `d816223d` sind historisch; Stellen mit „[v0.3.1]“ sind Requirements-Marker und gelten unverändert. |
 | Product Brief | v1.0, Commit `45d5ef6`, `docs/product/product-brief.md` |
 | Owner-Entscheidungen | E-1 bis E-6 (MAR-121) |
@@ -20,66 +20,81 @@
 
 ## Freigabe-Briefing
 
+*Gate „UI/UX-Design Material“. Dieses Briefing beschreibt nur das Delta von v0.6.1 (Commit `894d49e`, auf `main`) zu v0.6.2. Alles, was hier nicht steht, ist unverändert.*
+
 ### Kurzfassung
-Das UI/UX-Design für resellr Release 0.1 liegt als Entwurf v0.6.1 vor (46 Screens, 10 Flüsse, Klassifikation Material). Du bestätigst diesen Stand einmal. Gegenüber dem von dir freigegebenen Stand v0.5.2 (Commit `a9356c1`) gibt es zwei Gruppen von Änderungen: (A) dein Entscheid vom 07.11.2026: **ein Fenster, das sich anpasst, statt fest auf 1366 × 768 zugeschnitten** (MAR-169); (B) vier Ergänzungen aus dem Architecture Review (MAR-167); (C) drei Textkorrekturen nach deiner Entscheidung zu MAR-176 (v0.6.1: Text bei „rechtlich geprüft“, Markierung „übernommen“ bei Wertänderung, Sammeltext entfällt). Es gibt keine neuen Screens oder Flüsse.
+Das UI/UX-Design liegt als Nachtrag v0.6.2 vor (46 Screens, 10 Flüsse, Klassifikation Material). Er setzt deine Antworten auf die Fragenkarte um: O-1, O-3, O-4, O-5, O-6, O-8 und O-11. Bei **O-3** steht der Wortlaut, den du aus der Technical Specification übernehmen wolltest, dort nicht; der Product Owner hat entschieden, dass ich ihn nach dem Katalogmuster formuliere (M-30, M-31). Es gibt keine neuen Screens und keine neuen Flüsse; sieben Screens und zwei Flüsse sind angepasst. Neu ist vor allem der Knopf **„Als beendet melden“** für veröffentlichte Kanal-Inhalte. Du bestätigst den Nachtrag einmal; die Texte zu O-3, O-4 und O-6 habe ich formuliert, du bestätigst sie mit der Freigabe.
 
 ### So haben wir dich verstanden
-| Deine Vorgabe (Quelle) | Unsere Auslegung | Beispiel |
+| Deine Vorgabe | Unsere Auslegung | Beispiel |
 |---|---|---|
-| „Die Oberfläche darf nicht auf einen bestimmten Bildschirm oder PC zugeschnitten sein, sie muss überall funktionieren, in der Fenstergröße veränderbar sein und sich anpassen“ (MAR-168) | Das Fenster darf beliebig groß sein. REQ-077 (ab 1366 × 768) bleibt die **Untergrenze**, nicht mehr das Maß für Höhenrechnungen. Seitenzoom bis 150 % muss funktionieren. Unter 1366 px Breite stapeln sich Spalten (Regel R-1), nichts geht verloren. | Früher: „Der Hinweis passt bei 1366 × 768 in 588 px Höhe“. Jetzt: Wer das Fenster niedrig zieht oder auf 150 % zoomt, scrollt die Navigationsspalte; „resellr beenden“ ist immer erreichbar, die drei Kanal-Karten von UI-014 stehen bei 150 % untereinander. |
-| Umbuchen auf ein Modell-Inserat mit anderen Angaben (Entscheid PO, FIND-208) | Der Dialog zeigt vor dem Umbuchen einen zweiten Schritt mit den Abweichungen; erst „Trotzdem umbuchen“ speichert. | Gerät mit „Optik-Note 4“ wird auf ein Inserat mit „Optik-Note 2“ umgebucht: Dialog „Umbuchen: Ziel weicht ab“, Hinweis „Das Gerät weicht vom Ziel-Modell-Inserat ab.“, Zeile „Optik-Note: Gerät 4, Ziel-Modell-Inserat 2“, Knöpfe „Anderes Ziel wählen“, „Abbrechen“, „Trotzdem umbuchen“. |
-| „übernommen“-Markierung im Kopier-Assistenten (REQ-049, Entscheidung MAR-176, K-06) | **Auslegung des Wortlauts von REQ-049, kein Faktum der Anforderung:** Die Markierung gilt für das Feld **mit seinem angezeigten Wert**. Ändert sich der Wert, ist das Feld wieder offen und „n von m“ rechnet neu; nur eine neue Freigabe setzt weiterhin alles zurück (AC-REQ-049-02). Keine zusätzliche Anzeige „Wert seit Übernahme geändert“. | Stückzahl 2 wird kopiert („übernommen“, z. B. 5 von 18). Dann wird ein Gerät verkauft, die Stückzahl ist 1: das Feld Stückzahl ist wieder offen, es steht „4 von 18 übernommen“, „14 offen“. Nach dem erneuten Kopieren wieder „5 von 18“. |
-| Prüfdatum/prüfende Stelle bei „rechtlich geprüft“ (AC-REQ-054-03, K-05) | Ein einziger Text „Prüfdatum und prüfende Stelle erforderlich“, egal ob eines oder beide fehlen; beide Felder sind markiert. | Prüfdatum ausgefüllt, prüfende Stelle leer: es erscheint „Prüfdatum und prüfende Stelle erforderlich“, einmal. |
-| Start dauert zu lange (Entscheid PO, DG-07) | Eigener Zustand von LP-02, der nicht „abgebrochen“ sagt und sich bei späterem Erfolg selbst weiterleitet. | Nach 120 s steht „resellr startet länger als erwartet“ und „Er kann noch gelingen. Lassen Sie dieses Fenster geöffnet“; gelingt der Start, öffnet sich die Inserat-Übersicht von selbst. |
+| **O-11** „Als beendet melden“ für Veröffentlicht → Beendet (REQ-046) | Sekundärbutton „Als beendet melden“ in der Kanal-Karte von UI-014 und im Kopier-Assistenten UI-019, **nur bei Status Veröffentlicht**. Er öffnet den bestehenden Dialog UI-020, der als Rückfrage dient. | Kleinanzeigen ist veröffentlicht, das Gerät ist verkauft: In UI-014 klickst du „Als beendet melden“, UI-020 zeigt „Die Kennzeichnungen ‚Bestand auf Kanal anpassen‘ und ‚Änderung auf Kanal übertragen‘ entfallen.“, du bestätigst, die Karte zeigt „Beendet“ und das Banner „Kanal-Inhalt ist jetzt beendet“. |
+| **O-1** Kategorie-Zuordnung entfernen (UI-035) | Textbutton „Zuordnung entfernen“ in der Zelle, nur wenn eine Zuordnung besteht; vorher Rückfrage; danach ist die Zelle leer („fehlt“). | Zelle „Notebook × eBay“ hat einen Pfad: du klickst „Zuordnung entfernen“, bestätigst, die Zelle zeigt „fehlt“, Banner „Zuordnung entfernt“. Bei einer leeren Zelle gibt es den Knopf nicht. |
+| **O-4** Herstellernummer: zwei neue Meldungen (UI-007) | Eine für „länger als 40 Zeichen“ (M-25), eine für „unzulässiges Zeichen“ (M-26); beide nennen Feld und Regel, Anrede „Sie“, Muster des Katalogs. | „ABC#123“ ergibt „Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt“. 41 Zeichen ergeben „Herstellernummer: höchstens 40 Zeichen“. |
+| **O-5** Dubletten-Dialog (UI-007) | Titel und Text wie von dir vorgegeben; Knöpfe und Verhalten unverändert. | Titel „Mögliche Dublette“, Text „Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.“, Knöpfe „Vorhandene verwenden“ / „Trotzdem anlegen“. |
+| **O-6** Warnung gleiche Herstellernummer (REQ-058, Could) | Bestätigungsdialog mit Titel, Text und zwei Knöpfen; „Trotzdem speichern“ speichert. **Nur wenn REQ-058 in den Umfang kommt.** | Zwei Modellvorlagen mit „20TD002MGE“: Dialog „Gleiche Herstellernummer“ mit Verweis auf die vorhandene; „Trotzdem speichern“ legt die zweite an. |
+| **O-8** Löschen einer Modellvorlage mit Modell-Inserat (UI-041) | Dein Text, Zeichen für Zeichen, ohne Schlusspunkt, als Banner im Dialog; „Löschen“ bleibt deaktiviert. | Banner: „Löschen nicht möglich: Modellvorlage wird von ein oder mehreren Inseraten genutzt“. |
+| **O-3** Längentext „Name“ und „Prüfende Stelle“ (UI-030) | **Umgesetzt:** Die Specification enthält keinen Wortlaut, nur die Grenzen. Auf Entscheidung des Product Owners habe ich zwei Texte nach dem Katalogmuster formuliert (M-30, M-31); du bestätigst sie mit der Freigabe. | Ein leerer „Name“ ergibt „Name: 1 bis 100 Zeichen“; 101 Zeichen bei „Prüfende Stelle“ ergeben „Prüfende Stelle: höchstens 100 Zeichen“. |
 
 ### Hauptflüsse (Kurzfassung)
-- **FLOW-01 Neues Modell inserieren:** Modell-Bibliothek → Modellvorlage → Gerät einbuchen → Zuordnen → Modell-Inserat → Fotos → Kanal-Inhalt freigeben → Kopier-Assistent → Kanal-Status → Datenblatt.
-- **FLOW-02 Weiteres Gerät:** Einbuchen → Zuordnen (bei Abweichung Dialog UI-005) → Abgleich, falls ein Kanal veröffentlicht ist.
-- **FLOW-03 Verkauf:** Geräte → Gerät → Verkauf erfassen → Übersicht → Abgleich oder Kanal beenden.
-- **FLOW-09 Kopier-Assistent:** Modell-Inserat → Assistent (Vollfenster oder schmal) → Feld für Feld kopieren, „n von m übernommen“ → Kanal-Status.
-- **FLOW-10 Sicherung:** Hinweis in jedem Rahmen → „resellr beenden“ → Rückfrage → Endseite mit Speicherort.
-Übrige Flüsse (FLOW-04 bis 08) unverändert; FLOW-07 (Zugang) ist in Release 0.1 nicht umgesetzt (OD-02 Variante A).
+- **FLOW-03 Verkauf:** … Abgleich → **„Als beendet melden“ in UI-014 oder UI-019** → UI-020 (Beendet) → zurück mit Banner.
+- **FLOW-09 Kopier-Assistent:** … → UI-020 (Veröffentlicht); **neu:** bei Veröffentlicht auch „Als beendet melden“ → UI-020 → zurück zu UI-019.
+- **FLOW-08 Löschen:** UI-014/UI-007 → UI-041; **neu:** Ablehnung bei Modellvorlage mit Modell-Inserat mit deinem Text.
+- **FLOW-01/FLOW-05:** Eingaben in UI-007 bzw. Einstellungen in UI-035 haben neue Meldungen und Dialoge, der Ablauf bleibt.
+Übrige Flüsse unverändert.
 
 ### Kritische Annahmen – bitte einzeln bestätigen
-1. **Annahme:** Der Sicherungshinweis (UI-044) darf bei wenig Höhe erst durch Scrollen der Navigationsspalte sichtbar werden; das gilt weiter als „ohne weitere Nutzeraktion“ (AC-REQ-104-01), weil er nicht eingeklappt, nicht ausgeblendet und nicht gekürzt wird.
-   *Beispiel:* Das Fenster ist 700 px hoch und der Speicherort hat 100 Zeichen: Kopf „resellr“ und die sechs Einträge sind sichtbar, den vollständigen Hinweis samt Knopf „resellr beenden“ sieht man nach einem Mausrad-Scroll in der Spalte. In einem hohen Fenster steht er ohne Scrollen unten in der Spalte.
-   **Wenn falsch:** Müsste der Hinweis immer ohne Scrollen sichtbar sein, bräuchte es einen festen Bereich mit eigener Höhe, der bei kleinen Fenstern die Navigation verdrängt, oder eine Kürzung des Wortlauts (Änderung von REQ-104). (UI-044, „Annahmen und offene Fragen“)
-2. **Annahme:** In der schmalen Ansicht des Kopier-Assistenten (UI-019) steht der Hinweis am Ende der scrollenden Fläche (nach der Feldliste und den Aktionen), nicht mehr fest unten.
-   *Beispiel:* Bei 18 Feldern liest man die Feldliste, scrollt ans Ende und findet dort den vollständigen Hinweis. Ein fester Streifen (etwa 250 px) würde in einem niedrigen Fenster die Feldliste fast verdrängen.
-   **Wenn falsch:** Bleibt der Streifen fest unten, ist bei niedrigen Fenstern kaum Platz für die Feldliste; Alternative: Streifen mit begrenzter Höhe und eigenem Scrollen. (UI-019, UI-044)
+1. **Annahme:** „Als beendet melden“ braucht **keine zusätzliche Rückfrage**; der Dialog UI-020 mit Hinweis und Knopf „Als beendet melden“ ist die Rückfrage.
+   *Beispiel:* Klick auf „Als beendet melden“ → ein Dialog → bestätigen → fertig (zwei Klicks).
+   **Wenn falsch:** Verlangst du eine zweite Rückfrage nach dem Muster „resellr beenden“ (UI-045), kommt ein weiterer Dialog dazu; das ist ein kleiner Änderungsaufwand.
+2. **Annahme (Wortlaut O-3, O-4):** „Herstellernummer: höchstens 40 Zeichen“, „Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt“, „Name: 1 bis 100 Zeichen“ und „Prüfende Stelle: höchstens 100 Zeichen“.
+   *Beispiel:* „ABC#123“ zeigt den zweiten Text am Feld Herstellernummer; ein Textbaustein mit 101 Zeichen bei „Prüfende Stelle“ zeigt den vierten Text am Feld; nichts wird gespeichert.
+   **Wenn falsch:** Nenne deinen Wortlaut; es ändern sich nur M-25, M-26, M-30, M-31, UI-007 und UI-030.
+3. **Annahme (Wortlaut O-6, nur Could):** Titel „Gleiche Herstellernummer“, Text „Es gibt bereits eine Modellvorlage mit gleicher Herstellernummer.“, Knöpfe „Abbrechen“ und „Trotzdem speichern“, als **Dialog** (bisher stand im Design „Hinweis“).
+   *Beispiel:* Beim Speichern von „ThinkPad V15“ mit der Nummer von „ThinkPad E15 Gen 2“ erscheint der Dialog mit Verweis auf „ThinkPad E15 Gen 2“.
+   **Wenn falsch:** Sollte es nur ein Hinweisbanner ohne Bestätigung sein, passt das nicht zur Specification (`mpn_in_use` verlangt Bestätigung, AC-REQ-058-01).
+4. **Annahme (Rückfrage O-1):** Titel „Zuordnung entfernen“, Text „Die Kategorie-Zuordnung „<Pfad>“ für <Geräteart> bei <Kanal> wird entfernt. Ohne Zuordnung zeigt der Kanal-Inhalt „Kategorie fehlt“.“; Knöpfe „Abbrechen“ und „Zuordnung entfernen“, Fokus auf „Abbrechen“. Die Specification hat dafür keinen Wortlaut.
+   **Wenn falsch:** Andere Texte oder ein Kontrollkästchen wie in UI-041 sind reine Textänderungen in UI-035.
+5. **Annahme (O-8):** Hat die Modellvorlage Modell-Inserate, steht dein Text (M-29). Verweisen nur Geräte ohne Modell-Inserat, z. B. stornierte Geräte, steht der Gerätetext aus der Specification.
+   *Beispiel:* Die Modellvorlage „ThinkPad E15 Gen 2“ hat ein Modell-Inserat: Das Banner zeigt „Löschen nicht möglich: Modellvorlage wird von ein oder mehreren Inseraten genutzt“. Eine Modellvorlage, auf die nur stornierte Geräte ohne Modell-Inserat verweisen, zeigt den Gerätetext („Löschen nicht möglich: … Geräte verweisen auf die Modellvorlage“).
+   **Wenn falsch:** Akzeptierst du, dass immer der Gerätetext steht, entfällt M-29 (M-29 im Katalog und UI-041 entfallen, nur Textänderung).
+   Die Rangfolge der Gründe betrifft das Serververhalten und wird deshalb in die Specification (Nachtrag v0.5.2) übernommen; das Design beschreibt nur die Anzeige.
 
 ### Weitere Annahmen
-- **Reflow R-1 (neu):** Unter 1366 px Breite (Zoom 125 %/150 % oder schmaleres Fenster) stapeln sich Spalten, Tabellen scrollen in ihrem Bereich, die Seite scrollt nicht waagrecht; zugesichert bis etwa 910 px Breite. *Beispiel:* Bei Zoom 150 % steht in UI-003 das Info-Panel unter dem Formular statt rechts daneben.
-- **Zoom und Text:** Seitenzoom 150 % bei 1366 × 768 entspricht etwa 910 × 512 px; Text mindestens 12 px. Dialoge sind nie höher als das Fenster (Titel und Knöpfe bleiben sichtbar, der Inhalt scrollt).
-- **Umbuchen mit Abweichung:** Beim Umbuchen ändern sich die Angaben des Ziel-Modell-Inserats nicht (Satz im Dialog); der Protokolleintrag nennt die abweichenden Angaben, wie bei „trotzdem zuordnen“. Der Fokus liegt zuerst auf „Anderes Ziel wählen“ (die ungefährlichere Wahl). Kein neues Mockup, Muster ist `default.png`.
-- **LP-02 Zeitüberschreitung:** Textvorschlag Titel „resellr startet länger als erwartet“; die Referenznummer ist die eigene der Zeitüberschreitung und steht im Betriebsprotokoll. Falls die Seite sich technisch nicht selbst aktualisieren kann (Windows-Spike T-5), entfällt der Satz „resellr öffnet sich von selbst“ und der Nutzer lädt die Seite neu.
-- **Meldungskatalog (`meldungskatalog.md`, M-01 bis M-22 und M-24, 23 Meldungen; M-23 entfallen):** neue Texte für bisher fehlende Fälle. *Beispiele:* „Gerät ist bereits einem Modell-Inserat zugeordnet“ (M-01), „Herstellername: höchstens 200 Zeichen“ (M-05), „Excel-Datei: höchstens 10 MB“ (M-22), „Dieser Eintrag ist nicht mehr vorhanden.“ (M-15), „Prüfdatum und prüfende Stelle erforderlich“ (M-24). Einen Sammeltext „Bitte die markierten Felder prüfen.“ gibt es nicht (M-23 entfallen). Die Texte folgen den Längen aus den Requirements; Zeichen werden gezählt, nicht Bytes.
-- **UI-019 Kopierfelder:** Jedes Feld ist eine eigene Zeile mit eigenem Kopieren-Knopf und Marke „übernommen“; die 13 festen Felder und ihre Bezeichnungen stehen in der Tabelle des Screens. *Beispiel:* „3 von 18 übernommen“ zählt jede GPSR-Angabe einzeln; optionale Felder (z. B. „Verantwortliche Person in der EU“) erscheinen nur, wenn sie angegeben sind.
-- **REQ-029 (Feldreihenfolge im Kopier-Assistenten):** bleibt **offen**; die Reihenfolge der Merkmalsfelder liegt in UI-036. Keine Entscheidung nötig, solange du die Reihenfolge nicht fest vorgeben willst.
+- Alle neuen Dialoge (UI-035, UI-007) haben den Fokus beim Öffnen auf „Abbrechen“, Esc bricht ab.
+- Treten „Mögliche Dublette“ und „Gleiche Herstellernummer“ zugleich auf, kommt zuerst die Dublette, danach die Warnung.
+- Der neue Knopf ist bei anderem Status **nicht sichtbar** (nicht deaktiviert), wie die übrigen Übergänge in UI-020.
+- Kein neues Mockup; die neuen Knöpfe und Dialoge sind nur in `screen.md` beschrieben (Hinweis „Bekannte Abweichungen im Mockup“).
 
 ### Entscheidungen der Agenten
 | Entscheidung | Verworfene Alternative | Warum | Umkehrbar |
 |---|---|---|---|
-| **Variante A:** Kopf „resellr“ fest, Einträge und Hinweis scrollen in einem Bereich | **Variante B:** Hinweis klappt bei wenig Höhe ein | Ein Einklappen wäre ein neuer Zustand und widerspräche „nicht ausblendbar, ohne Zustand“ (X-1 (c)); bei A bleiben Wortlaut und Zustände unverändert | leicht |
-| Streifen in UI-019 schmal am Ende der Fläche | fester Streifen unten | verdrängt bei wenig Höhe die Feldliste | leicht |
-| Reflow-Regel R-1 statt eigener Layouts unter 1366 px | zusätzliche Layouts je Screen | gleiche Wirkung (nichts geht verloren), kein neuer Gestaltungsaufwand | leicht |
-| Abnahme „Kein Inhalt und keine Aktion ist unerreichbar“ (alle Screens; ausführlicher Test in UI-044, Stichprobe für übrige) | „ohne Scrollen sichtbar bei 1366 × 768“ | passt zum anpassenden Fenster; testbar in Chrome mit Zoom 100/125/150 % und Pfad mit 100 Zeichen | leicht |
-| LP-02 leitet bei späterem Erfolg selbst weiter | Nutzer muss selbst neu laden | der Text sagt „kann noch gelingen“; Fortsetzung von LP-01, keine neue Funktion | leicht |
+| „Als beendet melden“ öffnet UI-020 als Rückfrage | direkt ausführen mit eigener Rückfrage (Muster UI-045) | UI-020 hat Hinweis und Knopf schon; ein zweiter Dialog wäre doppelt | leicht |
+| Knopf nur bei Veröffentlicht, sonst unsichtbar | deaktiviert mit Tooltip | wie die übrigen Übergänge in UI-020: unzulässige Übergänge werden nicht angeboten | leicht |
+| M-25 und M-26 als zwei Texte; bei beidem nur „höchstens 40 Zeichen“ | ein Sammeltext „Herstellernummer ungültig“ | nennt Feld und verletzte Regel; eine Meldung je Feld | leicht |
+| O-6 als Bestätigungsdialog (M-28) | Hinweisbanner | Specification verlangt Bestätigung (`mpn_in_use`) | leicht |
+| Rückfrage „Zuordnung entfernen“ als Dialog mit Text (kein Kontrollkästchen) | Kontrollkästchen wie UI-041 | eine Zelle, geringe Tragweite; Kästchen wäre zu schwer | leicht |
+| Meldungen M-25 bis M-29 für O-1 bis O-8, O-11 vergeben; M-23 bleibt unbesetzt | M-23 neu belegen | Nummern bleiben stabil (Schlüssel der Specification) | leicht |
+| O-3: Wortlaut ohne Vorlage in der Specification, M-30 „Name: 1 bis 100 Zeichen“ und M-31 „Prüfende Stelle: höchstens 100 Zeichen“ | Lücke offen lassen | der Product Owner hat es im Review Runde 1 so entschieden; Muster wie M-05, Feld und Regel genannt | leicht |
 
 ### Bewusst nicht enthalten
-Keine Layouts für Smartphone oder Tablet (E-2). Keine Feststellung, ab wann ein Fenster „zu klein“ ist, außer REQ-077. *Beispiel:* Ein Fenster mit 1000 × 600 px ohne Zoom liegt unter REQ-077 und wird nicht zugesichert; es ist nicht verboten, und R-1 stapelt die Spalten trotzdem. Zugesichert ist REQ-077 samt Zoom bis 150 % (etwa 910 × 512 px). Befunde der Startprüfung werden nicht angezeigt (X-5).
+- **O-2:** Klartext bleibt 1 bis 500 Zeichen, gilt auch für leer. *Beispiel:* Ein leerer Klartext wird weiter mit „1 bis 500 Zeichen“ abgelehnt.
+- **O-7:** UI-024 (Änderungsprotokoll) bleibt, wie es ist.
+- **O-9:** „Geräteart deaktivieren“ bleibt.
+- Merkmalswerte in UI-036 (1 bis 100) bekommen keinen Längentext; das ist nicht Teil von O-3.
+Keine dieser Entscheidungen berührt eine Designstelle.
 
 ### Was sich geändert hat
-Gegenüber v0.5.2: (1) **Fenster anpassend** (UI-044, UI-019, DESIGN.md, Regel R-1, Dialoge in 45 von 46 Screens); Rechnung „588 px ≤ 600 px“ und Maß ~1350 × 630 entfallen; der Hinweis ist nicht mehr bei 1366 × 768 garantiert ohne Scrollen sichtbar. (2) UI-005 Umbuchen mit Abweichung (neuer Schritt 2). (3) LP-02 Zustand Zeitüberschreitung. (4) `meldungskatalog.md` mit 23 Meldungen (M-01 bis M-22 und M-24). (5) UI-019 feste Kopierfelder. (6) **v0.6.1:** (a) UI-030/M-24: ein Text „Prüfdatum und prüfende Stelle erforderlich“ statt „Prüfdatum fehlt“; (b) UI-019: Markierung „übernommen“ gilt mit dem angezeigten Wert, bei Wertänderung ist das Feld wieder offen (Auslegung, siehe „So haben wir dich verstanden“); (c) M-23 „Bitte die markierten Felder prüfen.“ entfällt. Einzelheiten: Kap. 11.
+Gegenüber v0.6.1: (1) **O-11:** Knopf „Als beendet melden“ in UI-014 (Kanal-Karte) und UI-019 mit Sichtbarkeit, Aktion, Erfolg, Fehler, Fokus und Zuständen; UI-020 ergänzt um die Einstiege, Titel „Als beendet melden“ und Fokus auf „Abbrechen“; FLOW-03 und FLOW-09. (2) **O-1:** UI-035 Textbutton „Zuordnung entfernen“ mit Rückfrage, Erfolg und Fehlern (`not_found` M-15, Konflikt P-05, P-08). (3) **O-4:** UI-007 und Meldungskatalog M-25, M-26. (4) **O-5:** UI-007 Dialog „Mögliche Dublette“ (M-27). (5) **O-6:** UI-007 Dialog „Gleiche Herstellernummer“ (M-28, Could). (6) **O-8:** UI-041 Text (M-29). (7) **O-3:** UI-030 „Name“ und „Prüfende Stelle“ mit Längentext (M-30, M-31). (8) Katalog jetzt 30 Meldungen (M-01 bis M-22 und M-24 bis M-31), Hinweis 4 nachgeführt. (9) Kap. 3, 4, 7, 11 nachgeführt. Keine Änderung an anderen Screens (`git diff --stat`). Einzelheiten: Kap. 11.
 
 ### Designsystem und Werkzeug
-Designsystem `DESIGN.md`, Status **vorgeschlagen** (helles, dichtes Arbeitswerkzeug, kompakt; wird mit deiner Bestätigung verbindlich). Google Stitch: **27 von 40** Generierungen verbraucht (`stitch-log.md`); seit v0.5.2 wurde nichts neu generiert, die Änderungen sind Text.
+Designsystem `DESIGN.md` unverändert (Status **vorgeschlagen**). Google Stitch: weiter **27 von 40** Generierungen; nichts neu generiert.
 
 ### Deine Entscheidungen
-Keine offenen Fragen; bitte die zwei kritischen Annahmen bestätigen. Sag Bescheid, falls die Feldreihenfolge (REQ-029) vor der Umsetzung feststehen soll.
+Bitte die fünf kritischen Annahmen bestätigen. Es gibt keine weitere offene Frage.
 
 ### Lesetipps
-1. UI-044 (Hinweis, Abnahmekriterium, Auslegung bei wenig Höhe)  2. UI-019 „Fenstergröße und Bedienung“ und „Feste Kopierfelder“  3. UI-005 „Umbuchen: Ziel weicht ab“  4. LP-02 „Start dauert länger als erwartet“  5. `meldungskatalog.md` (Tabelle M-01 bis M-22 und M-24; M-23 entfallen); UI-019 „Markierungen übernommen“, UI-030 „Eingaben“; Regel R-1 in Kap. 5.
+1. UI-014 und UI-019 „Als beendet melden“, dann UI-020 „Einstiege“  2. UI-035 „Entfernen: Rückfrage und Fehler“  3. UI-007 „Dialoge“ und Herstellernummer  4. UI-041 Ablehnungsgrund  5. UI-030 Eingaben und `meldungskatalog.md` M-25 bis M-31
 
 ## 2. Nutzer, Umfang, Designziele
 
@@ -98,13 +113,13 @@ Flussdiagramm: `flows/flow.md` (Textdiagramm je FLOW).
 |---|---|---|---|
 | FLOW-01 | Neues Modell erstmals inserieren | J-01 | UI-006 → UI-007 (→ UI-008) → UI-003 → UI-004 → UI-014 → UI-015 → UI-016 → UI-019 → UI-020 → UI-023 |
 | FLOW-02 | Weiteres Gerät einbuchen | J-02 | UI-003 → UI-004 → UI-005 → UI-021 (bei veröffentlichtem Kanal) |
-| FLOW-03 | Verkauf erfassen | J-03 | UI-009 → UI-010 → UI-011 → UI-002 → UI-021 / UI-020 (Beendet) |
+| FLOW-03 | Verkauf erfassen | J-03 | UI-009 → UI-010 → UI-011 → UI-002 → UI-021 / (UI-014 oder UI-019, „Als beendet melden“) → UI-020 (Beendet) |
 | FLOW-04 | Textbaustein/GPSR ändern | J-04 | UI-030 / UI-031 → UI-043 → UI-016 / UI-018 → UI-019 → UI-021 |
 | FLOW-05 | Neue Geräteart anlegen | J-05 | UI-027 → UI-029 → UI-035 → UI-036 → UI-039 |
 | FLOW-06 | Veröffentlichtes Modell-Inserat ändern | J-06 | UI-014 (oder UI-007) → UI-018 → UI-019 → UI-021 |
 | FLOW-07 | Zugang (Netzbetrieb) – **in Release 0.1 nicht umgesetzt** (OD-02 Variante A, Kap. 6c) | REQ-001/097 | UI-001; UI-040 (Reserve für Variante B) |
 | FLOW-08 | Fehlerkorrektur und Löschen | REQ-092/093/084/095 | UI-010 → UI-013 / UI-012 / UI-011 (Rücknahme); UI-014/UI-007 → UI-041 |
-| FLOW-09 | Kopier-Assistent nutzen | REQ-047–049 | UI-014 → UI-019 (Vollfenster oder schmal) → UI-020 / UI-021 |
+| FLOW-09 | Kopier-Assistent nutzen | REQ-046–049 | UI-014 → UI-019 (Vollfenster oder schmal) → UI-020 (Veröffentlicht oder, bei Veröffentlicht, Beendet) / UI-021 |
 | FLOW-10 | Sicherung anlegen | REQ-104, 105 (E-7) | UI-044 (in jedem Rahmen) → UI-045 → UI-046; LP-01 bis LP-03 ohne Server |
 
 **Informationsarchitektur (linke Navigation, 208 px breit, immer sichtbar, Kopf fest, Einträge und Hinweis scrollen bei wenig Höhe):** Inserate (UI-002) · Gerät einbuchen (UI-003) · Modell-Bibliothek (UI-006) · Geräte (UI-009) · Änderungsprotokoll (UI-024) · Einstellungen (UI-025, mit zweiter Spalte für 14 Bereiche).
@@ -124,20 +139,20 @@ Spalte „Mockup“: Zustände mit PNG. „Text“ = nur `screen.md` (Muster P-0
 | UI-004 | Modell-Inserat wählen (Dialog) | Gerät zuordnen oder neues Modell-Inserat anlegen | REQ-017, 019 | 01, 02 | Text | UI-004-zuordnen-dialog |
 | UI-005 | Abweichungen bei Zuordnung (Dialog; v0.6: Schritt 2 „Umbuchen: Ziel weicht ab“) | Abweichung der Variantenangaben entscheiden | REQ-018, 014, 020 | 02 | default | UI-005-abweichungen-dialog |
 | UI-006 | Modell-Bibliothek | Modellvorlagen suchen | REQ-009 | 01 | Text | UI-006-modell-bibliothek |
-| UI-007 | Modellvorlage anlegen/ändern | Modelldaten und Vorbelegungen pflegen | REQ-008, 010, 011, 058 | 01, 06 | default | UI-007-modellvorlage |
+| UI-007 | Modellvorlage anlegen/ändern | Modelldaten und Vorbelegungen pflegen (v0.6.2: Meldungen Herstellernummer, Dialoge Dublette und gleiche Herstellernummer) | REQ-008, 010, 011, 058 | 01, 06 | default | UI-007-modellvorlage |
 | UI-008 | Hersteller anlegen (Dialog) | neuen Hersteller anlegen | REQ-100 | 01 | Text | UI-008-hersteller-dialog |
 | UI-009 | Geräte | Geräte per WI-Nr finden, nicht zugeordnete Geräte | REQ-016, 094 | 03 | Text | UI-009-geraete |
 | UI-010 | Gerät | Gerätewerte, Verkauf, Korrektur, Datenblatt | REQ-014, 016, 020, 021, 084, 092, 093 | 03, 08 | Text | UI-010-geraet |
 | UI-011 | Verkauf markieren (Dialog) | Verkauf mit Kanal/Datum markieren | REQ-021, 084 | 03 | Text | UI-011-verkauf-dialog |
 | UI-012 | Gerät stornieren (Dialog) | Fehlerfassung stornieren | REQ-093 | 08 | Text | UI-012-storno-dialog |
 | UI-013 | WI-Nr korrigieren (Dialog) | WI-Nr ändern | REQ-092 | 08 | Text | UI-013-wi-nr-dialog |
-| UI-014 | Modell-Inserat | Arbeitsbereich: Kanäle, Preise, Inseratswerte, Fotos, Geräte | REQ-019, 032, 033, 088, 091, 095 | 01, 06, 09 | default | UI-014-modell-inserat |
+| UI-014 | Modell-Inserat | Arbeitsbereich: Kanäle, Preise, Inseratswerte, Fotos, Geräte (v0.6.2: „Als beendet melden“ in der Kanal-Karte) | REQ-019, 032, 033, 046, 088, 091, 095 | 01, 06, 09 | default | UI-014-modell-inserat |
 | UI-015 | Fotos verwalten | Fotos hinzufügen, ordnen, entfernen (sofort gespeichert) | REQ-042 | 01 | Text | UI-015-fotos |
 | UI-016 | Kanal-Inhalt prüfen und freigeben | Prüfen, manuell anpassen und speichern, freigeben | REQ-034–044, 086, 087 | 01, 04 | default | UI-016-kanal-inhalt-freigeben |
 | UI-017 | Kanäle vergleichen | 3 Kanal-Inhalte nebeneinander | REQ-044 (Kap. 10.6) | 01 | default | UI-017-kanal-vergleich |
 | UI-018 | Änderungsentwurf prüfen | freigegebener und neuer Stand | REQ-045, 089 | 04, 06 | default | UI-018-aenderungsentwurf-pruefen |
-| UI-019 | Kopier-Assistent | Felder und Fotos in Kanal-Formular übernehmen | REQ-047–049 | 09 | default, compact | UI-019-kopier-assistent |
-| UI-020 | Kanal-Status setzen (Dialog) | Veröffentlicht / Beendet melden | REQ-046 | 01, 03, 09 | Text | UI-020-kanal-status-dialog |
+| UI-019 | Kopier-Assistent | Felder und Fotos in Kanal-Formular übernehmen (v0.6.2: „Als beendet melden“ bei Veröffentlicht) | REQ-046–049 | 09 | default, compact | UI-019-kopier-assistent |
+| UI-020 | Kanal-Status setzen (Dialog; v0.6.2: Einstiege aus UI-014 und UI-019, Titel „Als beendet melden“) | Veröffentlicht / Beendet melden | REQ-046 | 01, 03, 09 | Text | UI-020-kanal-status-dialog |
 | UI-021 | Abgleich bestätigen (Dialog) | Übertragung bestätigen | REQ-090 | 02, 03, 04, 06 | Text | UI-021-abgleich-dialog |
 | UI-022 | Ungeprüften Rechtstext bestätigen (Dialog) | Freigabe mit ungeprüftem Rechtstext | REQ-087 | 01, 06 | Text | UI-022-rechtstext-dialog |
 | UI-023 | Datenblatt | Button „Datenblatt öffnen (PDF)“ (Erzeugungsschritt, keine Vorschau) | REQ-050 | 01 | `inhaltsreferenz-pdf.png` (Inhaltsreferenz des PDFs, **kein Bildschirm**) | UI-023-datenblatt |
@@ -152,13 +167,13 @@ Spalte „Mockup“: Zustände mit PNG. „Text“ = nur `screen.md` (Muster P-0
 | UI-032 | Lieferanten | Lieferanten pflegen | REQ-099 | – | Text | UI-032-lieferanten |
 | UI-033 | Code-Übersetzung | Zustandscodes | REQ-022 | – | Text | UI-033-code-uebersetzung |
 | UI-034 | Zustandszuordnung | Zustand → Kanal-Bezeichnung | REQ-023 | – | Text | UI-034-zustandszuordnung |
-| UI-035 | Kategoriezuordnung | Geräteart → Kanal-Kategorie | REQ-024 | 05 | Text | UI-035-kategoriezuordnung |
+| UI-035 | Kategoriezuordnung | Geräteart → Kanal-Kategorie (v0.6.2: „Zuordnung entfernen“ mit Rückfrage) | REQ-024 | 05 | Text | UI-035-kategoriezuordnung |
 | UI-036 | Merkmalszuordnung | Felder je Kanal/Geräteart, Reihenfolge | REQ-025 | 05 | default | UI-036-merkmalszuordnung |
 | UI-037 | Beschreibungsvorlagen | Abschnitte je Kanal | REQ-031, 036 | 05 | default | UI-037-beschreibungsvorlagen |
 | UI-038 | Kanäle und Preisregeln | Kanal-Einstellungen, Preisregel | REQ-029, 033, 085 | – | Text | UI-038-kanaele-preisregeln |
 | UI-039 | Datenblatt-Layout | Kopfzeilen, Blockfolge | REQ-051 | 05 | Text | UI-039-datenblatt-layout |
 | UI-040 | Zugangspasswort ändern **(in Release 0.1 nicht umgesetzt, OD-02 A)** | Passwort ändern (nur Netzbetrieb, Reserve für Variante B) | REQ-097, 067 | 07 | success | UI-040-zugangspasswort |
-| UI-041 | Löschen bestätigen (Dialog) | Modell-Inserat/Modellvorlage löschen | REQ-095, 103 | 08 | default | UI-041-loeschen-dialog |
+| UI-041 | Löschen bestätigen (Dialog) | Modell-Inserat/Modellvorlage löschen (v0.6.2: Grund „Modellvorlage wird von ein oder mehreren Inseraten genutzt“) | REQ-095, 103 | 08 | default | UI-041-loeschen-dialog |
 | UI-042 | Excel-Übernahme | Datenblatt-Excel einlesen (Could) | REQ-056 | – | Text | UI-042-excel-uebernahme |
 | UI-043 | Auswirkung der Änderung (Dialog) | Zahlen je Gruppe nach dem Speichern von Textbaustein/GPSR-Herstellerangaben melden (nur UI-030/UI-031, kein eigener Fehlerzustand) | REQ-053, 043 | 04 | default | UI-043-auswirkung-dialog |
 | UI-044 | Hinweis „Sicherung einrichten“ (Rahmenkomponente) | Dauerhafter Hinweis mit Speicherort und Aktion „resellr beenden“ | REQ-104, 106 | 10 | Text | UI-044-sicherungshinweis |
@@ -180,7 +195,7 @@ Nicht abgedeckt, weil nicht in Kap. 6 gefordert: Suche über alles, Dashboard, B
 - **P-06 resellr nicht erreichbar beim Laden (`.unreachable`, X-3, K-6):** Gilt **nur für lesende Anfragen** (Laden von Listen, Details, Dialoginhalten). Antwortet der Server beim Laden nicht (Server beendet in anderem Fenster, Absturz bis zum automatischen Neustart, Update, abgebrochener Start), erscheint ein **dauerhaftes Banner** (flag-warn, ohne „×“) oben im Inhaltsbereich, **ohne die Seite zu ersetzen**: „resellr ist nicht erreichbar. Ihre Eingaben sind noch nicht gespeichert, bleiben aber sichtbar, solange diese Seite offen ist. Warten Sie einen Moment und versuchen Sie es erneut. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ im Startmenü.“ Button „Erneut versuchen“ (einheitliche Beschriftung, auch in UI-046 `.unknown`) prüft nur die Verbindung und lädt neu; antwortet der Server, verschwindet das Banner. Keine Referenznummer (es gibt keinen Protokolleintrag). Das Banner ersetzt `.error` für Verbindungsfehler beim Laden im Netz- und Einzelbetrieb. **Nicht für schreibende Aktionen:** dort gilt P-08 (K-6), weil der Browser nicht unterscheiden kann, ob die Anfrage den Server nie erreichte oder erst die Antwort verloren ging. Hinweis UI-044 bleibt unverändert sichtbar.
 - **P-07 resellr wird beendet (`.wird-beendet`, X-3):** Lehnt der Server eine schreibende Aktion mit „resellr wird beendet“ ab (Beenden läuft in einem anderen Fenster, bis etwa 10 s), zeigt die Seite ein **eigenes Banner** (flag-warn, ohne „×“, **ohne Referenznummer**, da kein Protokolleintrag; kein `.error` im Sinne von Kap. 5): „resellr wird gerade beendet. Ihre Eingabe wurde nicht gespeichert. Warten Sie, bis resellr beendet ist, und starten Sie es dann über die Verknüpfung „resellr“ im Startmenü.“ Eingaben bleiben sichtbar; folgt der Verbindungsverlust, gilt P-06. Das Banner verschwindet nicht von selbst.
 - **P-08 Schreibende Aktion: Wartezeit und „Ausgang unbekannt“ (`.speichert`, `.ausgang-unbekannt`, K-4, K-6, Ä-29):** Gilt für **alle schreibenden Aktionen** (Speichern, Freigeben, Einbuchen, Zuordnen, Abgleichen, Statuswechsel, Verkauf, Storno, Löschen, WI-Nr ändern, Foto hinzufügen/ordnen/entfernen, Rechtstext), nicht nur für Screens mit `.speichert`. Schreibaktionen haben **kein festes Timeout**. Während der Aktion sind Auslöser und alle Eingaben bis zur Antwort gesperrt; bei Speicherknöpfen zeigt der Knopf „Speichern …“ (`.speichert`). Kommt keine Antwort wegen Verbindungsverlust, zeigt die Seite (nicht P-06) ein dauerhaftes Banner (flag-warn, ohne „×“, ohne Referenznummer) mit dem festen Kern **„Ausgang unbekannt, bitte neu laden.“** und dem Zusatz: „Ob Ihre Aktion gespeichert wurde, ist unklar. Laden Sie die Seite neu (Browser-Aktualisierung, z. B. F5) und prüfen Sie danach, ob sie gespeichert wurde. Beim Neuladen gehen Eingaben verloren: schreiben Sie sie vorher bei Bedarf ab oder markieren Sie sie. Läuft resellr nicht, starten Sie es über die Verknüpfung „resellr“ im Startmenü.“ Die Eingaben bleiben bis zum Neuladen sichtbar (markierbar). Das Banner bietet **kein „Erneut versuchen“ und keinen Button**; die Aktion bleibt bis zum Neuladen der Seite gesperrt (kein erneutes Absenden, damit keine Doppel bei Neuanlagen und keine irreführende Meldung wie „WI-Nr vergeben“ entstehen). Zustand `UI-nnn.ausgang-unbekannt`. Die Zahlen aus der Speicherantwort (UI-043) kommen erst danach. `.speichert` in UI-007, 014, 016, 026–031, 034–038; `.ausgang-unbekannt` zusätzlich in UI-003, 004, 005, 008, 011, 012, 013, 015, 016, 018, 020, 021, 022, 041. UI-015 speichert sofort je Foto („Speichern …“ am Foto). **Abgrenzung zu P-07:** „resellr wird beendet“ ist eine eindeutige Ablehnung des Servers, die Eingabe wurde nachweislich nicht gespeichert; P-07 bleibt unverändert. **Gleicher Kern** in UI-046 `.unknown` („Ausgang unbekannt“).
-- **Meldungskatalog (v0.6):** Texte für Fälle ohne Wortlaut stehen in `meldungskatalog.md` (M-01 bis M-22 und M-24, M-23 entfallen: Längenregeln, `not_found`, „Prüfdatum und prüfende Stelle erforderlich“); sie folgen dem Muster der Validierung.
+- **Meldungskatalog (v0.6, v0.6.2):** Texte für Fälle ohne Wortlaut stehen in `meldungskatalog.md` (M-01 bis M-22 und M-24 bis M-31, M-23 entfallen: Längenregeln, `not_found`, „Prüfdatum und prüfende Stelle erforderlich“); sie folgen dem Muster der Validierung.
 - **Validierung:** Fehler am Feld, Fehlertext aus Kap. 6/9.6 im Wortlaut der Requirements; Prüfung beim Verlassen des Feldes und beim Speichern; erster Fehler erhält Fokus. Zahlen akzeptieren Dezimalkomma und -punkt (Kap. 9.6).
 - **Feedback:** Erfolg als Banner oben (z. B. „Zugangspasswort geändert“), schließt nach 5 s oder per „×“ (5 s = Anzeigedauer des Banners, keine Ladezeit-Regel); technische Fehler als Banner mit Funktion, nächstem Schritt, Referenznummer (REQ-073).
 - **Zustände (State-IDs):** `UI-nnn.default`, `.loading` (Skeleton/„Lade …“ bis 5 s, danach Fehler; die 5-Sekunden-Regel gilt **nur für Laden**, nicht für Speichern/Schreiben, Ä-29), `.empty`, `.error`, `.validation`, `.success`, `.disabled`, `.conflict` (P-05), `.speichert` und `.ausgang-unbekannt` (P-08, schreibende Aktionen). Rollenabhängige Zustände entfallen (E-4). Offline/Timeout: nicht vorgesehen (A-02). Verbindungsfehler beim **Laden** (lesend): `.unreachable` (P-06); bei **schreibenden Aktionen**: `.ausgang-unbekannt` (P-08, K-6), Ablehnung beim Beenden: `.wird-beendet` (P-07); `.error` bleibt für Fehler mit Referenznummer.
@@ -289,24 +304,24 @@ Ergebnis des Software Architects (MAR-150): kein Blocker, keine Baseline-Änderu
 | REQ-001, 067, 097 | 07 | UI-001, UI-040 (in Release 0.1 nicht umgesetzt, OD-02 Variante A; Reserve für Variante B) |
 | REQ-004, 005, 006 | 05 | UI-027 (Start-Belegung ist Datenbestand, kein UI) |
 | REQ-007 | – | UI-028 |
-| REQ-008, 010, 011, 058 | 01, 06 | UI-007 (UI-003 für Neuanlage per Link) |
+| REQ-008, 010, 011, 058 | 01, 06 | UI-007 (UI-003 für Neuanlage per Link; v0.6.2: O-4 M-25/M-26, O-5 M-27, O-6 M-28 Could) |
 | REQ-009 | 01 | UI-006, UI-003 (Suchfeld) |
 | REQ-100, 101 | 01, 04 | UI-008, UI-031 |
 | REQ-012–016 | 01, 02 | UI-003, UI-009, UI-010 |
 | REQ-017–020 | 01, 02, 08 | UI-004, UI-005, UI-010 |
 | REQ-021, 084 | 03 | UI-011, UI-010 |
 | REQ-088 | 06 | UI-014 |
-| REQ-092, 093, 094, 095, 103 | 08 | UI-013, UI-012, UI-009, UI-041 |
+| REQ-092, 093, 094, 095, 103 | 08 | UI-013, UI-012, UI-009, UI-041 (v0.6.2: O-8 M-29) |
 | REQ-022, 099 | – | UI-033, UI-032 |
-| REQ-023, 024, 025 | 05 | UI-034, UI-035, UI-036 |
-| REQ-026, 027, 054, 087, 053 | 04 | UI-030, UI-031, UI-022, UI-043 |
+| REQ-023, 024, 025 | 05 | UI-034, UI-035 (v0.6.2: O-1 „Zuordnung entfernen“), UI-036 |
+| REQ-026, 027, 054, 087, 053 | 04 | UI-030 (v0.6.2: O-3 M-30/M-31), UI-031, UI-022, UI-043 |
 | REQ-028 | 05 | UI-026 |
 | REQ-029, 085, 033 | – | UI-038, UI-014 (Preis-Vorschlag) |
 | REQ-030, 031 | 05 | UI-029, UI-037 |
 | REQ-032, 042 | 01 | UI-014, UI-015 (Fotoänderungen sofort gespeichert) |
 | REQ-034–041, 043, 044, 086 | 01 | UI-016 (inkl. „Anpassung speichern“), UI-017 |
 | REQ-045, 089 | 04, 06 | UI-018, UI-016, UI-002 |
-| REQ-046, 090 | 03, 06, 09 | UI-020, UI-021, UI-019, UI-014 |
+| REQ-046, 090 | 03, 06, 09 | UI-020, UI-021, UI-019, UI-014 (v0.6.2, O-11: „Als beendet melden“ in UI-014 und UI-019, Dialog UI-020) |
 | REQ-047, 048, 049 | 09 | UI-019 |
 | REQ-050, 051 | 01, 05 | UI-023, UI-039 |
 | REQ-052 | 03, 04 | UI-002 (Filter „Geändert seit Freigabe“, Kennzeichnung „Daten geändert, manuell angepassten Text prüfen“; Ziel von UI-043) |
@@ -360,6 +375,7 @@ Stand siehe `stitch-log.md`: **27 von 40** Generierungen (inkl. 1 genehmigte Neu
 | v0.1 | 06.11.2026 | Erstfassung (Entwurf): Katalog, Flüsse, Muster, Traceability, Mockups Kernscreens |
 | v0.2 | 06.11.2026 | Überarbeitung nach Struktur-Review Runde 1 (Commit 53bd6de) |
 | v0.3 | 06.11.2026 | Restpunkte Review R1 (Kennzeichnung „Design-Annahme“, Kap. 8); Mockups UI-001, 005, 007, 030, 036, 037, 040, 041, 043; Neugenerierung UI-016 (Freigeben aktiv, Fehlerliste) und UI-019 compact (480 px, „n von m“, Foto-Aktionen); Self-Review (Kap. 12) |
+| v0.6.2 | 09.11.2026 | MAR-212 (Parent MAR-211, Fragenkarte O-1 bis O-11 des Owners), **Entwurf**, nur Text, Basis v0.6.1 (`894d49e`): (O-11, REQ-046) „Als beendet melden“ in UI-014 (Kanal-Karte) und UI-019, nur bei Veröffentlicht, öffnet UI-020 als Rückfrage; **UI-020 ausgewiesen geändert** (Einstiege, Titel „Als beendet melden“, Fokus auf „Abbrechen“); FLOW-03, FLOW-09, Kap. 3; (O-1, REQ-024) UI-035 „Zuordnung entfernen“ mit Rückfrage, Erfolg, Fehlern; (O-4, REQ-008) UI-007 und Katalog M-25, M-26 (Wortlaut vom Designer); (O-5, REQ-011) UI-007 Dialog „Mögliche Dublette“ (M-27); (O-6, REQ-058, Could) UI-007 Dialog „Gleiche Herstellernummer“ (M-28, Wortlaut vom Designer; statt reinem Hinweis jetzt Dialog wegen `mpn_in_use`); (O-8, REQ-095) UI-041 Text (M-29); (O-3, REQ-026, REQ-054) UI-030 „Name“ und „Prüfende Stelle“ mit Längentext (M-30, M-31, Wortlaut vom Designer nach PO-Entscheidung Review Runde 1, weil die Specification v0.5.1 keinen Wortlaut enthält; Owner bestätigt mit der Freigabe); Katalog 30 Meldungen. UI-036 Merkmalswerte unverändert. O-2, O-7, O-9 unverändert. Kap. 3, 4, 5, 7 und Freigabe-Briefing nachgeführt. Keine Mockups, Stitch weiter 27/40 |
 | v0.6.1 | 07.11.2026 | MAR-181 (Parent MAR-179, Owner-Entscheidung MAR-176, Abschnitt 2), **Entwurf**, nur Text: (K-05) UI-030 und M-24: ein Text „Prüfdatum und prüfende Stelle erforderlich“ statt „Prüfdatum fehlt“ / „Prüfende Stelle fehlt“ (AC-REQ-054-03); (K-06) UI-019: Markierung „übernommen“ gilt mit dem angezeigten Wert, bei Wertänderung (z. B. Stückzahl nach Verkauf) ist das Feld wieder offen, „n von m“ rechnet neu, neue Freigabe setzt weiterhin alles zurück (Auslegung von REQ-049); (M-23) „Bitte die markierten Felder prüfen.“ entfallen, Nummer M-23 nicht neu vergeben, Katalog mit 23 Meldungen (M-01 bis M-22, M-24); es entfällt nur der Sammeltext M-23, die im freigegebenen Design (v0.5.3) beschriebene Fehlerzusammenfassung in UI-003, DESIGN.md und UI-016 bleibt unverändert (PO-Review MAR-182, FIND-1); Freigabe-Briefing nachgeführt. Keine Mockups, keine Stitch-Generierung, Stand 27/40 |
 | v0.6 | 07.11.2026 | MAR-169 (Parent MAR-168, Owner-Entscheid 07.11.2026), **Entwurf, im selben Stand v0.6 (Branch `design/MAR-167`)**: Fenster **responsiv statt fest 1366 × 768 / ~1350 × 630**; REQ-077 bleibt Untergrenze, Ä-28 nur noch Hinweis darauf. (1) UI-044/linke Navigation **Variante A**: Kopf fest, Bereich mit Einträgen und Hinweis scrollt bei wenig Höhe; Variante B (Einklappen) verworfen, weil neuer Zustand und Widerspruch zu X-1 (c); Pixelrechnung 588 px ≤ 600 px und Planungshöhe 600 px entfallen; (2) UI-019 schmal: Streifen am Ende der scrollenden Fläche statt fest unten (256 px, 374/344 px entfallen); (3) Dialoge und Formulare: nie höher als das Fenster, Titel und Aktionsleiste sichtbar, Inhalt scrollt (DESIGN.md, 45 von 46 `screen.md` (alle außer der freistehenden Karte UI-046; Nachtrag Review R1: UI-004, UI-005 und die Reflow-Regel R-1 in 33 Screens, 13 vom Review genannte Dateien geprüft, nur UI-004 und UI-005 fehlte die Dialogregel), u. a. UI-002, 014, 016, 018, 043); Mockup-Abweichungen UI-002 `hinweis.png`, UI-019 `compact-hinweis.png`, UI-043 ergänzt; (4) Abnahmekriterium „Kein Inhalt und keine Aktion ist unerreichbar“ (Chrome, Fenstergröße verändert, Zoom 100/125/150 %, Pfad 100 Zeichen); (5) Freigabe-Briefing ergänzt. **Nachtrag Review Runde 1 (FIND-1 bis FIND-3):** Reflow-Regel R-1 unter 1366 px (Kap. 5, DESIGN.md, 33 `screen.md`), Satz „Unter 1366 px wird nicht gestaltet“ ersetzt, Geltung des Abnahmekriteriums (alle Screens, Stichprobe), Dialogregel in UI-004/005, Briefing um MAR-167, Hauptflüsse, Designsystem, Stitch-Stand und Lesetipps erweitert. Keine neuen Funktionen, Screens oder Flows, keine Mockups, Stitch unverändert 27/40 |
 | v0.6 | 07.11.2026 | MAR-167 (Parent MAR-163, Entscheidungen PO zu Spec v0.1, FIND-208/210, DG-01 bis DG-03, DG-07, DG-08), **Entwurf**: (1) UI-005 Schritt 2 „Umbuchen: Ziel weicht ab“ (`UI-005.ziel-abweichung`, Texte, Aktionen, kein Mockup); (2) LP-02 eigener Zustand `LP-02.zeitueberschreitung` (Text, Betriebsprotokoll, automatische Weiterleitung bei späterem Erfolg, Rückfall T-5); (3) neues `meldungskatalog.md` M-01 bis M-24, Feldzeilen in UI-004, 016, 027, 029, 030, 031, 035, 037, 042; (4) UI-019 feste Kopierfelder mit Bezeichnungen, „n von m“ je Feld, Markierungen je Fenster; Beispielzahlen „3 von 18“. REQ-029 (Feldreihenfolge) unverändert offen. Keine Mockups, Stitch unverändert 27/40 |
