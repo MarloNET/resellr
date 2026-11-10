@@ -184,6 +184,62 @@ describe('audit writer (CU-035)', () => {
     expect(auditRows()).toEqual([]);
   });
 
+  it('REQ-069 an entry has only the fields of 2.0.9, no user and no password', () => {
+    const columns = database.sqlite
+      .prepare('SELECT name FROM pragma_table_info(?) ORDER BY cid')
+      .pluck()
+      .all('audit_entry');
+
+    expect(columns).toEqual([
+      'id',
+      'occurred_at',
+      'object_type',
+      'object_category',
+      'object_id',
+      'object_label',
+      'action',
+      'old_value',
+      'new_value',
+    ]);
+  });
+
+  it('REQ-069 the input type has no field for a user or a password', async () => {
+    const write = createAuditWriter({ db: database.db, clock }).write;
+
+    // @ts-expect-error -- 2.0.9: an entry names no user (E-4, E-5).
+    await write({ ...visualGradeChanged, user: 'Max Mustermann' });
+    // @ts-expect-error -- 2.0.9: an entry holds no password (E-4, E-5).
+    await write({ ...visualGradeChanged, password: 'geheim' });
+
+    expect(JSON.stringify(auditRows())).not.toMatch(/Max Mustermann|geheim|user|password/);
+  });
+
+  it('REQ-069 releases and reconciliations are stored without a person', async () => {
+    const write = createAuditWriter({ db: database.db, clock }).write;
+    const base = {
+      objectType: 'channel_content',
+      objectId: 3,
+      objectLabel: 'Kanal-Inhalt eBay',
+      oldValue: null,
+    } as const;
+
+    await write({ ...base, action: 'released', newValue: { Status: 'Freigegeben' } });
+    await write({ ...base, action: 'reconciled', newValue: { Stückzahl: 2 } });
+
+    const stored = {
+      occurred_at: '2026-11-10T09:15:00.000Z',
+      object_type: 'channel_content',
+      object_category: 'channel_content',
+      object_id: 3,
+      object_label: 'Kanal-Inhalt eBay',
+      old_value: null,
+    };
+    expect(auditRows()).toEqual([
+      { id: 1, ...stored, action: 'released', new_value: '{"Status":"Freigegeben"}' },
+      { id: 2, ...stored, action: 'reconciled', new_value: '{"Stückzahl":2}' },
+    ]);
+  });
+
   it('E6 rejects an entry the database refuses, so the action is not stored', async () => {
     const uow = createUnitOfWork(database.db);
 

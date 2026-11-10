@@ -703,3 +703,187 @@ describe('constraints of the initial migration (CU-030)', () => {
     );
   });
 });
+
+// Words of a table or column name (split at `_`) that point to data REQ-068 and REQ-069 forbid.
+const FORBIDDEN_WORDS: Readonly<Record<string, readonly string[]>> = {
+  'platform credentials (REQ-068)': [
+    'password',
+    'passwort',
+    'passwd',
+    'pwd',
+    'passphrase',
+    'secret',
+    'token',
+    'credential',
+    'credentials',
+    'apikey',
+    'oauth',
+    'login',
+    'logon',
+    'username',
+    'session',
+    'cookie',
+    'auth',
+  ],
+  'buyers (REQ-069)': [
+    'buyer',
+    'kaeufer',
+    'customer',
+    'kunde',
+    'purchaser',
+    'orders',
+    'bestellung',
+    'recipient',
+    'billing',
+    'shipping',
+    'invoice',
+    'payment',
+    'iban',
+    'email',
+    'mail',
+    'phone',
+    'telefon',
+    'mobile',
+    'birthday',
+    'birthdate',
+  ],
+  'the user or another person (REQ-069)': [
+    'user',
+    'users',
+    'nutzer',
+    'benutzer',
+    'account',
+    'konto',
+    'person',
+    'owner',
+    'operator',
+    'employee',
+    'author',
+    'editor',
+    'member',
+    'firstname',
+    'lastname',
+    'surname',
+    'vorname',
+    'nachname',
+    'salutation',
+    // `<action>_by`, e.g. `released_by`, names who did something.
+    'by',
+  ],
+  'contact or address data (REQ-069)': [
+    'contact',
+    'address',
+    'street',
+    'postal',
+    'zip',
+    'city',
+    'country',
+  ],
+};
+// Joined words: `api_key`, `order_id`; `sort_order` and `block_order` are orders of display.
+const FORBIDDEN_PATTERNS = [/(^|_)api_?key(_|$)/, /(^|_)order_(id|no|number|ref)(_|$)/];
+
+/**
+ * The exception of REQ-069: business contact data the user maintains as content. Each entry
+ * must exist and must be caught by the check, so the list cannot hide anything else.
+ */
+const BUSINESS_CONTACT_COLUMNS: Readonly<Record<string, string>> = {
+  'merchant_profile.contact_text': 'contact data of the merchant brand (REQ-028)',
+  'manufacturer.gpsr_street': 'GPSR manufacturer data (REQ-027)',
+  'manufacturer.gpsr_postal_code': 'GPSR manufacturer data (REQ-027)',
+  'manufacturer.gpsr_city': 'GPSR manufacturer data (REQ-027)',
+  'manufacturer.gpsr_country': 'GPSR manufacturer data (REQ-027)',
+  'manufacturer.gpsr_contact': 'GPSR manufacturer data (REQ-027)',
+  'manufacturer.eu_rp_address': 'GPSR responsible person in the EU (REQ-027)',
+  'manufacturer.eu_rp_contact': 'GPSR responsible person in the EU (REQ-027)',
+  'text_block.legal_checked_by': 'checking body of a legal text block, not the user (REQ-054)',
+};
+
+/** Why a table or column name points to forbidden data, or null. */
+function forbiddenReason(name: string): string | null {
+  const words = name.toLowerCase().split('_');
+  for (const [reason, forbidden] of Object.entries(FORBIDDEN_WORDS)) {
+    const word = words.find((w) => forbidden.includes(w));
+    if (word) return `${reason}: "${word}"`;
+  }
+  const pattern = FORBIDDEN_PATTERNS.find((p) => p.test(name.toLowerCase()));
+  return pattern ? `platform credentials or buyers (REQ-068, REQ-069): ${pattern}` : null;
+}
+
+describe('no credentials and no personal data in the data model (REQ-068, REQ-069)', () => {
+  const tables = () =>
+    database.sqlite
+      .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+      .pluck()
+      .all() as string[];
+  /** Every column of every table of the migrated database as `table.column`. */
+  const columns = () =>
+    tables().flatMap((table) =>
+      (database.sqlite.pragma(`table_info(${table})`) as TableInfoRow[]).map(
+        (column) => `${table}.${column.name}`,
+      ),
+    );
+
+  it.each([
+    'password_hash',
+    'ebay_api_key',
+    'kleinanzeigen_token',
+    'shop_login',
+    'buyer_name',
+    'customer_email',
+    'order_id',
+    'shipping_street',
+    'user_id',
+    'created_by',
+    'released_by',
+    'reconciled_by',
+  ])('REQ-069 the check catches the column name %s', (name) => {
+    expect(forbiddenReason(name)).not.toBeNull();
+  });
+
+  it.each([
+    'name_key',
+    'sort_order',
+    'block_order',
+    'released_at',
+    'last_reconciled_at',
+    'external_ref',
+  ])('REQ-069 the check accepts the column name %s', (name) => {
+    expect(forbiddenReason(name)).toBeNull();
+  });
+
+  it('REQ-068 REQ-069 no table holds user accounts, buyers, orders or platform credentials', () => {
+    const found = tables().flatMap((table) => {
+      const reason = forbiddenReason(table);
+      return reason ? [`${table}: ${reason}`] : [];
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('REQ-068 REQ-069 no column of any table holds credentials, buyers or the user', () => {
+    const found = columns().flatMap((column) => {
+      if (column in BUSINESS_CONTACT_COLUMNS) return [];
+      const reason = forbiddenReason(column.split('.')[1] ?? column);
+      return reason ? [`${column}: ${reason}`] : [];
+    });
+    expect(found).toEqual([]);
+  });
+
+  it.each(Object.entries(BUSINESS_CONTACT_COLUMNS))(
+    'REQ-069 the exception %s exists and is business contact data: %s',
+    (column) => {
+      expect(columns()).toContain(column);
+      expect(forbiddenReason(column.split('.')[1] ?? column)).not.toBeNull();
+    },
+  );
+
+  it.each(['audit_entry', 'channel_content', 'device'])(
+    'REQ-069 %s (audit entries, releases, reconciliations, devices) names no person',
+    (table) => {
+      const found = columns()
+        .filter((column) => column.startsWith(`${table}.`))
+        .filter((column) => forbiddenReason(column.split('.')[1] ?? column) !== null);
+      expect(found).toEqual([]);
+    },
+  );
+});

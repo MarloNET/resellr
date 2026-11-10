@@ -55,6 +55,23 @@ describe('error log (CU-036)', () => {
     expect(JSON.stringify(entry)).not.toContain('626198');
   });
 
+  it('REQ-069 writes only the fields of 2.19, never field values or request content', () => {
+    const log = createErrorLog({ dir, appVersion: '0.1.0', startId: null, now });
+    const request = { body: { wiNr: '626198' }, url: '/api/devices?search=geheim' };
+
+    // @ts-expect-error -- 2.19: an error entry takes no field values or request content.
+    log.error({ refNo: 'R-0000-0002', function: 'http.request', error: new Error('x'), request });
+    // @ts-expect-error -- 2.19: a warning takes no field values or request content.
+    log.warn({ function: 'http.local-guard', message: 'G-1 forbidden_host', request });
+
+    const entries = readEntries();
+    expect(entries.map((entry) => Object.keys(entry).sort())).toEqual([
+      ['appVersion', 'function', 'level', 'message', 'refNo', 'stack', 'startId', 'ts'],
+      ['appVersion', 'function', 'level', 'message', 'refNo', 'stack', 'startId', 'ts'],
+    ]);
+    expect(JSON.stringify(entries)).not.toMatch(/626198|geheim/);
+  });
+
   it('writes a warning without reference number and stack', () => {
     const log = createErrorLog({ dir, appVersion: '0.1.0', startId: null, now });
 

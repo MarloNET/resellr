@@ -51,6 +51,16 @@ jobs:
       - name: AC coverage of the completed build steps (CU-284)
         run: node tools/qa/check-ac-coverage.mjs
 
+      # Evidence of REQ-068 and REQ-069 (Technical Specification 2.20, 5): schema test over all
+      # tables, audit entries without a user, error log without field values. The tests also run
+      # in `npm test`; this step names the evidence and fails if no such test is found.
+      - name: No credentials and no personal data (REQ-068, REQ-069)
+        run: >-
+          npx vitest run -t "REQ-06[89]"
+          apps/server/src/db/schema.int.test.ts
+          apps/server/src/audit/audit-writer.int.test.ts
+          apps/server/src/ops/error-log
+
       # The E2E suite runs in Google Chrome (channel `chrome`, Technical Specification 6.1),
       # which the Ubuntu runner image provides; Playwright downloads no browser.
       - name: Google Chrome version
