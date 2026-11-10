@@ -63,6 +63,37 @@ describe('local-guard G-1 host (E2)', () => {
     expect(errorCode(response.body)).toBe('forbidden_host');
   });
 
+  it('DER-97-01 rejects Host localhost:<port> and the network address without side effect and logs a warning without request content', async () => {
+    const responses = [
+      await t.app.inject({
+        method: 'GET',
+        url: '/api/test/items?search=geheim',
+        headers: { host: 'localhost:4310' },
+      }),
+      await t.app.inject({
+        method: 'POST',
+        url: '/api/test/items',
+        headers: { ...SAME_ORIGIN_WRITE, host: '192.168.178.20:4310' },
+        payload: { wiNr: '626198' },
+      }),
+    ];
+
+    for (const response of responses) {
+      expect(response.statusCode).toBe(403);
+      expect(errorCode(response.body)).toBe('forbidden_host');
+    }
+    expect(sideEffects).toBe(0);
+    const entries = t.readErrorLog();
+    expect(entries.map(({ level, message }) => ({ level, message }))).toEqual([
+      { level: 'warn', message: 'G-1 forbidden_host GET' },
+      { level: 'warn', message: 'G-1 forbidden_host POST' },
+    ]);
+    const logged = JSON.stringify(entries);
+    for (const content of ['localhost', '192.168', 'geheim', '626198', '/api/test/items']) {
+      expect(logged).not.toContain(content);
+    }
+  });
+
   it('AC-REQ-001-05 accepts a request with Host 127.0.0.1:<port> without any login', async () => {
     const response = await t.app.inject({
       method: 'GET',
