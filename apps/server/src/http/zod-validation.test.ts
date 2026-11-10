@@ -1,5 +1,5 @@
 import { errorResponseSchema } from '@resellr/domain/errors/error-response';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
@@ -47,6 +47,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await t.close();
 });
 
@@ -70,7 +71,10 @@ const expectBadRequestWarning = (route: string, message: string | RegExp) => {
       message: typeof message === 'string' ? message : expect.stringMatching(message),
     }),
   ]);
-  const logged = JSON.stringify(entries);
+  // `ts` is left out: its digits (for example `.500Z`) would match a searched value (#303).
+  const logged = JSON.stringify(entries, (key, value: unknown) =>
+    key === 'ts' ? undefined : value,
+  );
   for (const content of ['626198', '62-61', 'zu lang', 'abc', '500', 'WI-Nr', 'Notiz']) {
     expect(logged).not.toContain(content);
   }
@@ -206,6 +210,23 @@ describe('Zod schemas as request validation (E13)', () => {
 
     expect(response.statusCode).toBe(400);
     expect(parse(response.body).code).toBe('bad_request');
+    expectBadRequestWarning('http POST /api/test/devices', /^bad_request FST_ERR_CTP_[A-Z_]+$/);
+  });
+
+  it('ignores the log timestamp when checking for field contents (#303)', async () => {
+    const ts = '2026-11-10T13:09:30.500Z';
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(ts));
+
+    const response = await t.app.inject({
+      method: 'POST',
+      url: '/api/test/devices',
+      headers: SAME_ORIGIN_WRITE,
+      payload: '',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(t.readErrorLog()).toEqual([expect.objectContaining({ ts })]);
     expectBadRequestWarning('http POST /api/test/devices', /^bad_request FST_ERR_CTP_[A-Z_]+$/);
   });
 });
