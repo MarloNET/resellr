@@ -1,6 +1,10 @@
 import { createBrowserRouter, Link, Navigate, type RouteObject } from 'react-router';
 
 import { buttonClassName } from '../components/ui/Button.tsx';
+import {
+  LastSettingsSectionRedirect,
+  SettingsLayout,
+} from '../features/settings/SettingsLayout.tsx';
 import { AppFrame } from './AppFrame.tsx';
 
 /**
@@ -32,6 +36,29 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/inserate" replace /> },
       { path: 'inserate', element: <ListingOverviewPlaceholder /> },
+      {
+        // UI-025 (CU-093) with its 14 sections; a section without its own screen keeps an
+        // empty content area until the task that builds its screen sets `element`.
+        path: 'einstellungen',
+        element: <SettingsLayout />,
+        children: [
+          { index: true, element: <LastSettingsSectionRedirect /> },
+          { path: 'haendlermarke', element: null },
+          { path: 'geraetearten', element: null },
+          { path: 'auswahllisten', element: null },
+          { path: 'titelmuster', element: null },
+          { path: 'textbausteine', element: null },
+          { path: 'hersteller', element: null },
+          { path: 'lieferanten', element: null },
+          { path: 'code-uebersetzung', element: null },
+          { path: 'zustandszuordnung', element: null },
+          { path: 'kategoriezuordnung', element: null },
+          { path: 'merkmalszuordnung', element: null },
+          { path: 'beschreibungsvorlagen', element: null },
+          { path: 'kanaele', element: null },
+          { path: 'datenblatt-layout', element: null },
+        ],
+      },
       { path: '*', element: null },
     ],
   },

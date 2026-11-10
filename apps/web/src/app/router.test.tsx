@@ -62,7 +62,7 @@ describe('router and application frame', () => {
       '/modelle',
       '/geraete',
       '/protokoll',
-      '/einstellungen/haendlermarke',
+      '/einstellungen',
     ]);
   });
 
