@@ -34,12 +34,16 @@ export function createDemoApi(baseUrl: string): DemoApi {
         body: writes ? JSON.stringify(body ?? {}) : undefined,
       });
       const text = await response.text();
-      const json: unknown = text === '' ? undefined : JSON.parse(text);
       if (!response.ok) {
-        const code = (json as { error?: { code?: string } } | undefined)?.error?.code ?? 'unknown';
+        let code = 'unknown';
+        try {
+          code = (JSON.parse(text) as { error?: { code?: string } }).error?.code ?? code;
+        } catch {
+          // No JSON error body (Technical Specification 2.0.5), e.g. from a proxy or cut off.
+        }
         throw new Error(`${method} ${path} failed with ${response.status} ${code}`);
       }
-      return json as T;
+      return (text === '' ? undefined : JSON.parse(text)) as T;
     },
   };
 }

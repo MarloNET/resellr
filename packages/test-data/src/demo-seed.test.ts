@@ -37,6 +37,10 @@ describe('createDemoApi', () => {
         if (request.url === '/api/conflict') {
           response.statusCode = 409;
           response.end(JSON.stringify({ error: { code: 'version_conflict' } }));
+        } else if (request.url === '/api/html-error') {
+          response.statusCode = 502;
+          response.setHeader('content-type', 'text/html');
+          response.end('<html>Bad Gateway</html>');
         } else if (request.url === '/api/empty') {
           response.statusCode = 204;
           response.end();
@@ -86,6 +90,12 @@ describe('createDemoApi', () => {
   it('throws for an answer other than 2xx with method, path, status and error code', async () => {
     await expect(createDemoApi(baseUrl).request('PATCH', '/api/conflict', {})).rejects.toThrow(
       'PATCH /api/conflict failed with 409 version_conflict',
+    );
+  });
+
+  it('throws with method, path and status for an error answer that is no JSON', async () => {
+    await expect(createDemoApi(baseUrl).request('GET', '/api/html-error')).rejects.toThrow(
+      'GET /api/html-error failed with 502 unknown',
     );
   });
 

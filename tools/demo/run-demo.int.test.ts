@@ -2,6 +2,7 @@ import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { createServer, type Socket } from 'node:net';
 import { join } from 'node:path';
 
+import type { SeedArea } from '@resellr/test-data/demo-seed';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -103,6 +104,30 @@ describe('startDemo (CU-004)', () => {
 
     expect(existsSync(first.root)).toBe(false);
     expect(existsSync(second.root)).toBe(false);
+  });
+
+  it('E1 writes the demo data only after ready, and stops the server and names the kept folder when that fails', async () => {
+    const port = await freePort();
+    const healthDuringSeed: unknown[] = [];
+    const failingArea: SeedArea = async (api) => {
+      healthDuringSeed.push(await api.request('GET', '/api/ops/health'));
+      throw new Error('seed failed');
+    };
+
+    const error = await startDemo({ port, seedAreas: [failingArea] }).then(
+      (started) => void (demo = started),
+      (caught: unknown) => caught,
+    );
+
+    expect(healthDuringSeed).toEqual([{ state: 'ready', startId: null }]);
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message).toMatch(/^seed failed; temporary folder with the logs: /);
+    const root = /temporary folder with the logs: (.+)$/.exec(message)?.[1] ?? '';
+    // The server is stopped and no longer holds the port; the folder stays for its logs.
+    await expect(fetch(`http://127.0.0.1:${port}/api/ops/health`)).rejects.toThrow();
+    expect(existsSync(join(root, 'Daten', 'resellr.db'))).toBe(true);
+    rmSync(root, { recursive: true, force: true });
   });
 
   it('stops and names the kept temporary folder when the port is taken', async () => {

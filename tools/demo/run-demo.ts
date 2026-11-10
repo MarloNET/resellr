@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url';
 
 import { CONFIG_FILE_NAME, DEFAULT_PORT } from '@resellr/runtime-shared/configured-port';
 import type { RuntimePaths } from '@resellr/runtime-shared/paths';
-import { createDemoApi, seedDemoData } from '@resellr/test-data/demo-seed';
+import {
+  createDemoApi,
+  SEED_AREAS,
+  type SeedArea,
+  seedDemoData,
+} from '@resellr/test-data/demo-seed';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SERVER_MAIN = join(REPO_ROOT, 'apps/server/src/main.ts');
@@ -20,6 +25,8 @@ export interface RunningDemo {
   /** Temporary folder holding the data, log, handover and update-copy folders. */
   root: string;
   paths: RuntimePaths;
+  /** Resolves with the exit code (`null` after a signal) once the server process has ended. */
+  exited: Promise<number | null>;
   /** Stops the server and removes the temporary folder. */
   stop(): Promise<void>;
 }
@@ -50,9 +57,16 @@ export function buildApp(): void {
  * MAR-305): `config.json` with the port, the server migrates the empty database and listens on
  * `127.0.0.1:<port>`; once it reports `ready`, the demo data (CU-061) goes in through its API.
  * Every run is independent. If the start or the demo data fail, the server is stopped and the
- * error names the temporary folder, which stays for its logs.
+ * error names the temporary folder, which stays for its logs. `seedAreas` defaults to the demo
+ * data of all build steps.
  */
-export async function startDemo({ port }: { port: number }): Promise<RunningDemo> {
+export async function startDemo({
+  port,
+  seedAreas = SEED_AREAS,
+}: {
+  port: number;
+  seedAreas?: readonly SeedArea[];
+}): Promise<RunningDemo> {
   const root = mkdtempSync(join(tmpdir(), 'resellr-demo-'));
   const paths: RuntimePaths = {
     dataDir: join(root, 'Daten'),
@@ -79,7 +93,7 @@ export async function startDemo({ port }: { port: number }): Promise<RunningDemo
   const baseUrl = `http://127.0.0.1:${port}`;
   try {
     await waitUntilReady(baseUrl, paths.dataDir, exited);
-    await seedDemoData(createDemoApi(baseUrl));
+    await seedDemoData(createDemoApi(baseUrl), seedAreas);
   } catch (error) {
     await stopServer(server, exited);
     const message = error instanceof Error ? error.message : String(error);
@@ -90,6 +104,7 @@ export async function startDemo({ port }: { port: number }): Promise<RunningDemo
     baseUrl,
     root,
     paths,
+    exited,
     stop: async () => {
       await stopServer(server, exited);
       rmSync(root, { recursive: true, force: true });
@@ -142,7 +157,8 @@ async function stopServer(server: ChildProcess, exited: Promise<number | null>):
 
 /**
  * `npm run demo`: build, start, and only then print the address; Ctrl+C stops the server and
- * removes the temporary folder.
+ * removes the temporary folder. If the server ends on its own, the demo ends with exit code 1
+ * and names the temporary folder, which stays for its logs.
  */
 async function main(): Promise<void> {
   const port = demoPort(process.env.PORT);
@@ -151,9 +167,19 @@ async function main(): Promise<void> {
   console.log(`resellr demo: ${demo.baseUrl}/ (data folder ${demo.paths.dataDir})`);
   console.log('Stop with Ctrl+C; the temporary folder is removed.');
 
+  let stopping = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, () => void demo.stop().then(() => process.exit(0)));
+    process.once(signal, () => {
+      stopping = true;
+      void demo.stop().then(() => process.exit(0));
+    });
   }
+  void demo.exited.then((code) => {
+    if (stopping) return;
+    const how = code === null ? 'by a signal' : `with exit code ${code}`;
+    console.error(`The server ended ${how}; temporary folder with the logs: ${demo.root}`);
+    process.exit(1);
+  });
 }
 
 if (import.meta.main) {

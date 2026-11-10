@@ -146,3 +146,33 @@ test.describe('Walking Skeleton (Technical Specification 4.6)', () => {
     expect(browserRequests.filter((url) => !isLocalRequest(url))).toEqual([]);
   });
 });
+
+/** The REQ-079 check of the fixture must catch what Technical Specification 6.2 forbids. */
+test.describe('REQ-079 request check (CU-062)', () => {
+  for (const [url, local] of [
+    ['http://127.0.0.1:4310/api/ops/health', true],
+    ['file:///C:/Daten/foto.jpg', true],
+    ['http://localhost:4310/', false],
+    ['https://127.0.0.1:4310/', false],
+    ['http://127.0.0.1.evil.example/', false],
+    ['ws://127.0.0.1:4310/', false],
+    ['data:image/png;base64,AAAA', false],
+    ['http://198.51.100.1/x.png', false],
+  ] as const) {
+    test(`isLocalRequest(${url}) is ${local}`, () => {
+      expect(isLocalRequest(url)).toBe(local);
+    });
+  }
+
+  test('records a request of the page to another host', async ({ page, browserRequests }) => {
+    const foreign = 'http://198.51.100.1/x.png';
+    await page.route(foreign, (route) => route.abort());
+    const requested = page.waitForRequest(foreign);
+    await page.setContent(`<img src="${foreign}">`);
+    await requested;
+
+    expect(browserRequests.filter((url) => !isLocalRequest(url))).toEqual([foreign]);
+    // Only this self-test may send it; the check after the test would fail otherwise.
+    browserRequests.length = 0;
+  });
+});

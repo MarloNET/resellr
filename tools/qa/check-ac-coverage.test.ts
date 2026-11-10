@@ -74,6 +74,63 @@ describe('acIdsInTestTitles', () => {
     expect(acIdsInTestTitles(source)).toEqual(new Set(['AC-REQ-001-05', 'AC-REQ-001-07']));
   });
 
+  it('does not count a template title without a space after the ID', () => {
+    const source = 'it(`AC-REQ-001-05${suffix}`, () => {});';
+
+    expect(acIdsInTestTitles(source)).toEqual(new Set());
+  });
+
+  it.each([
+    ['describe.skip', "describe.skip('g', () => { it('AC-REQ-001-05 x', () => {}); });"],
+    ['describe.todo', "describe.todo('g', () => { it('AC-REQ-001-05 x', () => {}); });"],
+    [
+      'describe.skip.each',
+      "describe.skip.each([1])('g %s', () => { it('AC-REQ-001-05 x', () => {}); });",
+    ],
+    ['describe.skipIf', "describe.skipIf(ci)('g', () => { it('AC-REQ-001-05 x', () => {}); });"],
+    [
+      'test.describe.skip',
+      "test.describe.skip('g', () => { test('AC-REQ-001-05 x', async () => {}); });",
+    ],
+    [
+      'test.describe.fixme',
+      "test.describe.fixme('g', () => { test('AC-REQ-001-05 x', async () => {}); });",
+    ],
+    [
+      'a nested skipped group',
+      "describe('a', () => { describe.skip('b', () => { describe('c', () => { it('AC-REQ-001-05 x', () => {}); }); }); });",
+    ],
+    [
+      'describe with { skip: true }',
+      "describe('g', { skip: true }, () => { it('AC-REQ-001-05 x', () => {}); });",
+    ],
+    ['it with { skip: true }', "it('AC-REQ-001-05 x', { skip: true }, () => {});"],
+    ['it with { todo: true }', "it('AC-REQ-001-05 x', { todo: true }, () => {});"],
+    ['it with { skip: condition }', "it('AC-REQ-001-05 x', { skip: ci }, () => {});"],
+  ])('does not count a test in %s', (_, source) => {
+    expect(acIdsInTestTitles(source)).toEqual(new Set());
+  });
+
+  it('counts tests in running groups and with options that do not skip', () => {
+    const source = `
+      describe('a', () => { it('AC-REQ-001-05 x', () => {}); });
+      test.describe.serial('b', () => { test('AC-REQ-001-07 x', async () => {}); });
+      describe.each([1])('c %s', () => { it('AC-REQ-002-01 x', () => {}); });
+      describe('d', { skip: false }, () => { it('AC-REQ-002-02 x', () => {}); });
+      it('AC-REQ-002-03 x', { skip: false, timeout: 100 }, () => {});
+    `;
+
+    expect(acIdsInTestTitles(source)).toEqual(
+      new Set([
+        'AC-REQ-001-05',
+        'AC-REQ-001-07',
+        'AC-REQ-002-01',
+        'AC-REQ-002-02',
+        'AC-REQ-002-03',
+      ]),
+    );
+  });
+
   it('reads JSX in component tests', () => {
     const source =
       'it(\'AC-REQ-104-01 shows the notice\', () => { render(<Notice path="x" />); });';
@@ -92,6 +149,8 @@ describe('parseAcSteps', () => {
   it.each([
     [{ steps: STEPS }, '"completedSteps" must list steps of "steps"'],
     [{ steps: STEPS, completedSteps: ['S3'] }, '"completedSteps" must list steps of "steps"'],
+    [{ steps: STEPS, completedSteps: ['toString'] }, '"completedSteps" must list steps of "steps"'],
+    [{ steps: STEPS, completedSteps: [1] }, '"completedSteps" must list steps of "steps"'],
     [{ steps: { S1: ['REQ-001'] }, completedSteps: [] }, 'step S1 must list AC-REQ-IDs'],
     [{ completedSteps: [] }, '"steps" must map build steps to AC-REQ-IDs'],
     [
