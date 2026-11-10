@@ -5,6 +5,16 @@ import { ShuttingDownError } from '../shared/domain-error.ts';
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    /**
+     * The write gate rejects the write in state `stopping` but does not count it as running.
+     * Only `POST /api/ops/shutdown`, which waits for the running writes itself (2.17 step 3).
+     */
+    uncountedWrite?: boolean;
+  }
+}
+
 export interface WriteGate {
   /** Writes that were accepted and have not sent their response yet. */
   activeWrites(): number;
@@ -34,6 +44,7 @@ export function registerWriteGate(
   app.addHook('onRequest', async (request) => {
     if (!WRITE_METHODS.has(request.method)) return;
     if (lifecycle.isStopping()) throw new ShuttingDownError();
+    if (request.routeOptions.config.uncountedWrite) return;
     running.add(request);
   });
   // The response is complete when the action has ended; `onResponse` covers a reply that

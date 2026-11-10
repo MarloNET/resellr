@@ -8,7 +8,7 @@ import { registerStaticWeb } from './static-web.ts';
 import { registerWriteGate, type WriteGate } from './write-gate.ts';
 import { registerZodValidation } from './zod-validation.ts';
 
-export { createFrameworkErrorHandler } from './error-mapper.ts';
+export { createFrameworkErrorHandler, sendError } from './error-mapper.ts';
 export { LISTEN_HOST } from './listen-address.ts';
 export type { WriteGate } from './write-gate.ts';
 
