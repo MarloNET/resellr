@@ -1,5 +1,8 @@
 # Linux CI (CU-003): lint, type check, unit, integration and E2E tests with Google Chrome,
-# and the AC coverage check (CU-284).
+# and the AC coverage check (CU-284). REQ-079 is checked in two places: the unit tests check
+# the dependency list of apps/server and the security headers, the E2E suite starts the
+# server in its test mode and fails on any outbound connection to another destination than
+# 127.0.0.1 and on any browser request to another host.
 name: CI
 
 on:
@@ -42,7 +45,7 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Unit and integration tests
+      - name: Unit and integration tests (incl. REQ-079 dependency list and security headers)
         run: npm test
 
       - name: AC coverage of the completed build steps (CU-284)
@@ -53,5 +56,5 @@ jobs:
       - name: Google Chrome version
         run: google-chrome --version
 
-      - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7)
+      - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7, REQ-079 connections)
         run: npm run e2e
