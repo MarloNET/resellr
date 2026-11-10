@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router';
 
+import { useOpsStatusQuery } from '../api/ops.api.ts';
+import { UnreachableBanner } from '../components/patterns/UnreachableBanner.tsx';
 import { BackupNotice } from '../features/backup-notice/BackupNotice.tsx';
 import { Navigation } from './Navigation.tsx';
 
@@ -8,9 +10,13 @@ import { Navigation } from './Navigation.tsx';
  * column 208 px wide and as high as the viewport with the fixed head "resellr" (40 px) and
  * below it one scrolling area with the entries and the backup notice UI-044 (`margin-top: auto`:
  * at the lower edge with enough height, otherwise after the entries); the content area scrolls
- * separately and never horizontally (R-1 (2)).
+ * separately and never horizontally (R-1 (2)). While `GET /api/ops/status` is unreachable, P-06
+ * stands as the first element of the content area, the page below it stays (DG-06, Nachtrag
+ * MAR-395); not while the status loads and not on `500` (then `UI-044.error` in the notice).
  */
 export function AppFrame() {
+  const status = useOpsStatusQuery();
+
   return (
     <div className="flex h-dvh w-full overflow-hidden">
       <aside
@@ -32,6 +38,11 @@ export function AppFrame() {
         data-testid="content-area"
         className="h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto [overflow-wrap:anywhere]"
       >
+        {status.error?.kind === 'unreachable' && (
+          <div className="px-6 pt-6">
+            <UnreachableBanner alwaysShow />
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

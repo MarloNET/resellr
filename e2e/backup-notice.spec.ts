@@ -158,3 +158,51 @@ test.describe('Backup notice UI-044 in the navigation column (#137)', () => {
     await expect(button).toBeFocused();
   });
 });
+
+test.describe('Backup notice UI-044 without connection (#139)', () => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      !COLUMN_ROWS.includes(testInfo.project.name),
+      'full frame only in FM-1 to FM-4, FM-6',
+    );
+  });
+
+  test('DER-95-04 with the server ended the notice keeps "wird geladen …" and the content area shows P-06; after "Erneut versuchen" the data folder appears', async ({
+    page,
+    server,
+  }) => {
+    // The page is loaded; the server ends exactly when the status is requested, so that
+    // request finds no server any more.
+    await page.route(
+      '**/api/ops/status',
+      async (route) => {
+        await server.kill();
+        await route.continue();
+      },
+      { times: 1 },
+    );
+
+    try {
+      await page.goto('/inserate');
+
+      const content = page.getByTestId('content-area');
+      const banner = content.getByRole('alert');
+      await expect(banner).toContainText('resellr ist nicht erreichbar.');
+      await expect(banner.getByRole('button', { name: 'Erneut versuchen' })).toBeVisible();
+      await expect(page.getByRole('alert')).toHaveCount(1);
+      await expect(notice(page).getByTestId('backup-notice-path')).toHaveText('wird geladen …');
+      // The page is not replaced.
+      await expect(content).toContainText('Noch keine Modell-Inserate');
+
+      await server.restart();
+      await banner.getByRole('button', { name: 'Erneut versuchen' }).click();
+
+      await expect(notice(page).getByTestId('backup-notice-path')).toHaveText(server.paths.dataDir);
+      await expect(page.getByRole('alert')).toHaveCount(0);
+    } finally {
+      // The other tests of this worker need the server.
+      await server.restart();
+    }
+  });
+});
