@@ -64,9 +64,11 @@ test.describe('Walking Skeleton (Technical Specification 4.6)', () => {
 
     for (const label of NAVIGATION) {
       const link = navigation.getByRole('link', { name: label, exact: true });
+      const href = (await link.getAttribute('href')) ?? '';
       await link.click();
+      // "Einstellungen" leads to `/einstellungen`, which opens a section below it (UI-025).
       await expect(page).toHaveURL(
-        new URL((await link.getAttribute('href')) ?? '', page.url()).href,
+        (url) => url.pathname === href || url.pathname.startsWith(`${href}/`),
       );
       await expect(link).toHaveAttribute('aria-current', 'page');
       await expect(navigation.getByRole('link')).toHaveText(NAVIGATION);
