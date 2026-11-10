@@ -8,7 +8,9 @@ import { createSupervisorIpc, type IpcProcess } from './supervisor-ipc.ts';
 function processWithChannel() {
   const emitter = new EventEmitter();
   const ipcProcess = {
-    send: vi.fn<(message: unknown) => boolean>(() => true),
+    send: vi.fn<(message: unknown, callback?: (error: Error | null) => void) => boolean>(
+      () => true,
+    ),
     connected: true,
     once: (event: 'disconnect', listener: () => void) => emitter.once(event, listener),
     disconnect: () => {
@@ -27,7 +29,10 @@ describe('IPC to the supervisor (CU-249)', () => {
 
     createSupervisorIpc(ipcProcess, 'start-1').reportReady();
 
-    expect(ipcProcess.send).toHaveBeenCalledExactlyOnceWith({ type: 'ready', startId: 'start-1' });
+    expect(ipcProcess.send).toHaveBeenCalledExactlyOnceWith(
+      { type: 'ready', startId: 'start-1' },
+      expect.any(Function),
+    );
   });
 
   it('sends nothing once the channel is closed', () => {
@@ -58,6 +63,41 @@ describe('IPC to the supervisor (CU-249)', () => {
 
     ipc.onSupervisorLost(lost);
 
+    expect(lost).toHaveBeenCalledOnce();
+  });
+
+  it('treats a failed ready report as a lost supervisor, also for a handler added later', () => {
+    const ipcProcess = processWithChannel();
+    ipcProcess.send.mockImplementation((_message, callback) => {
+      callback?.(new Error('write EPIPE'));
+      return false;
+    });
+    const ipc = createSupervisorIpc(ipcProcess, 'start-1');
+    const lostEarly = vi.fn();
+    ipc.onSupervisorLost(lostEarly);
+
+    ipc.reportReady();
+    const lostLater = vi.fn();
+    ipc.onSupervisorLost(lostLater);
+
+    expect(lostEarly).toHaveBeenCalledOnce();
+    expect(lostLater).toHaveBeenCalledOnce();
+    // The channel closes afterwards: no second call.
+    ipcProcess.disconnect();
+    expect(lostEarly).toHaveBeenCalledOnce();
+    expect(lostLater).toHaveBeenCalledOnce();
+  });
+
+  it('treats a ready report that throws as a lost supervisor', () => {
+    const ipcProcess = processWithChannel();
+    ipcProcess.send.mockImplementation(() => {
+      throw new Error('Channel closed');
+    });
+    const ipc = createSupervisorIpc(ipcProcess, 'start-1');
+    const lost = vi.fn();
+    ipc.onSupervisorLost(lost);
+
+    expect(() => ipc.reportReady()).not.toThrow();
     expect(lost).toHaveBeenCalledOnce();
   });
 

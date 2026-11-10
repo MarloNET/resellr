@@ -1,16 +1,19 @@
 /** The part of `process` the IPC channel to the supervisor uses. */
 export interface IpcProcess {
-  send?: (message: unknown) => boolean;
+  send?: (message: unknown, callback: (error: Error | null) => void) => boolean;
   readonly connected?: boolean;
   once(event: 'disconnect', listener: () => void): unknown;
 }
 
 export interface SupervisorIpc {
-  /** Reports `{ type: 'ready', startId }` to the supervisor; does nothing without a channel. */
+  /**
+   * Reports `{ type: 'ready', startId }` to the supervisor; does nothing without a channel. A
+   * report that cannot be sent counts as a lost supervisor.
+   */
   reportReady(): void;
   /**
-   * Calls `handle` once when the channel to the supervisor closes, at once if it is already
-   * closed; never without a channel (started directly, e.g. demo and tests).
+   * Calls `handle` once when the channel to the supervisor closes or a report to it fails, at
+   * once if that already happened; never without a channel (started directly, e.g. demo and tests).
    */
   onSupervisorLost(handle: () => void): void;
 }
@@ -22,14 +25,32 @@ export interface SupervisorIpc {
  */
 export function createSupervisorIpc(ipcProcess: IpcProcess, startId: string | null): SupervisorIpc {
   const hasChannel = typeof ipcProcess.send === 'function';
+  let lost = hasChannel && !ipcProcess.connected;
+  const lostHandlers: (() => void)[] = [];
+  const markLost = () => {
+    if (lost) return;
+    lost = true;
+    for (const handle of lostHandlers.splice(0)) handle();
+  };
+  if (hasChannel && !lost) ipcProcess.once('disconnect', markLost);
+
   return {
     reportReady: () => {
-      if (hasChannel && ipcProcess.connected) ipcProcess.send?.({ type: 'ready', startId });
+      if (!hasChannel || lost || !ipcProcess.connected) return;
+      // A channel the supervisor closed during the start stays `connected` until `disconnect`;
+      // without a callback the failed write (`EPIPE`) would end the server as an unhandled error.
+      try {
+        ipcProcess.send?.({ type: 'ready', startId }, (error) => {
+          if (error) markLost();
+        });
+      } catch {
+        markLost();
+      }
     },
     onSupervisorLost: (handle) => {
       if (!hasChannel) return;
-      if (ipcProcess.connected) ipcProcess.once('disconnect', handle);
-      else handle();
+      if (lost || !ipcProcess.connected) handle();
+      else lostHandlers.push(handle);
     },
   };
 }

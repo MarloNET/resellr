@@ -81,4 +81,19 @@ describe('server under a supervisor (CU-018, CU-040, CU-249)', () => {
     },
     START_TIMEOUT_MS,
   );
+
+  it(
+    'ends with exit code 12 and without a WAL file when the channel closes during the start',
+    async () => {
+      const { server } = await startServer();
+      const exited = once(server, 'exit');
+
+      // The server is still `starting`: its IPC `ready` meets a closed channel (QA-DEF-01).
+      server.disconnect();
+
+      expect(await exited).toEqual([ExitCode.SupervisorLost, null]);
+      expect(existsSync(join(root, 'Daten', 'resellr.db-wal'))).toBe(false);
+    },
+    START_TIMEOUT_MS,
+  );
 });
