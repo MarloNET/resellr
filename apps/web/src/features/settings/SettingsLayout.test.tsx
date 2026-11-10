@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { routes } from '../../app/router.tsx';
@@ -34,7 +34,10 @@ function sectionList() {
 
 describe('UI-025 settings layout (CU-093)', () => {
   beforeEach(() => localStorage.clear());
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it('UI-025.default: DER-33-01 lists exactly the 14 designed sections without "Zugangspasswort" and opens "Händlermarke" first', async () => {
     const router = renderAt('/inserate');
@@ -162,6 +165,39 @@ describe('UI-025 settings layout (CU-093)', () => {
     expect(column.className).toContain('full:w-60');
     expect(layout.firstElementChild).toBe(column);
     expect(screen.getByTestId('settings-content').className).toContain('min-w-0');
+  });
+
+  it('UI-025.default: a throwing localStorage.getItem still opens "Händlermarke" in the frame', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage is disabled', 'SecurityError');
+    });
+    const router = renderAt('/einstellungen');
+
+    expect(await screen.findByRole('link', { name: 'Händlermarke', current: 'page' })).toBeTruthy();
+    expect(within(sectionList()).getAllByRole('link')).toHaveLength(14);
+    expect(router.state.location.pathname).toBe('/einstellungen/haendlermarke');
+  });
+
+  it('UI-025.default: a throwing localStorage.setItem keeps the frame and the open section', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    renderAt('/einstellungen/haendlermarke');
+
+    fireEvent.click(within(sectionList()).getByRole('link', { name: 'Auswahllisten' }));
+    expect(
+      await screen.findByRole('link', { name: 'Auswahllisten', current: 'page' }),
+    ).toBeTruthy();
+    expect(within(sectionList()).getAllByRole('link')).toHaveLength(14);
+  });
+
+  it('UI-025.default: a section path in other letter case marks the matching section as current', () => {
+    renderAt('/einstellungen/Auswahllisten');
+
+    expect(within(sectionList()).getByRole('link', { current: 'page' }).textContent).toBe(
+      'Auswahllisten',
+    );
+    expect(localStorage.getItem(LAST_SECTION_STORAGE_KEY)).toBe('auswahllisten');
   });
 
   it('an unknown section is not a route of UI-025 and falls back to the empty frame', () => {

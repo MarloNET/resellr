@@ -39,11 +39,31 @@ function isSectionSlug(value: string | null): value is string {
 }
 
 /**
+ * Remembering the section is only a convenience (UI-025): a storage that throws
+ * (`SecurityError`, `QuotaExceededError`) must not replace the frame with an error page.
+ */
+function readLastSection(): string | null {
+  try {
+    return localStorage.getItem(LAST_SECTION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberSection(slug: string) {
+  try {
+    localStorage.setItem(LAST_SECTION_STORAGE_KEY, slug);
+  } catch {
+    // Not remembered; the next call of `/einstellungen` opens "Händlermarke".
+  }
+}
+
+/**
  * Index route `/einstellungen`: opens the last used section, "Händlermarke" on the first call
  * or when the stored value is not one of the 14 sections (UI-025.default).
  */
 export function LastSettingsSectionRedirect() {
-  const stored = localStorage.getItem(LAST_SECTION_STORAGE_KEY);
+  const stored = readLastSection();
   return (
     <Navigate
       to={`${SETTINGS_PREFIX}${isSectionSlug(stored) ? stored : DEFAULT_SECTION}`}
@@ -71,10 +91,11 @@ function moveFocus(event: KeyboardEvent<HTMLUListElement>) {
  */
 export function SettingsLayout() {
   const { pathname } = useLocation();
-  const openSlug = pathname.slice(SETTINGS_PREFIX.length).split('/')[0] ?? '';
+  // Route paths match case-insensitively, so the open section is compared in lower case.
+  const openSlug = (pathname.slice(SETTINGS_PREFIX.length).split('/')[0] ?? '').toLowerCase();
 
   useEffect(() => {
-    if (isSectionSlug(openSlug)) localStorage.setItem(LAST_SECTION_STORAGE_KEY, openSlug);
+    if (isSectionSlug(openSlug)) rememberSection(openSlug);
   }, [openSlug]);
 
   return (
