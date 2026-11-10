@@ -96,6 +96,25 @@ describe('fixed texts of REQ-104 and REQ-105 (E1)', () => {
     );
   });
 
+  it('splits the backup notice text into the lines of UI-044 without changing the wording', () => {
+    const path = 'C:\\Daten';
+    expect(
+      [
+        FIXED_TEXTS.backupNoticeIntro,
+        FIXED_TEXTS.backupNoticeStepsLead,
+        FIXED_TEXTS.backupNoticeStep1,
+        FIXED_TEXTS.backupNoticeStep2,
+        `${FIXED_TEXTS.backupNoticeLocationLead} ${path}.`,
+        FIXED_TEXTS.backupNoticeWarning,
+      ].join(' '),
+    ).toBe(FIXED_TEXTS.backupNoticeText(path));
+  });
+
+  it('has the loading text at the place of the path and the action "resellr beenden"', () => {
+    expect(FIXED_TEXTS.backupNoticeLoading).toBe('wird geladen …');
+    expect(FIXED_TEXTS.shutdownAction).toBe('resellr beenden');
+  });
+
   it('has the shutdown question', () => {
     expect(FIXED_TEXTS.shutdownQuestion).toBe(
       'resellr jetzt beenden? Nicht gespeicherte Eingaben gehen verloren. ' +
