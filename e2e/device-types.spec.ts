@@ -54,13 +54,15 @@ test.describe('UI-027 device types (CU-095)', () => {
     await nameField(page).fill(name);
     await saveButton(page).click();
 
-    await expect(
-      page.getByRole('status').filter({ hasText: 'Geräteart gespeichert' }),
-    ).toBeVisible();
+    const banner = page.getByRole('status').filter({ hasText: 'Geräteart gespeichert' });
+    await expect(banner).toBeVisible();
     const row = deviceTypes(page).getByRole('button', { name: new RegExp(name) });
     await expect(row).toHaveAttribute('aria-current', 'true');
     await expect(row).toContainText('aktiv');
     await expect(page.getByRole('button', { name: /löschen/i })).toHaveCount(0);
+    // DER-33-05: the banner closes after 5 s. Only then the page is checked, so the check does
+    // not count the "×" of a banner that closes while it runs.
+    await expect(banner).toBeHidden({ timeout: 10_000 });
     await expectReachable(page);
   });
 
@@ -126,23 +128,25 @@ test.describe('UI-027 device types (CU-095)', () => {
     const name = uniqueName('Beenden', testInfo.title, testInfo.project.name);
     await createDeviceType(page, server.baseUrl, name);
     await openDeviceType(page, name);
-    // Answer of the write gate in state `stopping` (2.0.4), without ending the shared server.
-    await page.route('**/api/device-types/*', (route) =>
-      route.request().method() === 'PATCH'
-        ? route.fulfill({
-            status: 503,
-            json: {
-              error: {
-                code: 'shutting_down',
-                message: '',
-                fields: [],
-                details: {},
-                referenceNumber: null,
-              },
-            },
-          })
-        : route.continue(),
-    );
+    // Answer of the write gate in state `stopping` (2.0.4), without ending the shared server and
+    // without sending the write: status and body of P-07, headers from a read of the same server.
+    await page.route('**/api/device-types/*', async (route) => {
+      if (route.request().method() !== 'PATCH') return route.continue();
+      const read = await route.fetch({ url: `${server.baseUrl}/api/ops/health`, method: 'GET' });
+      return route.fulfill({
+        response: read,
+        status: 503,
+        json: {
+          error: {
+            code: 'shutting_down',
+            message: '',
+            fields: [],
+            details: {},
+            referenceNumber: null,
+          },
+        },
+      });
+    });
 
     await nameField(page).fill(`${name} neu`);
     await saveButton(page).click();
