@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { isReferenceNumber } from '@resellr/runtime-shared/reference-number';
 import BetterSqlite3 from 'better-sqlite3';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appFactory } from '../../test/test-app.ts';
 
@@ -151,6 +151,39 @@ describe('startup sequence (CU-040)', () => {
       'server_started',
       'server_ready',
     ]);
+  });
+
+  it('reports IPC ready to the supervisor once the server listens, before server_ready (2.19 step 9)', async () => {
+    const port = await freePort();
+    writeConfig({ port });
+    const seen: { state: LifecycleStateName; events: unknown[] }[] = [];
+    const { lifecycle, run } = start({
+      supervisorIpc: {
+        reportReady: () => {
+          seen.push({
+            state: lifecycle.get(),
+            events: readLog('operations').map((entry) => entry.event),
+          });
+        },
+      },
+    });
+
+    result = await run();
+
+    expect(seen).toEqual([{ state: 'ready', events: ['server_started'] }]);
+    expect((await fetch(`http://127.0.0.1:${port}/api/ops/health`)).status).toBe(200);
+  });
+
+  it('reports no IPC ready when the start is aborted', async () => {
+    blocker = createServer();
+    await new Promise<void>((resolve) => blocker?.listen(0, '127.0.0.1', resolve));
+    writeConfig({ port: (blocker.address() as AddressInfo).port });
+    const reportReady = vi.fn();
+
+    result = await start({ supervisorIpc: { reportReady } }).run();
+
+    expect(result.state).toBe('aborted');
+    expect(reportReady).not.toHaveBeenCalled();
   });
 
   it('E7 aborts on a port in use with a reference number in the error log', async () => {

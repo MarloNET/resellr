@@ -6,4 +6,5 @@ export {
   type LifecycleStateName,
 } from './lifecycle-state.ts';
 export { opsRoutes, type OpsRoutesOptions } from './ops.routes.ts';
+export { createSupervisorIpc, type IpcProcess, type SupervisorIpc } from './supervisor-ipc.ts';
 export { runStartup, type StartupOptions, type StartupResult } from './startup.ts';
