@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import { createQueryClient } from '../../app/query-client.ts';
 import { BackupNotice } from './BackupNotice.tsx';
 
 const DATA_DIR_PATH = 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten';
+const REFERENCE_NUMBER = 'R-7K2M-9QX4';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -89,6 +90,60 @@ describe('BackupNotice (UI-044, CU-254)', () => {
     const loading = within(notice).getByTestId('backup-notice-path');
     expect(loading.textContent).toBe('wird geladen …');
     expect(within(notice).getByRole('button', { name: 'resellr beenden' })).toBeTruthy();
+  });
+
+  it('DER-95-03 UI-044.error shows the text with the reference number at the place of the path on 500', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json(
+        {
+          error: {
+            code: 'internal_error',
+            message: '',
+            fields: [],
+            details: {},
+            referenceNumber: REFERENCE_NUMBER,
+          },
+        },
+        { status: 500 },
+      ),
+    );
+
+    const notice = renderNotice();
+
+    const text = await within(notice).findByText(
+      `Speicherort konnte nicht ermittelt werden. Informieren Sie den Betreiber und nennen Sie die Referenznummer ${REFERENCE_NUMBER}.`,
+    );
+    expect(text.dataset.testid).toBe('backup-notice-path');
+    // The rest of the notice stays complete.
+    expect(within(notice).getByRole('heading', { name: 'Sicherung einrichten' })).toBeTruthy();
+    for (const line of [
+      FIXED_TEXTS.backupNoticeIntro,
+      FIXED_TEXTS.backupNoticeStepsLead,
+      FIXED_TEXTS.backupNoticeStep1,
+      FIXED_TEXTS.backupNoticeStep2,
+      FIXED_TEXTS.backupNoticeLocationLead,
+      FIXED_TEXTS.backupNoticeWarning,
+    ]) {
+      expect(within(notice).getByText(line)).toBeTruthy();
+    }
+    expect(within(notice).getByRole('button', { name: 'resellr beenden' })).toBeTruthy();
+    expect(within(notice).queryByText(FIXED_TEXTS.backupNoticeLoading)).toBeNull();
+    // The notice is no banner: it shows no P-06 and no own alert.
+    expect(within(notice).queryByRole('alert')).toBeNull();
+  });
+
+  it('DER-95-04 keeps "wird geladen …" at the place of the path when resellr is not reachable', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const notice = renderNotice();
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    // Let the rejected request settle into the error state of the query.
+    await act(async () => {});
+    expect(within(notice).getByTestId('backup-notice-path').textContent).toBe('wird geladen …');
+    expect(within(notice).getByText(FIXED_TEXTS.backupNoticeWarning)).toBeTruthy();
+    expect(within(notice).getByRole('button', { name: 'resellr beenden' })).toBeTruthy();
+    expect(within(notice).queryByRole('alert')).toBeNull();
   });
 
   it('DER-95-06 "resellr beenden" is a focusable button that does nothing until #142', async () => {

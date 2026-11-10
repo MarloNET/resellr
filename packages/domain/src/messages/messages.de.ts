@@ -85,6 +85,10 @@ export const FIXED_TEXTS = {
     ].join(' '),
   /** UI-044.loading: at the place of the path while `GET /api/ops/status` loads. */
   backupNoticeLoading: 'wird geladen …',
+  /** UI-044.error: at the place of the path on `500` of `GET /api/ops/status` (REQ-073). */
+  backupNoticeError: (referenceNumber: string) =>
+    'Speicherort konnte nicht ermittelt werden. Informieren Sie den Betreiber und nennen Sie ' +
+    `die Referenznummer ${referenceNumber}.`,
   shutdownAction: 'resellr beenden',
   shutdownQuestion:
     'resellr jetzt beenden? Nicht gespeicherte Eingaben gehen verloren. ' +
