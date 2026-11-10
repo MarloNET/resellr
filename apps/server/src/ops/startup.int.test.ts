@@ -66,6 +66,7 @@ function start(overrides: Partial<StartupOptions> = {}) {
         startId: 's-1',
       }),
       now: clock.now,
+      clock,
       exit: () => {},
     }),
     ...overrides,

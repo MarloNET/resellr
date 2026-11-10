@@ -30,6 +30,15 @@ export const MESSAGES = {
   'M-24': 'Prüfdatum und prüfende Stelle erforderlich',
 } as const;
 
+/**
+ * Field texts without a key M-xx, worded as in the `screen.md` of the screen that shows them;
+ * the schemas of `packages/domain` set them, so browser and server show the same text (2.0.5).
+ */
+export const FIELD_MESSAGES = {
+  /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
+  deviceTypeName: 'Name: 1 bis 50 Zeichen',
+} as const;
+
 type MessageText = string | ((...args: string[]) => string);
 
 /**
@@ -38,6 +47,7 @@ type MessageText = string | ((...args: string[]) => string);
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  'name_taken.device_type': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 

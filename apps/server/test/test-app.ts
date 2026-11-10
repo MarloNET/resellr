@@ -8,6 +8,7 @@ import { type AppDeps, buildApp } from '../src/app.ts';
 import { type Database, openDatabase } from '../src/db/database.ts';
 import type { DB } from '../src/db/schema.ts';
 import { createErrorLog, createLifecycleState, createOperationsLog } from '../src/ops/index.ts';
+import { createClock } from '../src/shared/clock.ts';
 
 export const TEST_PORT = 4310;
 export const HOST = `127.0.0.1:${TEST_PORT}`;
@@ -62,6 +63,7 @@ export function createTestApp() {
     ops: { startId: null, dataDirPath: dataDir, appVersion: TEST_APP_VERSION },
     operationsLog,
     now: () => new Date(),
+    clock: createClock(),
     exit,
   });
 
