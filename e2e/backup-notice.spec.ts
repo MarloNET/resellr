@@ -168,7 +168,7 @@ test.describe('Backup notice UI-044 without connection (#139)', () => {
     );
   });
 
-  test('DER-95-04 with the server ended the notice keeps "wird geladen …" and the content area shows P-06; after "Erneut versuchen" the data folder appears', async ({
+  test('UI-044.unreachable: DER-95-04 with the server ended the notice keeps "wird geladen …" and the content area shows P-06; after "Erneut versuchen" the data folder appears', async ({
     page,
     server,
   }) => {

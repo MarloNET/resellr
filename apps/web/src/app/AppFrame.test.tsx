@@ -73,7 +73,7 @@ describe('AppFrame P-06 for GET /api/ops/status (CU-044, Nachtrag MAR-395)', () 
     vi.unstubAllGlobals();
   });
 
-  it('DER-95-04 shows P-06 as the first element of the content area above the page while the status is unreachable', async () => {
+  it('UI-044.unreachable: DER-95-04 shows P-06 as the first element of the content area above the page while the status is unreachable', async () => {
     serve({});
     renderFrame();
 
@@ -87,7 +87,7 @@ describe('AppFrame P-06 for GET /api/ops/status (CU-044, Nachtrag MAR-395)', () 
     );
   });
 
-  it('DER-95-04 shows no P-06 while the status still loads', async () => {
+  it('UI-044.loading: DER-95-04 shows no P-06 while the status still loads', async () => {
     vi.useFakeTimers();
     fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
     renderFrame();
@@ -100,7 +100,7 @@ describe('AppFrame P-06 for GET /api/ops/status (CU-044, Nachtrag MAR-395)', () 
     );
   });
 
-  it('DER-95-03 shows no P-06 on 500, the notice shows UI-044.error instead', async () => {
+  it('UI-044.error: DER-95-03 shows no P-06 on 500, the notice shows UI-044.error instead', async () => {
     serve({ '/api/ops/status': statusError });
     renderFrame();
 
@@ -110,7 +110,7 @@ describe('AppFrame P-06 for GET /api/ops/status (CU-044, Nachtrag MAR-395)', () 
     expect(within(content()).queryByRole('alert')).toBeNull();
   });
 
-  it('DER-95-04 "Erneut versuchen" checks the health, reloads the data folder path and the banner disappears', async () => {
+  it('UI-044.unreachable: DER-95-04 "Erneut versuchen" checks the health, reloads the data folder path and the banner disappears', async () => {
     serve({});
     renderFrame();
     await within(content()).findByRole('alert');

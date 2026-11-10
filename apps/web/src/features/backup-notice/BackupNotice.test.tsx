@@ -92,7 +92,7 @@ describe('BackupNotice (UI-044, CU-254)', () => {
     expect(within(notice).getByRole('button', { name: 'resellr beenden' })).toBeTruthy();
   });
 
-  it('DER-95-03 UI-044.error shows the text with the reference number at the place of the path on 500', async () => {
+  it('UI-044.error: DER-95-03 shows the text with the reference number at the place of the path on 500', async () => {
     fetchMock.mockResolvedValue(
       Response.json(
         {
@@ -132,7 +132,7 @@ describe('BackupNotice (UI-044, CU-254)', () => {
     expect(within(notice).queryByRole('alert')).toBeNull();
   });
 
-  it('DER-95-04 keeps "wird geladen …" at the place of the path when resellr is not reachable', async () => {
+  it('UI-044.unreachable: DER-95-04 keeps "wird geladen …" at the place of the path when resellr is not reachable', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
     const notice = renderNotice();
