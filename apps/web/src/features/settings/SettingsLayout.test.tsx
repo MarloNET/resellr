@@ -1,7 +1,9 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
+import { createQueryClient } from '../../app/query-client.ts';
 import { routes } from '../../app/router.tsx';
 import { LAST_SECTION_STORAGE_KEY, SETTINGS_SECTIONS } from './SettingsLayout.tsx';
 
@@ -24,19 +26,37 @@ const DESIGNED_SECTIONS = [
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return router;
 }
+
+// The application frame renders BackupNotice (CU-254), which reads GET /api/ops/status.
+const fetchMock = vi.fn<typeof fetch>();
 
 function sectionList() {
   return screen.getByRole('navigation', { name: 'Einstellungen' });
 }
 
 describe('UI-025 settings layout (CU-093)', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () =>
+      Response.json({
+        dataDirPath: 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten',
+        appVersion: '0.1.0',
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+  });
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('UI-025.default: DER-33-01 lists exactly the 14 designed sections without "Zugangspasswort" and opens "Händlermarke" first', async () => {
