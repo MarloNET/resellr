@@ -21,7 +21,6 @@ beforeEach(async () => {
   t.app.put('/api/test/items', count);
   t.app.patch('/api/test/items', count);
   t.app.delete('/api/test/items', count);
-  t.app.post('/api/ops/shutdown', count);
   t.app.post('/api/test/upload', { config: { upload: true } }, count);
   await t.app.ready();
 });
@@ -164,8 +163,9 @@ describe('local-guard G-3 shutdown without browser (E4)', () => {
       payload: {},
     });
 
+    // The real shutdown route (CU-041) ran.
     expect(response.statusCode).toBe(200);
-    expect(sideEffects).toBe(1);
+    expect(t.lifecycle.get()).toBe('stopping');
   });
 
   it.each([
@@ -181,7 +181,7 @@ describe('local-guard G-3 shutdown without browser (E4)', () => {
 
     expect(response.statusCode).toBe(403);
     expect(errorCode(response.body)).toBe('forbidden_origin');
-    expect(sideEffects).toBe(0);
+    expect(t.lifecycle.get()).toBe('ready');
   });
 
   it('the exception holds for no other path', async () => {

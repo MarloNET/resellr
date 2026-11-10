@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -75,6 +75,9 @@ describe('server under a supervisor (CU-018, CU-040, CU-249)', () => {
 
       expect(await exited).toEqual([ExitCode.SupervisorLost, null]);
       await expect(fetch(`http://127.0.0.1:${port}/api/ops/health`)).rejects.toThrow();
+      // Checkpoint and close: the WAL file is moved into the database and removed.
+      expect(existsSync(join(root, 'Daten', 'resellr.db'))).toBe(true);
+      expect(existsSync(join(root, 'Daten', 'resellr.db-wal'))).toBe(false);
     },
     START_TIMEOUT_MS,
   );

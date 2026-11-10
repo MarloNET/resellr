@@ -5,6 +5,8 @@ export interface LifecycleState {
   get(): LifecycleStateName;
   set(state: LifecycleStateName): void;
   isStopping(): boolean;
+  /** Changes `ready` to `stopping` and returns true; in any other state returns false (2.17 step 1). */
+  beginStopping(): boolean;
 }
 
 export function createLifecycleState(initial: LifecycleStateName = 'starting'): LifecycleState {
@@ -15,5 +17,10 @@ export function createLifecycleState(initial: LifecycleStateName = 'starting'): 
       state = next;
     },
     isStopping: () => state === 'stopping',
+    beginStopping: () => {
+      if (state !== 'ready') return false;
+      state = 'stopping';
+      return true;
+    },
   };
 }

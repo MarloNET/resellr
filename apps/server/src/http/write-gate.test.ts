@@ -27,6 +27,13 @@ beforeEach(async () => {
     });
     return { ok: true };
   });
+  t.app.post('/api/test/uncounted', { config: { uncountedWrite: true } }, async () => {
+    markStarted();
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { ok: true };
+  });
   t.app.post('/api/test/slow-fail', async () => {
     markStarted();
     await new Promise<void>((resolve) => {
@@ -176,5 +183,35 @@ describe('write gate (E11)', () => {
 
   it('waitUntilIdle resolves at once without running writes', async () => {
     await expect(t.writeGate.waitUntilIdle(0)).resolves.toBe(true);
+  });
+
+  it('does not count a write whose route sets uncountedWrite, e.g. the shutdown itself (2.17 step 3)', async () => {
+    const pending = t.app.inject({
+      method: 'POST',
+      url: '/api/test/uncounted',
+      headers: SAME_ORIGIN_WRITE,
+      payload: {},
+    });
+    await started;
+
+    expect(t.writeGate.activeWrites()).toBe(0);
+    await expect(t.writeGate.waitUntilIdle(0)).resolves.toBe(true);
+
+    release();
+    expect((await pending).statusCode).toBe(200);
+  });
+
+  it('rejects a write whose route sets uncountedWrite in state stopping as well', async () => {
+    t.lifecycle.set('stopping');
+
+    const response = await t.app.inject({
+      method: 'POST',
+      url: '/api/test/uncounted',
+      headers: SAME_ORIGIN_WRITE,
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(errorCode(response.body)).toBe('shutting_down');
   });
 });
