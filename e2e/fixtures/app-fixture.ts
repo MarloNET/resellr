@@ -25,6 +25,10 @@ export interface AppServer {
   paths: RuntimePaths;
   /** Every outbound connection the server has reported since its start (REQ-079). */
   outboundConnections(): OutboundConnection[];
+  /** Ends the server process on purpose; its folders and port stay for `restart`. */
+  kill(): Promise<void>;
+  /** Starts the server again on the same port with the same folders, waits until ready. */
+  restart(): Promise<void>;
 }
 
 /** One outbound connection of a process, reported by the probe below. */
@@ -147,34 +151,49 @@ async function startServer(): Promise<{
   writeFileSync(join(paths.dataDir, CONFIG_FILE_NAME), JSON.stringify({ port }));
 
   const probe = `--import=${outboundConnectionProbe(connectionLog)}`;
-  const child = spawn(process.execPath, [probe, SERVER_MAIN], {
-    cwd: REPO_ROOT,
-    stdio: ['ignore', 'ignore', 'inherit'],
-    env: {
-      ...process.env,
-      RESELLR_DATA_DIR: paths.dataDir,
-      RESELLR_LOG_DIR: paths.logDir,
-      RESELLR_HANDOVER_DIR: paths.handoverDir,
-      RESELLR_UPDATE_COPY_DIR: paths.updateCopyDir,
-    },
-  });
-  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  const spawnServer = () => {
+    const serverProcess = spawn(process.execPath, [probe, SERVER_MAIN], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'ignore', 'inherit'],
+      env: {
+        ...process.env,
+        RESELLR_DATA_DIR: paths.dataDir,
+        RESELLR_LOG_DIR: paths.logDir,
+        RESELLR_HANDOVER_DIR: paths.handoverDir,
+        RESELLR_UPDATE_COPY_DIR: paths.updateCopyDir,
+      },
+    });
+    const exited = new Promise<void>((resolve) => serverProcess.once('exit', () => resolve()));
+    return { process: serverProcess, exited };
+  };
+  let child = spawnServer();
+  const kill = async () => {
+    if (child.process.exitCode === null && child.process.signalCode === null) {
+      child.process.kill('SIGTERM');
+    }
+    await child.exited;
+  };
   const server: AppServer = {
     port,
     baseUrl: `http://127.0.0.1:${port}`,
     paths,
     outboundConnections: () => readOutboundConnections(connectionLog),
+    kill,
+    restart: async () => {
+      await kill();
+      child = spawnServer();
+      await waitUntilReady(server, child.process);
+    },
   };
   const stop = async () => {
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
-    await exited;
+    await kill();
     const connections = server.outboundConnections();
     rmSync(root, { recursive: true, force: true });
     return connections;
   };
 
   try {
-    await waitUntilReady(server, child);
+    await waitUntilReady(server, child.process);
   } catch (error) {
     await stop();
     throw error;

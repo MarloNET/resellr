@@ -23,11 +23,15 @@ export interface ShutdownResult {
 /** Time limit of `POST /api/ops/shutdown` from UI-045 (Technical Specification 2.0.8, T-3). */
 export const SHUTDOWN_TIMEOUT_MS = 30_000;
 
-/** Data folder path for UI-044 and UI-046. */
-export function useOpsStatusQuery() {
+/**
+ * Data folder path for UI-044 and UI-046. With `enabled: false` it only reads the cached state
+ * and requests nothing, e.g. for P-06 of the frame (CU-053 `alwaysShow`).
+ */
+export function useOpsStatusQuery(options: { enabled?: boolean } = {}) {
   return useQuery<OpsStatus, ApiError>({
     queryKey: queryKeys.ops.status(),
     queryFn: ({ signal }) => apiClient.get<OpsStatus>('/api/ops/status', { signal }),
+    enabled: options.enabled ?? true,
   });
 }
 

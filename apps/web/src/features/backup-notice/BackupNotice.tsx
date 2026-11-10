@@ -34,13 +34,17 @@ function InfoIcon() {
  * Backup notice UI-044 (CU-254, REQ-104, Technical Specification 2.17): fixed texts from
  * `messages.de.ts`, the data folder path from `GET /api/ops/status`. No state, no setting, no
  * "×" and no collapsing; while the status loads, "wird geladen …" stands at the place of the
- * path and the rest is shown at once (`UI-044.loading`). In the column it has `margin-top: auto`:
+ * path and the rest is shown at once (`UI-044.loading`); on `500` the text with the reference
+ * number stands there instead (`UI-044.error`), the rest stays complete. In the column it has `margin-top: auto`:
  * at the lower edge with enough height, otherwise after the entries.
  * "resellr beenden" opens UI-045 from #142 on; until then it has no effect.
  */
 export function BackupNotice({ variant }: BackupNoticeProps) {
   const headingId = useId();
-  const { data } = useOpsStatusQuery();
+  const { data, error } = useOpsStatusQuery();
+  // `UI-044.error` only for `500 internal_error`, the one answer with a reference number (2.0.5);
+  // without an answer "wird geladen …" stays and the content area shows P-06 (DG-06).
+  const referenceNumber = error?.kind === 'error' ? (error.error?.referenceNumber ?? null) : null;
 
   return (
     <div data-variant={variant} className="mt-auto shrink-0 px-2 pt-1 pb-2">
@@ -60,7 +64,11 @@ export function BackupNotice({ variant }: BackupNoticeProps) {
         <p className="m-0">{FIXED_TEXTS.backupNoticeStep1}</p>
         <p className="m-0">{FIXED_TEXTS.backupNoticeStep2}</p>
         <p className="m-0">{FIXED_TEXTS.backupNoticeLocationLead}</p>
-        {data === undefined ? (
+        {referenceNumber ? (
+          <p data-testid="backup-notice-path" className="m-0">
+            {FIXED_TEXTS.backupNoticeError(referenceNumber)}
+          </p>
+        ) : data === undefined ? (
           <p data-testid="backup-notice-path" className="m-0 text-text-secondary">
             {FIXED_TEXTS.backupNoticeLoading}
           </p>
