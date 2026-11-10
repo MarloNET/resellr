@@ -14,3 +14,16 @@ export const ExitCode = {
 } as const;
 
 export type ExitCode = (typeof ExitCode)[keyof typeof ExitCode];
+
+/**
+ * Exit codes of `resellr-launcher` (CU-258). Technical Specification 2.18 names 0 and 1 for
+ * `stop --for-update`; every other command uses the same two codes.
+ */
+export const LauncherExitCode = {
+  /** The command did its work. */
+  Success: 0,
+  /** The command failed or is unknown. */
+  Failed: 1,
+} as const;
+
+export type LauncherExitCode = (typeof LauncherExitCode)[keyof typeof LauncherExitCode];
