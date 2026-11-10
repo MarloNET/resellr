@@ -213,6 +213,38 @@ describe('shutdown service (CU-245)', () => {
     expect(readLog('operations').map((entry) => entry.event)).toEqual(['shutdown_failed']);
   });
 
+  it('a failed reopen after a failed marker still ends in state ready with one reference number (step 8, FIND-284)', async () => {
+    mkdirSync(join(markerPath(), 'blocker'), { recursive: true });
+    vi.spyOn(database, 'reopen').mockImplementation(() => {
+      throw new Error('disk full');
+    });
+
+    const result = await service.shutdown();
+
+    expect(result).toEqual({ state: 'failed', refNo: expect.any(String) });
+    const refNo = result.state === 'failed' ? result.refNo : '';
+    expect(isReferenceNumber(refNo)).toBe(true);
+    expect(lifecycle.get()).toBe('ready');
+    expect(existsSync(join(markerPath(), 'blocker'))).toBe(true);
+    // Both the original error and the error of the reopen, under the same reference number.
+    const errors = readLog('errors');
+    expect(errors).toHaveLength(2);
+    expect(errors).toEqual([
+      expect.objectContaining({ level: 'error', refNo, function: 'ops.shutdown' }),
+      expect.objectContaining({
+        level: 'error',
+        refNo,
+        function: 'ops.shutdown',
+        message: 'Error: disk full',
+      }),
+    ]);
+    expect(errors[0]?.message).not.toBe('Error: disk full');
+    expect(readLog('operations')).toEqual([
+      expect.objectContaining({ level: 'warn', event: 'shutdown_failed', refNo }),
+    ]);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
   it('a later shutdown succeeds after a failed one', async () => {
     const reader = holdReader();
     try {

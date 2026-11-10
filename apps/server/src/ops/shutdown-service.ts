@@ -93,10 +93,15 @@ export function createShutdownService({
         writeMarker();
       } catch (error) {
         // Step 8: resellr runs on; no marker exists, because writing it is the last step.
-        database.reopen();
-        lifecycle.set('ready');
         const refNo = createReferenceNumber();
         errorLog.error({ refNo, function: 'ops.shutdown', error });
+        try {
+          database.reopen();
+        } catch (reopenError) {
+          // Stay reachable so the user can retry the shutdown (FIND-284).
+          errorLog.error({ refNo, function: 'ops.shutdown', error: reopenError });
+        }
+        lifecycle.set('ready');
         operationsLog.warn('shutdown_failed', { refNo });
         return { state: 'failed', refNo };
       }

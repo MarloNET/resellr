@@ -126,6 +126,54 @@ describe('POST /api/ops/shutdown (CU-041, 2.17)', () => {
     expect((await shutdown()).statusCode).toBe(200);
   });
 
+  it('waits for a running counted write before checkpoint, close and marker (step 3, FIND-285)', async () => {
+    // Own app: routes for a test are added before `ready()`.
+    const s = createTestApp();
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    let release!: () => void;
+    s.app.post('/api/test/slow', async () => {
+      markStarted();
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return { ok: true };
+    });
+    await s.app.ready();
+    const markerPath = join(s.dataDir, SHUTDOWN_MARKER_FILE_NAME);
+    try {
+      const write = s.app.inject({
+        method: 'POST',
+        url: '/api/test/slow',
+        headers: SAME_ORIGIN_WRITE,
+        payload: {},
+      });
+      await started;
+      let shutdownDone = false;
+      const shutdownResponse = s.app
+        .inject({ method: 'POST', url: '/api/ops/shutdown', headers: SAME_ORIGIN_WRITE, payload: {} })
+        .finally(() => {
+          shutdownDone = true;
+        });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(s.lifecycle.get()).toBe('stopping');
+      expect(shutdownDone).toBe(false);
+      expect(s.database.sqlite.open).toBe(true);
+      expect(existsSync(markerPath)).toBe(false);
+
+      release();
+      expect((await write).statusCode).toBe(200);
+      expect((await shutdownResponse).statusCode).toBe(200);
+      expect(s.database.sqlite.open).toBe(false);
+      expect(existsSync(markerPath)).toBe(true);
+    } finally {
+      await s.close();
+    }
+  });
+
   it('rejects a body other than {} with 400 bad_request and does not stop', async () => {
     const response = await shutdown({ force: true });
 
