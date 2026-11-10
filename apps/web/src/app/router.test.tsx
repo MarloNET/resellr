@@ -10,6 +10,24 @@ import { routes } from './router.tsx';
 
 const DATA_DIR_PATH = 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten';
 
+/** Words of a login, a user account, an access password or a password reset (OD-02 A). */
+const ACCESS_FUNCTION =
+  /login|logout|sign-?in|sign-?up|regist|anmeld|auth|account|konto|user|benutzer|passw|session|zugang/i;
+
+/**
+ * Addresses UI-001 "Zugang" and UI-040 "Zugangspasswort" (as 15th settings area) would have,
+ * and common addresses of a login or password reset (Technical Specification 2.20).
+ */
+const ACCESS_ADDRESSES = [
+  '/zugang',
+  '/einstellungen/zugangspasswort',
+  '/anmelden',
+  '/login',
+  '/passwort-zuruecksetzen',
+  '/registrieren',
+  '/konto',
+];
+
 function renderAt(path: string, routeObjects: RouteObject[] = routes) {
   const router = createMemoryRouter(routeObjects, { initialEntries: [path] });
   render(
@@ -152,6 +170,28 @@ describe('router and application frame', () => {
     expect(content.childElementCount).toBe(0);
     expect(content.textContent).toBe('');
   });
+
+  it('AC-REQ-001-05 the route table has no path for login, access password, accounts or password reset', () => {
+    const paths = (list: RouteObject[]): string[] =>
+      list.flatMap((route) => [route.path ?? '', ...paths(route.children ?? [])]);
+
+    expect(paths(routes)).toContain('inserate');
+    expect(paths(routes).filter((path) => ACCESS_FUNCTION.test(path))).toEqual([]);
+  });
+
+  it.each(ACCESS_ADDRESSES)(
+    'DER-97-02 %s shows no access or password page, only the frame with an empty content area',
+    (path) => {
+      const router = renderAt(path);
+
+      expect(router.state.location.pathname).toBe(path);
+      expect(screen.getByRole('navigation', { name: 'Hauptnavigation' })).toBeTruthy();
+      const content = screen.getByTestId('content-area');
+      expect(content.childElementCount).toBe(0);
+      expect(document.querySelector('input[type="password"]')).toBeNull();
+      expect(document.body.textContent).not.toMatch(/passwort|anmeld|zugang/i);
+    },
+  );
 
   it('E8 the frame never scrolls horizontally: content area with min-width 0 and no x-overflow', () => {
     renderAt('/inserate');

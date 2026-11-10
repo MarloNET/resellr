@@ -45,6 +45,11 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      # The integration test of AC-REQ-001-07 tries to reach resellr over the other addresses of
+      # the runner in place of a second device; the log shows which ones it had.
+      - name: Network addresses of the runner (AC-REQ-001-07)
+        run: ip -brief address
+
       - name: Unit and integration tests (incl. REQ-079 dependency list and security headers)
         run: npm test
 
