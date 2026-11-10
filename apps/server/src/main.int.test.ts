@@ -130,6 +130,62 @@ describe('server entry (CU-018)', () => {
       await copy.exited;
     }
   }, 60_000);
+
+  it('AC-REQ-104-05 after a complete copy of the data folder at ended resellr and a new start the status of the notice is unchanged, and nothing of the notice is stored', async () => {
+    const port = await freePort();
+    const own = installation(join(root, 'own'), port);
+    const status = () =>
+      fetch(`http://127.0.0.1:${port}/api/ops/status`).then(async (response) => ({
+        status: response.status,
+        body: (await response.json()) as unknown,
+      }));
+
+    const first = startServer(own, 'start-first');
+    await waitUntilReady(port);
+    const before = await status();
+    expect(before).toStrictEqual({
+      status: 200,
+      body: { dataDirPath: own.dataDir, appVersion: '0.1.0' },
+    });
+    const response = await fetch(`http://127.0.0.1:${port}/api/ops/shutdown`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(response.status).toBe(200);
+    expect(await first.exited).toBe(0);
+
+    // The user copies the data folder completely to the backup location.
+    const backup = join(root, 'Sicherung', 'Daten');
+    cpSync(own.dataDir, backup, { recursive: true });
+    expect(readdirSync(backup).sort()).toEqual(readdirSync(own.dataDir).sort());
+    // `config.json` holds only the port (2.19), the database no state of the notice (2.17).
+    expect(JSON.parse(readFileSync(join(own.dataDir, 'config.json'), 'utf8'))).toStrictEqual({
+      port,
+    });
+    const db = new BetterSqlite3(join(own.dataDir, 'resellr.db'), { readonly: true });
+    try {
+      const names = [
+        ...(db.prepare(`SELECT name FROM sqlite_master`).pluck().all() as string[]),
+        ...(db.prepare(`SELECT key FROM app_meta`).pluck().all() as string[]),
+      ];
+      expect(names.filter((name) => /backup|notice|hinweis|sicherung/i.test(name))).toEqual([]);
+    } finally {
+      db.close();
+    }
+
+    const second = startServer(own, 'start-second');
+    try {
+      await waitUntilReady(port);
+      expect(await status()).toStrictEqual(before);
+      expect(JSON.parse(readFileSync(join(own.dataDir, 'config.json'), 'utf8'))).toStrictEqual({
+        port,
+      });
+    } finally {
+      second.process.kill('SIGTERM');
+      await second.exited;
+    }
+  }, 60_000);
 });
 
 /** A port on 127.0.0.1 that is free right now. */

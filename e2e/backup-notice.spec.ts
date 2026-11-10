@@ -1,4 +1,8 @@
+import { cpSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
 import type { Locator, Page } from '@playwright/test';
+import { CONFIG_FILE_NAME } from '@resellr/runtime-shared/configured-port';
 
 import { DATA_DIR_PATH_LENGTH, expect, test } from './fixtures/app-fixture.ts';
 import { findReachabilityProblems } from './fixtures/reachability.ts';
@@ -208,3 +212,179 @@ test.describe('Backup notice UI-044 without connection (#139)', () => {
     }
   });
 });
+
+/** Day length for the test clock; DST does not matter for "400 days later". */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Key of UI-025 for the last used section (CU-093); the only key resellr stores in the browser. */
+const LAST_SECTION_STORAGE_KEY = 'resellr.settings.lastSection';
+
+/** The whole notice once its data folder path is shown: heading, text, path and action. */
+async function loadedNotice(page: Page, dataDir: string): Promise<string> {
+  const region = notice(page);
+  // Up to 15 s: after a restart of the server under load the status can take longer than 5 s.
+  await expect(region.getByTestId('backup-notice-path')).toHaveText(dataDir, { timeout: 15_000 });
+  return region.innerText();
+}
+
+/** Every key of `localStorage` and `sessionStorage` of the page. */
+function browserStorage(page: Page) {
+  return page.evaluate(() => ({
+    local: Object.keys(localStorage),
+    session: Object.keys(sessionStorage),
+  }));
+}
+
+test.describe('Backup notice UI-044 without state (#138)', () => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      !COLUMN_ROWS.includes(testInfo.project.name),
+      'full frame only in FM-1 to FM-4, FM-6',
+    );
+  });
+
+  test('AC-REQ-104-02 UI-044.default the existing steps of J-01 work without confirming the notice, nothing is locked', async ({
+    page,
+    server,
+  }) => {
+    await page.goto('/');
+    const expected = await loadedNotice(page, server.paths.dataDir);
+    const navigation = page.getByRole('navigation', { name: 'Hauptnavigation' });
+    const content = page.getByTestId('content-area');
+
+    // J-01 steps 1 to 4 as far as their screens exist (S3 to S7 add the rest): Modell-Bibliothek,
+    // Gerät einbuchen, Inserate and the action of the empty list. Each click must reach its
+    // target, so nothing lies over it or locks it.
+    for (const [entry, url] of [
+      ['Modell-Bibliothek', /\/modelle$/],
+      ['Gerät einbuchen', /\/geraete\/neu$/],
+      ['Inserate', /\/inserate$/],
+    ] as const) {
+      await navigation.getByRole('link', { name: entry }).click();
+      await expect(page).toHaveURL(url);
+      await expect(navigation.getByRole('link', { name: entry })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    }
+    await content.getByRole('link', { name: 'Gerät einbuchen' }).click();
+    await expect(page).toHaveURL(/\/geraete\/neu$/);
+
+    // The notice asks for nothing: no dialog, no alert, no inert or hidden part of the page.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.locator('[inert], [aria-hidden="true"]:not(svg)')).toHaveCount(0);
+    expect(await notice(page).innerText()).toBe(expected);
+  });
+
+  test('AC-REQ-104-03 UI-044.default after every action at the notice and in the settings the notice is back after closing and opening, nothing hides it', async ({
+    page,
+    context,
+    server,
+  }) => {
+    await page.goto('/inserate');
+    const expected = await loadedNotice(page, server.paths.dataDir);
+    const region = notice(page);
+
+    // At the notice: the only action is "resellr beenden" (excluded); no "×", no "Schließen",
+    // no "Nicht mehr anzeigen", no collapsing. The path can be selected and copied.
+    await expect(region.getByRole('button')).toHaveText(['resellr beenden']);
+    await expect(region.getByRole('checkbox')).toHaveCount(0);
+    await expect(region.getByRole('switch')).toHaveCount(0);
+    await expect(region.getByRole('link')).toHaveCount(0);
+    const path = region.getByTestId('backup-notice-path');
+    await path.scrollIntoViewIfNeeded();
+    await path.click({ clickCount: 3 });
+    await page.keyboard.press('Control+C');
+    await region.getByRole('heading', { name: 'Sicherung einrichten' }).click();
+
+    // In the settings: every section, none of them is about the notice.
+    await page
+      .getByRole('navigation', { name: 'Hauptnavigation' })
+      .getByRole('link', { name: 'Einstellungen' })
+      .click();
+    const sections = page.getByRole('navigation', { name: 'Einstellungen' }).getByRole('link');
+    await expect(sections).toHaveCount(14);
+    for (const label of await sections.allInnerTexts()) {
+      expect(label).not.toMatch(/Sicherung|Hinweis/i);
+      await sections.filter({ hasText: label }).click();
+      await expect(page.getByTestId('settings-layout')).not.toContainText(
+        /Sicherung|Hinweis|ausblenden/i,
+      );
+      expect(await region.innerText()).toBe(expected);
+    }
+
+    // Nothing of the notice in the browser: only the last section of UI-025 is stored.
+    expect(await browserStorage(page)).toEqual({
+      local: [LAST_SECTION_STORAGE_KEY],
+      session: [],
+    });
+    expect(await context.cookies()).toEqual([]);
+
+    // Close resellr and open it again: the browser page and the server.
+    await page.close();
+    await server.restart();
+    const reopened = await context.newPage();
+    await reopened.goto('/');
+    expect(await loadedNotice(reopened, server.paths.dataDir)).toBe(expected);
+    expect(JSON.parse(readFileSync(join(server.paths.dataDir, CONFIG_FILE_NAME), 'utf8'))).toEqual({
+      port: server.port,
+    });
+  });
+
+  test('AC-REQ-104-04 UI-044.default with the system date 400 days after the first use the notice is unchanged', async ({
+    page,
+    server,
+  }) => {
+    // First use.
+    await page.goto('/inserate');
+    const expected = await loadedNotice(page, server.paths.dataDir);
+
+    const later = new Date(Date.now() + 400 * DAY_MS);
+    try {
+      await server.restart({ testClockAt: later });
+      await page.clock.setSystemTime(later);
+      await page.goto('/inserate');
+
+      expect(await page.evaluate(() => Date.now())).toBeGreaterThanOrEqual(later.getTime());
+      // The server runs with the test clock: its start is logged 400 days later.
+      expect(readyTimestamps(server.paths.logDir).some((ts) => ts >= later.getTime())).toBe(true);
+      expect(await loadedNotice(page, server.paths.dataDir)).toBe(expected);
+    } finally {
+      // The other tests of this worker need the normal clock.
+      await server.restart();
+    }
+  });
+
+  test('AC-REQ-104-05 UI-044.default after a complete copy of the data folder at ended resellr and a new start the notice is unchanged', async ({
+    page,
+    server,
+  }) => {
+    await page.goto('/inserate');
+    const expected = await loadedNotice(page, server.paths.dataDir);
+
+    try {
+      await server.shutdown();
+      const backup = join(dirname(server.paths.dataDir), 'Sicherung');
+      cpSync(server.paths.dataDir, backup, { recursive: true });
+      expect(readdirSync(backup).sort()).toEqual(readdirSync(server.paths.dataDir).sort());
+    } finally {
+      await server.restart();
+    }
+
+    await page.goto('/inserate');
+    expect(await loadedNotice(page, server.paths.dataDir)).toBe(expected);
+  });
+});
+
+/** Instants of every `server_ready` in the operations log of the server (2.19). */
+function readyTimestamps(logDir: string): number[] {
+  return readdirSync(logDir)
+    .filter((name) => name.startsWith('operations-'))
+    .flatMap((name) => readFileSync(join(logDir, name), 'utf8').split('\n'))
+    .filter((line) => line !== '')
+    .map((line) => JSON.parse(line) as { event: string; ts: string })
+    .filter(({ event }) => event === 'server_ready')
+    .map(({ ts }) => Date.parse(ts));
+}

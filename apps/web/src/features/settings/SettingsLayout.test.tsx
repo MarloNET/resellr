@@ -228,6 +228,26 @@ describe('UI-025 settings layout (CU-093)', () => {
     expect(screen.getByTestId('settings-content').textContent).toBe('');
   });
 
+  it('AC-REQ-104-03 has no section and no action for the backup notice, and every section keeps it', async () => {
+    renderAt('/einstellungen');
+    const notice = screen.getByRole('region', { name: 'Sicherung einrichten' });
+    const path = await within(notice).findByText(
+      'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten',
+    );
+
+    for (const label of DESIGNED_SECTIONS) {
+      fireEvent.click(within(sectionList()).getByRole('link', { name: label }));
+
+      const layout = await screen.findByTestId('settings-layout');
+      expect(layout.textContent).not.toMatch(/Sicherung|Hinweis|ausblenden/i);
+      expect(screen.getByRole('region', { name: 'Sicherung einrichten' })).toBe(notice);
+      expect(within(notice).getByTestId('backup-notice-path')).toBe(path);
+    }
+    // Only the last used section is remembered, nothing of the notice (Kap. 2.17).
+    expect(Object.keys(localStorage)).toEqual([LAST_SECTION_STORAGE_KEY]);
+    expect(localStorage.getItem(LAST_SECTION_STORAGE_KEY)).toBe('datenblatt-layout');
+  });
+
   it('an unknown section is not a route of UI-025 and falls back to the empty frame', () => {
     renderAt('/einstellungen/zugangspasswort');
 

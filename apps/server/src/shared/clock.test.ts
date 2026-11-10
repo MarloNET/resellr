@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
-import { type Clock, createClock, type TestClock } from './clock.ts';
+import { type Clock, createClock, createClockFromArgs, type TestClock } from './clock.ts';
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -45,6 +45,35 @@ describe('clock (CU-032)', () => {
 
     vi.advanceTimersByTime(1500);
     expect(clock.now().toISOString()).toBe('2027-12-14T10:00:01.500Z');
+  });
+
+  it('without --test-clock the arguments give the normal clock', () => {
+    const clock = createClockFromArgs(['node', 'main.ts']);
+
+    expect('set' in clock).toBe(false);
+    expect(clock.now().toISOString()).toBe('2026-11-09T10:00:00.000Z');
+  });
+
+  it('--test-clock gives the test clock at the current instant', () => {
+    const clock = createClockFromArgs(['node', 'main.ts', '--test-clock']);
+
+    expect('set' in clock).toBe(true);
+    expect(clock.now().toISOString()).toBe('2026-11-09T10:00:00.000Z');
+  });
+
+  it('--test-clock=<instant> starts the test clock at that instant, and it keeps running', () => {
+    const clock = createClockFromArgs(['node', 'main.ts', '--test-clock=2027-12-14T10:00:00.000Z']);
+
+    expect('set' in clock).toBe(true);
+    expect(clock.today()).toBe('2027-12-14');
+    vi.advanceTimersByTime(1500);
+    expect(clock.now().toISOString()).toBe('2027-12-14T10:00:01.500Z');
+  });
+
+  it('rejects --test-clock with a value that is no instant', () => {
+    expect(() => createClockFromArgs(['node', 'main.ts', '--test-clock=morgen'])).toThrow(
+      '--test-clock=morgen is no ISO 8601 instant',
+    );
   });
 
   it('returns a new Date each time so callers cannot move the clock', () => {

@@ -9,7 +9,8 @@ interface SettingsSection {
 
 /**
  * The 14 fixed sections of UI-025 in design order (Technical Specification 4.5 and 7.3,
- * OD-02 variant A): "Zugangspasswort" (UI-040) is not part of release 0.1.
+ * OD-02 variant A): "Zugangspasswort" (UI-040) is not part of release 0.1. There is no section
+ * and no setting for the backup notice UI-044: it cannot be hidden (AC-REQ-104-03, 2.17).
  */
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { label: 'Händlermarke', slug: 'haendlermarke' },
