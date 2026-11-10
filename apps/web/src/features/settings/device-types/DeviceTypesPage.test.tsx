@@ -89,6 +89,36 @@ function rename(name: string) {
   fireEvent.click(saveButton());
 }
 
+/**
+ * Another window renamed "Notebook" to "Notebook Pro" (version 4) after the first list request.
+ * Like the server, `PATCH` answers `409 version_conflict` unless it sends version 4.
+ */
+function mockConcurrentChange() {
+  let listCalls = 0;
+  return mockApi({
+    list: () => {
+      listCalls += 1;
+      const notebook =
+        listCalls === 1 ? NOTEBOOK : { ...NOTEBOOK, name: 'Notebook Pro', version: 4 };
+      return Response.json({ items: [notebook, TABLET], total: 2 });
+    },
+    writes: {
+      [PATCH_NOTEBOOK]: (init) => {
+        const body = JSON.parse(String(init?.body)) as { version: number; name: string };
+        return body.version === 4
+          ? Response.json({ ...NOTEBOOK, name: body.name, version: 5 })
+          : Response.json(errorBody('version_conflict'), { status: 409 });
+      },
+    },
+  });
+}
+
+/** The browser window gets the focus again; TanStack Query loads the list in the background. */
+async function refetchOnFocus() {
+  fireEvent(window, new Event('visibilitychange'));
+  await screen.findByRole('button', { name: /Notebook Pro/ });
+}
+
 /** Accessibility assertion of a state: every control has a name, field errors are linked. */
 function expectAccessibleForm() {
   expect(nameInput().getAttribute('aria-required')).toBe('true');
@@ -348,6 +378,49 @@ describe('UI-027 device types (CU-095)', () => {
     fireEvent.click(within(banner).getByRole('button', { name: 'Neu laden' }));
     await vi.waitFor(() => expect(nameInput().value).toBe('Notebook Pro'));
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('UI-027.conflict DER-33-08 (a) a refetch between opening and saving sends the version the form is based on and shows P-05', async () => {
+    const { sent } = mockConcurrentChange();
+    await openPage();
+
+    fireEvent.change(nameInput(), { target: { value: 'Laptop' } });
+    await refetchOnFocus();
+    fireEvent.click(saveButton());
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain(
+      'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert.',
+    );
+    expect(sent.map((write) => write.body)).toEqual([{ version: 3, name: 'Laptop', active: true }]);
+    expect(nameInput().value).toBe('Laptop');
+    expect(screen.queryByText('Geräteart gespeichert')).toBeNull();
+    expectAccessibleForm();
+  });
+
+  it('UI-027.conflict DER-33-08 (a) after P-05 a focus change before "Neu laden" does not overwrite the other change', async () => {
+    const { sent } = mockConcurrentChange();
+    await openPage();
+
+    rename('Laptop');
+    await screen.findByRole('alert');
+    await refetchOnFocus();
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+
+    expect(sent.map((write) => write.body)).toEqual([
+      { version: 3, name: 'Laptop', active: true },
+      { version: 3, name: 'Laptop', active: true },
+    ]);
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.queryByText('Geräteart gespeichert')).toBeNull();
+
+    fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Neu laden' }));
+    await vi.waitFor(() => expect(nameInput().value).toBe('Notebook Pro'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    rename('Laptop');
+    await screen.findByText('Geräteart gespeichert');
+    expect(sent[2]?.body).toEqual({ version: 4, name: 'Laptop', active: true });
   });
 
   it('UI-027.unreachable DER-33-08 (b) shows P-06 with "Erneut versuchen" when the list gets no answer, without replacing the page', async () => {

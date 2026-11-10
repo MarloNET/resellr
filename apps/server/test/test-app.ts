@@ -54,6 +54,8 @@ export function createTestApp() {
   const lifecycle = createLifecycleState('ready');
   // A test never ends the test process; it checks the calls instead.
   const exit = vi.fn<(code: number) => void>();
+  // One time source, as in `main.ts`: `now` is the clock's `now`.
+  const clock = createClock();
   const { app, writeGate } = buildApp({
     port: TEST_PORT,
     webRoot,
@@ -62,8 +64,8 @@ export function createTestApp() {
     database,
     ops: { startId: null, dataDirPath: dataDir, appVersion: TEST_APP_VERSION },
     operationsLog,
-    now: () => new Date(),
-    clock: createClock(),
+    now: clock.now,
+    clock,
     exit,
   });
 

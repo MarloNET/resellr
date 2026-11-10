@@ -49,6 +49,11 @@ type Notice =
 interface Draft {
   name: string;
   active: boolean;
+  /**
+   * Version of the state the form is based on, taken when it is opened (2.0.3). A background
+   * refetch does not change it, so a change from another window leads to `409` and P-05.
+   */
+  version: number | null;
 }
 
 /** `null` while a new device type is entered. */
@@ -57,6 +62,7 @@ type Selection = { id: number | null };
 const draftOf = (deviceType: DeviceType | undefined): Draft => ({
   name: deviceType?.name ?? '',
   active: deviceType?.active ?? true,
+  version: deviceType?.version ?? null,
 });
 
 /** First message of the Zod check in the browser, the same schema as on the server (2.0.7). */
@@ -168,9 +174,9 @@ export function DeviceTypesPage() {
     const callbacks = { onSuccess: onSaved, onError: onFailed };
     if (selectedId === null) {
       createMutation.mutate({ name: draft.name, active: draft.active }, callbacks);
-    } else if (selected) {
+    } else if (draft.version !== null) {
       updateMutation.mutate(
-        { id: selected.id, version: selected.version, name: draft.name, active: draft.active },
+        { id: selectedId, version: draft.version, name: draft.name, active: draft.active },
         callbacks,
       );
     }
