@@ -188,7 +188,9 @@ test.describe('Backup notice UI-044 without connection (#139)', () => {
 
       const content = page.getByTestId('content-area');
       const banner = content.getByRole('alert');
-      await expect(banner).toContainText('resellr ist nicht erreichbar.');
+      // P-06 comes once the status request fails, at the latest after the 5 s read limit of
+      // the API client; ending the server under load can take part of that time.
+      await expect(banner).toContainText('resellr ist nicht erreichbar.', { timeout: 15_000 });
       await expect(banner.getByRole('button', { name: 'Erneut versuchen' })).toBeVisible();
       await expect(page.getByRole('alert')).toHaveCount(1);
       await expect(notice(page).getByTestId('backup-notice-path')).toHaveText('wird geladen …');
