@@ -13,6 +13,8 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SERVER_MAIN = join(REPO_ROOT, 'apps/server/src/main.ts');
 const WEB_INDEX = join(REPO_ROOT, 'apps/web/dist/index.html');
 const READY_TIMEOUT_MS = 30_000;
+/** Time `kill` gives the server to end on SIGTERM before it ends it with SIGKILL. */
+const KILL_GRACE_MS = 5_000;
 /** Argument of the server for the test clock (`TEST_CLOCK_FLAG`, CU-032). */
 const TEST_CLOCK_FLAG = '--test-clock';
 
@@ -181,10 +183,14 @@ async function startServer(): Promise<{
   };
   let child = spawnServer();
   const kill = async () => {
-    if (child.process.exitCode === null && child.process.signalCode === null) {
-      child.process.kill('SIGTERM');
-    }
-    await child.exited;
+    const { process: running, exited } = child;
+    if (running.exitCode !== null || running.signalCode !== null) return void (await exited);
+    running.kill('SIGTERM');
+    // On SIGTERM the server waits for every open connection; a connection the browser opened
+    // in advance without a request keeps it running, so it is killed after the grace time.
+    const timer = setTimeout(() => running.kill('SIGKILL'), KILL_GRACE_MS);
+    await exited;
+    clearTimeout(timer);
   };
   const server: AppServer = {
     port,
