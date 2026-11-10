@@ -24,6 +24,8 @@ const CLI = fileURLToPath(new URL('../cli.ts', import.meta.url));
 /** Generous: a real server under Node.js with type stripping can take several seconds to start. */
 const REAL_START_MS = 90_000;
 const POLL = { timeout: 60_000, interval: 100 };
+/** Tests with the fake server also wait up to `POLL.timeout`; 5 s is too short on a slow host. */
+const FAKE_START_MS = POLL.timeout + 10_000;
 
 /**
  * `resellr-launcher` and `resellr-server` as real processes (#119 test expectation): Unix socket
@@ -208,58 +210,74 @@ describe('launcher as supervisor (CU-258, CU-259, CU-261, CU-263, CU-264)', () =
     REAL_START_MS,
   );
 
-  it('DER-102-08 after already_running open asks the health once more and hands over to LP-02 with the reference number of the warning', async () => {
-    writePort(await freePort());
-    // The server answers `starting` and ends with exit code 11 shortly after the health request of `open`.
-    const supervise = launch('supervise', fakeServer('exit-11-after-health'));
-    await expect.poll(() => fakeStarts().length, POLL).toBe(1);
+  it(
+    'DER-102-08 after already_running open asks the health once more and hands over to LP-02 with the reference number of the warning',
+    async () => {
+      writePort(await freePort());
+      // The server answers `starting` and ends with exit code 11 shortly after the health request of `open`.
+      const supervise = launch('supervise', fakeServer('exit-11-after-health'));
+      await expect.poll(() => fakeStarts().length, POLL).toBe(1);
 
-    const open = launch('open', fakeServer('exit-11-after-health'));
+      const open = launch('open', fakeServer('exit-11-after-health'));
 
-    expect(await open.exitCode).toBe(0);
-    expect(await supervise.exitCode).toBe(0);
-    await expect
-      .poll(() => fakes.chromeCalls(), POLL)
-      .toEqual([expect.stringMatching(startFailedPage)]);
-    expect(fakeStarts()).toHaveLength(1);
-  });
+      expect(await open.exitCode).toBe(0);
+      expect(await supervise.exitCode).toBe(0);
+      await expect
+        .poll(() => fakes.chromeCalls(), POLL)
+        .toEqual([expect.stringMatching(startFailedPage)]);
+      expect(fakeStarts()).toHaveLength(1);
+    },
+    FAKE_START_MS,
+  );
 
-  it('DER-102-09 after stopped open goes on with step 3: takes over the pipe, starts the server and runs on as supervisor', async () => {
-    const port = await freePort();
-    writePort(port);
-    const runs = fakeServer('exit-0-after-health', 'ready');
-    const supervise = launch('supervise', runs);
-    await expect.poll(() => fakeStarts().length, POLL).toBe(1);
+  it(
+    'DER-102-09 after stopped open goes on with step 3: takes over the pipe, starts the server and runs on as supervisor',
+    async () => {
+      const port = await freePort();
+      writePort(port);
+      const runs = fakeServer('exit-0-after-health', 'ready');
+      const supervise = launch('supervise', runs);
+      await expect.poll(() => fakeStarts().length, POLL).toBe(1);
 
-    const open = launch('open', runs);
+      const open = launch('open', runs);
 
-    expect(await supervise.exitCode).toBe(0);
-    await expect.poll(() => fakes.chromeCalls(), POLL).toEqual([`http://127.0.0.1:${port}/`]);
-    expect(fakeStarts()).toHaveLength(2);
-    expect(running(open)).toBe(true);
-  });
+      expect(await supervise.exitCode).toBe(0);
+      await expect.poll(() => fakes.chromeCalls(), POLL).toEqual([`http://127.0.0.1:${port}/`]);
+      expect(fakeStarts()).toHaveLength(2);
+      expect(running(open)).toBe(true);
+    },
+    FAKE_START_MS,
+  );
 
-  it('opens LP-02 with an own reference number of the supervisor when the aborted start left no start result', async () => {
-    writePort(await freePort());
+  it(
+    'opens LP-02 with an own reference number of the supervisor when the aborted start left no start result',
+    async () => {
+      writePort(await freePort());
 
-    const open = launch('open', fakeServer('exit-10'));
+      const open = launch('open', fakeServer('exit-10'));
 
-    expect(await open.exitCode).toBe(0);
-    await expect
-      .poll(() => fakes.chromeCalls(), POLL)
-      .toEqual([expect.stringMatching(startFailedPage)]);
-    expect(fakes.chromeCalls()[0]).not.toContain('R-ABCD-EFGH');
-  });
+      expect(await open.exitCode).toBe(0);
+      await expect
+        .poll(() => fakes.chromeCalls(), POLL)
+        .toEqual([expect.stringMatching(startFailedPage)]);
+      expect(fakes.chromeCalls()[0]).not.toContain('R-ABCD-EFGH');
+    },
+    FAKE_START_MS,
+  );
 
-  it('opens LP-02 with the reference number of the start result when the start is aborted', async () => {
-    writePort(await freePort());
+  it(
+    'opens LP-02 with the reference number of the start result when the start is aborted',
+    async () => {
+      writePort(await freePort());
 
-    const open = launch('open', fakeServer('aborted'));
+      const open = launch('open', fakeServer('aborted'));
 
-    expect(await open.exitCode).toBe(0);
-    await expect
-      .poll(() => fakes.chromeCalls(), POLL)
-      .toEqual([expect.stringMatching(startFailedPage)]);
-    expect(fakes.chromeCalls()[0]).toMatch(/\?ref=R-ABCD-EFGH$/);
-  });
+      expect(await open.exitCode).toBe(0);
+      await expect
+        .poll(() => fakes.chromeCalls(), POLL)
+        .toEqual([expect.stringMatching(startFailedPage)]);
+      expect(fakes.chromeCalls()[0]).toMatch(/\?ref=R-ABCD-EFGH$/);
+    },
+    FAKE_START_MS,
+  );
 });
