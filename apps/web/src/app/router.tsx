@@ -28,7 +28,9 @@ function ListingOverviewPlaceholder() {
  * task that builds a screen adds its route here, before the fallback route `*`. The fallback
  * route stays the last entry permanently (Technical Specification 4.2, DG-18): every path
  * without its own route shows the frame with navigation and an empty content area, without
- * text, redirect or change of the address.
+ * text, redirect or change of the address. There is no route for a login, an access password,
+ * user accounts or a password reset (OD-02 A, Technical Specification 2.20): UI-001 and UI-040
+ * are not built, and `router.test.tsx` checks the table for such paths.
  */
 export const routes: RouteObject[] = [
   {
