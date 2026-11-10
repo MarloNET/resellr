@@ -1,5 +1,5 @@
-# Linux CI (CU-003): lint, type check, unit and integration tests.
-# The E2E step with Google Chrome is added with the E2E foundation (#115).
+# Linux CI (CU-003): lint, type check, unit, integration and E2E tests with Google Chrome,
+# and the AC coverage check (CU-284).
 name: CI
 
 on:
@@ -18,7 +18,7 @@ jobs:
   linux:
     name: Lint, type check, tests (Linux)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -44,3 +44,14 @@ jobs:
 
       - name: Unit and integration tests
         run: npm test
+
+      - name: AC coverage of the completed build steps (CU-284)
+        run: node tools/qa/check-ac-coverage.mjs
+
+      # The E2E suite runs in Google Chrome (channel `chrome`, Technical Specification 6.1),
+      # which the Ubuntu runner image provides; Playwright downloads no browser.
+      - name: Google Chrome version
+        run: google-chrome --version
+
+      - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7)
+        run: npm run e2e

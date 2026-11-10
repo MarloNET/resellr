@@ -1,5 +1,9 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["*.ts", "test/**/*.ts"],
+  "compilerOptions": {
+    // The E2E suite runs functions in the browser (`page.evaluate`).
+    "lib": ["ES2024", "DOM", "DOM.Iterable"]
+  },
+  "include": ["*.ts", "test/**/*.ts", "e2e/**/*.ts"],
   "exclude": ["node_modules", "test/fixtures"]
 }
