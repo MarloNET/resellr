@@ -53,13 +53,40 @@ jobs:
 
       # Evidence of REQ-068 and REQ-069 (Technical Specification 2.20, 5): schema test over all
       # tables, audit entries without a user, error log without field values. The tests also run
-      # in `npm test`; this step names the evidence and fails if no such test is found.
+      # in `npm test`; this step names the evidence and fails if an evidence file is missing or
+      # one of them has no passing test whose name carries REQ-068 or REQ-069.
       - name: No credentials and no personal data (REQ-068, REQ-069)
-        run: >-
-          npx vitest run -t "REQ-06[89]"
-          apps/server/src/db/schema.int.test.ts
-          apps/server/src/audit/audit-writer.int.test.ts
-          apps/server/src/ops/error-log
+        env:
+          EVIDENCE_FILES: >-
+            apps/server/src/db/schema.int.test.ts
+            apps/server/src/audit/audit-writer.int.test.ts
+            apps/server/src/ops/error-log.int.test.ts
+          REPORT: ${{ runner.temp }}/req-068-069.json
+        run: |
+          set -eo pipefail
+          for file in $EVIDENCE_FILES; do
+            test -f "$file" || { echo "::error::Evidence file $file is missing"; exit 1; }
+          done
+          npx vitest run -t "REQ-06[89]" --reporter=default --reporter=json \
+            --outputFile.json="$REPORT" $EVIDENCE_FILES
+          node -e '
+            const { readFileSync } = require("node:fs");
+            const { resolve } = require("node:path");
+            const report = JSON.parse(readFileSync(process.env.REPORT, "utf8"));
+            let failed = false;
+            for (const file of process.env.EVIDENCE_FILES.trim().split(/\s+/)) {
+              const result = report.testResults.find((r) => r.name === resolve(file));
+              const passed = (result?.assertionResults ?? []).filter(
+                (a) => a.status === "passed" && /REQ-06[89]/.test(a.title),
+              ).length;
+              console.log(`${file}: ${passed} passing REQ-068/REQ-069 tests`);
+              if (passed === 0) {
+                console.log(`::error::${file} has no passing REQ-068/REQ-069 test`);
+                failed = true;
+              }
+            }
+            process.exit(failed ? 1 : 0);
+          '
 
       # The E2E suite runs in Google Chrome (channel `chrome`, Technical Specification 6.1),
       # which the Ubuntu runner image provides; Playwright downloads no browser.

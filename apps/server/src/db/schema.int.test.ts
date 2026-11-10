@@ -704,7 +704,7 @@ describe('constraints of the initial migration (CU-030)', () => {
   });
 });
 
-// Words of a table or column name (split at `_`) that point to data REQ-068 and REQ-069 forbid.
+// Words of a table or column name (split at `_` and camelCase) that point to data REQ-068 and REQ-069 forbid.
 const FORBIDDEN_WORDS: Readonly<Record<string, readonly string[]>> = {
   'platform credentials (REQ-068)': [
     'password',
@@ -717,6 +717,7 @@ const FORBIDDEN_WORDS: Readonly<Record<string, readonly string[]>> = {
     'credential',
     'credentials',
     'apikey',
+    'pin',
     'oauth',
     'login',
     'logon',
@@ -742,6 +743,7 @@ const FORBIDDEN_WORDS: Readonly<Record<string, readonly string[]>> = {
     'email',
     'mail',
     'phone',
+    'tel',
     'telefon',
     'mobile',
     'birthday',
@@ -761,6 +763,8 @@ const FORBIDDEN_WORDS: Readonly<Record<string, readonly string[]>> = {
     'author',
     'editor',
     'member',
+    'actor',
+    'approver',
     'firstname',
     'lastname',
     'surname',
@@ -801,7 +805,10 @@ const BUSINESS_CONTACT_COLUMNS: Readonly<Record<string, string>> = {
 
 /** Why a table or column name points to forbidden data, or null. */
 function forbiddenReason(name: string): string | null {
-  const words = name.toLowerCase().split('_');
+  const words = name
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .split('_');
   for (const [reason, forbidden] of Object.entries(FORBIDDEN_WORDS)) {
     const word = words.find((w) => forbidden.includes(w));
     if (word) return `${reason}: "${word}"`;
@@ -837,6 +844,12 @@ describe('no credentials and no personal data in the data model (REQ-068, REQ-06
     'created_by',
     'released_by',
     'reconciled_by',
+    'actor_id',
+    'approver',
+    'device_pin',
+    'contact_tel',
+    'buyerName',
+    'createdBy',
   ])('REQ-069 the check catches the column name %s', (name) => {
     expect(forbiddenReason(name)).not.toBeNull();
   });
