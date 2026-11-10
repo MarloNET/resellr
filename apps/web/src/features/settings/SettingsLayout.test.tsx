@@ -200,6 +200,14 @@ describe('UI-025 settings layout (CU-093)', () => {
     expect(localStorage.getItem(LAST_SECTION_STORAGE_KEY)).toBe('auswahllisten');
   });
 
+  it('UI-025.default: a section without its screen keeps the list, an empty content area and the address', () => {
+    const router = renderAt('/einstellungen/kanaele');
+
+    expect(router.state.location.pathname).toBe('/einstellungen/kanaele');
+    expect(within(sectionList()).getAllByRole('link')).toHaveLength(14);
+    expect(screen.getByTestId('settings-content').textContent).toBe('');
+  });
+
   it('an unknown section is not a route of UI-025 and falls back to the empty frame', () => {
     renderAt('/einstellungen/zugangspasswort');
 
