@@ -10,11 +10,15 @@ const WEB_ROOT = resolve(import.meta.dirname, '..');
 
 /**
  * URL strings in the production bundle that are no requests: XML namespaces of react-dom,
- * links inside error messages of React and React Router, and React Router's base for
- * parsing relative URLs (`new URL(path, 'http://localhost')`) when no window is present.
+ * links inside error messages of React and React Router, React Router's base for parsing
+ * relative URLs (`new URL(path, 'http://localhost')`) when no window is present, and from Zod
+ * (error response schema of the API client) the `$schema` identifiers of its JSON Schema output.
  */
 const NON_REQUEST_URLS = [
+  'http://json-schema.org/draft-04/schema#',
+  'http://json-schema.org/draft-07/schema#',
   'http://localhost',
+  'https://json-schema.org/draft/2020-12/schema',
   'https://reactrouter.com/en/main/routers/picking-a-router.',
   'http://www.w3.org/1998/Math/MathML',
   'http://www.w3.org/1999/xhtml',
@@ -84,7 +88,9 @@ describe('E6 bundle without external resources (REQ-079)', () => {
       (url) =>
         !url.startsWith('http://127.0.0.1') &&
         !NON_REQUEST_URLS.some((allowed) => url === allowed || url.startsWith(`${allowed}/`)) &&
-        !url.startsWith('https://react.dev/errors/'),
+        !url.startsWith('https://react.dev/errors/') &&
+        // Template with a variable host, e.g. Zod's IPv6 check `new URL(`http://[${value}]`)`.
+        !/^https?:\/\/\[?\$\{\w+\}\]?$/.test(url),
     );
     expect(external).toEqual([]);
     expect(text).not.toMatch(/@import\s+url|url\(\s*["']?\/\//);

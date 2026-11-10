@@ -52,16 +52,40 @@ export type ErrorMessageUsage<C extends ErrorCode> = keyof typeof ERROR_MESSAGES
   : never;
 
 /**
+ * Lines of the backup notice text (REQ-104). UI-044 shows "So geht es" and the two steps on
+ * their own lines; joined with spaces they are the unchanged wording of `backupNoticeText`.
+ */
+const BACKUP_NOTICE_LINES = {
+  backupNoticeIntro:
+    'resellr sichert Ihre Daten nicht selbst. Bitte sichern Sie sie regelmäßig selbst, ' +
+    'zum Beispiel in OneDrive.',
+  backupNoticeStepsLead: 'So geht es:',
+  backupNoticeStep1: '1. resellr beenden.',
+  backupNoticeStep2: '2. Den Datenordner vollständig an Ihren Sicherungsort kopieren.',
+  backupNoticeLocationLead: 'Der Datenordner liegt hier:',
+  backupNoticeWarning:
+    'Wichtig: Eine Kopie, die bei laufendem resellr entsteht, kann unbrauchbar sein.',
+} as const;
+
+/**
  * Fixed texts of the backup notice and of "resellr beenden" (REQ-104, REQ-105) and the banner
  * texts of the patterns P-05 to P-08 (design chapter 5).
  */
 export const FIXED_TEXTS = {
   backupNoticeTitle: 'Sicherung einrichten',
+  ...BACKUP_NOTICE_LINES,
   backupNoticeText: (dataDirPath: string) =>
-    'resellr sichert Ihre Daten nicht selbst. Bitte sichern Sie sie regelmäßig selbst, ' +
-    'zum Beispiel in OneDrive. So geht es: 1. resellr beenden. 2. Den Datenordner ' +
-    `vollständig an Ihren Sicherungsort kopieren. Der Datenordner liegt hier: ${dataDirPath}. ` +
-    'Wichtig: Eine Kopie, die bei laufendem resellr entsteht, kann unbrauchbar sein.',
+    [
+      BACKUP_NOTICE_LINES.backupNoticeIntro,
+      BACKUP_NOTICE_LINES.backupNoticeStepsLead,
+      BACKUP_NOTICE_LINES.backupNoticeStep1,
+      BACKUP_NOTICE_LINES.backupNoticeStep2,
+      `${BACKUP_NOTICE_LINES.backupNoticeLocationLead} ${dataDirPath}.`,
+      BACKUP_NOTICE_LINES.backupNoticeWarning,
+    ].join(' '),
+  /** UI-044.loading: at the place of the path while `GET /api/ops/status` loads. */
+  backupNoticeLoading: 'wird geladen …',
+  shutdownAction: 'resellr beenden',
   shutdownQuestion:
     'resellr jetzt beenden? Nicht gespeicherte Eingaben gehen verloren. ' +
     'Danach können Sie den Datenordner kopieren.',
