@@ -153,7 +153,12 @@ describe('POST /api/ops/shutdown (CU-041, 2.17)', () => {
       await started;
       let shutdownDone = false;
       const shutdownResponse = s.app
-        .inject({ method: 'POST', url: '/api/ops/shutdown', headers: SAME_ORIGIN_WRITE, payload: {} })
+        .inject({
+          method: 'POST',
+          url: '/api/ops/shutdown',
+          headers: SAME_ORIGIN_WRITE,
+          payload: {},
+        })
         .finally(() => {
           shutdownDone = true;
         });
