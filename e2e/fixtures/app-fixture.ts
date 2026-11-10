@@ -14,6 +14,9 @@ const SERVER_MAIN = join(REPO_ROOT, 'apps/server/src/main.ts');
 const WEB_INDEX = join(REPO_ROOT, 'apps/web/dist/index.html');
 const READY_TIMEOUT_MS = 30_000;
 
+/** Length of the data folder path in every E2E run (Technical Specification 6.3, UI-044). */
+export const DATA_DIR_PATH_LENGTH = 100;
+
 /** The server of one test worker. */
 export interface AppServer {
   port: number;
@@ -104,9 +107,24 @@ async function waitUntilReady(server: AppServer, process: ChildProcess): Promise
 }
 
 /**
+ * Data folder below `root` whose path has exactly `DATA_DIR_PATH_LENGTH` characters, so the
+ * backup notice UI-044 shows a 100-character path in every row of the matrix (6.3).
+ */
+function longDataDir(root: string): string {
+  const prefix = join(root, 'Daten-');
+  const padding = DATA_DIR_PATH_LENGTH - prefix.length;
+  if (padding < 1) {
+    throw new Error(
+      `The temporary folder ${root} is too long for a ${DATA_DIR_PATH_LENGTH}-character data folder path`,
+    );
+  }
+  return prefix + 'x'.repeat(padding);
+}
+
+/**
  * Starts `resellr-server` for one test worker (CU-062): own temporary data, log, handover and
- * update-copy folder, `config.json` with a free port, migrated empty database. The user
- * interface comes from `apps/web/dist` (`npm run build`).
+ * update-copy folder, `config.json` with a free port, migrated empty database. The data folder
+ * path has 100 characters. The user interface comes from `apps/web/dist` (`npm run build`).
  */
 async function startServer(): Promise<{
   server: AppServer;
@@ -118,7 +136,7 @@ async function startServer(): Promise<{
   }
   const root = mkdtempSync(join(tmpdir(), 'resellr-e2e-'));
   const paths: RuntimePaths = {
-    dataDir: join(root, 'Daten'),
+    dataDir: longDataDir(root),
     logDir: join(root, 'Protokolle'),
     handoverDir: join(root, 'Fotoübergabe'),
     updateCopyDir: join(root, 'Update-Kopien'),

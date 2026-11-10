@@ -1,12 +1,14 @@
 import { Outlet } from 'react-router';
 
+import { BackupNotice } from '../features/backup-notice/BackupNotice.tsx';
 import { Navigation } from './Navigation.tsx';
 
 /**
  * Application frame (CU-044, Technical Specification 2.17 variant A, Design Kap. 3): left
  * column 208 px wide and as high as the viewport with the fixed head "resellr" (40 px) and
- * below it one scrolling area with the entries (the backup notice UI-044 follows there with
- * `margin-top: auto`); the content area scrolls separately and never horizontally (R-1 (2)).
+ * below it one scrolling area with the entries and the backup notice UI-044 (`margin-top: auto`:
+ * at the lower edge with enough height, otherwise after the entries); the content area scrolls
+ * separately and never horizontally (R-1 (2)).
  */
 export function AppFrame() {
   return (
@@ -23,6 +25,7 @@ export function AppFrame() {
           className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
         >
           <Navigation />
+          <BackupNotice variant="sidebar" />
         </div>
       </aside>
       <main

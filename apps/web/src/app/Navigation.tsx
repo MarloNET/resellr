@@ -12,7 +12,8 @@ const startsWith = (prefix: string) => (pathname: string) =>
 
 /**
  * The six fixed entries of the left column (CU-045, Design Kap. 3, Technical Specification
- * 4.2); hotspot rule 4.5: no change. "Einstellungen" opens "Händlermarke" (UI-025, first call).
+ * 4.2); hotspot rule 4.5: no change. "Einstellungen" leads to `/einstellungen`, which opens the
+ * last used section, on the first call "Händlermarke" (UI-025.default).
  */
 export const NAVIGATION_ENTRIES: readonly NavigationEntry[] = [
   { label: 'Inserate', to: '/inserate', isCurrent: startsWith('/inserate') },
@@ -27,7 +28,7 @@ export const NAVIGATION_ENTRIES: readonly NavigationEntry[] = [
   { label: 'Änderungsprotokoll', to: '/protokoll', isCurrent: startsWith('/protokoll') },
   {
     label: 'Einstellungen',
-    to: '/einstellungen/haendlermarke',
+    to: '/einstellungen',
     isCurrent: startsWith('/einstellungen'),
   },
 ];
