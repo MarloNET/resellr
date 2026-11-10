@@ -101,6 +101,20 @@ describe('IPC to the supervisor (CU-249)', () => {
     expect(lost).toHaveBeenCalledOnce();
   });
 
+  it('holds the channel open only once a handler waits for its end', () => {
+    const ipcProcess = processWithChannel();
+    const once = vi.spyOn(ipcProcess, 'once');
+    const ipc = createSupervisorIpc(ipcProcess, 'start-1');
+
+    // An aborted start adds no handler and must end with an empty event loop (FIND-296).
+    ipc.reportReady();
+    expect(once).not.toHaveBeenCalled();
+
+    ipc.onSupervisorLost(vi.fn());
+    ipc.onSupervisorLost(vi.fn());
+    expect(once).toHaveBeenCalledExactlyOnceWith('disconnect', expect.any(Function));
+  });
+
   it('does nothing without a channel, as when started directly', () => {
     const lost = vi.fn();
     const ipc = createSupervisorIpc(withoutChannel, null);

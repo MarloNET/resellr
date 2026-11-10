@@ -11,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const SERVER_MAIN = fileURLToPath(new URL('../main.ts', import.meta.url));
 const START_TIMEOUT_MS = 60_000;
+/** An aborted start ends within this time; a channel holding the event loop open never ends. */
+const ABORT_EXIT_MS = 15_000;
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -38,8 +40,8 @@ afterEach(async () => {
 });
 
 /** Starts the real server as the supervisor does: hidden, with an IPC channel (2.18). */
-async function startServer(): Promise<{ server: ChildProcess; port: number }> {
-  const port = await freePort();
+async function startServer(port?: number): Promise<{ server: ChildProcess; port: number }> {
+  port ??= await freePort();
   const dataDir = join(root, 'Daten');
   mkdirSync(dataDir);
   writeFileSync(join(dataDir, 'config.json'), JSON.stringify({ port }));
@@ -57,6 +59,21 @@ async function startServer(): Promise<{ server: ChildProcess; port: number }> {
   });
   child = server;
   return { server, port };
+}
+
+let blocker: ReturnType<typeof createServer> | undefined;
+
+afterEach(async () => {
+  if (blocker) await new Promise((resolve) => blocker?.close(resolve));
+  blocker = undefined;
+});
+
+/** Occupies a port on the server's listen address, so its start aborts (`EADDRINUSE`). */
+async function occupiedPort(): Promise<number> {
+  blocker = createServer();
+  blocker.listen(0, '127.0.0.1');
+  await once(blocker, 'listening');
+  return (blocker.address() as { port: number }).port;
 }
 
 describe('server under a supervisor (CU-018, CU-040, CU-249)', () => {
@@ -93,6 +110,20 @@ describe('server under a supervisor (CU-018, CU-040, CU-249)', () => {
 
       expect(await exited).toEqual([ExitCode.SupervisorLost, null]);
       expect(existsSync(join(root, 'Daten', 'resellr.db-wal'))).toBe(false);
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
+    'ends with exit code 10 under the supervisor when the start aborts on an occupied port',
+    async () => {
+      const { server } = await startServer(await occupiedPort());
+
+      // The open IPC channel must not keep the aborted server running (FIND-296).
+      const exited = once(server, 'exit');
+      const timeout = new Promise((resolve) => setTimeout(resolve, ABORT_EXIT_MS, 'timeout'));
+
+      expect(await Promise.race([exited, timeout])).toEqual([ExitCode.StartAborted, null]);
     },
     START_TIMEOUT_MS,
   );

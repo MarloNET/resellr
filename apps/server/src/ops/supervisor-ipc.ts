@@ -32,7 +32,6 @@ export function createSupervisorIpc(ipcProcess: IpcProcess, startId: string | nu
     lost = true;
     for (const handle of lostHandlers.splice(0)) handle();
   };
-  if (hasChannel && !lost) ipcProcess.once('disconnect', markLost);
 
   return {
     reportReady: () => {
@@ -49,8 +48,15 @@ export function createSupervisorIpc(ipcProcess: IpcProcess, startId: string | nu
     },
     onSupervisorLost: (handle) => {
       if (!hasChannel) return;
-      if (lost || !ipcProcess.connected) handle();
-      else lostHandlers.push(handle);
+      if (lost || !ipcProcess.connected) {
+        handle();
+        return;
+      }
+      // Only now: a `disconnect` listener keeps the channel and so the event loop open, which an
+      // aborted start relies on running empty (exit code 10). A channel closed during the start is
+      // noticed by `connected` or the failed ready report.
+      if (lostHandlers.length === 0) ipcProcess.once('disconnect', markLost);
+      lostHandlers.push(handle);
     },
   };
 }

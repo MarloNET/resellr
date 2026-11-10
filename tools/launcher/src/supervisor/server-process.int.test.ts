@@ -8,6 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FAKE_REF_NO, FAKE_SERVER } from '../../test/fake-programs.ts';
 import { classifyServerExit, SERVER_ENTRY, startServerProcess } from './server-process.ts';
 
+/** How long the fake server may take to report; the test limit leaves room above it. */
+const FAKE_POLL = { timeout: 10_000 };
+const FAKE_START_MS = FAKE_POLL.timeout + 10_000;
+
 let root: string;
 let paths: RuntimePaths;
 
@@ -70,31 +74,47 @@ describe('server process (CU-264)', () => {
     ]);
   });
 
-  it('calls onReady when the server reports ready with the startId of this attempt', async () => {
-    const server = startFake('ready');
-    await expect.poll(() => server.onReady.mock.calls.length, { timeout: 10_000 }).toBe(1);
-  });
+  it(
+    'calls onReady when the server reports ready with the startId of this attempt',
+    async () => {
+      const server = startFake('ready');
+      await expect.poll(() => server.onReady.mock.calls.length, FAKE_POLL).toBe(1);
+    },
+    FAKE_START_MS,
+  );
 
-  it('ignores ready with another startId', async () => {
-    const server = startFake('ready-other-start');
-    await expect.poll(() => existsSync(join(root, 'starts.jsonl')), { timeout: 10_000 }).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(server.onReady).not.toHaveBeenCalled();
-  });
+  it(
+    'ignores ready with another startId',
+    async () => {
+      const server = startFake('ready-other-start');
+      await expect.poll(() => existsSync(join(root, 'starts.jsonl')), FAKE_POLL).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(server.onReady).not.toHaveBeenCalled();
+    },
+    FAKE_START_MS,
+  );
 
-  it('reads the reference number of the abort from start-result.json of this start', async () => {
-    await expect(startFake('aborted').ended).resolves.toEqual({
-      kind: 'aborted',
-      refNo: FAKE_REF_NO,
-    });
-  });
+  it(
+    'reads the reference number of the abort from start-result.json of this start',
+    async () => {
+      await expect(startFake('aborted').ended).resolves.toEqual({
+        kind: 'aborted',
+        refNo: FAKE_REF_NO,
+      });
+    },
+    FAKE_START_MS,
+  );
 
-  it('never uses the start result of another start (FIND-112 b)', async () => {
-    await expect(startFake('aborted-other-start').ended).resolves.toEqual({
-      kind: 'aborted',
-      refNo: null,
-    });
-  });
+  it(
+    'never uses the start result of another start (FIND-112 b)',
+    async () => {
+      await expect(startFake('aborted-other-start').ended).resolves.toEqual({
+        kind: 'aborted',
+        refNo: null,
+      });
+    },
+    FAKE_START_MS,
+  );
 
   it.each([
     ['exit-11', { kind: 'already_running' }],
