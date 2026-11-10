@@ -14,6 +14,7 @@ import type { Migration } from '../db/migrator.ts';
 import { createClock } from '../shared/clock.ts';
 import { createErrorLog } from './error-log.ts';
 import { createLifecycleState, type LifecycleStateName } from './lifecycle-state.ts';
+import { createOperationsLog } from './operations-log.ts';
 import { runStartup, type StartupOptions, type StartupResult } from './startup.ts';
 
 let root: string;
@@ -59,6 +60,13 @@ function start(overrides: Partial<StartupOptions> = {}) {
       errorLog,
       lifecycle,
       ops: { startId: 's-1', dataDirPath: paths.dataDir, appVersion: '0.1.0' },
+      operationsLog: createOperationsLog({
+        dir: paths.logDir,
+        appVersion: '0.1.0',
+        startId: 's-1',
+      }),
+      now: clock.now,
+      exit: () => {},
     }),
     ...overrides,
   };

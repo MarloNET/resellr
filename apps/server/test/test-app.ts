@@ -2,12 +2,12 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { Kysely } from 'kysely';
+import { vi } from 'vitest';
 
 import { type AppDeps, buildApp } from '../src/app.ts';
-import { openDatabase } from '../src/db/database.ts';
+import { type Database, openDatabase } from '../src/db/database.ts';
 import type { DB } from '../src/db/schema.ts';
-import { createErrorLog, createLifecycleState } from '../src/ops/index.ts';
+import { createErrorLog, createLifecycleState, createOperationsLog } from '../src/ops/index.ts';
 
 export const TEST_PORT = 4310;
 export const HOST = `127.0.0.1:${TEST_PORT}`;
@@ -45,21 +45,33 @@ export function createTestApp() {
   const database = openDatabase<DB>(join(dataDir, 'resellr.db'));
 
   const errorLog = createErrorLog({ dir: logDir, appVersion: TEST_APP_VERSION, startId: null });
+  const operationsLog = createOperationsLog({
+    dir: logDir,
+    appVersion: TEST_APP_VERSION,
+    startId: null,
+  });
   const lifecycle = createLifecycleState('ready');
+  // A test never ends the test process; it checks the calls instead.
+  const exit = vi.fn<(code: number) => void>();
   const { app, writeGate } = buildApp({
     port: TEST_PORT,
     webRoot,
     errorLog,
     lifecycle,
-    db: database.db,
+    database,
     ops: { startId: null, dataDirPath: dataDir, appVersion: TEST_APP_VERSION },
+    operationsLog,
+    now: () => new Date(),
+    exit,
   });
 
   /** All entries of the error log, oldest first. */
   const readErrorLog = (): Record<string, unknown>[] => {
     let names: string[];
     try {
-      names = readdirSync(logDir).sort();
+      names = readdirSync(logDir)
+        .filter((name) => name.startsWith('errors-'))
+        .sort();
     } catch {
       return [];
     }
@@ -77,10 +89,11 @@ export function createTestApp() {
     rmSync(root, { recursive: true, force: true });
   };
 
-  return { app, lifecycle, writeGate, dataDir, webRoot, readErrorLog, close };
+  return { app, lifecycle, writeGate, database, exit, dataDir, webRoot, readErrorLog, close };
 }
 
 /** `buildApp` of CU-019 in the form the startup sequence (CU-040) takes, as `main.ts` passes it. */
-export function appFactory(deps: Omit<AppDeps, 'port' | 'db'>) {
-  return ({ port, db }: { port: number; db: Kysely<DB> }) => buildApp({ ...deps, port, db }).app;
+export function appFactory(deps: Omit<AppDeps, 'port' | 'database'>) {
+  return ({ port, database }: { port: number; database: Database<DB> }) =>
+    buildApp({ ...deps, port, database }).app;
 }

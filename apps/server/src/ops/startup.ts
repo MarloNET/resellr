@@ -3,9 +3,8 @@ import { join } from 'node:path';
 import { createReferenceNumber } from '@resellr/runtime-shared/reference-number';
 import type { RuntimePaths } from '@resellr/runtime-shared/paths';
 import type { FastifyInstance } from 'fastify';
-import type { Kysely } from 'kysely';
 
-import { openDatabase } from '../db/database.ts';
+import { type Database, openDatabase } from '../db/database.ts';
 import { migrations as shippedMigrations } from '../db/migrations/index.ts';
 import { type Migration, runMigrations } from '../db/migrator.ts';
 import type { DB } from '../db/schema.ts';
@@ -29,8 +28,11 @@ export interface StartupOptions {
   clock: Clock;
   errorLog: ErrorLog;
   lifecycle: LifecycleState;
-  /** Builds the app on the migrated database; `main.ts` passes `buildApp` of CU-019. */
-  buildApp: (input: { port: number; db: Kysely<DB> }) => FastifyInstance;
+  /**
+   * Builds the app on the migrated database; `main.ts` passes `buildApp` of CU-019. The app gets
+   * the database itself, because the shutdown closes and on failure reopens it (2.17).
+   */
+  buildApp: (input: { port: number; database: Database<DB> }) => FastifyInstance;
   /** Loopback address the server listens on (`LISTEN_HOST`, ADR-002). */
   host: string;
   /** Migrations to run; the shipped list CU-308 unless a test adds its own. */
@@ -99,7 +101,7 @@ export async function runStartup({
   let app: FastifyInstance;
   try {
     await runMigrations(database, migrations, clock.now);
-    app = buildApp({ port: config.port, db: database.db });
+    app = buildApp({ port: config.port, database });
   } catch (error) {
     await database.close();
     throw error;

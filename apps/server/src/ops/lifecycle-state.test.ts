@@ -21,4 +21,18 @@ describe('lifecycle state (CU-038)', () => {
     lifecycle.set('ready');
     expect(lifecycle.isStopping()).toBe(false);
   });
+
+  it('beginStopping changes only ready to stopping', () => {
+    const lifecycle = createLifecycleState('ready');
+
+    expect(lifecycle.beginStopping()).toBe(true);
+    expect(lifecycle.get()).toBe('stopping');
+    // A second shutdown is refused (2.17, step 1).
+    expect(lifecycle.beginStopping()).toBe(false);
+    expect(lifecycle.get()).toBe('stopping');
+
+    const starting = createLifecycleState();
+    expect(starting.beginStopping()).toBe(false);
+    expect(starting.get()).toBe('starting');
+  });
 });

@@ -7,7 +7,12 @@ import { resolveRuntimePaths } from '@resellr/runtime-shared/paths';
 
 import { buildApp } from './app.ts';
 import { LISTEN_HOST } from './http/index.ts';
-import { createErrorLog, createLifecycleState, runStartup } from './ops/index.ts';
+import {
+  createErrorLog,
+  createLifecycleState,
+  createOperationsLog,
+  runStartup,
+} from './ops/index.ts';
 import { createClock, TEST_CLOCK_FLAG } from './shared/clock.ts';
 
 const APP_VERSION = '0.1.0';
@@ -16,6 +21,12 @@ const paths = resolveRuntimePaths();
 const startId = process.env.RESELLR_START_ID || null;
 const clock = createClock({ testClock: process.argv.includes(TEST_CLOCK_FLAG) });
 const errorLog = createErrorLog({
+  dir: paths.logDir,
+  appVersion: APP_VERSION,
+  startId,
+  now: clock.now,
+});
+const operationsLog = createOperationsLog({
   dir: paths.logDir,
   appVersion: APP_VERSION,
   startId,
@@ -35,14 +46,18 @@ const result = await runStartup({
   errorLog,
   lifecycle,
   host: LISTEN_HOST,
-  buildApp: ({ port, db }) =>
+  buildApp: ({ port, database }) =>
     buildApp({
       port,
-      db,
+      database,
       webRoot,
       errorLog,
       lifecycle,
       ops: { startId, dataDirPath: paths.dataDir, appVersion: APP_VERSION },
+      operationsLog,
+      now: clock.now,
+      // After an orderly shutdown (2.17 step 7): exit code 0, the supervisor restarts nothing.
+      exit: (code) => process.exit(code),
     }).app,
 });
 
