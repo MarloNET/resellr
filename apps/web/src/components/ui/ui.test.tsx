@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useRef, useState, type RefObject } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Badge } from './Badge.tsx';
 import { Button } from './Button.tsx';
@@ -17,12 +17,19 @@ import { Sheet, SheetContent, SheetTrigger } from './Sheet.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './Table.tsx';
 
 /** A screen that opens a dialog from a button without `DialogTrigger`, like the feature screens. */
-function DialogScreen({ useOtherTarget = false }: { useOtherTarget?: boolean }) {
+function DialogScreen({
+  useOtherTarget = false,
+  targetRef,
+  onCloseAutoFocus,
+}: {
+  useOtherTarget?: boolean;
+  targetRef?: RefObject<HTMLElement | null>;
+  onCloseAutoFocus?: (event: Event, otherTarget: HTMLElement | null) => void;
+}) {
   const [open, setOpen] = useState(false);
   const otherTargetRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef: RefObject<HTMLElement | null> | undefined = useOtherTarget
-    ? otherTargetRef
-    : undefined;
+  const returnFocusRef: RefObject<HTMLElement | null> | undefined =
+    targetRef ?? (useOtherTarget ? otherTargetRef : undefined);
 
   return (
     <>
@@ -33,7 +40,13 @@ function DialogScreen({ useOtherTarget = false }: { useOtherTarget?: boolean }) 
         Statusanzeige
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent width={480} returnFocusRef={returnFocusRef}>
+        <DialogContent
+          width={480}
+          returnFocusRef={returnFocusRef}
+          onCloseAutoFocus={
+            onCloseAutoFocus && ((event) => onCloseAutoFocus(event, otherTargetRef.current))
+          }
+        >
           <DialogHeader>
             <DialogTitle>Als beendet melden</DialogTitle>
           </DialogHeader>
@@ -137,6 +150,66 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Statusanzeige' })),
     );
+  });
+
+  /** A target the screen set, e.g. a list cell, that is gone from the DOM when the dialog closes. */
+  function removedTarget(): RefObject<HTMLElement | null> {
+    const target = document.createElement('button');
+    document.body.append(target);
+    target.remove();
+    return { current: target };
+  }
+
+  it('F1 Dialog returns the focus to the opening element after Esc when the target is gone', async () => {
+    render(<DialogScreen targetRef={removedTarget()} />);
+    const dialog = openDialogFromFocusedButton();
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Als beendet melden' }),
+      ),
+    );
+  });
+
+  it('F1 Dialog returns the focus to the opening element after "Abbrechen" when the target is gone', async () => {
+    render(<DialogScreen targetRef={removedTarget()} />);
+    openDialogFromFocusedButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Als beendet melden' }),
+      ),
+    );
+  });
+
+  it('F2 an own onCloseAutoFocus with preventDefault() takes precedence over the focus return', async () => {
+    const onCloseAutoFocus = vi.fn((event: Event, otherTarget: HTMLElement | null) => {
+      event.preventDefault();
+      otherTarget?.focus();
+    });
+    render(<DialogScreen onCloseAutoFocus={onCloseAutoFocus} />);
+    openDialogFromFocusedButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalledOnce());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Statusanzeige' }));
+  });
+
+  it('F2 an own onCloseAutoFocus without preventDefault() keeps the focus return', async () => {
+    const onCloseAutoFocus = vi.fn();
+    render(<DialogScreen onCloseAutoFocus={onCloseAutoFocus} />);
+    openDialogFromFocusedButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalledOnce());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Als beendet melden' }));
   });
 
   it('Sheet overlays with "Schließen" and closes with it and with Esc', () => {
