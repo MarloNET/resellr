@@ -62,6 +62,26 @@ describe('security headers (E9)', () => {
     expect(response.headers['referrer-policy']).toBe('no-referrer');
   });
 
+  it.each(cases)(
+    'REQ-079 %s allows connections and scripts only to the own origin and no embedding',
+    async (_case, request) => {
+      const response = await t.app.inject(request);
+      const directives = String(response.headers['content-security-policy'])
+        .split(';')
+        .map((directive) => directive.trim());
+
+      expect(directives).toEqual(
+        expect.arrayContaining([
+          "connect-src 'self'",
+          "script-src 'self'",
+          "object-src 'none'",
+          "base-uri 'none'",
+          "frame-ancestors 'none'",
+        ]),
+      );
+    },
+  );
+
   it.each(cases.filter(([, request]) => request.url.startsWith('/api')))(
     '%s under /api is not cached',
     async (_case, request) => {
