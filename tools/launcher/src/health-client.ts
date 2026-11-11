@@ -15,8 +15,11 @@ export interface ShutdownResponse {
 export interface HealthClient {
   /** Local address of resellr, `http://127.0.0.1:<port>/` (2.0.1). */
   appUrl: string;
-  /** State of the running server, or null without a valid answer within 1 s. */
-  getHealth(): Promise<HealthState | null>;
+  /**
+   * State of the running server, or null without a valid answer within the time limit: 1 s in
+   * the flow `open`, 5 s for the availability check (CU-265).
+   */
+  getHealth(timeoutMs?: number): Promise<HealthState | null>;
   /** Asks the running server to stop; null if no server answers (2.17). */
   shutdown(): Promise<ShutdownResponse | null>;
 }
@@ -34,10 +37,10 @@ export interface HealthClientOptions {
 export function createHealthClient({ port }: HealthClientOptions): HealthClient {
   const appUrl = `http://127.0.0.1:${port}/`;
 
-  const getHealth = async (): Promise<HealthState | null> => {
+  const getHealth = async (timeoutMs = HEALTH_TIMEOUT_MS): Promise<HealthState | null> => {
     try {
       const response = await fetch(new URL('/api/ops/health', appUrl), {
-        signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (response.status !== 200) return null;
       const body: unknown = await response.json();
