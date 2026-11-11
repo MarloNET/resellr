@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { join } from 'node:path';
 
-import { IS_BUNDLED, programFolderPaths, resolveRuntimePaths } from './paths.ts';
+import {
+  IS_BUNDLED,
+  isInRuntimeFolder,
+  programFolderPaths,
+  resolveRuntimePaths,
+  runtimeFolders,
+} from './paths.ts';
 
 const LOCAL_APP_DATA = 'C:\\Users\\haendler\\AppData\\Local';
 
@@ -81,5 +87,46 @@ describe('program folder paths (Technical Specification 2.19, Nachtrag MAR-446)'
 
   it('is not bundled in the source tree, where RESELLR_BUNDLED is not defined', () => {
     expect(IS_BUNDLED).toBe(false);
+  });
+});
+
+describe('runtime folders the server may write in (REQ-106)', () => {
+  const paths = {
+    dataDir: '/tmp/resellr/Daten',
+    logDir: '/tmp/resellr/Protokolle',
+    handoverDir: '/tmp/resellr/Fotoübergabe',
+    updateCopyDir: '/tmp/resellr/Update-Kopien',
+  };
+
+  it('lists the data, log, handover and update-copy folder', () => {
+    expect(runtimeFolders(paths)).toEqual([
+      '/tmp/resellr/Daten',
+      '/tmp/resellr/Protokolle',
+      '/tmp/resellr/Fotoübergabe',
+      '/tmp/resellr/Update-Kopien',
+    ]);
+  });
+
+  it.each([
+    '/tmp/resellr/Daten',
+    '/tmp/resellr/Daten/resellr.db-wal',
+    '/tmp/resellr/Daten/media/photos/..hidden',
+    '/tmp/resellr/Protokolle/operations-2026-11-11.jsonl',
+    '/tmp/resellr/Fotoübergabe/A1-shop-20261101-120000-fotos.zip',
+    '/tmp/resellr/Update-Kopien/20261111-v0.1.0-v0.2.0/resellr.db',
+    '/tmp/resellr/Daten/media/../config.json',
+  ])('%s lies in a runtime folder', (target) => {
+    expect(isInRuntimeFolder(target, paths)).toBe(true);
+  });
+
+  it.each([
+    '/tmp/resellr',
+    '/tmp/resellr/state.json',
+    '/tmp/resellr/Daten-Kopie/resellr.db',
+    '/tmp/resellr/Daten/../Programme/app/server.mjs',
+    '/tmp/other.db',
+    '/home/haendler/Desktop/resellr.db',
+  ])('%s lies outside every runtime folder', (target) => {
+    expect(isInRuntimeFolder(target, paths)).toBe(false);
   });
 });

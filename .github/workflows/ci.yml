@@ -2,7 +2,9 @@
 # and the AC coverage check (CU-284). REQ-079 is checked in two places: the unit tests check
 # the dependency list of apps/server and the security headers, the E2E suite starts the
 # server in its test mode and fails on any outbound connection to another destination than
-# 127.0.0.1 and on any browser request to another host.
+# 127.0.0.1 and on any browser request to another host. REQ-106 is checked in the E2E project
+# `write-paths`: it runs the server under strace along a complete run and fails on any write
+# outside the data, log, handover and update-copy folder.
 name: CI
 
 on:
@@ -98,5 +100,13 @@ jobs:
       - name: Google Chrome version
         run: google-chrome --version
 
-      - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7, REQ-079 connections)
+      # The E2E project `write-paths` observes every write operation of the server with strace
+      # (REQ-106, Technical Specification 6.2); without strace it fails.
+      - name: Install strace (REQ-106)
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends strace
+          strace -V | head -n 1
+
+      - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7, REQ-079 connections, REQ-106 write paths)
         run: npm run e2e

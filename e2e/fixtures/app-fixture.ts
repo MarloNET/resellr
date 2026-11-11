@@ -1,8 +1,16 @@
-import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { test as base, expect } from '@playwright/test';
@@ -29,6 +37,11 @@ export interface AppServer {
   paths: RuntimePaths;
   /** Every outbound connection the server has reported since its start (REQ-079). */
   outboundConnections(): OutboundConnection[];
+  /**
+   * Every successful write operation on the file system of every start of the server so far
+   * (REQ-106); only for a worker with `observeFileWrites`, otherwise it throws.
+   */
+  fileWrites(): FileWrite[];
   /** Ends the server process on purpose; its folders and port stay for `restart`. */
   kill(): Promise<void>;
   /**
@@ -79,6 +92,185 @@ export function outboundConnectionProbe(logFile: string): string {
     });
   `;
   return `data:text/javascript,${encodeURIComponent(source)}`;
+}
+
+/** One successful write operation of a process on the file system, observed by `strace`. */
+export interface FileWrite {
+  syscall: string;
+  /** Absolute path of the file or folder the operation changes. */
+  path: string;
+}
+
+/**
+ * Path arguments of the system calls that change the file system (REQ-106, Technical
+ * Specification 6.2): `path` is the index of a path string, `dir` the index of the folder file
+ * descriptor it is relative to (or, without `path`, of the file descriptor the call changes).
+ * Writing through a file descriptor (`write`, `ftruncate`, `fallocate`, ...) needs one opened for
+ * writing, so the `open` calls with a writing flag cover it. A `?` lets `strace` skip a call the
+ * architecture lacks.
+ */
+const WRITE_SYSCALLS: Record<string, { dir?: number; path?: number }[]> = {
+  open: [{ path: 0 }],
+  creat: [{ path: 0 }],
+  openat: [{ dir: 0, path: 1 }],
+  openat2: [{ dir: 0, path: 1 }],
+  mkdir: [{ path: 0 }],
+  mkdirat: [{ dir: 0, path: 1 }],
+  mknod: [{ path: 0 }],
+  mknodat: [{ dir: 0, path: 1 }],
+  rmdir: [{ path: 0 }],
+  unlink: [{ path: 0 }],
+  unlinkat: [{ dir: 0, path: 1 }],
+  rename: [{ path: 0 }, { path: 1 }],
+  renameat: [
+    { dir: 0, path: 1 },
+    { dir: 2, path: 3 },
+  ],
+  renameat2: [
+    { dir: 0, path: 1 },
+    { dir: 2, path: 3 },
+  ],
+  link: [{ path: 1 }],
+  linkat: [{ dir: 2, path: 3 }],
+  symlink: [{ path: 1 }],
+  symlinkat: [{ dir: 1, path: 2 }],
+  truncate: [{ path: 0 }],
+  chmod: [{ path: 0 }],
+  fchmod: [{ dir: 0 }],
+  fchmodat: [{ dir: 0, path: 1 }],
+  fchmodat2: [{ dir: 0, path: 1 }],
+  chown: [{ path: 0 }],
+  lchown: [{ path: 0 }],
+  fchown: [{ dir: 0 }],
+  fchownat: [{ dir: 0, path: 1 }],
+  utime: [{ path: 0 }],
+  utimes: [{ path: 0 }],
+  utimensat: [{ dir: 0, path: 1 }],
+  futimesat: [{ dir: 0, path: 1 }],
+  setxattr: [{ path: 0 }],
+  lsetxattr: [{ path: 0 }],
+  fsetxattr: [{ dir: 0 }],
+  removexattr: [{ path: 0 }],
+  lremovexattr: [{ path: 0 }],
+  fremovexattr: [{ dir: 0 }],
+};
+
+/** Index of the flags of the `open` calls; they only write with one of `WRITING_OPEN_FLAGS`. */
+const OPEN_FLAGS_ARG: Record<string, number> = { open: 1, openat: 2, openat2: 2 };
+const WRITING_OPEN_FLAGS = /\bO_(WRONLY|RDWR|CREAT|TRUNC|APPEND)\b/;
+
+/**
+ * Arguments of `strace` that observe every process and thread of a command (`-f`), one output
+ * file per process (`-ff`, `<prefix>.<pid>`) and only successful calls (`-z`), with the path
+ * behind every file descriptor (`-y`) and complete strings (`-s`).
+ */
+export function fileWriteTraceArgs(outputPrefix: string): string[] {
+  const syscalls = Object.keys(WRITE_SYSCALLS).map((name) => `?${name}`);
+  return [
+    '-f',
+    '-ff',
+    '-qq',
+    '-z',
+    '-y',
+    '-s',
+    '65535',
+    '-e',
+    'signal=none',
+    '-e',
+    `trace=${syscalls.join(',')}`,
+    '-o',
+    outputPrefix,
+  ];
+}
+
+/** Decodes a C string literal of `strace` (`\"`, `\303\274` for "ü", ...) to UTF-8 text. */
+function decodeStraceString(literal: string): string {
+  const escapes: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 };
+  const bytes: number[] = [];
+  for (const [, octal, hex, escaped, text] of literal.matchAll(
+    /\\(?:([0-7]{1,3})|x([0-9a-fA-F]{2})|(.))|([^\\]+)/gsu,
+  )) {
+    if (text !== undefined) bytes.push(...Buffer.from(text, 'utf8'));
+    else if (octal !== undefined) bytes.push(parseInt(octal, 8));
+    else if (hex !== undefined) bytes.push(parseInt(hex, 16));
+    else if (escaped !== undefined) bytes.push(escapes[escaped] ?? escaped.charCodeAt(0));
+  }
+  return Buffer.from(bytes).toString('utf8');
+}
+
+/** Splits the argument list of a call at the commas outside strings and brackets. */
+function splitArguments(list: string): string[] {
+  const args: string[] = [];
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let current = '';
+  for (const char of list) {
+    if (char === ',' && depth === 0 && !inString) {
+      args.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+    if (escaped) escaped = false;
+    else if (inString && char === '\\') escaped = true;
+    else if (char === '"') inString = !inString;
+    else if (!inString && '([{<'.includes(char)) depth++;
+    else if (!inString && ')]}>'.includes(char)) depth--;
+  }
+  if (current.trim() !== '') args.push(current.trim());
+  return args;
+}
+
+/** The path a file descriptor argument stands for (`AT_FDCWD</cwd>`, `20</path>`). */
+function descriptorPath(arg: string | undefined): string | undefined {
+  const path = /^[^<]*<(.*)>$/.exec(arg ?? '')?.[1];
+  return path === undefined ? undefined : decodeStraceString(path);
+}
+
+/**
+ * The write operations in the output of `strace` with `fileWriteTraceArgs` for one process.
+ * Paths without a folder file descriptor are relative to `cwd`. A line it does not understand
+ * fails the parsing, so nothing is lost unnoticed.
+ */
+export function parseFileWrites(trace: string, cwd: string): FileWrite[] {
+  const writes: FileWrite[] = [];
+  for (const line of trace.split('\n')) {
+    if (line.trim() === '') continue;
+    const { syscall = '', list = '' } =
+      /^(?<syscall>\w+)\((?<list>.*)\)\s+=\s+\S+/.exec(line)?.groups ?? {};
+    const pathArgs = WRITE_SYSCALLS[syscall];
+    if (!pathArgs) throw new Error(`Unexpected line of strace: ${line}`);
+    const args = splitArguments(list);
+    const flagsArg = OPEN_FLAGS_ARG[syscall];
+    if (flagsArg !== undefined && !WRITING_OPEN_FLAGS.test(args[flagsArg] ?? '')) continue;
+    for (const { dir, path } of pathArgs) {
+      const base = dir === undefined ? cwd : (descriptorPath(args[dir]) ?? cwd);
+      const literal = path === undefined ? undefined : /^"(.*)"$/.exec(args[path] ?? '')?.[1];
+      const name = literal === undefined ? '' : decodeStraceString(literal);
+      writes.push({
+        syscall,
+        path: isAbsolute(name) ? resolvePath(name) : resolvePath(base, name),
+      });
+    }
+  }
+  return writes;
+}
+
+/** All write operations in the `strace` output files in `traceDir`. */
+export function readFileWrites(traceDir: string, cwd: string): FileWrite[] {
+  if (!existsSync(traceDir)) return [];
+  return readdirSync(traceDir)
+    .sort()
+    .flatMap((file) => parseFileWrites(readFileSync(join(traceDir, file), 'utf8'), cwd));
+}
+
+/** Fails early with a clear message if `strace` is missing (REQ-106 runs only under Linux). */
+export function requireStrace(): void {
+  const result = spawnSync('strace', ['-V'], { stdio: 'ignore' });
+  if (result.error || result.status !== 0) {
+    throw new Error('strace is needed to observe the file writes of the server (REQ-106)');
+  }
 }
 
 /** The connections to another destination than `127.0.0.1`. */
@@ -142,8 +334,11 @@ function longDataDir(root: string): string {
  * Starts `resellr-server` for one test worker (CU-062): own temporary data, log, handover and
  * update-copy folder, `config.json` with a free port, migrated empty database. The data folder
  * path has 100 characters. The user interface comes from `apps/web/dist` (`npm run build`).
+ * With `observeFileWrites`, every start runs under `strace` from its first system call to its
+ * end (REQ-106); `strace` ends the server at once on SIGTERM, so such a test ends it with
+ * `shutdown()`.
  */
-async function startServer(): Promise<{
+async function startServer({ observeFileWrites }: { observeFileWrites: boolean }): Promise<{
   server: AppServer;
   /** Ends the server and returns all its outbound connections up to its end. */
   stop(): Promise<OutboundConnection[]>;
@@ -160,12 +355,30 @@ async function startServer(): Promise<{
   };
   const port = await freePort();
   const connectionLog = join(root, 'outbound-connections.jsonl');
+  const traceDir = join(root, 'file-writes');
+  let starts = 0;
+  if (observeFileWrites) {
+    requireStrace();
+    mkdirSync(traceDir);
+  }
   mkdirSync(paths.dataDir);
   writeFileSync(join(paths.dataDir, CONFIG_FILE_NAME), JSON.stringify({ port }));
 
   const probe = `--import=${outboundConnectionProbe(connectionLog)}`;
   const spawnServer = (args: string[] = []) => {
-    const serverProcess = spawn(process.execPath, [probe, SERVER_MAIN, ...args], {
+    const serverArgs = [probe, SERVER_MAIN, ...args];
+    const [command, commandArgs] = observeFileWrites
+      ? [
+          'strace',
+          [
+            ...fileWriteTraceArgs(join(traceDir, `start-${++starts}`)),
+            '--',
+            process.execPath,
+            ...serverArgs,
+          ],
+        ]
+      : [process.execPath, serverArgs];
+    const serverProcess = spawn(command, commandArgs, {
       cwd: REPO_ROOT,
       stdio: ['ignore', 'ignore', 'inherit'],
       env: {
@@ -197,6 +410,12 @@ async function startServer(): Promise<{
     baseUrl: `http://127.0.0.1:${port}`,
     paths,
     outboundConnections: () => readOutboundConnections(connectionLog),
+    fileWrites: () => {
+      if (!observeFileWrites)
+        throw new Error('The file writes are observed only with observeFileWrites');
+      // The connection probe of the test mode writes its log itself; it is no write of the server.
+      return readFileWrites(traceDir, REPO_ROOT).filter(({ path }) => path !== connectionLog);
+    },
     kill,
     shutdown: async () => {
       // Like the launcher (G-3): without Origin and Sec-Fetch-Site.
@@ -251,14 +470,24 @@ export function missingCspDirectives(policy: string | null): string[] {
   return REQUIRED_CSP_DIRECTIVES.filter((required) => !directives.includes(required));
 }
 
+/** Worker options of the fixture, set per project in `playwright.config.ts`. */
+export interface AppFixtureOptions {
+  observeFileWrites: boolean;
+}
+
 export const test = base.extend<
   { browserRequests: string[]; serverResponseHeaders: void; serverConnections: void },
-  { server: AppServer }
+  { server: AppServer } & AppFixtureOptions
 >({
+  /**
+   * Runs every start of the worker's server under `strace` and offers its write operations in
+   * `server.fileWrites()` (REQ-106, Technical Specification 6.2). Set by the project.
+   */
+  observeFileWrites: [false, { scope: 'worker', option: true }],
+
   server: [
-    // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
-    async ({}, use) => {
-      const { server, stop } = await startServer();
+    async ({ observeFileWrites }, use) => {
+      const { server, stop } = await startServer({ observeFileWrites });
       await use(server);
       // Also during the shutdown the server connects nowhere else (REQ-079).
       const connections = await stop();
