@@ -6,7 +6,7 @@ import { connect } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { ServerEnd } from './server-process.ts';
-import { runSupervisor } from './supervisor.ts';
+import { type CrashReport, runSupervisor, type SupervisorOptions } from './supervisor.ts';
 import {
   listenSupervisorPipe,
   type PhaseEvent,
@@ -15,6 +15,40 @@ import {
 } from './supervisor-pipe.ts';
 
 const REF_NO = 'R-7K3M-Q9TX';
+/** The clock of the supervisor stands still: every crash happens at this instant. */
+const SUPERVISOR_START = new Date('2026-11-10T09:00:00.000Z');
+const CRASH_AT = SUPERVISOR_START;
+
+/** The wait after a crash, released by the test. */
+function controlledWaits() {
+  const durations: number[] = [];
+  const releases: (() => void)[] = [];
+  return {
+    durations,
+    pending: () => releases.length,
+    release: () => releases.shift()?.(),
+    sleep: (ms: number) => {
+      durations.push(ms);
+      return new Promise<void>((resolve) => releases.push(resolve));
+    },
+  };
+}
+
+/** Availability check the test drives: `check(at)` reports a check at that instant. */
+function fakeProbes() {
+  let onProbe: (at: Date) => void = () => {};
+  const probes = {
+    started: 0,
+    stopped: 0,
+    check: (at: Date) => onProbe(at),
+    start: (callback: (at: Date) => void) => {
+      probes.started++;
+      onProbe = callback;
+      return { stop: () => void probes.stopped++ };
+    },
+  };
+  return probes;
+}
 
 /** A server process the test controls: `ready()` reports readiness, `end()` ends it. */
 function fakeServer() {
@@ -62,19 +96,30 @@ describe('supervisor (CU-261)', () => {
 
   afterEach(() => rmSync(path, { force: true }));
 
-  async function start() {
+  async function start(options: Partial<SupervisorOptions> = {}) {
     path = supervisorPipePath(`/tmp/resellr-test-${randomUUID()}`);
     const pipe = (await listenSupervisorPipe(path))!;
     const server = fakeServer();
     const phases: PhaseEvent[] = [];
+    const crashes: CrashReport[] = [];
+    const waits = controlledWaits();
+    const probes = fakeProbes();
+    const summaries = { count: 0 };
+    let startCount = 0;
     const ended = runSupervisor({
       pipe,
       startServer: server.startServer,
       onPhase: (event) => phases.push(event),
-      createStartId: () => 'start-1',
+      createStartId: () => `start-${++startCount}`,
       createRefNo: () => REF_NO,
+      now: () => SUPERVISOR_START,
+      sleep: waits.sleep,
+      onCrash: (crash) => crashes.push(crash),
+      startHealthProbe: probes.start,
+      summarizeAvailability: () => summaries.count++,
+      ...options,
     });
-    return { server, phases, ended };
+    return { server, phases, crashes, waits, probes, summaries, ended };
   }
 
   it('starts one server in starting and reports ready with the startId of this attempt', async () => {
@@ -141,19 +186,139 @@ describe('supervisor (CU-261)', () => {
     ['exit code 12', { kind: 'crashed', exitCode: 12, signal: null }],
     ['a signal', { kind: 'crashed', exitCode: null, signal: 'SIGKILL' }],
   ])(
-    'ends after a crash by %s without a restart and closes the pipe without a result (until #116)',
+    'after a crash by %s waits 5 s, writes crash with a reference number and restarts with a new startId',
     async (_, end) => {
-      const { server, ended } = await start();
+      const { server, phases, crashes, waits, ended } = await start();
       server.ready();
-      const client = await subscriber(path);
-      expect(await client.next()).toMatchObject({ phase: 'ready' });
 
       server.end(end);
+      await expect.poll(() => waits.pending()).toBe(1);
+      // Nothing is written during the wait: if the supervisor ends now, no crash is logged.
+      expect(crashes).toEqual([]);
+      expect(server.startIds).toEqual(['start-1']);
+      expect(waits.durations).toEqual([5000]);
 
-      expect(await client.next()).toBe('closed');
+      waits.release();
+      await expect.poll(() => server.startIds).toEqual(['start-1', 'start-2']);
+      expect(crashes).toEqual([
+        {
+          startId: 'start-1',
+          refNo: REF_NO,
+          at: CRASH_AT,
+          exitCode: end.exitCode,
+          signal: end.signal,
+        },
+      ]);
+      server.ready();
+      expect(phases).toEqual([
+        { event: 'phase', phase: 'starting', startId: 'start-1' },
+        { event: 'phase', phase: 'ready', startId: 'start-1' },
+        // In the wait after the crash a new subscriber waits instead of opening a dead address.
+        { event: 'phase', phase: 'starting' },
+        { event: 'phase', phase: 'starting', startId: 'start-2' },
+        { event: 'phase', phase: 'ready', startId: 'start-2' },
+      ]);
+      server.end({ kind: 'stopped' });
       await ended;
-      expect(server.startIds).toHaveLength(1);
-      expect(await subscribeToSupervisor(path)).toBeNull();
     },
   );
+
+  it('sends starting to a client that subscribes in the wait after a crash', async () => {
+    const { server, waits, ended } = await start();
+    server.ready();
+    server.end({ kind: 'crashed', exitCode: 1, signal: null });
+    await expect.poll(() => waits.pending()).toBe(1);
+
+    const client = await subscriber(path);
+
+    expect(await client.next()).toEqual({ event: 'phase', phase: 'starting' });
+    waits.release();
+    expect(await client.next()).toEqual({ event: 'phase', phase: 'starting', startId: 'start-2' });
+    server.ready();
+    expect(await client.next()).toEqual({ event: 'phase', phase: 'ready', startId: 'start-2' });
+    server.end({ kind: 'stopped' });
+    await ended;
+  });
+
+  it('restarts only as long as the restart rule allows and then ends without a restart', async () => {
+    let allowed = 2;
+    const { server, crashes, waits, ended } = await start({
+      restartPolicy: { mayRestart: () => allowed-- > 0 },
+    });
+
+    for (let crash = 1; crash <= 3; crash++) {
+      server.end({ kind: 'crashed', exitCode: 1, signal: null });
+      await expect.poll(() => waits.pending()).toBe(1);
+      waits.release();
+      if (crash < 3) await expect.poll(() => server.startIds).toHaveLength(crash + 1);
+    }
+
+    await ended;
+    // The third crash is logged too; `gave_up` with its reference number follows in #121.
+    expect(crashes.map((crash) => crash.startId)).toEqual(['start-1', 'start-2', 'start-3']);
+    expect(server.startIds).toEqual(['start-1', 'start-2', 'start-3']);
+    expect(await subscribeToSupervisor(path)).toBeNull();
+  });
+
+  it('keeps the restart going when writing the crash fails', async () => {
+    const { server, waits, ended } = await start({
+      onCrash: () => {
+        throw new Error('disk full');
+      },
+    });
+
+    server.end({ kind: 'crashed', exitCode: 1, signal: null });
+    await expect.poll(() => waits.pending()).toBe(1);
+    waits.release();
+
+    await expect.poll(() => server.startIds).toHaveLength(2);
+    server.end({ kind: 'stopped' });
+    await ended;
+  });
+
+  it('runs the availability check only while the server is ready', async () => {
+    const { server, probes, waits, ended } = await start();
+    expect(probes.started).toBe(0);
+
+    server.ready();
+    expect(probes.started).toBe(1);
+    server.end({ kind: 'crashed', exitCode: 1, signal: null });
+    await expect.poll(() => probes.stopped).toBe(1);
+
+    await expect.poll(() => waits.pending()).toBe(1);
+    waits.release();
+    await expect.poll(() => server.startIds).toHaveLength(2);
+    server.ready();
+    expect(probes.started).toBe(2);
+    server.end({ kind: 'stopped' });
+    await ended;
+    expect(probes.stopped).toBe(2);
+  });
+
+  it('summarises the missing days at its start and at the first check after midnight', async () => {
+    const { server, probes, summaries, ended } = await start();
+    expect(summaries.count).toBe(1);
+    server.ready();
+
+    probes.check(new Date('2026-11-10T21:00:00.000Z')); // 22:00 in Berlin, same day
+    expect(summaries.count).toBe(1);
+    probes.check(new Date('2026-11-10T23:01:00.000Z')); // 0:01 in Berlin, next day
+    probes.check(new Date('2026-11-10T23:06:00.000Z'));
+    expect(summaries.count).toBe(2);
+
+    server.end({ kind: 'stopped' });
+    await ended;
+  });
+
+  it('keeps running when the daily summary fails', async () => {
+    const { server, ended } = await start({
+      summarizeAvailability: () => {
+        throw new Error('disk full');
+      },
+    });
+
+    server.ready();
+    server.end({ kind: 'stopped' });
+    await expect(ended).resolves.toBeUndefined();
+  });
 });

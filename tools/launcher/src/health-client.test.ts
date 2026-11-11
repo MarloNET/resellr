@@ -90,6 +90,17 @@ describe('health client (CU-266)', () => {
     expect(elapsed).toBeLessThan(HEALTH_TIMEOUT_MS + 900);
   });
 
+  it('waits for the time limit the caller gives, e.g. 2 s instead of 1 s', async () => {
+    const port = await startServer(() => {});
+
+    const started = performance.now();
+    await expect(createHealthClient({ port }).getHealth(2000)).resolves.toBeNull();
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeGreaterThanOrEqual(2000 - 50);
+    expect(elapsed).toBeLessThan(2000 + 900);
+  });
+
   it('sends POST /api/ops/shutdown as JSON without Origin and returns status and body', async () => {
     const requests: Record<string, unknown>[] = [];
     const port = await startServer((request, body, response) => {
