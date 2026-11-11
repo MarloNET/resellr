@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Daily files older than this are deleted (Technical Specification 2.19, Housekeeping). */
@@ -18,6 +18,24 @@ const toDay = (instant: Date): string => berlinDate.format(instant);
 /** The calendar day `days` before `day`, both as `YYYY-MM-DD`. */
 const daysBefore = (day: string, days: number): string =>
   new Date(Date.parse(`${day}T00:00:00.000Z`) - days * DAY_MS).toISOString().slice(0, 10);
+
+/** Pattern of the daily files of a kind; group 1 is the day. */
+function dailyFilePattern(kind: string): RegExp {
+  if (!/^[a-z]+$/.test(kind)) {
+    throw new Error(`Invalid daily file kind: ${JSON.stringify(kind)}`);
+  }
+  return new RegExp(`^${kind}-(\\d{4}-\\d{2}-\\d{2})\\.jsonl$`);
+}
+
+/** Names in the folder; none if it does not exist. */
+function listNames(dir: string): string[] {
+  try {
+    return readdirSync(dir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
 
 export interface DailyJsonlWriterOptions {
   /** Log folder that holds the daily files. */
@@ -50,20 +68,11 @@ export function createDailyJsonlWriter({
   kind,
   now = () => new Date(),
 }: DailyJsonlWriterOptions): DailyJsonlWriter {
-  if (!/^[a-z]+$/.test(kind)) {
-    throw new Error(`Invalid daily file kind: ${JSON.stringify(kind)}`);
-  }
-  const dailyFile = new RegExp(`^${kind}-(\\d{4}-\\d{2}-\\d{2})\\.jsonl$`);
+  const dailyFile = dailyFilePattern(kind);
   let currentDay: string | null = null;
 
   const deleteExpiredFiles = (): string[] => {
-    let names: string[];
-    try {
-      names = readdirSync(dir);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-      throw error;
-    }
+    const names = listNames(dir);
     const oldestKept = daysBefore(toDay(now()), RETENTION_DAYS);
     const expired = names.filter((name) => {
       const day = dailyFile.exec(name)?.[1];
@@ -100,4 +109,41 @@ export function createDailyJsonlWriter({
   };
 
   return { write, deleteExpiredFiles };
+}
+
+/** Entries of one daily file. */
+export interface DailyFile {
+  /** Calendar day of the file, `YYYY-MM-DD`. */
+  day: string;
+  /** Its lines that are JSON objects, in file order. */
+  entries: Record<string, unknown>[];
+}
+
+/**
+ * Reads the daily files of a kind, oldest day first. Lines that are no JSON object are skipped,
+ * e.g. the last line of a file that a power failure cut off.
+ */
+export function readDailyFiles({ dir, kind }: { dir: string; kind: string }): DailyFile[] {
+  const dailyFile = dailyFilePattern(kind);
+  return listNames(dir)
+    .flatMap((name) => {
+      const day = dailyFile.exec(name)?.[1];
+      return day === undefined ? [] : [{ day, name }];
+    })
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .map(({ day, name }) => ({
+      day,
+      entries: readFileSync(join(dir, name), 'utf8').split('\n').flatMap(parseObjectLine),
+    }));
+}
+
+function parseObjectLine(line: string): Record<string, unknown>[] {
+  try {
+    const value: unknown = JSON.parse(line);
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? [value as Record<string, unknown>]
+      : [];
+  } catch {
+    return [];
+  }
 }

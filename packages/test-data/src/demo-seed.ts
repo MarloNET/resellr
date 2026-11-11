@@ -49,12 +49,26 @@ export function createDemoApi(baseUrl: string): DemoApi {
 }
 
 /**
+ * Device types (S2, UI-027): one more active device type and a deactivated one beside the
+ * initial settings, which come with the seed migration CU-071 and not from here (FIND-223).
+ */
+export const DEMO_DEVICE_TYPES = [
+  { name: 'Beamer', active: true },
+  { name: 'Drucker', active: false },
+] as const;
+
+export const seedDeviceTypes: SeedArea = async (api) => {
+  for (const deviceType of DEMO_DEVICE_TYPES) {
+    await api.request('POST', '/api/device-types', deviceType);
+  }
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
- * (random values only with a fixed seed). S1 has no demo data, and the initial settings follow
- * with S2 through CU-071 (FIND-223).
+ * (random values only with a fixed seed). S1 has no demo data (FIND-223).
  */
-export const SEED_AREAS: readonly SeedArea[] = [];
+export const SEED_AREAS: readonly SeedArea[] = [seedDeviceTypes];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */
 export async function seedDemoData(

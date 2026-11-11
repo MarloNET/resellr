@@ -10,6 +10,7 @@ export const queryKeys = {
   },
   settings: {
     all: ['settings'] as const,
+    deviceTypes: () => ['settings', 'device-types'] as const,
     pickLists: () => ['settings', 'pick-lists'] as const,
     pickListValues: (pickListId: number) => ['settings', 'pick-list-values', pickListId] as const,
   },

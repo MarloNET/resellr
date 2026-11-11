@@ -6,6 +6,7 @@ import {
   createDemoApi,
   type DemoApi,
   SEED_AREAS,
+  seedDeviceTypes,
   seedDemoData,
   type SeedArea,
 } from './demo-seed.ts';
@@ -110,9 +111,26 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('has no demo data in S1: the initial settings follow with S2 (FIND-223)', async () => {
-    expect(SEED_AREAS).toEqual([]);
-    await expect(seedDemoData(api)).resolves.toBeUndefined();
+  it('runs the areas of the build steps in their order: S2 device types', () => {
+    expect(SEED_AREAS).toEqual([seedDeviceTypes]);
+  });
+
+  it('creates the demo device types through POST /api/device-types', async () => {
+    const requests: unknown[][] = [];
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (...args: unknown[]) => {
+        requests.push(args);
+        return undefined as never;
+      },
+    };
+
+    await seedDeviceTypes(recording);
+
+    expect(requests).toEqual([
+      ['POST', '/api/device-types', { name: 'Beamer', active: true }],
+      ['POST', '/api/device-types', { name: 'Drucker', active: false }],
+    ]);
   });
 
   it('runs the seed functions one after the other in list order with the API', async () => {

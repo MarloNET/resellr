@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ExitCode } from '@resellr/runtime-shared/exit-codes';
-import { resolveRuntimePaths } from '@resellr/runtime-shared/paths';
+import { IS_BUNDLED, programFolderPaths, resolveRuntimePaths } from '@resellr/runtime-shared/paths';
 
 import { buildApp } from './app.ts';
 import { LISTEN_HOST } from './http/index.ts';
@@ -45,12 +45,15 @@ const operationsLog = createOperationsLog({
 const lifecycle = createLifecycleState();
 // Before the start, so a channel that closes during the start is noticed afterwards (H-13).
 const supervisorIpc = createSupervisorIpc(process, startId);
-const webRoot = fileURLToPath(new URL('../../web/dist', import.meta.url));
+// `resellr-node.exe` lies in the program folder (2.19).
+const programDir = dirname(process.execPath);
+const webRoot = IS_BUNDLED
+  ? programFolderPaths(programDir).webRoot
+  : fileURLToPath(new URL('../../web/dist', import.meta.url));
 
 const result = await runStartup({
   paths,
-  // `resellr-node.exe` lies in the program folder (2.19).
-  programDir: dirname(process.execPath),
+  programDir,
   homeDir: homedir(),
   appVersion: APP_VERSION,
   startId,

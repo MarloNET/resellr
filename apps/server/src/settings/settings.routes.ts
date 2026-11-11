@@ -1,5 +1,11 @@
 import { idSchema } from '@resellr/domain/schemas/common.schema';
 import {
+  deviceTypeCreateSchema,
+  deviceTypeListSchema,
+  deviceTypeSchema,
+  deviceTypeUpdateSchema,
+} from '@resellr/domain/schemas/device-type.schema';
+import {
   pickListListSchema,
   pickListSchema,
   pickListValueCreateSchema,
@@ -15,6 +21,7 @@ import { z } from 'zod';
 import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
+import { createDeviceTypeService } from './device-type-service.ts';
 import { createPickListService } from './pick-list-service.ts';
 
 export interface SettingsRoutesOptions {
@@ -34,14 +41,40 @@ const pageQuery = z.strictObject({
 /**
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
  * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, … Each route calls one service.
- * There is no route to create or delete a pick list and none to delete a value (RQ-07,
+ * There is no DELETE route for device types (REQ-004, DER-33-09). There is no route to create or
+ * delete a pick list and none to delete a value (RQ-07,
  * DER-35-09).
  */
 export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = async (
   app,
   { db, uow, clock },
 ) => {
+  const deviceTypes = createDeviceTypeService({ db, uow, clock });
   const pickLists = createPickListService({ db, uow, clock });
+
+  app.get(
+    '/api/device-types',
+    { schema: { querystring: pageQuery, response: { 200: deviceTypeListSchema } } },
+    async (request) => deviceTypes.list(request.query),
+  );
+
+  app.post(
+    '/api/device-types',
+    { schema: { body: deviceTypeCreateSchema, response: { 201: deviceTypeSchema } } },
+    async (request, reply) => reply.code(201).send(await deviceTypes.create(request.body)),
+  );
+
+  app.patch(
+    '/api/device-types/:id',
+    {
+      schema: {
+        params: idParams,
+        body: deviceTypeUpdateSchema,
+        response: { 200: deviceTypeSchema },
+      },
+    },
+    async (request) => deviceTypes.update(request.params.id, request.body),
+  );
 
   app.get(
     '/api/pick-lists',
