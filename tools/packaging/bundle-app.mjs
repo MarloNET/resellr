@@ -6,7 +6,7 @@
 // version of `.nvmrc` (the one CU-275 ships).
 // Usage: `node tools/packaging/bundle-app.mjs <program folder>` after `vite build` of the web UI.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { basename, dirname, join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, URL } from 'node:url';
 
@@ -66,7 +66,7 @@ export async function bundleApp({ repoRoot, programDir, webDist }) {
       external: NATIVE_MODULES,
       banner: { js: CJS_REQUIRE_BANNER },
       metafile: true,
-      // Folds `IS_BUNDLED` and drops the source-tree branches; names stay readable for stack traces.
+      // Folds `RESELLR_BUNDLED` and dead branches; names stay readable for stack traces.
       minifySyntax: true,
       logLevel: 'warning',
     });
@@ -191,7 +191,7 @@ async function main(programDir) {
     }
     const { nativePackages } = await bundleApp({ repoRoot, programDir });
     process.stdout.write(
-      `Bundled into ${join(basename(programDir), 'app')}; native packages: ${nativePackages.join(', ')}\n`,
+      `Bundled into ${programFolderPaths(programDir).appDir}; native packages: ${nativePackages.join(', ')}\n`,
     );
   } catch (error) {
     process.stderr.write(`Bundling failed: ${error instanceof Error ? error.message : error}\n`);
