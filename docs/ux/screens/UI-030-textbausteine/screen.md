@@ -11,7 +11,7 @@ Liste: Name, Art, Geltungsbereich (Gerätearten/Kanäle), Status, Prüfstatus (n
 |---|---|---|---|---|
 | Name | Text | ja | eindeutig, 1 bis 100 Zeichen | „Name ist bereits vergeben“; „Name: 1 bis 100 Zeichen“ (v0.6.2, M-30, O-3; Feldfehler am Feld, Muster wie M-05; Wortlaut vom Designer, Owner bestätigt mit der Freigabe) |
 | Art | Auswahl | ja | fünf Arten | – |
-| Text | Mehrzeilentext | ja | max. 5.000 Zeichen; nur zulässige Platzhalter | „Unbekannter Platzhalter {…}“; „{Baustein:Name} ist im Textbaustein nicht zulässig“ |
+| Text | Mehrzeilentext | ja | max. 5.000 Zeichen; nur zulässige Platzhalter | „Unbekannter Platzhalter {…}“; „{Baustein:Name} ist im Textbaustein nicht zulässig“; „Text: 1 bis 5.000 Zeichen“ (leer oder zu lang; **v0.6.4, MAR-494:** Wortlaut nach PO-Entscheidung MAR-492, Owner bestätigt mit der nächsten Freigabe) |
 | Geltungsbereich | Mehrfachauswahl Gerätearten, Kanäle (oder „alle“) | ja | | – |
 | Prüfstatus | Auswahl | nur Rechtliches/Akku-Hinweis | neue Bausteine „rechtlich ungeprüft“; Textänderung setzt zurück | – |
 | Prüfdatum | Datum | ja bei „rechtlich geprüft“ | nicht in der Zukunft | „Prüfdatum und prüfende Stelle erforderlich“ (v0.6.1, M-24, AC-REQ-054-03; derselbe eine Text wie bei „Prüfende Stelle“, siehe dort); „Prüfdatum darf nicht in der Zukunft liegen“ |

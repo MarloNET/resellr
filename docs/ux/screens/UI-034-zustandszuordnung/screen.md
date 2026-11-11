@@ -10,7 +10,7 @@ Kanal-Auswahl; Tabelle: Zustand, Optik-Note (Zahl oder „alle Noten“), Zustan
 |---|---|---|---|---|
 | Zustand, Optik-Note | Auswahl | ja | je Kanal/Zustand/Note höchstens ein Eintrag; einzelne Note hat Vorrang vor „alle Noten“ | „Für diese Kombination gibt es bereits einen Eintrag“ |
 | Zustandsbezeichnung | Text | ja | max. 100 | „Zustandsbezeichnung: 1 bis 100 Zeichen“ |
-| Zusatzangabe | Text | nein | max. 100; nur Platzhalter für Zusatzangaben (Kap. 9.7) | „Platzhalter {…} ist in der Zusatzangabe nicht zulässig“ |
+| Zusatzangabe | Text | nein | max. 100; nur Platzhalter für Zusatzangaben (Kap. 9.7) | „Platzhalter {…} ist in der Zusatzangabe nicht zulässig“; „Zusatzangabe: höchstens 100 Zeichen“ (**v0.6.4, MAR-494:** Wortlaut nach PO-Entscheidung MAR-492, Owner bestätigt mit der nächsten Freigabe) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
