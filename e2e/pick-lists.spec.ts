@@ -98,7 +98,7 @@ test.describe('UI-028 pick lists (CU-096)', () => {
     ).toBe(404);
   });
 
-  test('UI-028.reihenfolge DER-35-08 the order changes by dragging and with "Runter", each sent as value-order', async ({
+  test('UI-028.default DER-35-08 the order changes by dragging and with "Runter", each sent as value-order', async ({
     page,
     server,
   }, testInfo) => {
