@@ -69,6 +69,7 @@ const result = await runStartup({
       ops: { startId, dataDirPath: paths.dataDir, appVersion: APP_VERSION },
       operationsLog,
       now: clock.now,
+      clock,
       // After an orderly shutdown (2.17 step 7): exit code 0, the supervisor restarts nothing.
       exit: (code) => process.exit(code),
     }).app,

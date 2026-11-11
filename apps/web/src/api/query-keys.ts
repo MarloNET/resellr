@@ -8,6 +8,11 @@ export const queryKeys = {
     status: () => ['ops', 'status'] as const,
     health: () => ['ops', 'health'] as const,
   },
+  settings: {
+    all: ['settings'] as const,
+    pickLists: () => ['settings', 'pick-lists'] as const,
+    pickListValues: (pickListId: number) => ['settings', 'pick-list-values', pickListId] as const,
+  },
 } as const;
 
 /**

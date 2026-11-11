@@ -30,6 +30,20 @@ export const MESSAGES = {
   'M-24': 'Prüfdatum und prüfende Stelle erforderlich',
 } as const;
 
+/**
+ * Field texts without a key M-xx, worded as in the `screen.md` of the screen that shows them;
+ * the schemas of `packages/domain` set them, so browser and server show the same text (2.0.5).
+ */
+export const FIELD_MESSAGES = {
+  /** UI-028 "Akku vorhanden", missing in the list battery (REQ-007, DER-35-10). */
+  batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
+  /**
+   * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). UI-028 names no
+   * text for this rule; worded after the catalog pattern of M-02 (DG-08), see PR #154.
+   */
+  pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
+} as const;
+
 type MessageText = string | ((...args: string[]) => string);
 
 /**
@@ -38,6 +52,7 @@ type MessageText = string | ((...args: string[]) => string);
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
   'not_found.default': MESSAGES['M-15'],
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
