@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { programFolderPaths } from '@resellr/runtime-shared/paths';
 
-import { bundleApp } from './bundle-app.mjs';
+import { bundleApp, sourceTreeTraces } from './bundle-app.mjs';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
 
@@ -64,10 +64,15 @@ describe('bundleApp', { timeout: 60_000 }, () => {
     expect(existsSync(join(app.appDir, 'stale.mjs'))).toBe(false);
   });
 
-  it('replaces RESELLR_BUNDLED in both bundles (Nachtrag MAR-446)', () => {
-    for (const entry of [app.serverEntry, app.launcherEntry]) {
-      expect(readFileSync(entry, 'utf8')).not.toContain('RESELLR_BUNDLED');
-    }
+  it('drops RESELLR_BUNDLED and the source-tree branches from both bundles (Nachtrag MAR-446, MAR-474)', () => {
+    const server = readFileSync(app.serverEntry, 'utf8');
+    const launcher = readFileSync(app.launcherEntry, 'utf8');
+
+    expect(server).not.toContain('RESELLR_BUNDLED');
+    expect(launcher).not.toContain('RESELLR_BUNDLED');
+    // Source-tree web root of CU-018 and server entry of CU-264.
+    expect(server).not.toContain('web/dist');
+    expect(launcher).not.toContain('apps/server/src/main.ts');
   });
 
   it('keeps native modules external and ships them with their runtime dependencies only', () => {
@@ -125,6 +130,29 @@ describe('bundleApp', { timeout: 60_000 }, () => {
       supervisor.kill('SIGTERM');
       await ended;
     }
+  });
+});
+
+describe('sourceTreeTraces', () => {
+  const unfolded = [
+    '// apps/server/src/main.ts',
+    'var IS_BUNDLED = typeof RESELLR_BUNDLED !== "undefined";',
+    'const entry = new URL("../../../../apps/server/src/main.ts", import.meta.url);',
+    'const web = new URL("../../web/dist", import.meta.url);',
+  ].join('\n');
+
+  it('names the source-tree traces a bundle still contains (Nachtrag MAR-474)', () => {
+    expect(sourceTreeTraces('serverEntry', unfolded)).toEqual(['web/dist', 'RESELLR_BUNDLED']);
+    expect(sourceTreeTraces('launcherEntry', unfolded)).toEqual([
+      'apps/server/src/main.ts',
+      'RESELLR_BUNDLED',
+    ]);
+  });
+
+  it('accepts the module comment of the server entry in server.mjs', () => {
+    expect(sourceTreeTraces('serverEntry', '// apps/server/src/main.ts\nstart(webRoot);')).toEqual(
+      [],
+    );
   });
 });
 

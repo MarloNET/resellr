@@ -1,4 +1,5 @@
-// Bundling (CU-276, ADR-008, Technical Specification 2.19 "Build des Pakets", Nachtrag MAR-446):
+// Bundling (CU-276, ADR-008, Technical Specification 2.19 "Build des Pakets", Nachtrag MAR-446,
+// MAR-474):
 // bundles `resellr-server` and `resellr-launcher` with esbuild into one file each, copies the
 // built web UI and ships the native modules (external to the bundle) with their run-time
 // dependencies, all under `app` of the program folder. The native modules are the ones installed
@@ -22,6 +23,18 @@ const NATIVE_MODULES = ['better-sqlite3', 'sharp'];
 const INSTALL_ONLY = new Set(['prebuild-install']);
 /** Parts of a compiled package (one with `binding.gyp`) that are not needed at run time. */
 const NATIVE_SOURCES = new Set(['src', 'deps', 'binding.gyp']);
+
+/**
+ * Texts that show a bundle still contains the source-tree branches (Nachtrag MAR-446, MAR-474):
+ * the server entry of the launcher (CU-264) in `launcher.mjs`, the web root of the server (CU-018)
+ * in `server.mjs` and the constant itself in both. They remain if esbuild could not inline
+ * `IS_BUNDLED` (CU-313). `server.mjs` names its own entry in esbuild's module comments, so the
+ * server entry is only a trace in `launcher.mjs`.
+ */
+const SOURCE_TREE_TRACES = {
+  serverEntry: ['web/dist', 'RESELLR_BUNDLED'],
+  launcherEntry: ['apps/server/src/main.ts', 'RESELLR_BUNDLED'],
+};
 
 const ENTRIES = {
   serverEntry: 'apps/server/src/main.ts',
@@ -70,6 +83,11 @@ export async function bundleApp({ repoRoot, programDir, webDist }) {
       minifySyntax: true,
       logLevel: 'warning',
     });
+    const bundle = /** @type {keyof typeof ENTRIES} */ (key);
+    const traces = sourceTreeTraces(bundle, readFileSync(paths[bundle], 'utf8'));
+    if (traces.length > 0) {
+      throw new Error(`Bundle of ${entry} still contains ${traces.join(', ')}`);
+    }
     for (const output of Object.values(result.metafile.outputs)) {
       for (const imported of output.imports) {
         if (imported.external) externalImports.add(packageName(imported.path));
@@ -82,6 +100,15 @@ export async function bundleApp({ repoRoot, programDir, webDist }) {
   const roots = NATIVE_MODULES.filter((name) => externalImports.has(name));
   const nativePackages = shipPackages(repoRoot, roots, paths.nativeModulesDir);
   return { nativePackages };
+}
+
+/**
+ * @param {keyof typeof SOURCE_TREE_TRACES} bundle
+ * @param {string} code of the bundle
+ * @returns {string[]} the source-tree traces it contains
+ */
+export function sourceTreeTraces(bundle, code) {
+  return SOURCE_TREE_TRACES[bundle].filter((trace) => code.includes(trace));
 }
 
 /** @param {string} specifier for example `better-sqlite3` or `@img/sharp-win32-x64/sharp.node` */

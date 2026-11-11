@@ -53,11 +53,8 @@ export interface ProgramFolderPaths {
   nativeModulesDir: string;
 }
 
-// Set to `true` by the packaging step (CU-276, esbuild `define`); not defined in the source tree.
-declare const RESELLR_BUNDLED: boolean | undefined;
-
-/** True in `app/server.mjs` and `app/launcher.mjs`, false in the source tree. */
-export const IS_BUNDLED = typeof RESELLR_BUNDLED !== 'undefined' && RESELLR_BUNDLED === true;
+// Kept in an import-free module so esbuild can inline it (CU-313, Nachtrag MAR-474).
+export { IS_BUNDLED } from './bundled.ts';
 
 /**
  * Layout of `app` in the program folder. `node:path` instead of `win32`, so checks of the bundle
