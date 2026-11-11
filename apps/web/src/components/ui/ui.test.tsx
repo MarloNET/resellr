@@ -98,6 +98,27 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     expect(screen.getByText('Inhalt').className).toContain('overflow-y-auto');
   });
 
+  it('Dialog with dismissible={false} ignores Esc and a click outside', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent width={480} dismissible={false}>
+          <DialogHeader>
+            <DialogTitle>resellr beenden</DialogTitle>
+          </DialogHeader>
+          <DialogBody>Inhalt</DialogBody>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'resellr beenden' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.pointerDown(document.body);
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'resellr beenden' })).toBe(dialog);
+  });
+
   it('E1 Dialog returns the focus to the opening element after Esc', async () => {
     render(<DialogScreen />);
     const dialog = openDialogFromFocusedButton();

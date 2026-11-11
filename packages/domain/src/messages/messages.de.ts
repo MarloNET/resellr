@@ -108,6 +108,12 @@ export const FIXED_TEXTS = {
   shutdownQuestion:
     'resellr jetzt beenden? Nicht gespeicherte Eingaben gehen verloren. ' +
     'Danach können Sie den Datenordner kopieren.',
+  /** UI-045.loading: while `POST /api/ops/shutdown` runs. */
+  shutdownPending: 'resellr wird beendet …',
+  /** UI-045.error: banner on `500` of `POST /api/ops/shutdown` (REQ-073). */
+  shutdownError: (referenceNumber: string) =>
+    'resellr konnte nicht beendet werden. resellr läuft weiter. Bitte versuchen Sie es erneut. ' +
+    `Besteht der Fehler weiter, informieren Sie den Betreiber mit der Referenznummer ${referenceNumber}.`,
   shutdownDone: 'resellr ist beendet. Sie können den Datenordner jetzt kopieren.',
   conflictBanner:
     'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. ' +
