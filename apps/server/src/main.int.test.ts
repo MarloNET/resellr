@@ -261,7 +261,7 @@ describe('server entry (CU-018)', () => {
 
     await waitForOperationsEvent(own.logDir, 'server_started');
     server.process.kill('SIGTERM');
-    resumeStart(configFile, { port });
+    await resumeStart(configFile, { port }, server);
 
     expect(await server.ended).toStrictEqual({ code: 0, signal: null });
     // Ended after the start, not during it.
@@ -283,7 +283,7 @@ describe('server entry (CU-018)', () => {
 
     await waitForOperationsEvent(own.logDir, 'server_started');
     server.process.kill('SIGTERM');
-    resumeStart(configFile, { port });
+    await resumeStart(configFile, { port }, server);
 
     expect(await server.ended).toStrictEqual({ code: 10, signal: null });
   }, 30_000);
@@ -300,13 +300,34 @@ function pauseStartAtConfig({ dataDir }: Installation): string {
   return configFile;
 }
 
-/** Fails with `ENXIO` instead of blocking when the server no longer reads the FIFO. */
-function resumeStart(configFile: string, config: { port: number }): void {
-  const fd = openSync(configFile, constants.O_WRONLY | constants.O_NONBLOCK);
-  try {
-    writeSync(fd, JSON.stringify(config));
-  } finally {
-    closeSync(fd);
+/**
+ * Writes the content once the server has opened the FIFO for reading: `server_started` is logged
+ * just before that. Opening without a reader fails with `ENXIO` instead of blocking the test, and
+ * is repeated only while the server runs.
+ */
+async function resumeStart(
+  configFile: string,
+  config: { port: number },
+  server: { process: ChildProcess },
+): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    let fd: number;
+    try {
+      fd = openSync(configFile, constants.O_WRONLY | constants.O_NONBLOCK);
+    } catch (error) {
+      const running = server.process.exitCode === null && server.process.signalCode === null;
+      if ((error as NodeJS.ErrnoException).code !== 'ENXIO' || !running || attempt >= 500) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      continue;
+    }
+    try {
+      writeSync(fd, JSON.stringify(config));
+    } finally {
+      closeSync(fd);
+    }
+    return;
   }
 }
 
