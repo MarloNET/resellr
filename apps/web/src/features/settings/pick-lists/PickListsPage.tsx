@@ -384,7 +384,7 @@ export function PickListsPage() {
           {!loading && !empty && list !== undefined && (
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="whitespace-nowrap">
                   <TableHead>{TEXTS.order}</TableHead>
                   <TableHead>{TEXTS.value}</TableHead>
                   <TableHead>{TEXTS.status}</TableHead>
@@ -429,8 +429,11 @@ export function PickListsPage() {
                           onMove={reorder}
                         />
                       </TableCell>
-                      <TableCell className="font-semibold">{value.label}</TableCell>
-                      <TableCell>
+                      {/* Values break only between words; the table scrolls if they do not fit (2.0.10). */}
+                      <TableCell className="min-w-32 font-semibold [overflow-wrap:break-word]">
+                        {value.label}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Badge variant={value.active ? 'published' : 'draft'}>
                           {value.active ? TEXTS.active : TEXTS.inactive}
                         </Badge>
@@ -545,8 +548,16 @@ function EditRow({
 
   return (
     <TableRow className="hover:bg-surface">
-      <TableCell className="text-right">{position}</TableCell>
-      <TableCell className="min-w-60">
+      <TableCell>
+        {/* Number at the place of the number in `OrderControls`. */}
+        <span className="flex items-center gap-1">
+          <span aria-hidden="true" className="invisible">
+            ⠿
+          </span>
+          <span className="min-w-6 text-right">{position}</span>
+        </span>
+      </TableCell>
+      <TableCell className="min-w-32">
         <FormField label={TEXTS.value} required error={errors.label}>
           {(control) => (
             <Input
@@ -563,7 +574,7 @@ function EditRow({
         </FormField>
         {renamed && <p className="m-0 mt-1 text-label text-text-secondary">{TEXTS.renameHint}</p>}
       </TableCell>
-      <TableCell>
+      <TableCell className="whitespace-nowrap [overflow-wrap:normal]">
         <StatusSwitch
           checked={draft.active}
           disabled={saving}
