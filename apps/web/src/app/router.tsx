@@ -5,6 +5,7 @@ import {
   LastSettingsSectionRedirect,
   SettingsLayout,
 } from '../features/settings/SettingsLayout.tsx';
+import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
 import { AppFrame } from './AppFrame.tsx';
 
 /**
@@ -46,7 +47,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <LastSettingsSectionRedirect /> },
           { path: 'haendlermarke', element: null },
-          { path: 'geraetearten', element: null },
+          { path: 'geraetearten', element: <DeviceTypesPage /> },
           { path: 'auswahllisten', element: null },
           { path: 'titelmuster', element: null },
           { path: 'textbausteine', element: null },

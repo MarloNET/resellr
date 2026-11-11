@@ -11,6 +11,8 @@ import {
   opsRoutes,
   type OpsRoutesOptions,
 } from './ops/index.ts';
+import { settingsRoutes } from './settings/index.ts';
+import type { Clock } from './shared/clock.ts';
 
 export interface AppDeps extends HttpCoreDeps {
   /** The migrated database, opened by the startup sequence (CU-040). */
@@ -19,6 +21,8 @@ export interface AppDeps extends HttpCoreDeps {
   ops: Omit<OpsRoutesOptions, 'lifecycle' | 'shutdownService'>;
   operationsLog: OperationsLog;
   now: () => Date;
+  /** Server clock of the services (CU-032); `now` is its `now`. */
+  clock: Clock;
   /** Ends the process after an orderly shutdown; `main.ts` passes `process.exit`. */
   exit: (code: number) => void;
 }
@@ -52,6 +56,7 @@ export function buildApp(deps: AppDeps) {
   });
 
   app.register(opsRoutes, { ...deps.ops, lifecycle: deps.lifecycle, shutdownService });
+  app.register(settingsRoutes, { db: deps.database.db, uow, clock: deps.clock });
 
   return { app, writeGate, uow };
 }

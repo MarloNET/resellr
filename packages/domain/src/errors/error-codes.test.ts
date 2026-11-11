@@ -20,13 +20,22 @@ const GENERAL_CODES: [string, number][] = [
   ['internal_error', 500],
 ];
 
+// Domain codes of 2.0.6, added by the feature tasks that raise them.
+const DOMAIN_CODES: [string, number][] = [['name_taken', 422]];
+
 describe('error codes (E7)', () => {
   it.each(GENERAL_CODES)('maps %s to HTTP %i', (code, status) => {
     expect(ERROR_CODES).toHaveProperty(code, status);
   });
 
-  it('contains exactly the general codes', () => {
-    expect(Object.keys(ERROR_CODES).sort()).toEqual(GENERAL_CODES.map(([code]) => code).sort());
+  it.each(DOMAIN_CODES)('maps the domain code %s to HTTP %i (2.0.6)', (code, status) => {
+    expect(ERROR_CODES).toHaveProperty(code, status);
+  });
+
+  it('contains exactly the general and the domain codes', () => {
+    expect(Object.keys(ERROR_CODES).sort()).toEqual(
+      [...GENERAL_CODES, ...DOMAIN_CODES].map(([code]) => code).sort(),
+    );
   });
 
   it('lists the codes alphabetically (hotspot rule, Technical Specification 4.5)', () => {
