@@ -1430,7 +1430,8 @@ Kein Sequenzdiagramm: einzelne lesende Abfrage einer Komponente.
 - „resellr beenden“ sendet `POST /api/ops/shutdown` mit Zeitgrenze 30 s (`UI-045.loading`, Buttons gesperrt, Esc wirkungslos).
 - `200` → `apps/web/src/api/app-termination.ts` stoppt alle Abfragen (`queryClient.cancelQueries()`, `clear()`, Flag `terminated`) und navigiert clientseitig nach `/beendet` mit dem Pfad aus der Antwort: `UI-046.success`, Wortlaut REQ-105 („resellr ist beendet. Sie können den Datenordner jetzt kopieren.“) und „Der Datenordner liegt hier:“ mit Pfad. Die beiden Zusatzzeilen des Designvorschlags werden nicht gebaut.
 - `500` → Dialog schließt, Banner `UI-045.error` mit Referenznummer, resellr läuft weiter, Hinweis bleibt.
-- `503 shutting_down` → Banner P-07 (Beenden läuft schon aus einem anderen Fenster).
+- `503 shutting_down` → Dialog schließt, Banner P-07 (Beenden läuft schon aus einem anderen Fenster).
+- **Ort der beiden Banner (Nachtrag MAR-421):** Beide stehen oben im Inhaltsbereich, nicht im Hinweis. CU-255 legt den Ausgang beim Ende der Anfrage in CU-311 ab (`500` und jede andere Fehlerantwort außer `503 shutting_down` → `error` mit dem `ApiError`; `503 shutting_down` → `shutting-down`) und leert CU-311, sobald es eine neue Anfrage sendet. CU-312 zeigt den Ausgang: `UI-045.error` über CU-051 mit „×“ (leert CU-311) oder P-07 über CU-054 (ohne „×“, verschwindet nicht von selbst). Der Rahmen (CU-044) rendert CU-312 im Inhaltsbereich direkt nach dem P-06 des Rahmens und vor `<Outlet />`; der schmale Rahmen (CU-217) an derselben Stelle wie die übrigen Seitenbanner. Der Ausgang gilt je Fenster bis zum Neuladen und liegt nicht in `localStorage`.
 - Verbindungsabbruch oder 30 s ohne Antwort → `/beendet` mit `UI-046.unknown` (Text laut Design, **ohne** Button „Erneut versuchen“, ohne Pfad).
 - Neuladen von `/beendet` nach dem Beenden zeigt die Fehlerseite von Chrome (Design UI-046); das ist gewollt.
 
@@ -2814,7 +2815,7 @@ Kein Schritt braucht eine Einheit eines späteren Schritts. Wo ein Schritt Daten
 | S7 | S5, S6 | – |
 | S8 | S2, S4 | – (aktiviert den Vorschau-Link in UI-039) |
 | S9 | S4 bis S6 | – |
-| S10 | S1, S2, S4, S5, S7; F-17 (CU-245, CU-254 bis CU-257) nur S1 | F-17 darf nach S1 vorgezogen werden (Baseline 12.2). Der Rest von S10 braucht Reader späterer Schritte: CU-247 für Schritt 3 der Startprüfung (Fotodateien, CU-287 aus S7) und den Invariantentest der Bestandsspalten (CU-128, CU-129 aus S4); CU-251 und CU-307 die Verweise aus CU-287 (S7), CU-291 (S5, erweitert in S7) und CU-086 (S2); CU-234 nur die Tabelle aus S1 (FIND-227) |
+| S10 | S1, S2, S4, S5, S7; F-17 (CU-245, CU-254 bis CU-257, CU-311, CU-312) nur S1 | F-17 darf nach S1 vorgezogen werden (Baseline 12.2). Der Rest von S10 braucht Reader späterer Schritte: CU-247 für Schritt 3 der Startprüfung (Fotodateien, CU-287 aus S7) und den Invariantentest der Bestandsspalten (CU-128, CU-129 aus S4); CU-251 und CU-307 die Verweise aus CU-287 (S7), CU-291 (S5, erweitert in S7) und CU-086 (S2); CU-234 nur die Tabelle aus S1 (FIND-227) |
 | S11 | S4, S5 | – |
 
 Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegenseitige Abhängigkeit wählen, z. B. S3 neben dem vorgezogenen F-17 oder S8 neben S6.
@@ -2869,7 +2870,7 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-041 | Ops-Routen | `apps/server/src/ops/ops.routes.ts` | `GET /api/ops/health`, `GET /api/ops/status`; erweitert in S10 um `POST /api/ops/shutdown` | F-17 |
 | CU-042 | Web-Einstieg | `apps/web/src/main.tsx` | React starten, Provider | – |
 | CU-043 | Router | `apps/web/src/app/router.tsx` | alle Routen (Kap. 4.2), Hotspot; jede Route ergänzt die Task, die ihren Screen anlegt (S1: `/` und `/inserate`); Ausnahme Bereiche unter `/einstellungen`: alle 14 Unterrouten legt die Task von UI-025 an (S2, #148), die Task eines Bereichs-Screens setzt nur `element` ihrer Unterroute (Kap. 4.2, Nachtrag MAR-354); Ersatzroute `*` als letzter Eintrag unter dem Rahmen (Kap. 4.2, Nachtrag MAR-245) | alle |
-| CU-044 | Anwendungsrahmen | `apps/web/src/app/AppFrame.tsx` | Rahmen mit Navigationsspalte (Kopf fest, Bereich mit Einträgen und UI-044 scrollt bei wenig Höhe, Kap. 2.17), Inhaltsbereich; P-06 (CU-053) als erstes Element des Inhaltsbereichs vor `<Outlet />`, solange `useOpsStatusQuery()` (CU-050) mit `unreachable` endet (Nachtrag MAR-395) | Design Kap. 3 |
+| CU-044 | Anwendungsrahmen | `apps/web/src/app/AppFrame.tsx` | Rahmen mit Navigationsspalte (Kopf fest, Bereich mit Einträgen und UI-044 scrollt bei wenig Höhe, Kap. 2.17), Inhaltsbereich; P-06 (CU-053) als erstes Element des Inhaltsbereichs vor `<Outlet />`, solange `useOpsStatusQuery()` (CU-050) mit `unreachable` endet (Nachtrag MAR-395); danach, ebenfalls vor `<Outlet />`, der Ausgang des Beendens (CU-312, Nachtrag MAR-421) | Design Kap. 3 |
 | CU-045 | Navigation | `apps/web/src/app/Navigation.tsx` | sechs Einträge der linken Spalte, 28 px | Design Kap. 3 |
 | CU-046 | Query-Client | `apps/web/src/app/query-client.ts` | TanStack-Query-Einstellungen (5 s, Fokus-Neuladen außer `copy-view`, keine Wiederholung) | Kap. 2.0.8 |
 | CU-047 | API-Client | `apps/web/src/api/api-client.ts` | `fetch`-Hülle, Zeitgrenzen, Einordnung der Antwort in Zustände (Kap. 2.0.7) | alle |
@@ -3086,7 +3087,7 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-214 | Fotos-Screen | `apps/web/src/features/photos/PhotosPage.tsx` | UI-015 | REQ-042 |
 | CU-215 | Upload-Warteschlange | `apps/web/src/features/photos/photo-upload-queue.ts` | Dateien nacheinander mit Fortschritt hochladen | T-2 |
 | CU-216 | Kopier-Assistent-Screen | `apps/web/src/features/copy-assistant/CopyAssistantPage.tsx` | UI-019 Vollfenster und schmal | REQ-047 bis REQ-049 |
-| CU-217 | Schmaler Rahmen | `apps/web/src/features/copy-assistant/CompactFrame.tsx` | Rahmen ohne Navigation: fester Kopfbereich, eine scrollende Fläche mit UI-044 als Streifen am Ende (Kap. 2.17) | X-1 |
+| CU-217 | Schmaler Rahmen | `apps/web/src/features/copy-assistant/CompactFrame.tsx` | Rahmen ohne Navigation: fester Kopfbereich, eine scrollende Fläche mit UI-044 als Streifen am Ende (Kap. 2.17); Ausgang des Beendens (CU-312) an der Stelle der übrigen Seitenbanner (Nachtrag MAR-421) | X-1 |
 | CU-218 | Übernahme-Markierungen | `apps/web/src/features/copy-assistant/copy-progress-store.ts` | Markierungen „übernommen“ im `sessionStorage`, Schlüssel mit `valueHash`: ein geänderter Wert macht das Feld wieder offen (K-06, Kap. 2.12) | REQ-049 |
 | CU-219 | Zwischenablage | `apps/web/src/features/copy-assistant/clipboard.ts` | Text in die Zwischenablage, Fehlerfall | REQ-047 |
 
@@ -3141,7 +3142,9 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-252 | Aufräumen Übergabeordner | `apps/server/src/ops/housekeeping/handover-cleanup-job.ts` | Übergaben älter als 7 Tage, nur Ordner und ZIP-Dateien mit vollständig verankertem eigenem Namensmuster (Kap. 2.19; FIND-212, FIND-229) | Baseline 10.5 |
 | CU-253 | Speicherplatzprüfung | `apps/server/src/ops/housekeeping/disk-space-check.ts` | Warnung unter 10 GB frei | AR-09 |
 | CU-254 | Hinweis „Sicherung einrichten“ | `apps/web/src/features/backup-notice/BackupNotice.tsx` | UI-044 in beiden Varianten; S1 schafft nur den Platz im Rahmen (CU-044), F-17 darf nach S1 vorgezogen werden | REQ-104 |
-| CU-255 | Beenden-Dialog | `apps/web/src/features/shutdown/ShutdownDialog.tsx` | UI-045 | REQ-105 |
+| CU-255 | Beenden-Dialog | `apps/web/src/features/shutdown/ShutdownDialog.tsx` | UI-045; legt den Ausgang bei Fehlerantwort in CU-311 ab und leert CU-311 beim Senden (Nachtrag MAR-421) | REQ-105 |
+| CU-311 | Ausgang des Beendens | `apps/web/src/features/shutdown/shutdown-outcome-store.ts` | Ausgang der letzten Anfrage `POST /api/ops/shutdown` aus UI-045 in diesem Fenster (`error` mit `ApiError`, `shutting-down` oder keiner) bis zum Neuladen, nach dem Muster von CU-049; `set`, `clear`, Hook `useShutdownOutcome()` (Nachtrag MAR-421) | REQ-105, REQ-073 |
+| CU-312 | Banner nach dem Beenden | `apps/web/src/features/shutdown/ShutdownOutcomeBanner.tsx` | zeigt den Ausgang aus CU-311 oben im Inhaltsbereich: `UI-045.error` über CU-051 mit „×“ (leert CU-311), P-07 über CU-054; sonst nichts. Aufrufer: CU-044, CU-217 (Nachtrag MAR-421) | UI-045, P-07 |
 | CU-256 | Endzustand | `apps/web/src/features/shutdown/TerminatedPage.tsx` | UI-046 `success` und `unknown` | REQ-105 |
 | CU-257 | App-Beendigung | `apps/web/src/api/app-termination.ts` | nach dem Beenden alle Abfragen stoppen | REQ-105 |
 | CU-258 | Launcher-Einstieg | `tools/launcher/src/cli.ts` | Befehle `supervise`, `open`, `stop`, `availability-report` | F-18 |
@@ -3406,7 +3409,7 @@ Keine aktive Requirement ist ohne Umsetzung; nicht anwendbar sind nur die Netzbe
 | FLOW-07 | **nicht umgesetzt** (OD-02 A) | – |
 | FLOW-08 | 2.15, 2.6 | CU-240, CU-241, CU-239, CU-242 |
 | FLOW-09 | 2.12, 2.10 („Als beendet melden“, v0.5.2) | CU-216 bis CU-219, CU-202 |
-| FLOW-10 | 2.17, 2.18 | CU-254 bis CU-257, CU-258 bis CU-272 |
+| FLOW-10 | 2.17, 2.18 | CU-254 bis CU-257, CU-311, CU-312, CU-258 bis CU-272 |
 
 | Screen | Abschnitt | Code-Einheit | Screen | Abschnitt | Code-Einheit |
 | --- | --- | --- | --- | --- | --- |
@@ -3431,7 +3434,7 @@ Keine aktive Requirement ist ohne Umsetzung; nicht anwendbar sind nur die Netzbe
 | UI-019 | 2.12, 2.10 („Als beendet melden“, v0.5.2) | CU-216 bis CU-219, CU-202 | UI-042 | 2.21 (Could) | CU-282 |
 | UI-020 | 2.10 | CU-202 | UI-043 | 2.2, 2.8.4 | CU-103 |
 | UI-021 | 2.10 | CU-203 | UI-044 | 2.17 | CU-254 |
-| UI-022 | 2.9 | CU-201 | UI-045 | 2.17 | CU-255 |
+| UI-022 | 2.9 | CU-201 | UI-045 | 2.17 | CU-255, CU-311, CU-312 |
 | UI-023 | 2.13 | CU-227 | UI-046 | 2.17 | CU-256 |
 | LP-01, LP-02, LP-03 | 2.18 | CU-271 | | | |
 
@@ -3472,7 +3475,7 @@ Grundregel: Jeder Zustand folgt Kap. 2.0.7. **Zusätzlich gilt in jedem Screen m
 | UI-042 | default, loading, error, success, empty, validation, disabled | nur mit REQ-056 |
 | UI-043 | default, empty, loading, error, validation, success, disabled | nur Anzeige von `impact`; kein `.error` (K-5) |
 | UI-044 | default, loading, error, disabled, Netzbetrieb, empty, success, validation, `.unreachable`, `.ausgang-unbekannt`, `.wird-beendet` | Kap. 2.17; „Netzbetrieb“ entfällt (OD-02 A); bei fehlender Verbindung bleibt „wird geladen …“, P-06 setzt der Rahmen (DG-06, Nachtrag MAR-395) |
-| UI-045 | default, loading, error, unknown, validation, empty, success, disabled, `.wird-beendet` | Zeitgrenze 30 s → `unknown` (UI-046) |
+| UI-045 | default, loading, error, unknown, validation, empty, success, disabled, `.wird-beendet` | Zeitgrenze 30 s → `unknown` (UI-046); `error` und `.wird-beendet` als Banner oben im Inhaltsbereich über CU-312, gesetzt vom Rahmen (Nachtrag MAR-421) |
 | UI-046 | success, unknown, loading, error, empty, validation, disabled | ohne die nicht verbindlichen Zusatzzeilen und ohne „Erneut versuchen“ |
 | LP-01 | default | Seitenwechsel nach T-5 |
 | LP-02 | default, `zeitueberschreitung` (Design v0.6, K-07) | Referenznummer nach H-11. `default` bei `aborted` oder `gave_up`, auch nach der Startgrenze von 10 min mit deren eigener Nummer. `zeitueberschreitung`: 120 s ohne Startergebnis, Titel „resellr startet länger als erwartet“, Referenznummer von `start_timeout`; leitet bei späterem `ready` selbst weiter wie LP-01, wechselt bei Abbruch zu `default` (Kap. 2.18). Im Rückfall S-7 Text des Designs ohne Selbstweiterleitung |
@@ -4037,6 +4040,15 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
 - **Umfang in #139:** CU-044 (erweitert, neu im Issue) und CU-053 (`alwaysShow` und Unterdrückung). Tests: CU-053 zeigt ohne `alwaysShow` nichts bei Status `unreachable` und zeigt sich bei Status `200` oder `500` sowie mit `alwaysShow`; CU-044 zeigt P-06 bei Status `unreachable`, nicht bei laufendem Status und nicht bei `500`; E2E zu DER-95-04 („Inhaltsbereich zeigt P-06“) auf `/inserate`.
 - Kap. 2.0.7 (`.unreachable`), 2.17 (Zustände), 4.4 (CU-044, CU-053) und 7.3 (UI-044) entsprechend ergänzt.
 - **Keine Owner-Freigabe nötig (Kap. 4.7):** Verhalten, Text und Ort des Banners sind freigegeben (Design Kap. 5 P-06, UI-044 `screen.md`, DG-06). Festgelegt wird nur, welche Einheit das Banner setzt. Dass höchstens ein P-06 erscheint, folgt aus dem Design, das nur ein Banner oben im Inhaltsbereich vorsieht.
+
+**Code-Struktur-Nachtrag 11.11.2026 (MAR-421, GitHub-Issue #142, Rückfrage aus MAR-420):** zwei neue Einheiten (CU-311, CU-312) in `web-ui`, keine Komponentengrenze berührt, keine Migration.
+- **Die Banner `UI-045.error` und P-07 setzt der Rahmen (CU-044):** Vorschlag A aus MAR-421 übernommen, mit eigenem Zustand und eigener Anzeige. `AppFrame.tsx` rendert `<ShutdownOutcomeBanner />` (CU-312) im Inhaltsbereich direkt nach dem P-06 des Rahmens und vor `<Outlet />`; stehen beide, kommt P-06 zuerst. CU-312 liest CU-311: `error` → `PageBanner` (CU-051) `variant="error"` mit dem Text `UI-045.error` aus CU-012 und der Referenznummer aus dem `ApiError`, „×“ leert CU-311; `shutting-down` → `ShuttingDownBanner` (CU-054) mit dem Standardtext P-07, ohne „×“; kein Ausgang → nichts.
+- **Wer den Zustand setzt:** CU-255 nach dem Ende von `POST /api/ops/shutdown`: `503 shutting_down` (`ApiError.kind === 'shutting-down'`) → `shutting-down`; jede andere Fehlerantwort mit HTTP-Status (`500`) → `error` mit dem `ApiError`. Der Dialog schließt in beiden Fällen. Sendet CU-255 eine neue Anfrage, leert es CU-311 vorher; das alte Banner verschwindet also erst durch eine Handlung des Nutzers. `200` und ein unbekannter Ausgang führen wie bisher nach `/beendet` (CU-257, CU-256) und berühren CU-311 nicht.
+- **Grund:** Das Design legt beide Banner „oben im Inhaltsbereich“ fest (UI-045 `screen.md` `error` und `.wird-beendet`, Design Kap. 5 P-07). Der Inhaltsbereich gehört CU-044; der Auslöser steht in der Navigationsspalte (CU-254 → CU-255). Ein Portal aus CU-255 in `<main>` scheidet aus wie in MAR-395, ein Banner in der Spalte widerspräche dem Design. Der Zustand liegt in einem eigenen Store statt in CU-050, weil CU-050 nur die Abfragen hält; CU-049 liegt nur deshalb unter `api/`, weil der API-Client es liest. `useMutationState` scheidet aus: Ohne Beobachter entfernt TanStack Query den Eintrag nach `gcTime` (Standard 5 min). Das Banner verschwände dann von selbst, und „×“ bräuchte einen Eingriff in den Mutation-Cache. Die Anzeige liegt in einer eigenen Einheit (CU-312), weil auch der schmale Rahmen (CU-217) den Hinweis mit „resellr beenden“ zeigt und dieselben Banner braucht.
+- **Zwei P-07 möglich:** Lehnt der Server nach dem Banner aus UI-045 auch eine schreibende Aktion der Seite mit `503` ab, zeigt die Seite ihr eigenes P-07 darunter. Das ist nur innerhalb der rund 10 s des Beendens möglich und bleibt ohne Abgleich.
+- **Umfang in #142:** CU-044 (erweitert, neu im Issue), CU-311 und CU-312 (neu). Tests: CU-311 `set`, `clear` und Benachrichtigung; CU-312 zeigt nichts ohne Ausgang, `UI-045.error` mit Referenznummer und „×“ (leert CU-311), P-07 ohne „×“; CU-255 legt bei `500` `error` und bei `503 shutting_down` `shutting-down` ab, schließt dabei den Dialog und leert CU-311 beim nächsten Senden; CU-044 zeigt P-06 vor dem Banner von CU-312 und beide vor der Seite. CU-217 bindet CU-312 in dem Issue ein, das den schmalen Rahmen baut.
+- Kap. 2.17, 4.4.0 (S10), 4.4 (CU-044, CU-217, CU-255, neu CU-311, CU-312), 7.2 (FLOW-10, UI-045) und 7.3 (UI-045) entsprechend ergänzt.
+- **Keine Owner-Freigabe nötig (Kap. 4.7):** Text, Ort und Verhalten der Banner sind freigegeben (UI-045 `screen.md`, Design Kap. 5 P-07, Kap. 2.17). Festgelegt wird nur, welche Einheiten sie zeigen und wo ihr Zustand liegt. Beide neuen Einheiten liegen in `web-ui`.
 
 Weitere Code-Struktur-Nachträge (Kap. 4.7) werden hier mit Datum, Einheit und Grund ergänzt.
 
