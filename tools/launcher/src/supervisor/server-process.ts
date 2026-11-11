@@ -1,14 +1,23 @@
 import { spawn } from 'node:child_process';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ExitCode } from '@resellr/runtime-shared/exit-codes';
-import type { RuntimeEnv, RuntimePaths } from '@resellr/runtime-shared/paths';
+import {
+  IS_BUNDLED,
+  programFolderPaths,
+  type RuntimeEnv,
+  type RuntimePaths,
+} from '@resellr/runtime-shared/paths';
 import { readStartResult } from '@resellr/runtime-shared/runtime-state-files';
 
-/** Entry of `resellr-server` in the source tree; the packaging step replaces it with `app/server.mjs`. */
-export const SERVER_ENTRY = fileURLToPath(
-  new URL('../../../../apps/server/src/main.ts', import.meta.url),
-);
+/**
+ * Entry of `resellr-server`: in the package `app/server.mjs` beside `resellr-node.exe` (2.19),
+ * in the source tree `apps/server/src/main.ts`.
+ */
+export const SERVER_ENTRY = IS_BUNDLED
+  ? programFolderPaths(dirname(process.execPath)).serverEntry
+  : fileURLToPath(new URL('../../../../apps/server/src/main.ts', import.meta.url));
 
 /**
  * Test hook: path of a script the supervisor starts instead of `resellr-server`, so integration
