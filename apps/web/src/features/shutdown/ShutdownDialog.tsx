@@ -2,6 +2,7 @@ import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
 import type { RefObject } from 'react';
 
 import { useShutdownMutation } from '../../api/ops.api.ts';
+import { useWritesLocked } from '../../api/write-outcome-store.ts';
 import { ConfirmDialog } from '../../components/patterns/ConfirmDialog.tsx';
 import { shutdownOutcomeStore } from './shutdown-outcome-store.ts';
 
@@ -24,9 +25,11 @@ export interface ShutdownDialogProps {
  * leaves its outcome in CU-311 for the banner of the frame (CU-312, Nachtrag MAR-421):
  * `503 shutting_down` → P-07, any other (`500`) → `UI-045.error`; resellr keeps running. The
  * waiting state stays after `200` and without an answer: UI-046 replaces the dialog (#143).
+ * While all writes of the page are locked until reload (P-08, CU-049), the action is disabled.
  */
 export function ShutdownDialog({ open, onOpenChange, returnFocusRef }: ShutdownDialogProps) {
   const shutdown = useShutdownMutation();
+  const writesLocked = useWritesLocked();
 
   function confirm() {
     shutdownOutcomeStore.clear();
@@ -52,6 +55,7 @@ export function ShutdownDialog({ open, onOpenChange, returnFocusRef }: ShutdownD
       confirmLabel={FIXED_TEXTS.shutdownAction}
       width={SHUTDOWN_DIALOG_WIDTH}
       returnFocusRef={returnFocusRef}
+      confirmDisabled={writesLocked}
       pending={shutdown.isIdle ? undefined : FIXED_TEXTS.shutdownPending}
     >
       {FIXED_TEXTS.shutdownQuestion}

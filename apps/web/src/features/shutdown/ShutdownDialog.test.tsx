@@ -4,6 +4,7 @@ import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { writeOutcomeStore } from '../../api/write-outcome-store.ts';
 import { createQueryClient } from '../../app/query-client.ts';
 import { shutdownOutcomeStore } from './shutdown-outcome-store.ts';
 import { ShutdownDialog } from './ShutdownDialog.tsx';
@@ -179,5 +180,23 @@ describe('ShutdownDialog (UI-045, CU-255)', () => {
     expect(screen.getByRole('dialog', { name: 'resellr beenden' })).toBe(dialog);
     expect(within(dialog).getByRole('status')).toBeTruthy();
     expect(shutdownOutcomeStore.get()).toBeNull();
+  });
+
+  // Last test of the file: the write lock lasts until the page is reloaded (CU-049).
+  it('UI-045.default with writes locked until reload (P-08) the action is disabled and sends nothing', () => {
+    writeOutcomeStore.lock();
+    const dialog = openDialog();
+
+    const action = within(dialog).getByRole<HTMLButtonElement>('button', {
+      name: 'resellr beenden',
+    });
+    fireEvent.click(action);
+
+    expect(action.disabled).toBe(true);
+    expect(within(dialog).queryByRole('status')).toBeNull();
+    expect(
+      within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Abbrechen' }).disabled,
+    ).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

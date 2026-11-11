@@ -33,6 +33,22 @@ function renderNotice() {
   return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
 }
 
+/**
+ * Renders the notice with fresh modules: the write lock of a test above lasts until the page is
+ * reloaded (CU-049) and would disable "resellr beenden" in UI-045.
+ */
+async function renderFreshNotice() {
+  vi.resetModules();
+  const { BackupNotice: FreshBackupNotice } = await import('./BackupNotice.tsx');
+  const { createQueryClient: createFreshQueryClient } = await import('../../app/query-client.ts');
+  render(
+    <QueryClientProvider client={createFreshQueryClient()}>
+      <FreshBackupNotice variant="sidebar" />
+    </QueryClientProvider>,
+  );
+  return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
+}
+
 describe('BackupNotice (UI-044, CU-254)', () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -230,7 +246,7 @@ describe('BackupNotice (UI-044, CU-254)', () => {
         ? Promise.resolve(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }))
         : pending(input, init),
     );
-    const notice = renderNotice();
+    const notice = await renderFreshNotice();
     await within(notice).findByText(DATA_DIR_PATH);
     const button = within(notice).getByRole<HTMLButtonElement>('button', {
       name: 'resellr beenden',
@@ -252,7 +268,7 @@ describe('BackupNotice (UI-044, CU-254)', () => {
 
   it('UI-044.disabled: DER-96-04 after "Abbrechen" the button is enabled again and has the focus', async () => {
     fetchMock.mockResolvedValue(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }));
-    const notice = renderNotice();
+    const notice = await renderFreshNotice();
     await within(notice).findByText(DATA_DIR_PATH);
     const button = within(notice).getByRole<HTMLButtonElement>('button', {
       name: 'resellr beenden',
