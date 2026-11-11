@@ -85,6 +85,19 @@ async function freePort(): Promise<number> {
   return port;
 }
 
+/**
+ * The app listens on a free port whatever `config.json` says, so a test of the standard port 4310
+ * does not occupy 4310 (#329).
+ */
+const listeningOnFreePort =
+  (buildApp: StartupOptions['buildApp']): StartupOptions['buildApp'] =>
+  (deps) => {
+    const app = buildApp(deps);
+    const listen = app.listen.bind(app);
+    app.listen = ((options: object) => listen({ ...options, port: 0 })) as typeof app.listen;
+    return app;
+  };
+
 const writeConfig = (values: object) =>
   writeFileSync(join(paths.dataDir, 'config.json'), JSON.stringify(values));
 
@@ -106,7 +119,9 @@ const appliedMigrations = () => {
 
 describe('startup sequence (CU-040)', () => {
   it('E3 first start in an empty data folder creates config.json with port 4310 and migrates to 0001', async () => {
-    result = await start().run();
+    const { options } = start();
+
+    result = await runStartup({ ...options, buildApp: listeningOnFreePort(options.buildApp) });
 
     expect(JSON.parse(readFileSync(join(paths.dataDir, 'config.json'), 'utf8'))).toEqual({
       port: 4310,

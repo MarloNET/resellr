@@ -154,13 +154,14 @@ describe('launcher as supervisor (CU-258, CU-259, CU-261, CU-263, CU-264)', () =
     launcher.process.exitCode === null && launcher.process.signalCode === null;
 
   it(
-    'DER-102-02 without a server open takes over the pipe, starts the server without a window, opens Chrome on ready and runs on as supervisor; port 4311 from config.json',
+    'DER-102-02 without a server open takes over the pipe, starts the server without a window, opens Chrome on ready and runs on as supervisor; port from config.json',
     async () => {
-      writePort(4311);
+      const port = await freePort();
+      writePort(port);
       const open = launch('open');
 
-      await expect.poll(() => fakes.chromeCalls(), POLL).toEqual(['http://127.0.0.1:4311/']);
-      const health = await healthOf(4311);
+      await expect.poll(() => fakes.chromeCalls(), POLL).toEqual([`http://127.0.0.1:${port}/`]);
+      const health = await healthOf(port);
       // The server got the startId of this attempt from the supervisor (RESELLR_START_ID).
       expect(health).toEqual({ state: 'ready', startId: expect.any(String) });
       expect(serverStarts()).toHaveLength(1);
@@ -169,7 +170,7 @@ describe('launcher as supervisor (CU-258, CU-259, CU-261, CU-263, CU-264)', () =
 
       // End of the supervisor ends the server (IPC end, exit code 12).
       open.process.kill('SIGKILL');
-      await expect.poll(() => healthOf(4311), POLL).toBeNull();
+      await expect.poll(() => healthOf(port), POLL).toBeNull();
     },
     REAL_START_MS,
   );
