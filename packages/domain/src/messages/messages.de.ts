@@ -38,8 +38,8 @@ export const FIELD_MESSAGES = {
   /** UI-028 "Akku vorhanden", missing in the list battery (REQ-007, DER-35-10). */
   batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
   /**
-   * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). UI-028 names no
-   * text for this rule; worded after the catalog pattern of M-02 (DG-08), see PR #154.
+   * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
+   * Technical Specification 8.2 (addendum MAR-487).
    */
   pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
 } as const;
