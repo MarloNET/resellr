@@ -191,7 +191,7 @@ describe('TerminatedPage (UI-046, CU-256) and app termination (CU-257)', () => {
   });
 
   it('/beendet without shutting down in this window leads to the start page', async () => {
-    serve(never);
+    serve(() => never('/api/ops/shutdown'));
     const { router } = await renderApp('/beendet');
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/inserate'));
