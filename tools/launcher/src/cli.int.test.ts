@@ -11,12 +11,19 @@ import {
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createFakePrograms, type FakePrograms, waitFor } from '../test/fake-programs.ts';
+import {
+  createFakePrograms,
+  FAKE_REF_NO,
+  FAKE_SERVER,
+  type FakePrograms,
+  waitFor,
+} from '../test/fake-programs.ts';
+import { TEST_SERVER_ENTRY_ENV } from './supervisor/server-process.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
 
@@ -74,9 +81,11 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
   });
 
   /** Runs `resellr-launcher open` as its own process and returns its exit code. */
-  function runOpen(): Promise<number> {
+  function runOpen(extraEnv: Record<string, string> = {}): Promise<number> {
     const env = {
+      ...extraEnv,
       PATH: fakes.path,
+      LOCALAPPDATA: root,
       RESELLR_DATA_DIR: dataDir,
       RESELLR_LOG_DIR: logDir,
       RESELLR_HANDOVER_DIR: join(root, 'Fotoübergabe'),
@@ -153,23 +162,31 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     expect(operationsLog()).toEqual([]);
   });
 
-  it('does not create config.json when it is missing', async () => {
-    // Nothing listens on the port, so `open` ends without a browser (steps 2 and 3 follow in #119).
-    await expect(runOpen()).resolves.toBe(1);
-
-    expect(existsSync(join(dataDir, 'config.json'))).toBe(false);
-    expect(fakes.regCalls()).toEqual([]);
+  /** Lets the own supervisor start the fake server, which aborts the start (exit code 10). */
+  const abortingServer = () => ({
+    [TEST_SERVER_ENTRY_ENV]: FAKE_SERVER,
+    FAKE_SERVER_DIR: root,
+    FAKE_SERVER_RUNS: 'aborted',
   });
 
-  it('opens no browser and ends with exit code 1 while the server is starting', async () => {
+  const startFailedPage = (refNo: string) =>
+    `${pathToFileURL(join(dirname(process.execPath), 'launcher-pages', 'lp-02.html')).href}?ref=${refNo}`;
+
+  it('does not create config.json when it is missing', async () => {
+    await expect(runOpen(abortingServer())).resolves.toBe(0);
+
+    expect(existsSync(join(dataDir, 'config.json'))).toBe(false);
+  });
+
+  it('starts the server itself while another one is only starting and opens LP-02 with the reference number of the abort', async () => {
     server = await startTestServer(0, 'starting');
     writeConfig(JSON.stringify({ port: server.port }));
     fakes.registerChrome('HKCU', fakes.chromePath);
 
-    await expect(runOpen()).resolves.toBe(1);
+    await expect(runOpen(abortingServer())).resolves.toBe(0);
 
     expect(server.requests).toHaveLength(1);
-    expect(fakes.chromeArgs()).toBeNull();
+    expect(await waitFor(fakes.chromeArgs)).toEqual([startFailedPage(FAKE_REF_NO)]);
     expect(fakes.explorerArgs()).toBeNull();
   });
 });
