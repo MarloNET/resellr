@@ -13,6 +13,7 @@ import { loadConfig } from './config-file.ts';
 import type { ErrorLog } from './error-log.ts';
 import type { LifecycleState } from './lifecycle-state.ts';
 import { createOperationsLog } from './operations-log.ts';
+import type { SupervisorIpc } from './supervisor-ipc.ts';
 
 export const DATABASE_FILE_NAME = 'resellr.db';
 
@@ -40,6 +41,8 @@ export interface StartupOptions {
   host: string;
   /** Migrations to run; the shipped list CU-308 unless a test adds its own. */
   migrations?: readonly Migration[];
+  /** IPC channel to the supervisor (CU-249), told in step 9 that the server is ready. */
+  supervisorIpc?: Pick<SupervisorIpc, 'reportReady'>;
 }
 
 export type StartupResult =
@@ -61,7 +64,7 @@ export type StartupResult =
 /**
  * Startup sequence (CU-040) in the order of Technical Specification 2.19, in S1 without the
  * startup check: configuration, open the database, migrations, listen on `127.0.0.1:<port>`,
- * state `ready`. Until then `GET /api/ops/health` reports `starting`.
+ * state `ready` and IPC `ready` to the supervisor. Until then `GET /api/ops/health` reports `starting`.
  *
  * A failure to listen (`EADDRINUSE`, step 8) aborts the start: an entry with a reference number
  * in the error log, the database closed, result `aborted`. Any other error is thrown after the
@@ -79,6 +82,7 @@ export async function runStartup({
   buildApp,
   host,
   migrations = shippedMigrations,
+  supervisorIpc,
 }: StartupOptions): Promise<StartupResult> {
   const operationsLog = createOperationsLog({
     dir: paths.logDir,
@@ -132,6 +136,8 @@ export async function runStartup({
   }
 
   lifecycle.set('ready');
+  // Step 9: IPC `ready` with the `startId` of this start (2.18); `start-result.json` follows in #132.
+  supervisorIpc?.reportReady();
   // The kind of the last end and the findings of the startup check follow in S10 (2.19 step 9).
   operationsLog.event('server_ready');
 

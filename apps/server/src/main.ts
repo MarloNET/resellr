@@ -11,6 +11,7 @@ import {
   createErrorLog,
   createLifecycleState,
   createOperationsLog,
+  createSupervisorIpc,
   runStartup,
 } from './ops/index.ts';
 import { type Clock, createClockFromArgs } from './shared/clock.ts';
@@ -42,6 +43,8 @@ const operationsLog = createOperationsLog({
   now: clock.now,
 });
 const lifecycle = createLifecycleState();
+// Before the start, so a channel that closes during the start is noticed afterwards (H-13).
+const supervisorIpc = createSupervisorIpc(process, startId);
 const webRoot = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
 const result = await runStartup({
@@ -55,6 +58,7 @@ const result = await runStartup({
   errorLog,
   lifecycle,
   host: LISTEN_HOST,
+  supervisorIpc,
   buildApp: ({ port, database }) =>
     buildApp({
       port,
@@ -73,11 +77,18 @@ const result = await runStartup({
 if (result.state === 'aborted') {
   process.exitCode = ExitCode.StartAborted;
 } else {
+  let closing = false;
+  const closeAndExit = (code: number) => {
+    if (closing) return;
+    closing = true;
+    lifecycle.set('stopping');
+    void result.close().then(() => process.exit(code));
+  };
   // Linux only (development, CI, tests): no orderly shutdown of 2.17, no end marker.
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, () => {
-      lifecycle.set('stopping');
-      void result.close().then(() => process.exit(0));
-    });
+    process.once(signal, () => closeAndExit(0));
   }
+  // Coupling (H-13, S-3): without the supervisor the server ends in order; SQLite checkpoints the
+  // WAL file when the last connection closes.
+  supervisorIpc.onSupervisorLost(() => closeAndExit(ExitCode.SupervisorLost));
 }

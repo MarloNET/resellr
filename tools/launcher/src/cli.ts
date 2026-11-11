@@ -1,11 +1,27 @@
+import { dirname } from 'node:path';
+
 import { readConfiguredPort } from '@resellr/runtime-shared/configured-port';
 import { createDailyJsonlWriter } from '@resellr/runtime-shared/daily-jsonl-writer';
 import { LauncherExitCode } from '@resellr/runtime-shared/exit-codes';
-import { resolveRuntimePaths, type RuntimeEnv } from '@resellr/runtime-shared/paths';
+import {
+  resolveRuntimePaths,
+  type RuntimeEnv,
+  type RuntimePaths,
+} from '@resellr/runtime-shared/paths';
 
 import { createChromeOpener } from './chrome-opener.ts';
 import { createHealthClient } from './health-client.ts';
+import { launcherPageUrl } from './launcher-pages-location.ts';
 import { runOpenCommand } from './open-command.ts';
+import { startServerProcess } from './supervisor/server-process.ts';
+import { runSupervisor } from './supervisor/supervisor.ts';
+import {
+  listenSupervisorPipe,
+  type PhaseEvent,
+  subscribeToSupervisor,
+  supervisorPipePath,
+  type SupervisorPipeServer,
+} from './supervisor/supervisor-pipe.ts';
 
 /** A call of `resellr-launcher` (Technical Specification 2.18, command table). */
 export type LauncherCommand =
@@ -50,8 +66,10 @@ export async function runCli(
     switch (command?.name) {
       case 'open':
         return await runOpen(env);
+      case 'supervise':
+        return await runSupervise(env);
       default:
-        // `supervise` (#119), `stop` (#123) and `availability-report` (#116) are not built yet.
+        // `stop` (#123) and `availability-report` (#116) are not built yet.
         return LauncherExitCode.Failed;
     }
   } catch {
@@ -60,17 +78,56 @@ export async function runCli(
 }
 
 function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
-  const { dataDir, logDir } = resolveRuntimePaths(env);
+  const paths = resolveRuntimePaths(env);
+  const pipePath = pipePathFor(env);
   // The same rule as the server, read anew on every call; the launcher only reads `config.json`
   // and writes no warning about it (2.19, Nachtrag MAR-296).
-  const { port } = readConfiguredPort(dataDir);
-  const operationsLog = createDailyJsonlWriter({ dir: logDir, kind: 'operations' });
+  const { port } = readConfiguredPort(paths.dataDir);
+  const operationsLog = createDailyJsonlWriter({ dir: paths.logDir, kind: 'operations' });
+  // `resellr-node.exe` lies in the program folder (2.19), like for the server.
+  const programDir = dirname(process.execPath);
   return runOpenCommand({
     healthClient: createHealthClient({ port }),
     chromeOpener: createChromeOpener({
       warn: (event) => operationsLog.write({ level: 'warn', event }),
     }),
+    startFailedPageUrl: (refNo) => launcherPageUrl(programDir, 'lp-02', { ref: refNo }),
+    subscribe: () => subscribeToSupervisor(pipePath),
+    becomeSupervisor: async (onPhase) => {
+      const pipe = await listenSupervisorPipe(pipePath);
+      if (pipe === null) return 'taken';
+      await supervise(pipe, paths, env, onPhase);
+      return 'ended';
+    },
   });
+}
+
+/** Command `supervise` (2.18): becomes the supervisor, or ends at once if one runs; no Chrome. */
+async function runSupervise(env: RuntimeEnv): Promise<LauncherExitCode> {
+  const paths = resolveRuntimePaths(env);
+  const pipe = await listenSupervisorPipe(pipePathFor(env));
+  if (pipe !== null) await supervise(pipe, paths, env);
+  return LauncherExitCode.Success;
+}
+
+function supervise(
+  pipe: SupervisorPipeServer,
+  paths: RuntimePaths,
+  env: RuntimeEnv,
+  onPhase?: (event: PhaseEvent) => void,
+): Promise<void> {
+  return runSupervisor({
+    pipe,
+    onPhase,
+    startServer: ({ startId, onReady }) => startServerProcess({ paths, startId, env, onReady }),
+  });
+}
+
+/** The pipe of this user's supervisor, from `%LOCALAPPDATA%` (H-14). */
+function pipePathFor(env: RuntimeEnv): string {
+  const localAppData = env.LOCALAPPDATA;
+  if (!localAppData) throw new Error('LOCALAPPDATA is not set');
+  return supervisorPipePath(localAppData);
 }
 
 if (import.meta.main) {
