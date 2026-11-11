@@ -13,13 +13,22 @@ import {
   createOperationsLog,
   runStartup,
 } from './ops/index.ts';
-import { createClockFromArgs } from './shared/clock.ts';
+import { type Clock, createClockFromArgs } from './shared/clock.ts';
 
 const APP_VERSION = '0.1.0';
 
+// An invalid `--test-clock` value aborts before the startup sequence, without touching the data
+// and log folder (Nachtrag MAR-424); an unhandled error would end with exit code 1, a crash (2.18).
+let clock: Clock;
+try {
+  clock = createClockFromArgs(process.argv);
+} catch (error) {
+  process.stderr.write(`${(error as Error).message}\n`);
+  process.exit(ExitCode.StartAborted);
+}
+
 const paths = resolveRuntimePaths();
 const startId = process.env.RESELLR_START_ID || null;
-const clock = createClockFromArgs(process.argv);
 const errorLog = createErrorLog({
   dir: paths.logDir,
   appVersion: APP_VERSION,
@@ -64,6 +73,7 @@ const result = await runStartup({
 if (result.state === 'aborted') {
   process.exitCode = ExitCode.StartAborted;
 } else {
+  // Linux only (development, CI, tests): no orderly shutdown of 2.17, no end marker.
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
       lifecycle.set('stopping');
