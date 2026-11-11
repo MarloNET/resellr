@@ -120,9 +120,10 @@ describe('installer script resellr.iss (CU-273)', () => {
     expect(entry(section('Registry')[0] ?? '').ValueData).toMatch(/^"\{app\}\\resellr-node\.exe" /);
   });
 
-  it('DER-105-04 removes launcher-state.js and leaves the folders under %LOCALAPPDATA%\\resellr alone', () => {
+  it('DER-105-04 removes launcher-state.js with its lock file and leaves the folders under %LOCALAPPDATA%\\resellr alone', () => {
     expect(section('UninstallDelete').map(entry)).toEqual([
       { Type: 'files', Name: '{app}\\launcher-pages\\launcher-state.js' },
+      { Type: 'files', Name: '{app}\\launcher-pages\\launcher-state.js.lock' },
     ]);
     // Data folder, logs and update copies lie outside {app} and are never named.
     expect(SCRIPT).not.toMatch(/\{localappdata\}\\resellr|Daten|Protokolle|Update-Kopien/);

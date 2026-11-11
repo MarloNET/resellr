@@ -2,8 +2,8 @@
 ; package that installs resellr for the current user without admin rights into
 ; %LOCALAPPDATA%\Programs\resellr, with the autostart entry under HKCU, the shortcuts "resellr" and
 ; "resellr beenden", and `open` after the installation. The uninstaller removes the program
-; folder (with `launcher-state.js`), the autostart entry and the shortcuts; data folder, logs and
-; update copies under %LOCALAPPDATA%\resellr stay.
+; folder (with `launcher-state.js` and its lock file), the autostart entry and the shortcuts; data
+; folder, logs and update copies under %LOCALAPPDATA%\resellr stay.
 ;
 ; Build: iscc /DAppVersion=<version> [/DStageDir=<program folder>] [/O<output folder>] resellr.iss
 ; The staged program folder holds resellr-node.exe (CU-274), node.exe (CU-275), app\ (CU-276)
@@ -61,5 +61,7 @@ Name: "{userprograms}\resellr beenden"; Filename: "{#Runtime}"; Parameters: """{
 Filename: "{#Runtime}"; Parameters: """{#Launcher}"" open"; WorkingDir: "{app}"; Flags: nowait
 
 [UninstallDelete]
-; Written by the launcher at run time (2.18), so the uninstaller does not know it otherwise.
+; Written by the launcher at run time (2.18), so the uninstaller does not know them otherwise. The
+; lock file is left behind only by an interrupted write.
 Type: files; Name: "{app}\launcher-pages\launcher-state.js"
+Type: files; Name: "{app}\launcher-pages\launcher-state.js.lock"
