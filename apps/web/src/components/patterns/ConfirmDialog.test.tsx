@@ -169,4 +169,60 @@ describe('ConfirmDialog (CU-056, P-04)', () => {
     expect(action.disabled).toBe(true);
     expect(onConfirm).not.toHaveBeenCalled();
   });
+
+  it('P-04 the focus starts on "Abbrechen", so Enter does not trigger the action', async () => {
+    const { dialog, onConfirm } = renderDialog();
+
+    const cancel = within(dialog).getByRole('button', { name: 'Abbrechen' });
+    await waitFor(() => expect(document.activeElement).toBe(cancel));
+    expect(cancel.getAttribute('type')).toBe('button');
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('P-04 while pending, both buttons are disabled, the text shows and Esc does nothing', () => {
+    const { dialog, onOpenChange, onConfirm } = renderDialog({ pending: 'Wird ausgeführt …' });
+
+    const buttons = within(dialog).getAllByRole<HTMLButtonElement>('button');
+    expect(buttons.map((button) => button.disabled)).toEqual([true, true]);
+    expect(within(dialog).getByRole('status').textContent).toBe('Wird ausgeführt …');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.click(buttons[1]!);
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Gerät stornieren' })).toBe(dialog);
+  });
+
+  it('P-04 when the action starts pending, the focus stays in the dialog', async () => {
+    function PendingScreen() {
+      const [pending, setPending] = useState(false);
+      return (
+        <ConfirmDialog
+          open
+          onOpenChange={() => undefined}
+          onConfirm={() => setPending(true)}
+          title="resellr beenden"
+          confirmLabel="resellr beenden"
+          width={480}
+          pending={pending ? 'resellr wird beendet …' : undefined}
+        >
+          Text
+        </ConfirmDialog>
+      );
+    }
+    render(<PendingScreen />);
+    const dialog = screen.getByRole('dialog', { name: 'resellr beenden' });
+    const action = within(dialog).getByRole('button', { name: 'resellr beenden' });
+    action.focus();
+
+    fireEvent.click(action);
+
+    await waitFor(() => expect(document.activeElement).toBe(dialog));
+  });
+
+  it('P-04 without pending there is no progress text', () => {
+    const { dialog } = renderDialog();
+
+    expect(within(dialog).queryByRole('status')).toBeNull();
+  });
 });

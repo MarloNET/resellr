@@ -33,6 +33,22 @@ function renderNotice() {
   return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
 }
 
+/**
+ * Renders the notice with fresh modules: the write lock of a test above lasts until the page is
+ * reloaded (CU-049) and would disable "resellr beenden" in UI-045.
+ */
+async function renderFreshNotice() {
+  vi.resetModules();
+  const { BackupNotice: FreshBackupNotice } = await import('./BackupNotice.tsx');
+  const { createQueryClient: createFreshQueryClient } = await import('../../app/query-client.ts');
+  render(
+    <QueryClientProvider client={createFreshQueryClient()}>
+      <FreshBackupNotice variant="sidebar" />
+    </QueryClientProvider>,
+  );
+  return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
+}
+
 describe('BackupNotice (UI-044, CU-254)', () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -212,17 +228,59 @@ describe('BackupNotice (UI-044, CU-254)', () => {
     expect(sessionStorage.length).toBe(0);
   });
 
-  it('DER-95-06 "resellr beenden" is a focusable button that does nothing until #142', async () => {
+  it('DER-95-06 "resellr beenden" is a focusable button', async () => {
     fetchMock.mockResolvedValue(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }));
     const notice = renderNotice();
     await within(notice).findByText(DATA_DIR_PATH);
 
     const button = within(notice).getByRole('button', { name: 'resellr beenden' });
     button.focus();
-    fireEvent.click(button);
 
     expect(document.activeElement).toBe(button);
     expect(button.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('UI-044.disabled: DER-96-04 "resellr beenden" is disabled while UI-045 is open and while shutting down', async () => {
+    fetchMock.mockImplementation((input, init) =>
+      input === '/api/ops/status'
+        ? Promise.resolve(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }))
+        : pending(input, init),
+    );
+    const notice = await renderFreshNotice();
+    await within(notice).findByText(DATA_DIR_PATH);
+    const button = within(notice).getByRole<HTMLButtonElement>('button', {
+      name: 'resellr beenden',
+    });
+
+    button.focus();
+    fireEvent.click(button);
+    const dialog = screen.getByRole('dialog', { name: 'resellr beenden' });
+    expect(button.disabled).toBe(true);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'resellr beenden' }));
+    await within(dialog).findByRole('status');
+    expect(button.disabled).toBe(true);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/ops/status',
+      '/api/ops/shutdown',
+    ]);
+  });
+
+  it('UI-044.disabled: DER-96-04 after "Abbrechen" the button is enabled again and has the focus', async () => {
+    fetchMock.mockResolvedValue(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }));
+    const notice = await renderFreshNotice();
+    await within(notice).findByText(DATA_DIR_PATH);
+    const button = within(notice).getByRole<HTMLButtonElement>('button', {
+      name: 'resellr beenden',
+    });
+
+    button.focus();
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(button.disabled).toBe(false);
+    await waitFor(() => expect(document.activeElement).toBe(button));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

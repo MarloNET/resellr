@@ -8,7 +8,8 @@ import { cn } from './cn.ts';
  * `min(<design width>, 100vw − 16px)`, height at most `100dvh − 16px`; a column of title,
  * scrolling content and action bar, so title and actions always stay visible. Esc closes.
  * After closing (Esc, "Abbrechen", action) the focus returns to the element that had it when the
- * dialog opened, also without `DialogTrigger` (#285).
+ * dialog opened, also without `DialogTrigger` (#285). With `dismissible={false}` Esc and a click
+ * outside do nothing, e.g. while an action that cannot be taken back runs (UI-045.loading).
  */
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -24,16 +25,21 @@ export interface DialogContentProps extends ComponentProps<typeof DialogPrimitiv
    * screen resets the ref after closing, so a later close does not reuse an old target.
    */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /** `false`: Esc and a click outside do not close the dialog. */
+  dismissible?: boolean;
 }
 
 export function DialogContent({
   width,
   returnFocusRef,
+  dismissible = true,
   className,
   style,
   children,
   onOpenAutoFocus,
   onCloseAutoFocus,
+  onEscapeKeyDown,
+  onInteractOutside,
   ...props
 }: DialogContentProps) {
   // Radix returns the focus only to a `DialogTrigger`; the screens open their dialogs via `open`.
@@ -66,6 +72,14 @@ export function DialogContent({
           // A target no longer in the DOM would leave the focus on `<body>` (#300).
           const target = returnFocusRef?.current;
           (target?.isConnected ? target : openerRef.current)?.focus();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!dismissible) event.preventDefault();
+          onEscapeKeyDown?.(event);
+        }}
+        onInteractOutside={(event) => {
+          if (!dismissible) event.preventDefault();
+          onInteractOutside?.(event);
         }}
         {...props}
       >
