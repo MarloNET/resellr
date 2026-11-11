@@ -142,7 +142,7 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     expect(operationsLog()).toEqual([]);
   });
 
-  it('DER-102-05 opens the address through explorer.exe and writes a warning into the operations log', async () => {
+  it('DER-102-05 opens the address through explorer.exe and writes the warning chrome_not_found through CU-296 into the operations log', async () => {
     server = await startTestServer(0);
     writeConfig(JSON.stringify({ port: server.port }));
 
@@ -150,8 +150,16 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
 
     expect(await waitFor(fakes.explorerArgs)).toEqual([`http://127.0.0.1:${server.port}/`]);
     expect(fakes.chromeArgs()).toBeNull();
+    // Written by CU-296: level `warn`, no details, `appVersion` and `startId: null` for `open`
+    // (2.19, Nachtrag MAR-366).
     expect(operationsLog()).toEqual([
-      { ts: expect.any(String), level: 'warn', event: 'chrome_not_found' },
+      {
+        ts: expect.any(String),
+        level: 'warn',
+        event: 'chrome_not_found',
+        appVersion: '0.1.0',
+        startId: null,
+      },
     ]);
   });
 

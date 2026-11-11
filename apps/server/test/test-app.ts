@@ -8,6 +8,7 @@ import { type AppDeps, buildApp } from '../src/app.ts';
 import { type Database, openDatabase } from '../src/db/database.ts';
 import type { DB } from '../src/db/schema.ts';
 import { createErrorLog, createLifecycleState, createOperationsLog } from '../src/ops/index.ts';
+import { createClock } from '../src/shared/clock.ts';
 
 export const TEST_PORT = 4310;
 export const HOST = `127.0.0.1:${TEST_PORT}`;
@@ -53,6 +54,8 @@ export function createTestApp() {
   const lifecycle = createLifecycleState('ready');
   // A test never ends the test process; it checks the calls instead.
   const exit = vi.fn<(code: number) => void>();
+  // One time source, as in `main.ts`: `now` is the clock's `now`.
+  const clock = createClock();
   const { app, writeGate } = buildApp({
     port: TEST_PORT,
     webRoot,
@@ -61,7 +64,8 @@ export function createTestApp() {
     database,
     ops: { startId: null, dataDirPath: dataDir, appVersion: TEST_APP_VERSION },
     operationsLog,
-    now: () => new Date(),
+    now: clock.now,
+    clock,
     exit,
   });
 

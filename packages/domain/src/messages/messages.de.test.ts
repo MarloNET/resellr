@@ -1,6 +1,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { ERROR_MESSAGES, type ErrorMessageUsage, FIXED_TEXTS, MESSAGES } from './messages.de.ts';
+import {
+  ERROR_MESSAGES,
+  type ErrorMessageUsage,
+  FIELD_MESSAGES,
+  FIXED_TEXTS,
+  MESSAGES,
+} from './messages.de.ts';
 
 // Table "Meldungstexte" in Technical Specification 8.2; M-05 to M-13 per field as in the
 // message catalog of the design (docs/ux/meldungskatalog.md), which 8.2 refers to.
@@ -70,6 +76,14 @@ describe('message catalog (E1)', () => {
 
   it('uses M-15 for not_found', () => {
     expect(ERROR_MESSAGES['not_found.default']).toBe('Dieser Eintrag ist nicht mehr vorhanden.');
+  });
+
+  it('has the text of name_taken for device types (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['name_taken.device_type']).toBe('Name ist bereits vergeben');
+  });
+
+  it('has the field text of the device type name (UI-027)', () => {
+    expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
   });
 
   it('derives the usages of a code from the catalog keys', () => {

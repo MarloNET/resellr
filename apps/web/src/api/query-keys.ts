@@ -8,6 +8,10 @@ export const queryKeys = {
     status: () => ['ops', 'status'] as const,
     health: () => ['ops', 'health'] as const,
   },
+  settings: {
+    all: ['settings'] as const,
+    deviceTypes: () => ['settings', 'device-types'] as const,
+  },
 } as const;
 
 /**

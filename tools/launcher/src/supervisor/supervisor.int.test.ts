@@ -12,12 +12,16 @@ import {
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { readDailyFiles } from '@resellr/runtime-shared/daily-jsonl-writer';
 import { REFERENCE_NUMBER_PATTERN } from '@resellr/runtime-shared/reference-number';
+import { readRuntimeState } from '@resellr/runtime-shared/runtime-state-files';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createFakePrograms, FAKE_SERVER, type FakePrograms } from '../../test/fake-programs.ts';
+import { CRASH_GRACE_MS } from './restart-policy.ts';
 import { TEST_SERVER_ENTRY_ENV } from './server-process.ts';
 
 const CLI = fileURLToPath(new URL('../cli.ts', import.meta.url));
@@ -279,5 +283,85 @@ describe('launcher as supervisor (CU-258, CU-259, CU-261, CU-263, CU-264)', () =
       expect(fakes.chromeCalls()[0]).toMatch(/\?ref=R-ABCD-EFGH$/);
     },
     FAKE_START_MS,
+  );
+
+  const logEntries = (kind: 'operations' | 'errors' | 'availability') =>
+    readDailyFiles({ dir: logDir, kind }).flatMap((file) => file.entries);
+  const crashEntries = () => logEntries('operations').filter((entry) => entry.event === 'crash');
+
+  it(
+    'restarts the server 5 s after a crash and writes crash with a reference number, lastCrashAt and the availability check',
+    async () => {
+      const port = await freePort();
+      writePort(port);
+      const supervise = launch('supervise', fakeServer('exit-1', 'ready'));
+
+      await expect.poll(() => fakeStarts().length, POLL).toBe(1);
+      const crashedAt = Date.now();
+      await expect.poll(() => fakeStarts().length, POLL).toBe(2);
+      // The restart follows the wait of 5 s (2.18, H-12).
+      expect(Date.now() - crashedAt).toBeGreaterThanOrEqual(CRASH_GRACE_MS - 500);
+
+      await expect.poll(() => healthOf(port), POLL).toMatchObject({ state: 'ready' });
+      const [crash] = crashEntries();
+      expect(crash).toMatchObject({
+        level: 'warn',
+        event: 'crash',
+        refNo: expect.stringMatching(REFERENCE_NUMBER_PATTERN),
+        exitCode: 1,
+        signal: null,
+        appVersion: '0.1.0',
+        startId: expect.any(String),
+      });
+      // The same reference number in the error log (FIND-210).
+      expect(logEntries('errors')).toEqual([
+        expect.objectContaining({ refNo: crash!.refNo, function: 'launcher.crash' }),
+      ]);
+      expect(readRuntimeState(logDir)?.lastCrashAt).toEqual(expect.any(String));
+      // In `ready` the availability check writes its first entry at once.
+      await expect
+        .poll(() => logEntries('availability'), POLL)
+        .toEqual([{ ts: expect.any(String), ok: true }]);
+      expect(running(supervise)).toBe(true);
+    },
+    FAKE_START_MS,
+  );
+
+  it(
+    'writes no crash when the supervisor itself ends in the wait after a crash',
+    async () => {
+      writePort(await freePort());
+      const supervise = launch('supervise', fakeServer('exit-1', 'ready'));
+      await expect.poll(() => fakeStarts().length, POLL).toBe(1);
+      // The server crashed at once; 1 s later the supervisor is in the wait of 5 s.
+      await sleep(1000);
+
+      // Logging off or shutting down ends the supervisor within the 5 s.
+      supervise.process.kill('SIGKILL');
+      await supervise.exitCode;
+
+      expect(crashEntries()).toEqual([]);
+      expect(readRuntimeState(logDir)?.lastCrashAt).toBeUndefined();
+      expect(fakeStarts()).toHaveLength(1);
+    },
+    FAKE_START_MS,
+  );
+
+  it(
+    'restarts at most 3 times in 10 minutes; the fourth crash leads to no further restart',
+    async () => {
+      writePort(await freePort());
+      const supervise = launch(
+        'supervise',
+        fakeServer('exit-1', 'exit-1', 'exit-1', 'exit-1', 'ready'),
+      );
+
+      expect(await supervise.exitCode).toBe(0);
+
+      expect(fakeStarts()).toHaveLength(4);
+      // Every crash after the wait is logged; `gave_up` with its reference number follows in #121.
+      expect(crashEntries()).toHaveLength(4);
+    },
+    4 * CRASH_GRACE_MS + FAKE_START_MS,
   );
 });

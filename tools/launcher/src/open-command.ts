@@ -82,7 +82,7 @@ export async function runOpenCommand(deps: OpenCommandDeps): Promise<LauncherExi
         }
       });
       if (outcome === 'taken') continue;
-      // Without a result (e.g. a crash, no restart until #116) `open` showed nothing.
+      // Without a result (e.g. the restart limit, `gave_up` follows in #121) `open` showed nothing.
       return (await shown) ? LauncherExitCode.Success : LauncherExitCode.Failed;
     }
   } finally {
