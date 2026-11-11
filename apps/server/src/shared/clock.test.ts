@@ -76,6 +76,42 @@ describe('clock (CU-032)', () => {
     );
   });
 
+  it.each([
+    ['a day that does not exist', '2027-02-30T10:00:00Z'],
+    ['February 29 outside a leap year', '2027-02-29T10:00:00Z'],
+    ['month 13', '2027-13-01T10:00:00Z'],
+    ['day 0', '2027-02-00T10:00:00Z'],
+    ['hour 24', '2027-02-28T24:00:00Z'],
+    ['hour 25', '2027-02-28T25:00:00Z'],
+    ['minute 60', '2027-02-28T10:60:00Z'],
+    ['second 60', '2027-02-28T10:00:60Z'],
+    ['an offset of 24 hours', '2027-02-28T10:00:00+24:00'],
+    ['an offset minute of 60', '2027-02-28T10:00:00+01:60'],
+    ['no time', '2027-02-28'],
+    ['no Z or offset', '2027-02-28T10:00:00'],
+  ])('E3 rejects --test-clock with %s (%s)', (_, value) => {
+    expect(() => createClockFromArgs(['node', 'main.ts', `--test-clock=${value}`])).toThrow(
+      `--test-clock=${value} is no ISO 8601 instant`,
+    );
+  });
+
+  it.each([
+    ['2027-02-28T10:00:00Z', '2027-02-28T10:00:00.000Z'],
+    ['2027-12-14T10:00:00.000Z', '2027-12-14T10:00:00.000Z'],
+    ['2028-02-29T23:59:59.999Z', '2028-02-29T23:59:59.999Z'],
+    ['2027-12-14T10:00+01:00', '2027-12-14T09:00:00.000Z'],
+    ['2027-12-14T10:00:00-05:30', '2027-12-14T15:30:00.000Z'],
+    ['2027-12-14T00:00:00+14:00', '2027-12-13T10:00:00.000Z'],
+    // Years 0 to 99 stay literal, `Date.UTC` would map them to 1900 to 1999.
+    ['0000-01-01T00:00:00Z', '0000-01-01T00:00:00.000Z'],
+    ['0004-02-29T10:00:00Z', '0004-02-29T10:00:00.000Z'],
+    ['0099-12-31T23:59:59Z', '0099-12-31T23:59:59.000Z'],
+  ])('E3 accepts --test-clock=%s as the instant %s', (value, instant) => {
+    const clock = createClockFromArgs(['node', 'main.ts', `--test-clock=${value}`]);
+
+    expect(clock.now().toISOString()).toBe(instant);
+  });
+
   it('returns a new Date each time so callers cannot move the clock', () => {
     const clock = createClock();
 

@@ -17,6 +17,9 @@ import type { SupervisorIpc } from './supervisor-ipc.ts';
 
 export const DATABASE_FILE_NAME = 'resellr.db';
 
+/** Time running requests get to finish when the app closes, before all connections are cut. */
+const CLOSE_GRACE_MS = 2_000;
+
 export interface StartupOptions {
   paths: RuntimePaths;
   /** Program folder (`%LOCALAPPDATA%\Programs\resellr`), protected by the `handoverDir` check. */
@@ -49,7 +52,7 @@ export type StartupResult =
       /** Handover folder for this start: from `config.json` if valid, otherwise the standard path. */
       handoverDir: string;
       app: FastifyInstance;
-      /** Closes the app and the database. */
+      /** Closes the app, after at most 2 s with all open connections cut, and the database. */
       close(): Promise<void>;
     }
   | {
@@ -110,9 +113,17 @@ export async function runStartup({
     await database.close();
     throw error;
   }
+  // Bounded close (Nachtrag MAR-424): no new connections, running requests get at most
+  // CLOSE_GRACE_MS, then every open connection is cut, also one without a request or a keep-alive
+  // connection, which `app.close()` alone waits for without limit.
   const close = async () => {
-    await app.close();
-    await database.close();
+    const cutConnections = setTimeout(() => app.server.closeAllConnections(), CLOSE_GRACE_MS);
+    try {
+      await app.close();
+    } finally {
+      clearTimeout(cutConnections);
+      await database.close();
+    }
   };
 
   try {
