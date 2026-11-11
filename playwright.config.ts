@@ -19,13 +19,16 @@ const WINDOW_SIZE_MATRIX = [
 const FM_7_TAG = /@fm-7/;
 
 const DEMO_START_SPEC = 'demo-start.spec.ts';
+/** The launcher pages are `file://` pages without a server (2.18, 6.1); they set their own viewports. */
+const LAUNCHER_PAGES_SPEC = 'launcher-pages.spec.ts';
 
 /**
  * E2E foundation (CU-062, Technical Specification 6.1): Playwright in Google Chrome (channel
  * `chrome`), one project per row of the window-size matrix. All flows run in FM-1 to FM-6, FM-7
  * only runs tests tagged `@fm-7`. Each test worker starts its own server with its own data
  * folder (`e2e/fixtures/app-fixture.ts`). The project `demo-start` runs `npm run demo` first; it
- * also builds the user interface the matrix projects serve.
+ * also builds the user interface the matrix projects serve. The project `launcher-pages` checks
+ * the built launcher pages without a server.
  */
 export default defineConfig({
   testDir: 'e2e',
@@ -43,9 +46,14 @@ export default defineConfig({
       testMatch: DEMO_START_SPEC,
       use: { viewport: { width: 1366, height: 600 }, deviceScaleFactor: 1 },
     },
+    {
+      name: 'launcher-pages',
+      testMatch: LAUNCHER_PAGES_SPEC,
+      use: { viewport: { width: 480, height: 600 }, deviceScaleFactor: 1 },
+    },
     ...WINDOW_SIZE_MATRIX.map(({ name, width, height, deviceScaleFactor }) => ({
       name,
-      testIgnore: DEMO_START_SPEC,
+      testIgnore: [DEMO_START_SPEC, LAUNCHER_PAGES_SPEC],
       dependencies: ['demo-start'],
       ...(name === 'FM-7' && { grep: FM_7_TAG }),
       use: { viewport: { width, height }, deviceScaleFactor },
