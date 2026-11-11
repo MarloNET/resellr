@@ -1,4 +1,4 @@
-import { win32 } from 'node:path';
+import { join, win32 } from 'node:path';
 
 export interface RuntimePaths {
   dataDir: string;
@@ -40,5 +40,33 @@ export function resolveRuntimePaths(env: RuntimeEnv = process.env): RuntimePaths
     logDir: resolve('logDir'),
     handoverDir: resolve('handoverDir'),
     updateCopyDir: resolve('updateCopyDir'),
+  };
+}
+
+/** Files of the program folder under `app` (Technical Specification 2.19, Nachtrag MAR-446). */
+export interface ProgramFolderPaths {
+  appDir: string;
+  serverEntry: string;
+  launcherEntry: string;
+  webRoot: string;
+  /** Only the native modules; everything else is bundled into the two entries. */
+  nativeModulesDir: string;
+}
+
+// Kept in an import-free module so esbuild can inline it (CU-313, Nachtrag MAR-474).
+export { IS_BUNDLED } from './bundled.ts';
+
+/**
+ * Layout of `app` in the program folder. `node:path` instead of `win32`, so checks of the bundle
+ * also run under Linux.
+ */
+export function programFolderPaths(programDir: string): ProgramFolderPaths {
+  const appDir = join(programDir, 'app');
+  return {
+    appDir,
+    serverEntry: join(appDir, 'server.mjs'),
+    launcherEntry: join(appDir, 'launcher.mjs'),
+    webRoot: join(appDir, 'web'),
+    nativeModulesDir: join(appDir, 'node_modules'),
   };
 }
