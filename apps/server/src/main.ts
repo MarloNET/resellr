@@ -13,13 +13,13 @@ import {
   createOperationsLog,
   runStartup,
 } from './ops/index.ts';
-import { createClock, TEST_CLOCK_FLAG } from './shared/clock.ts';
+import { createClockFromArgs } from './shared/clock.ts';
 
 const APP_VERSION = '0.1.0';
 
 const paths = resolveRuntimePaths();
 const startId = process.env.RESELLR_START_ID || null;
-const clock = createClock({ testClock: process.argv.includes(TEST_CLOCK_FLAG) });
+const clock = createClockFromArgs(process.argv);
 const errorLog = createErrorLog({
   dir: paths.logDir,
   appVersion: APP_VERSION,
