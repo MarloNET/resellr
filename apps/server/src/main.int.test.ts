@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,7 +10,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer, type AddressInfo, type Server } from 'node:net';
+import { connect, createServer, type AddressInfo, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -130,6 +131,105 @@ describe('server entry (CU-018)', () => {
       await copy.exited;
     }
   }, 60_000);
+
+  it('AC-REQ-104-05 after a complete copy of the data folder at ended resellr and a new start the status of the notice is unchanged, and nothing of the notice is stored', async () => {
+    const port = await freePort();
+    const own = installation(join(root, 'own'), port);
+    const status = () =>
+      fetch(`http://127.0.0.1:${port}/api/ops/status`).then(async (response) => ({
+        status: response.status,
+        body: (await response.json()) as unknown,
+      }));
+
+    const first = startServer(own, 'start-first');
+    await waitUntilReady(port);
+    const before = await status();
+    expect(before).toStrictEqual({
+      status: 200,
+      body: { dataDirPath: own.dataDir, appVersion: '0.1.0' },
+    });
+    const response = await fetch(`http://127.0.0.1:${port}/api/ops/shutdown`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(response.status).toBe(200);
+    expect(await first.exited).toBe(0);
+
+    // The user copies the data folder completely to the backup location.
+    const backup = join(root, 'Sicherung', 'Daten');
+    cpSync(own.dataDir, backup, { recursive: true });
+    expect(readdirSync(backup).sort()).toEqual(readdirSync(own.dataDir).sort());
+    // `config.json` holds only the port (2.19), the database no state of the notice (2.17).
+    expect(JSON.parse(readFileSync(join(own.dataDir, 'config.json'), 'utf8'))).toStrictEqual({
+      port,
+    });
+    const db = new BetterSqlite3(join(own.dataDir, 'resellr.db'), { readonly: true });
+    try {
+      const names = [
+        ...(db.prepare(`SELECT name FROM sqlite_master`).pluck().all() as string[]),
+        ...(db.prepare(`SELECT key FROM app_meta`).pluck().all() as string[]),
+      ];
+      expect(names.filter((name) => /backup|notice|hinweis|sicherung/i.test(name))).toEqual([]);
+    } finally {
+      db.close();
+    }
+
+    const second = startServer(own, 'start-second');
+    try {
+      await waitUntilReady(port);
+      expect(await status()).toStrictEqual(before);
+      expect(JSON.parse(readFileSync(join(own.dataDir, 'config.json'), 'utf8'))).toStrictEqual({
+        port,
+      });
+    } finally {
+      second.process.kill('SIGTERM');
+      await second.exited;
+    }
+  }, 60_000);
+
+  it('E1 after SIGTERM ends with exit code 0 in under 5 s while a client holds a connection without a request', async () => {
+    const port = await freePort();
+    const server = startServer(installation(join(root, 'own'), port), 'start-e1');
+    await waitUntilReady(port);
+    const socket = connect(port, '127.0.0.1');
+    await new Promise<void>((resolve, reject) =>
+      socket.once('connect', resolve).once('error', reject),
+    );
+    socket.on('error', () => {});
+
+    try {
+      const signalledAt = Date.now();
+      server.process.kill('SIGTERM');
+      const exitCode = await Promise.race([
+        server.exited,
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 5_000)),
+      ]);
+
+      expect(exitCode).toBe(0);
+      expect(Date.now() - signalledAt).toBeLessThan(5_000);
+    } finally {
+      socket.destroy();
+      server.process.kill('SIGKILL');
+      await server.exited;
+    }
+  }, 30_000);
+
+  it.each(['2027-02-30T10:00:00Z', 'morgen'])(
+    'E2 --test-clock=%s ends with exit code 10 and a message on stderr before the startup sequence',
+    async (value) => {
+      const own = installation(join(root, 'own'), await freePort());
+
+      const server = startServer(own, 'start-e2', [`--test-clock=${value}`]);
+
+      expect(await server.exited).toBe(10);
+      expect(server.stderr()).toContain(`--test-clock=${value} is no ISO 8601 instant`);
+      // Nothing in the data and log folder is touched: no resellr.db, no log, no start-result.json.
+      expect(readdirSync(own.dataDir)).toEqual(['config.json']);
+      expect(existsSync(own.logDir)).toBe(false);
+    },
+    20_000,
+  );
 });
 
 /** A port on 127.0.0.1 that is free right now. */
@@ -158,9 +258,10 @@ function installation(dir: string, port: number): Installation {
 function startServer(
   { dataDir, logDir, root: dir }: Installation,
   startId: string,
-): { process: ChildProcess; exited: Promise<number | null> } {
-  const child = spawn(process.execPath, [MAIN], {
-    stdio: 'ignore',
+  args: readonly string[] = [],
+): { process: ChildProcess; exited: Promise<number | null>; stderr: () => string } {
+  const child = spawn(process.execPath, [MAIN, ...args], {
+    stdio: ['ignore', 'ignore', 'pipe'],
     env: {
       ...process.env,
       RESELLR_DATA_DIR: dataDir,
@@ -170,8 +271,10 @@ function startServer(
       RESELLR_START_ID: startId,
     },
   });
+  let stderr = '';
+  child.stderr?.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
   const exited = new Promise<number | null>((resolve) => child.once('exit', resolve));
-  return { process: child, exited };
+  return { process: child, exited, stderr: () => stderr };
 }
 
 async function waitUntilReady(port: number): Promise<void> {

@@ -13,6 +13,10 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SERVER_MAIN = join(REPO_ROOT, 'apps/server/src/main.ts');
 const WEB_INDEX = join(REPO_ROOT, 'apps/web/dist/index.html');
 const READY_TIMEOUT_MS = 30_000;
+/** Time `kill` gives the server to end on SIGTERM before it ends it with SIGKILL. */
+const KILL_GRACE_MS = 5_000;
+/** Argument of the server for the test clock (`TEST_CLOCK_FLAG`, CU-032). */
+const TEST_CLOCK_FLAG = '--test-clock';
 
 /** Length of the data folder path in every E2E run (Technical Specification 6.3, UI-044). */
 export const DATA_DIR_PATH_LENGTH = 100;
@@ -27,8 +31,17 @@ export interface AppServer {
   outboundConnections(): OutboundConnection[];
   /** Ends the server process on purpose; its folders and port stay for `restart`. */
   kill(): Promise<void>;
-  /** Starts the server again on the same port with the same folders, waits until ready. */
-  restart(): Promise<void>;
+  /**
+   * Ends the server in order like "resellr beenden" (`POST /api/ops/shutdown`, 2.17) and waits
+   * for its exit code 0; afterwards the data folder may be copied (AC-REQ-104-05).
+   */
+  shutdown(): Promise<void>;
+  /**
+   * Starts the server again on the same port with the same folders, waits until ready. With
+   * `testClockAt` it runs with the test clock started at that instant (`--test-clock`, CU-032);
+   * without, with the normal clock.
+   */
+  restart(options?: { testClockAt?: Date }): Promise<void>;
 }
 
 /** One outbound connection of a process, reported by the probe below. */
@@ -151,8 +164,8 @@ async function startServer(): Promise<{
   writeFileSync(join(paths.dataDir, CONFIG_FILE_NAME), JSON.stringify({ port }));
 
   const probe = `--import=${outboundConnectionProbe(connectionLog)}`;
-  const spawnServer = () => {
-    const serverProcess = spawn(process.execPath, [probe, SERVER_MAIN], {
+  const spawnServer = (args: string[] = []) => {
+    const serverProcess = spawn(process.execPath, [probe, SERVER_MAIN, ...args], {
       cwd: REPO_ROOT,
       stdio: ['ignore', 'ignore', 'inherit'],
       env: {
@@ -163,15 +176,21 @@ async function startServer(): Promise<{
         RESELLR_UPDATE_COPY_DIR: paths.updateCopyDir,
       },
     });
-    const exited = new Promise<void>((resolve) => serverProcess.once('exit', () => resolve()));
+    const exited = new Promise<number | null>((resolve) =>
+      serverProcess.once('exit', (code) => resolve(code)),
+    );
     return { process: serverProcess, exited };
   };
   let child = spawnServer();
   const kill = async () => {
-    if (child.process.exitCode === null && child.process.signalCode === null) {
-      child.process.kill('SIGTERM');
-    }
-    await child.exited;
+    const { process: running, exited } = child;
+    if (running.exitCode !== null || running.signalCode !== null) return void (await exited);
+    running.kill('SIGTERM');
+    // On SIGTERM the server waits for every open connection; a connection the browser opened
+    // in advance without a request keeps it running, so it is killed after the grace time.
+    const timer = setTimeout(() => running.kill('SIGKILL'), KILL_GRACE_MS);
+    await exited;
+    clearTimeout(timer);
   };
   const server: AppServer = {
     port,
@@ -179,9 +198,19 @@ async function startServer(): Promise<{
     paths,
     outboundConnections: () => readOutboundConnections(connectionLog),
     kill,
-    restart: async () => {
+    shutdown: async () => {
+      // Like the launcher (G-3): without Origin and Sec-Fetch-Site.
+      const response = await fetch(`${server.baseUrl}/api/ops/shutdown`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      expect(response.status, 'answer of POST /api/ops/shutdown').toBe(200);
+      expect(await child.exited, 'exit code after the orderly shutdown').toBe(0);
+    },
+    restart: async ({ testClockAt } = {}) => {
       await kill();
-      child = spawnServer();
+      child = spawnServer(testClockAt ? [`${TEST_CLOCK_FLAG}=${testClockAt.toISOString()}`] : []);
       await waitUntilReady(server, child.process);
     },
   };

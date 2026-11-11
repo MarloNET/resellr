@@ -5,11 +5,13 @@ import { join } from 'node:path';
 
 import { isReferenceNumber } from '@resellr/runtime-shared/reference-number';
 import BetterSqlite3 from 'better-sqlite3';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appFactory } from '../../test/test-app.ts';
 
+import type { Database } from '../db/database.ts';
 import { migrations } from '../db/migrations/index.ts';
+import type { DB } from '../db/schema.ts';
 import type { Migration } from '../db/migrator.ts';
 import { createClock } from '../shared/clock.ts';
 import { createErrorLog } from './error-log.ts';
@@ -71,7 +73,7 @@ function start(overrides: Partial<StartupOptions> = {}) {
     }),
     ...overrides,
   };
-  return { lifecycle, run: () => runStartup(options) };
+  return { lifecycle, options, run: () => runStartup(options) };
 }
 
 /** A port on 127.0.0.1 that is free right now. */
@@ -162,6 +164,39 @@ describe('startup sequence (CU-040)', () => {
     ]);
   });
 
+  it('reports IPC ready to the supervisor once the server listens, before server_ready (2.19 step 9)', async () => {
+    const port = await freePort();
+    writeConfig({ port });
+    const seen: { state: LifecycleStateName; events: unknown[] }[] = [];
+    const { lifecycle, run } = start({
+      supervisorIpc: {
+        reportReady: () => {
+          seen.push({
+            state: lifecycle.get(),
+            events: readLog('operations').map((entry) => entry.event),
+          });
+        },
+      },
+    });
+
+    result = await run();
+
+    expect(seen).toEqual([{ state: 'ready', events: ['server_started'] }]);
+    expect((await fetch(`http://127.0.0.1:${port}/api/ops/health`)).status).toBe(200);
+  });
+
+  it('reports no IPC ready when the start is aborted', async () => {
+    blocker = createServer();
+    await new Promise<void>((resolve) => blocker?.listen(0, '127.0.0.1', resolve));
+    writeConfig({ port: (blocker.address() as AddressInfo).port });
+    const reportReady = vi.fn();
+
+    result = await start({ supervisorIpc: { reportReady } }).run();
+
+    expect(result.state).toBe('aborted');
+    expect(reportReady).not.toHaveBeenCalled();
+  });
+
   it('E7 aborts on a port in use with a reference number in the error log', async () => {
     blocker = createServer();
     await new Promise<void>((resolve) => blocker?.listen(0, '127.0.0.1', resolve));
@@ -183,6 +218,28 @@ describe('startup sequence (CU-040)', () => {
     ]);
     expect(lifecycle.get()).toBe('starting');
     expect(readLog('operations').map((entry) => entry.event)).not.toContain('server_ready');
+  });
+
+  it('close() closes the database even when closing the app fails', async () => {
+    writeConfig({ port: await freePort() });
+    let database: Database<DB> | undefined;
+    const { options } = start();
+
+    const started = await runStartup({
+      ...options,
+      buildApp: (deps) => {
+        database = deps.database;
+        const app = options.buildApp(deps);
+        app.addHook('onClose', async () => {
+          throw new Error('close failed');
+        });
+        return app;
+      },
+    });
+
+    expect(started.state).toBe('ready');
+    await expect(started.state === 'ready' && started.close()).rejects.toThrow('close failed');
+    expect(database?.sqlite.open).toBe(false);
   });
 
   it('closes the database and rethrows when a migration fails', async () => {

@@ -1,7 +1,8 @@
 import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
-import { useId } from 'react';
+import { useId, useRef, useState } from 'react';
 
 import { useOpsStatusQuery } from '../../api/ops.api.ts';
+import { ShutdownDialog } from '../shutdown/ShutdownDialog.tsx';
 
 /** `sidebar` in the navigation column of AppFrame; the strip of UI-019 narrow follows in #140. */
 export type BackupNoticeVariant = 'sidebar';
@@ -37,11 +38,15 @@ function InfoIcon() {
  * path and the rest is shown at once (`UI-044.loading`); on `500` the text with the reference
  * number stands there instead (`UI-044.error`), the rest stays complete. In the column it has `margin-top: auto`:
  * at the lower edge with enough height, otherwise after the entries.
- * "resellr beenden" opens UI-045 from #142 on; until then it has no effect.
+ * "resellr beenden" opens UI-045 (CU-255) and is disabled while it is open and while shutting
+ * down (`UI-044.disabled`); the dialog stays open until the shutdown ended, so both hold the
+ * same condition. After closing, the enabled button gets the focus back.
  */
 export function BackupNotice({ variant }: BackupNoticeProps) {
   const headingId = useId();
   const { data, error } = useOpsStatusQuery();
+  const [shutdownOpen, setShutdownOpen] = useState(false);
+  const shutdownButtonRef = useRef<HTMLButtonElement>(null);
   // `UI-044.error` only for `500 internal_error`, the one answer with a reference number (2.0.5);
   // without an answer "wird geladen …" stays and the content area shows P-06 (DG-06).
   const referenceNumber = error?.kind === 'error' ? (error.error?.referenceNumber ?? null) : null;
@@ -84,12 +89,20 @@ export function BackupNotice({ variant }: BackupNoticeProps) {
         <p className="m-0">{FIXED_TEXTS.backupNoticeWarning}</p>
         {/* Secondary button (DESIGN.md "Buttons"), 28 px high: with the gap 32 px (UI-044). */}
         <button
+          ref={shutdownButtonRef}
           type="button"
-          className="mt-0.5 inline-flex h-7 w-full items-center justify-center rounded-control border border-border-input bg-surface px-4 text-body font-semibold text-text"
+          disabled={shutdownOpen}
+          onClick={() => setShutdownOpen(true)}
+          className="mt-0.5 inline-flex h-7 w-full items-center justify-center rounded-control border border-border-input bg-surface px-4 text-body font-semibold text-text disabled:cursor-not-allowed disabled:opacity-60"
         >
           {FIXED_TEXTS.shutdownAction}
         </button>
       </section>
+      <ShutdownDialog
+        open={shutdownOpen}
+        onOpenChange={setShutdownOpen}
+        returnFocusRef={shutdownButtonRef}
+      />
     </div>
   );
 }

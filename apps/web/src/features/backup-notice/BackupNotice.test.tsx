@@ -1,9 +1,14 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { writeOutcomeStore } from '../../api/write-outcome-store.ts';
 import { createQueryClient } from '../../app/query-client.ts';
+import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
+import { ShuttingDownBanner } from '../../components/patterns/ShuttingDownBanner.tsx';
+import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.tsx';
 import { BackupNotice } from './BackupNotice.tsx';
 
 const DATA_DIR_PATH = 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten';
@@ -23,6 +28,22 @@ function renderNotice() {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <BackupNotice variant="sidebar" />
+    </QueryClientProvider>,
+  );
+  return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
+}
+
+/**
+ * Renders the notice with fresh modules: the write lock of a test above lasts until the page is
+ * reloaded (CU-049) and would disable "resellr beenden" in UI-045.
+ */
+async function renderFreshNotice() {
+  vi.resetModules();
+  const { BackupNotice: FreshBackupNotice } = await import('./BackupNotice.tsx');
+  const { createQueryClient: createFreshQueryClient } = await import('../../app/query-client.ts');
+  render(
+    <QueryClientProvider client={createFreshQueryClient()}>
+      <FreshBackupNotice variant="sidebar" />
     </QueryClientProvider>,
   );
   return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
@@ -146,17 +167,120 @@ describe('BackupNotice (UI-044, CU-254)', () => {
     expect(within(notice).queryByRole('alert')).toBeNull();
   });
 
-  it('DER-95-06 "resellr beenden" is a focusable button that does nothing until #142', async () => {
+  it.each([
+    ['UI-044.unreachable', 'P-06', () => <UnreachableBanner alwaysShow />],
+    ['UI-044.wird-beendet', 'P-07', () => <ShuttingDownBanner />],
+    [
+      'UI-044.ausgang-unbekannt',
+      'P-08',
+      () => {
+        // The page state "gesperrt bis Neuladen" (CU-049); it lasts for this test file only.
+        writeOutcomeStore.lock();
+        return <OutcomeUnknownBanner />;
+      },
+    ],
+  ])(
+    '%s: DER-95-05 with %s in the content area heading, text and path of the notice stay unchanged',
+    async (_state, _pattern, banner) => {
+      fetchMock.mockResolvedValue(
+        Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }),
+      );
+      const queryClient = createQueryClient();
+      const frame = (content: ReactNode) => (
+        <QueryClientProvider client={queryClient}>
+          <BackupNotice variant="sidebar" />
+          <main>{content}</main>
+        </QueryClientProvider>
+      );
+      const { rerender } = render(frame(null));
+      const notice = screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
+      await within(notice).findByText(DATA_DIR_PATH);
+      const before = notice.innerHTML;
+
+      rerender(frame(banner()));
+
+      const main = screen.getByRole('main');
+      expect(within(main).getByRole('alert')).toBeTruthy();
+      // The same element with the same content: no other heading, text or path, no own message.
+      expect(screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle })).toBe(notice);
+      expect(notice.innerHTML).toBe(before);
+      expect(within(notice).getByTestId('backup-notice-path').textContent).toBe(DATA_DIR_PATH);
+      expect(within(notice).queryByRole('alert')).toBeNull();
+      expect(within(notice).queryByRole('status')).toBeNull();
+      expect(within(notice).getByRole('button', { name: 'resellr beenden' })).toHaveProperty(
+        'disabled',
+        false,
+      );
+    },
+  );
+
+  it('AC-REQ-104-03 the notice puts nothing into localStorage or sessionStorage', async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    fetchMock.mockResolvedValue(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }));
+
+    const notice = renderNotice();
+    const path = await within(notice).findByText(DATA_DIR_PATH);
+    fireEvent.click(path, { detail: 3 });
+    fireEvent.click(within(notice).getByRole('heading', { name: 'Sicherung einrichten' }));
+
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+  });
+
+  it('DER-95-06 "resellr beenden" is a focusable button', async () => {
     fetchMock.mockResolvedValue(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }));
     const notice = renderNotice();
     await within(notice).findByText(DATA_DIR_PATH);
 
     const button = within(notice).getByRole('button', { name: 'resellr beenden' });
     button.focus();
-    fireEvent.click(button);
 
     expect(document.activeElement).toBe(button);
     expect(button.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('UI-044.disabled: DER-96-04 "resellr beenden" is disabled while UI-045 is open and while shutting down', async () => {
+    fetchMock.mockImplementation((input, init) =>
+      input === '/api/ops/status'
+        ? Promise.resolve(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }))
+        : pending(input, init),
+    );
+    const notice = await renderFreshNotice();
+    await within(notice).findByText(DATA_DIR_PATH);
+    const button = within(notice).getByRole<HTMLButtonElement>('button', {
+      name: 'resellr beenden',
+    });
+
+    button.focus();
+    fireEvent.click(button);
+    const dialog = screen.getByRole('dialog', { name: 'resellr beenden' });
+    expect(button.disabled).toBe(true);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'resellr beenden' }));
+    await within(dialog).findByRole('status');
+    expect(button.disabled).toBe(true);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/ops/status',
+      '/api/ops/shutdown',
+    ]);
+  });
+
+  it('UI-044.disabled: DER-96-04 after "Abbrechen" the button is enabled again and has the focus', async () => {
+    fetchMock.mockResolvedValue(Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }));
+    const notice = await renderFreshNotice();
+    await within(notice).findByText(DATA_DIR_PATH);
+    const button = within(notice).getByRole<HTMLButtonElement>('button', {
+      name: 'resellr beenden',
+    });
+
+    button.focus();
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(button.disabled).toBe(false);
+    await waitFor(() => expect(document.activeElement).toBe(button));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
