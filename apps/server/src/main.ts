@@ -28,6 +28,19 @@ try {
   process.exit(ExitCode.StartAborted);
 }
 
+// Before the startup sequence and any access to the data and log folder (Nachtrag MAR-439):
+// without a handler the operating system ends the process on a signal at once, before any
+// JavaScript, and `-wal`/`-shm` stay behind. A signal during the start is only noted and handled
+// after it, since `close()` exists only then and the end marker is deleted only after step 9.
+// Linux only (development, CI, tests): no orderly shutdown of 2.17, no end marker.
+let signalled = false;
+let onSignal = () => {
+  signalled = true;
+};
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => onSignal());
+}
+
 const paths = resolveRuntimePaths();
 const startId = process.env.RESELLR_START_ID || null;
 const errorLog = createErrorLog({
@@ -88,10 +101,8 @@ if (result.state === 'aborted') {
     lifecycle.set('stopping');
     void result.close().then(() => process.exit(code));
   };
-  // Linux only (development, CI, tests): no orderly shutdown of 2.17, no end marker.
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, () => closeAndExit(0));
-  }
+  onSignal = () => closeAndExit(0);
+  if (signalled) onSignal();
   // Coupling (H-13, S-3): without the supervisor the server ends in order; SQLite checkpoints the
   // WAL file when the last connection closes.
   supervisorIpc.onSupervisorLost(() => closeAndExit(ExitCode.SupervisorLost));
