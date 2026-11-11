@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -50,6 +50,16 @@ function dataSample(server: AppServer): unknown {
   }
 }
 
+/**
+ * Content of the end marker in the data folder, `null` without one. The server of a test worker
+ * is shared by its tests, so an earlier test may have shut it down and left a marker: a test
+ * compares the marker before and after instead of expecting none.
+ */
+function shutdownMarker(server: AppServer): string | null {
+  const path = join(server.paths.dataDir, SHUTDOWN_MARKER_FILE_NAME);
+  return existsSync(path) ? readFileSync(path, 'utf8') : null;
+}
+
 /** Every `POST /api/ops/shutdown` the page sends. */
 function shutdownRequests(page: Page): string[] {
   const requests: string[] = [];
@@ -78,6 +88,7 @@ test.describe('Question UI-045 from the backup notice (#142)', () => {
     await page.goto('/inserate');
     const before = await health(server);
     expect(before).toMatchObject({ state: 'ready' });
+    const markerBefore = shutdownMarker(server);
 
     await noticeButton(page).click();
 
@@ -90,7 +101,7 @@ test.describe('Question UI-045 from the backup notice (#142)', () => {
     await page.waitForTimeout(500);
     expect(requests).toEqual([]);
     expect(await health(server)).toEqual(before);
-    expect(existsSync(join(server.paths.dataDir, SHUTDOWN_MARKER_FILE_NAME))).toBe(false);
+    expect(shutdownMarker(server)).toEqual(markerBefore);
 
     await dialog(page).getByRole('button', { name: 'Abbrechen' }).click();
     await expect(noticeButton(page)).toBeFocused();
@@ -105,6 +116,7 @@ test.describe('Question UI-045 from the backup notice (#142)', () => {
     await expect(page.getByTestId('backup-notice-path')).toHaveText(server.paths.dataDir);
     const healthBefore = await health(server);
     const sampleBefore = dataSample(server);
+    const markerBefore = shutdownMarker(server);
 
     await noticeButton(page).click();
     await dialog(page).getByRole('button', { name: 'Abbrechen' }).click();
@@ -116,7 +128,7 @@ test.describe('Question UI-045 from the backup notice (#142)', () => {
     expect(requests).toEqual([]);
     expect(await health(server)).toEqual(healthBefore);
     expect(dataSample(server)).toEqual(sampleBefore);
-    expect(existsSync(join(server.paths.dataDir, SHUTDOWN_MARKER_FILE_NAME))).toBe(false);
+    expect(shutdownMarker(server)).toEqual(markerBefore);
   });
 
   test('DER-96-01 Esc closes the question, and Enter on "Abbrechen" does not shut down', async ({
