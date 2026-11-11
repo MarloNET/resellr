@@ -94,6 +94,9 @@ export function DeviceTypesPage() {
 
   const formRef = useRef<HTMLFormElement>(null);
   const focusFirstError = useFocusFirstError(formRef);
+  // A pointer is pressed in the form: the focus leaves "Name" in the middle of a click there.
+  const pointerPressed = useRef(false);
+  const cancelDeferredCheck = useRef(() => {});
 
   const saving = createMutation.isPending || updateMutation.isPending;
   const selectedId = selection?.id ?? null;
@@ -164,12 +167,52 @@ export function DeviceTypesPage() {
     }
   }
 
+  function pressPointer() {
+    pointerPressed.current = true;
+    const release = () => {
+      pointerPressed.current = false;
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+  }
+
+  /**
+   * Check on leaving "Name" (2.0.7). During a click in the form the check waits until after the
+   * click: a new or vanished error line would move the button or the switch between `mousedown`
+   * and `mouseup`, and the browser would drop the click (QA-D1).
+   */
+  function checkNameOnBlur() {
+    const name = draft.name;
+    if (!pointerPressed.current) {
+      setNameError(checkName(name));
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = () => {
+      cancelDeferredCheck.current();
+      // `click` follows `pointerup` in the same task, so the timeout runs after it.
+      timer = setTimeout(() => setNameError(checkName(name)));
+    };
+    window.addEventListener('pointerup', run);
+    window.addEventListener('pointercancel', run);
+    cancelDeferredCheck.current = () => {
+      window.removeEventListener('pointerup', run);
+      window.removeEventListener('pointercancel', run);
+      clearTimeout(timer);
+    };
+  }
+
   function save() {
+    // The save checks the name itself; a later check on leaving must not hide its result.
+    cancelDeferredCheck.current();
     const message = checkName(draft.name);
     if (message) {
       showFieldError(message);
       return;
     }
+    setNameError(undefined);
     setNotice(null);
     const callbacks = { onSuccess: onSaved, onError: onFailed };
     if (selectedId === null) {
@@ -231,7 +274,7 @@ export function DeviceTypesPage() {
           <>
             <span className="flex items-center justify-between gap-2">
               <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{item.name}</span>
-              <Badge variant={item.active ? 'published' : 'draft'}>
+              <Badge variant={item.active ? 'published' : 'draft'} className="shrink-0">
                 {item.active ? TEXTS.active : TEXTS.inactive}
               </Badge>
             </span>
@@ -256,6 +299,7 @@ export function DeviceTypesPage() {
           aria-label={TEXTS.list}
           noValidate
           className="flex flex-col gap-4 rounded-control border border-border bg-surface p-4 full:flex-row full:flex-wrap full:items-start"
+          onPointerDown={pressPointer}
           onSubmit={(event) => {
             event.preventDefault();
             save();
@@ -269,7 +313,7 @@ export function DeviceTypesPage() {
                   value={draft.name}
                   disabled={formLocked}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                  onBlur={() => setNameError(checkName(draft.name))}
+                  onBlur={checkNameOnBlur}
                 />
               )}
             </FormField>

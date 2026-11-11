@@ -89,6 +89,37 @@ function rename(name: string) {
   fireEvent.click(saveButton());
 }
 
+/** Types into "Name" like the user: the field has the focus. */
+function typeName(value: string) {
+  act(() => nameInput().focus());
+  fireEvent.change(nameInput(), { target: { value } });
+}
+
+/** Leaves "Name" with the keyboard (Tab): the focus moves to the next control. */
+function leaveNameByKeyboard() {
+  act(() => statusSwitch().focus());
+}
+
+/**
+ * First half of a mouse click: the button goes down on the element and, like in the browser, the
+ * focus moves to it, so "Name" loses it.
+ */
+function pressPointer(element: HTMLElement) {
+  fireEvent.pointerDown(element);
+  fireEvent.mouseDown(element);
+  act(() => element.focus());
+}
+
+/** Second half of a mouse click, in the order of the browser: `pointerup`, `mouseup`, `click`. */
+async function releasePointerAndClick(element: HTMLElement) {
+  await act(async () => {
+    fireEvent.pointerUp(element);
+    fireEvent.mouseUp(element);
+    fireEvent.click(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 /**
  * Another window renamed "Notebook" to "Notebook Pro" (version 4) after the first list request.
  * Like the server, `PATCH` answers `409 version_conflict` unless it sends version 4.
@@ -304,6 +335,97 @@ describe('UI-027 device types (CU-095)', () => {
     expect(await screen.findByText('Name ist bereits vergeben')).toBeTruthy();
     expect(document.activeElement).toBe(nameInput());
     expect(screen.queryByText('Geräteart gespeichert')).toBeNull();
+  });
+
+  it('UI-027.validation DER-33-06 leaving "Name" with the keyboard checks the field at once', async () => {
+    mockApi();
+    await openPage();
+
+    typeName('x'.repeat(51));
+    leaveNameByKeyboard();
+
+    expect(screen.getByText('Name: 1 bis 50 Zeichen')).toBeTruthy();
+    expectAccessibleForm();
+  });
+
+  // QA-D1: the check on leaving the field must not change the error line while the mouse button
+  // is pressed on "Geräteart speichern"; otherwise the button moves and the click is lost.
+  it('UI-027.validation DER-33-06 a mouse click on save after an invalid name shows the error after the click, without request', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Geräteart anlegen' }));
+    typeName('x'.repeat(51));
+
+    pressPointer(saveButton());
+    expect(screen.queryByText('Name: 1 bis 50 Zeichen')).toBeNull();
+    await releasePointerAndClick(saveButton());
+
+    expect(screen.getByText('Name: 1 bis 50 Zeichen')).toBeTruthy();
+    expect(document.activeElement).toBe(nameInput());
+    expect(sent).toEqual([]);
+  });
+
+  it('UI-027.validation DER-33-06 a mouse click on save after a corrected name saves when renaming', async () => {
+    const { sent } = mockApi({ writes: { [PATCH_NOTEBOOK]: () => Response.json(SAVED_NOTEBOOK) } });
+    await openPage();
+    typeName('x'.repeat(51));
+    leaveNameByKeyboard();
+    expect(screen.getByText('Name: 1 bis 50 Zeichen')).toBeTruthy();
+    typeName('Laptop');
+
+    pressPointer(saveButton());
+    expect(screen.getByText('Name: 1 bis 50 Zeichen')).toBeTruthy();
+    await releasePointerAndClick(saveButton());
+
+    expect(await screen.findByText('Geräteart gespeichert')).toBeTruthy();
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/device-types/1',
+        body: { version: 3, name: 'Laptop', active: true },
+      },
+    ]);
+    expect(screen.queryByText('Name: 1 bis 50 Zeichen')).toBeNull();
+  });
+
+  it('UI-027.validation AC-REQ-004-02 a mouse click on save after a corrected name sends the new device type and shows "Name ist bereits vergeben"', async () => {
+    const { sent } = mockApi({
+      writes: {
+        'POST /api/device-types': () =>
+          Response.json(errorBody('name_taken', { message: 'Name ist bereits vergeben' }), {
+            status: 422,
+          }),
+      },
+    });
+    await openPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Geräteart anlegen' }));
+    typeName('x'.repeat(51));
+    leaveNameByKeyboard();
+    expect(screen.getByText('Name: 1 bis 50 Zeichen')).toBeTruthy();
+    typeName('Tablet');
+
+    pressPointer(saveButton());
+    await releasePointerAndClick(saveButton());
+
+    expect(await screen.findByText('Name ist bereits vergeben')).toBeTruthy();
+    expect(screen.queryByText('Name: 1 bis 50 Zeichen')).toBeNull();
+    expect(document.activeElement).toBe(nameInput());
+    expect(sent).toEqual([
+      { method: 'POST', path: '/api/device-types', body: { name: 'Tablet', active: true } },
+    ]);
+  });
+
+  it('UI-027.validation DER-33-06 a mouse click on the status switch after an invalid name toggles it', async () => {
+    mockApi();
+    await openPage();
+    typeName('x'.repeat(51));
+
+    pressPointer(statusSwitch());
+    expect(screen.queryByText('Name: 1 bis 50 Zeichen')).toBeNull();
+    await releasePointerAndClick(statusSwitch());
+
+    expect(statusSwitch().getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByText('Name: 1 bis 50 Zeichen')).toBeTruthy();
   });
 
   it('UI-027.error DER-33-10 shows the error banner with the reference number and keeps the inputs', async () => {

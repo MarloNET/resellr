@@ -66,6 +66,80 @@ test.describe('UI-027 device types (CU-095)', () => {
     await expectReachable(page);
   });
 
+  // QA-D2: a name of 50 characters without spaces wraps itself, not the status chip.
+  test('UI-027.default a long name without spaces keeps the status chip on one line', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const short = uniqueName('Kurz', testInfo.title, testInfo.project.name);
+    const long = uniqueName('W', testInfo.title, testInfo.project.name)
+      .replace(' ', '')
+      .padEnd(50, 'W');
+    await createDeviceType(page, server.baseUrl, short);
+    await createDeviceType(page, server.baseUrl, long);
+    await page.goto(PAGE);
+
+    const chipOf = (name: string) =>
+      deviceTypes(page)
+        .getByRole('button', { name: new RegExp(name) })
+        .getByText('aktiv', { exact: true });
+    const shortChip = await chipOf(short).boundingBox();
+    const longChip = await chipOf(long).boundingBox();
+    expect(longChip?.height).toBe(shortChip?.height);
+    expect(longChip?.width).toBe(shortChip?.width);
+  });
+
+  // QA-D1: the check on leaving the field must not move the button between `mousedown` and
+  // `mouseup`; one mouse click saves, whether the error line appears or disappears.
+  test('UI-027.validation DER-33-06 one mouse click after an invalid or corrected name saves when creating', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Klick', testInfo.title, testInfo.project.name);
+    await createDeviceType(page, server.baseUrl, `${name} vergeben`);
+    await page.goto(PAGE);
+    await page.getByRole('button', { name: 'Geräteart anlegen' }).click();
+
+    await nameField(page).fill('x'.repeat(51));
+    await saveButton(page).click();
+    await expect(page.getByText('Name: 1 bis 50 Zeichen')).toBeVisible();
+    await expect(nameField(page)).toBeFocused();
+
+    await nameField(page).fill(`${name} vergeben`);
+    await saveButton(page).click();
+    await expect(page.getByText('Name ist bereits vergeben')).toBeVisible();
+    await expect(nameField(page)).toBeFocused();
+
+    await nameField(page).fill(name);
+    await saveButton(page).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Geräteart gespeichert' }),
+    ).toBeVisible();
+  });
+
+  test('UI-027.validation DER-33-06 one mouse click after an invalid or corrected name saves when renaming', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Umbenennen', testInfo.title, testInfo.project.name);
+    await createDeviceType(page, server.baseUrl, name);
+    await openDeviceType(page, name);
+
+    await nameField(page).fill('x'.repeat(51));
+    await saveButton(page).click();
+    await expect(page.getByText('Name: 1 bis 50 Zeichen')).toBeVisible();
+    await expect(nameField(page)).toBeFocused();
+
+    await nameField(page).fill(`${name} neu`);
+    await saveButton(page).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Geräteart gespeichert' }),
+    ).toBeVisible();
+    await expect(
+      deviceTypes(page).getByRole('button', { name: new RegExp(`${name} neu`) }),
+    ).toBeVisible();
+  });
+
   test('UI-027.conflict DER-33-08 (a) a save after a change in another window shows P-05 and keeps the input', async ({
     page,
     server,
