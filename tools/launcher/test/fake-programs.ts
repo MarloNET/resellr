@@ -9,6 +9,13 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/** Stand-in for `resellr-server` (`fake-server.ts`), for the test hook `RESELLR_TEST_SERVER_ENTRY`. */
+export const FAKE_SERVER = fileURLToPath(new URL('./fake-server.ts', import.meta.url));
+
+/** Reference number the fake server writes into `start-result.json`. */
+export const FAKE_REF_NO = 'R-ABCD-EFGH';
 
 /**
  * Stand-ins for `reg`, Chrome and `explorer.exe` under Linux: shell scripts in a temporary
@@ -23,6 +30,8 @@ export interface FakePrograms {
   registerChrome(hive: 'HKCU' | 'HKLM', value: string): void;
   /** Arguments the fake Chrome was started with, or null until it ran. */
   chromeArgs(): string[] | null;
+  /** Every start of the fake Chrome, its arguments joined by spaces, in order. */
+  chromeCalls(): string[];
   /** Arguments the fake `explorer.exe` was started with, or null until it ran. */
   explorerArgs(): string[] | null;
   /** Calls of `reg`, one line of arguments each, in order. */
@@ -53,9 +62,13 @@ fi
 echo "FEHLER: Der angegebene Registrierungsschlüssel bzw. Wert wurde nicht gefunden." >&2
 exit 1`;
 
-/** Writes the arguments, one per line, and renames the file so a reader never sees half of it. */
+/**
+ * Writes the arguments, one per line, and renames the file so a reader never sees half of it;
+ * appends them as one line to `<file>.all`, so parallel starts are all counted.
+ */
 const recorderScript = (file: string) =>
-  `printf '%s\\n' "$@" > "${file}.tmp" && mv "${file}.tmp" "${file}"`;
+  `printf '%s\\n' "$*" >> "${file}.all"
+printf '%s\\n' "$@" > "${file}.$$.tmp" && mv "${file}.$$.tmp" "${file}"`;
 
 export function createFakePrograms(): FakePrograms {
   const dir = mkdtempSync(join(tmpdir(), 'resellr-launcher-fakes-'));
@@ -77,6 +90,7 @@ export function createFakePrograms(): FakePrograms {
     path: `${dir}${delimiter}${process.env.PATH ?? ''}`,
     registerChrome: (hive, value) => writeFileSync(join(dir, `reg-${hive}.txt`), value),
     chromeArgs: () => readLines(chromeArgsFile),
+    chromeCalls: () => readLines(`${chromeArgsFile}.all`) ?? [],
     explorerArgs: () => readLines(explorerArgsFile),
     regCalls: () => readLines(join(dir, 'reg-calls.txt')) ?? [],
     remove: () => rmSync(dir, { recursive: true, force: true }),
