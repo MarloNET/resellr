@@ -2,7 +2,7 @@ import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { createServer, type Socket } from 'node:net';
 import { join } from 'node:path';
 
-import { DEMO_DEVICE_TYPES, type SeedArea } from '@resellr/test-data/demo-seed';
+import { DEMO_DEVICE_TYPES, DEMO_SUPPLIERS, type SeedArea } from '@resellr/test-data/demo-seed';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -86,11 +86,14 @@ describe('startDemo (CU-004)', () => {
       const filled = SCHEMA_TABLES.filter((table) => !STARTUP_TABLES.has(table)).filter(
         (table) => db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get() !== 0,
       );
-      // Only the demo data written through the API (CU-061): the device types of S2 with their
-      // audit entries; the initial settings follow with the seed migration CU-071.
-      expect(filled).toEqual(['audit_entry', 'device_type']);
+      // Only the demo data written through the API (CU-061): the device types and suppliers of
+      // S2 with their audit entries; the initial settings follow with the seed migration CU-071.
+      expect(filled).toEqual(['audit_entry', 'device_type', 'supplier']);
       expect(db.prepare('SELECT name, active FROM device_type ORDER BY id').all()).toEqual(
         DEMO_DEVICE_TYPES.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
+      );
+      expect(db.prepare('SELECT name, active FROM supplier ORDER BY id').all()).toEqual(
+        DEMO_SUPPLIERS.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
       );
     } finally {
       db.close();

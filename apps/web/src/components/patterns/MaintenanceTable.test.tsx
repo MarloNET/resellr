@@ -68,6 +68,26 @@ describe('maintenance table P-01 (CU-094)', () => {
     }
   });
 
+  it('shows the empty text in the list area with "Anlegen" as primary button below it', () => {
+    const { onCreate, region } = renderTable({ items: [], emptyText: 'Noch keine Gerätearten' });
+
+    expect(within(region).getByText('Noch keine Gerätearten')).toBeTruthy();
+    const create = within(region).getAllByRole('button');
+    expect(create.map((button) => button.textContent)).toEqual(['+Geräteart anlegen']);
+    expect(create[0]?.className).toContain('bg-primary');
+    fireEvent.click(create[0]!);
+    expect(onCreate).toHaveBeenCalledOnce();
+  });
+
+  it('shows no empty text while the placeholder stands or entries exist', () => {
+    renderTable({ emptyText: 'Noch keine Gerätearten' });
+    expect(screen.queryByText('Noch keine Gerätearten')).toBeNull();
+    cleanup();
+
+    renderTable({ items: [], emptyText: 'Noch keine Gerätearten', placeholder: <p>Lade …</p> });
+    expect(screen.queryByText('Noch keine Gerätearten')).toBeNull();
+  });
+
   it('shows the placeholder instead of the rows', () => {
     renderTable({ placeholder: <p role="status">Lade Gerätearten …</p> });
 

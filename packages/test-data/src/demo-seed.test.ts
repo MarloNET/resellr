@@ -9,6 +9,7 @@ import {
   seedDeviceTypes,
   seedDemoData,
   type SeedArea,
+  seedSuppliers,
 } from './demo-seed.ts';
 
 interface Received {
@@ -111,8 +112,8 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types', () => {
-    expect(SEED_AREAS).toEqual([seedDeviceTypes]);
+  it('runs the areas of the build steps in their order: S2 device types and suppliers', () => {
+    expect(SEED_AREAS).toEqual([seedDeviceTypes, seedSuppliers]);
   });
 
   it('creates the demo device types through POST /api/device-types', async () => {
@@ -130,6 +131,25 @@ describe('seedDemoData', () => {
     expect(requests).toEqual([
       ['POST', '/api/device-types', { name: 'Beamer', active: true }],
       ['POST', '/api/device-types', { name: 'Drucker', active: false }],
+    ]);
+  });
+
+  it('creates the demo suppliers through POST /api/suppliers', async () => {
+    const requests: unknown[][] = [];
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (...args: unknown[]) => {
+        requests.push(args);
+        return undefined as never;
+      },
+    };
+
+    await seedSuppliers(recording);
+
+    expect(requests).toEqual([
+      ['POST', '/api/suppliers', { name: 'Lieferant A', active: true }],
+      ['POST', '/api/suppliers', { name: 'Lieferant B', active: true }],
+      ['POST', '/api/suppliers', { name: 'Lieferant C', active: false }],
     ]);
   });
 

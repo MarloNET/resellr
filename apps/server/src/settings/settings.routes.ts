@@ -5,6 +5,12 @@ import {
   deviceTypeSchema,
   deviceTypeUpdateSchema,
 } from '@resellr/domain/schemas/device-type.schema';
+import {
+  supplierCreateSchema,
+  supplierListSchema,
+  supplierSchema,
+  supplierUpdateSchema,
+} from '@resellr/domain/schemas/supplier.schema';
 import type { Kysely } from 'kysely';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -13,6 +19,7 @@ import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
 import { createDeviceTypeService } from './device-type-service.ts';
+import { createSupplierService } from './supplier-service.ts';
 
 export interface SettingsRoutesOptions {
   db: Kysely<DB>;
@@ -28,10 +35,18 @@ const pageQuery = z.strictObject({
   offset: z.coerce.number().pipe(z.int().nonnegative()).default(0),
 });
 
+/** `?includeInactive=true` adds the deactivated entries to a list (2.2). */
+const includeInactiveQuery = pageQuery.extend({
+  includeInactive: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+});
+
 /**
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
  * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, … Each route calls one service.
- * There is no DELETE route for device types (REQ-004, DER-33-09).
+ * There is no DELETE route for device types (REQ-004, DER-33-09) or suppliers (2.2, DER-36-08).
  */
 export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = async (
   app,
@@ -61,5 +76,27 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       },
     },
     async (request) => deviceTypes.update(request.params.id, request.body),
+  );
+
+  const suppliers = createSupplierService({ db, uow, clock });
+
+  app.get(
+    '/api/suppliers',
+    { schema: { querystring: includeInactiveQuery, response: { 200: supplierListSchema } } },
+    async (request) => suppliers.list(request.query),
+  );
+
+  app.post(
+    '/api/suppliers',
+    { schema: { body: supplierCreateSchema, response: { 201: supplierSchema } } },
+    async (request, reply) => reply.code(201).send(await suppliers.create(request.body)),
+  );
+
+  app.patch(
+    '/api/suppliers/:id',
+    {
+      schema: { params: idParams, body: supplierUpdateSchema, response: { 200: supplierSchema } },
+    },
+    async (request) => suppliers.update(request.params.id, request.body),
   );
 };
