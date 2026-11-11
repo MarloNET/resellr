@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
+import { shutdownOutcomeStore } from '../features/shutdown/shutdown-outcome-store.ts';
 import { AppFrame } from './AppFrame.tsx';
 import { createQueryClient } from './query-client.ts';
 
@@ -27,6 +28,19 @@ const statusError = () =>
     { status: 500 },
   );
 const health = () => Response.json({ state: 'ready', startId: 's-1' });
+const shuttingDown = () =>
+  Response.json(
+    {
+      error: {
+        code: 'shutting_down',
+        message: '',
+        fields: [],
+        details: {},
+        referenceNumber: null,
+      },
+    },
+    { status: 503 },
+  );
 
 /** Answers per path; a path without answer fails like a lost connection. */
 function serve(answers: Record<string, () => Response>) {
@@ -123,5 +137,74 @@ describe('AppFrame P-06 for GET /api/ops/status (CU-044, Nachtrag MAR-395)', () 
     );
     expect(within(content()).queryByRole('alert')).toBeNull();
     expect(calls('/api/ops/health')).toBe(1);
+  });
+});
+
+describe('AppFrame banner after "resellr beenden" (CU-044, Nachtrag MAR-421)', () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    cleanup();
+    shutdownOutcomeStore.clear();
+    vi.unstubAllGlobals();
+  });
+
+  async function confirmShutdown() {
+    await within(notice()).findByText(DATA_DIR_PATH);
+    fireEvent.click(within(notice()).getByRole('button', { name: 'resellr beenden' }));
+    const dialog = screen.getByRole('dialog', { name: 'resellr beenden' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'resellr beenden' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  }
+
+  it('UI-045.error: DER-96-03 on 500 the dialog closes, the notice stays and the banner names function, next step and reference number', async () => {
+    serve({ '/api/ops/status': status, '/api/ops/shutdown': statusError });
+    renderFrame();
+
+    await confirmShutdown();
+
+    const banner = await within(content()).findByRole('alert');
+    expect(banner.textContent).toBe(`${FIXED_TEXTS.shutdownError(REFERENCE_NUMBER)}×`);
+    expect(banner.textContent).toContain('resellr konnte nicht beendet werden.');
+    expect(banner.textContent).toContain('Bitte versuchen Sie es erneut.');
+    expect(content().firstElementChild?.contains(banner)).toBe(true);
+    expect(within(content()).getByRole('heading', { name: 'Inserat-Übersicht' })).toBeTruthy();
+    expect(within(notice()).getByTestId('backup-notice-path').textContent).toBe(DATA_DIR_PATH);
+    expect(
+      within(notice()).getByRole<HTMLButtonElement>('button', { name: 'resellr beenden' }).disabled,
+    ).toBe(false);
+
+    fireEvent.click(within(banner).getByRole('button', { name: FIXED_TEXTS.closeBanner }));
+    expect(within(content()).queryByRole('alert')).toBeNull();
+  });
+
+  it('UI-045.wird-beendet: DER-96-05 on 503 shutting_down the content area shows P-07 without reference number', async () => {
+    serve({ '/api/ops/status': status, '/api/ops/shutdown': shuttingDown });
+    renderFrame();
+
+    await confirmShutdown();
+
+    const banner = await within(content()).findByRole('alert');
+    expect(banner.textContent).toBe(FIXED_TEXTS.shuttingDownBanner);
+    expect(banner.textContent).not.toMatch(/R-[0-9A-Z]{4}-[0-9A-Z]{4}/);
+    expect(within(banner).queryByRole('button')).toBeNull();
+    expect(content().firstElementChild?.contains(banner)).toBe(true);
+    expect(within(notice()).getByTestId('backup-notice-path').textContent).toBe(DATA_DIR_PATH);
+  });
+
+  it('shows P-06 before the banner of the shutdown and both before the page', async () => {
+    serve({});
+    shutdownOutcomeStore.set({ kind: 'shutting-down' });
+    renderFrame();
+
+    await waitFor(() => expect(within(content()).getAllByRole('alert')).toHaveLength(2));
+    const [first, second] = within(content()).getAllByRole('alert');
+    expect(first!.textContent).toBe(`${FIXED_TEXTS.unreachableBanner}Erneut versuchen`);
+    expect(second!.textContent).toBe(FIXED_TEXTS.shuttingDownBanner);
+    const page = within(content()).getByRole('heading', { name: 'Inserat-Übersicht' });
+    expect(second!.compareDocumentPosition(page) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
