@@ -9,7 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appFactory } from '../../test/test-app.ts';
 
+import type { Database } from '../db/database.ts';
 import { migrations } from '../db/migrations/index.ts';
+import type { DB } from '../db/schema.ts';
 import type { Migration } from '../db/migrator.ts';
 import { createClock } from '../shared/clock.ts';
 import { createErrorLog } from './error-log.ts';
@@ -70,7 +72,7 @@ function start(overrides: Partial<StartupOptions> = {}) {
     }),
     ...overrides,
   };
-  return { lifecycle, run: () => runStartup(options) };
+  return { lifecycle, options, run: () => runStartup(options) };
 }
 
 /** A port on 127.0.0.1 that is free right now. */
@@ -215,6 +217,28 @@ describe('startup sequence (CU-040)', () => {
     ]);
     expect(lifecycle.get()).toBe('starting');
     expect(readLog('operations').map((entry) => entry.event)).not.toContain('server_ready');
+  });
+
+  it('close() closes the database even when closing the app fails', async () => {
+    writeConfig({ port: await freePort() });
+    let database: Database<DB> | undefined;
+    const { options } = start();
+
+    const started = await runStartup({
+      ...options,
+      buildApp: (deps) => {
+        database = deps.database;
+        const app = options.buildApp(deps);
+        app.addHook('onClose', async () => {
+          throw new Error('close failed');
+        });
+        return app;
+      },
+    });
+
+    expect(started.state).toBe('ready');
+    await expect(started.state === 'ready' && started.close()).rejects.toThrow('close failed');
+    expect(database?.sqlite.open).toBe(false);
   });
 
   it('closes the database and rethrows when a migration fails', async () => {

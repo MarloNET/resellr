@@ -102,6 +102,10 @@ describe('clock (CU-032)', () => {
     ['2027-12-14T10:00+01:00', '2027-12-14T09:00:00.000Z'],
     ['2027-12-14T10:00:00-05:30', '2027-12-14T15:30:00.000Z'],
     ['2027-12-14T00:00:00+14:00', '2027-12-13T10:00:00.000Z'],
+    // Years 0 to 99 stay literal, `Date.UTC` would map them to 1900 to 1999.
+    ['0000-01-01T00:00:00Z', '0000-01-01T00:00:00.000Z'],
+    ['0004-02-29T10:00:00Z', '0004-02-29T10:00:00.000Z'],
+    ['0099-12-31T23:59:59Z', '0099-12-31T23:59:59.000Z'],
   ])('E3 accepts --test-clock=%s as the instant %s', (value, instant) => {
     const clock = createClockFromArgs(['node', 'main.ts', `--test-clock=${value}`]);
 

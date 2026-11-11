@@ -122,8 +122,8 @@ export async function runStartup({
       await app.close();
     } finally {
       clearTimeout(cutConnections);
+      await database.close();
     }
-    await database.close();
   };
 
   try {
