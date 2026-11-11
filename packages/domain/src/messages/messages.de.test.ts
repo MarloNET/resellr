@@ -122,6 +122,16 @@ describe('fixed texts of REQ-104 and REQ-105 (E1)', () => {
     );
   });
 
+  // Wording of UI-045 screen.md (states loading and error), verbatim.
+  it('has the waiting text and the error banner of UI-045', () => {
+    expect(FIXED_TEXTS.shutdownPending).toBe('resellr wird beendet …');
+    expect(FIXED_TEXTS.shutdownError('R-7K2M-9QX4')).toBe(
+      'resellr konnte nicht beendet werden. resellr läuft weiter. Bitte versuchen Sie es ' +
+        'erneut. Besteht der Fehler weiter, informieren Sie den Betreiber mit der ' +
+        'Referenznummer R-7K2M-9QX4.',
+    );
+  });
+
   it('has the message after shutdown', () => {
     expect(FIXED_TEXTS.shutdownDone).toBe(
       'resellr ist beendet. Sie können den Datenordner jetzt kopieren.',
