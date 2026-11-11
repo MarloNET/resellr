@@ -145,6 +145,11 @@ test.describe('Backup notice UI-044 in the navigation column (#137)', () => {
 
     await button.scrollIntoViewIfNeeded();
     await button.click();
+    // The click opens UI-045 (#142); "Abbrechen" closes it and the focus returns to the button.
+    await page
+      .getByRole('dialog', { name: 'resellr beenden' })
+      .getByRole('button', { name: 'Abbrechen' })
+      .click();
     await expect(button).toBeFocused();
 
     await scrollArea(page).evaluate((element) => element.scrollTo(0, 0));
@@ -157,7 +162,10 @@ test.describe('Backup notice UI-044 in the navigation column (#137)', () => {
     // Chrome scrolls the focused button into the visible part of the column.
     await expect(button).toBeInViewport({ ratio: 1 });
     await page.keyboard.press('Enter');
-    // No effect until UI-045 (#142): the page stays as it is.
+    // Enter opens UI-045 (#142); Esc closes it and the focus returns to the button.
+    await expect(page.getByRole('dialog', { name: 'resellr beenden' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page).toHaveURL(/\/inserate$/);
     await expect(button).toBeFocused();
   });
