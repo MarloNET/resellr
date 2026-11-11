@@ -1,5 +1,8 @@
 import { isReferenceNumber } from '@resellr/runtime-shared/reference-number';
-import { writeLauncherState } from '@resellr/runtime-shared/runtime-state-files';
+import {
+  ensureLauncherStateFile,
+  writeLauncherState,
+} from '@resellr/runtime-shared/runtime-state-files';
 
 import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
 
@@ -9,6 +12,11 @@ import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts'
  * reloads it every second and reacts only to the `request` of its own call.
  */
 export interface LauncherStateWriter {
+  /**
+   * Creates `launcher-state.js` if it is missing, before `open` opens LP-01 (later `stop`
+   * LP-03), so the page finds the file from its first load (FIND-311, Nachtrag MAR-470).
+   */
+  prepare(): void;
   /** `ready`: the page goes on to the local address `url` itself. */
   ready(request: string, url: string): void;
   /** `aborted`, also for `gave_up` and `already_running` without a server: the page goes to LP-02. */
@@ -18,6 +26,7 @@ export interface LauncherStateWriter {
 export function createLauncherStateWriter(programDir: string): LauncherStateWriter {
   const pagesDir = launcherPagesDir(programDir);
   return {
+    prepare: () => ensureLauncherStateFile(pagesDir),
     ready: (request, url) =>
       writeLauncherState(pagesDir, { request, phase: 'ready', url, refNo: null, dataDir: null }),
     aborted: (request, refNo) => {

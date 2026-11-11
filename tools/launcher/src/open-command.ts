@@ -104,10 +104,14 @@ function showWaitingPageLater(deps: OpenCommandDeps): WaitingPage {
   const request = deps.newRequestId();
   let opened: Promise<boolean> | undefined;
   const timer = setTimeout(() => {
-    opened = deps.chromeOpener.open(deps.waitingPageUrl(request)).then(
-      () => true,
-      () => false,
-    );
+    // Without `launcher-state.js` LP-01 would not open; the result then opens directly.
+    opened = Promise.resolve()
+      .then(() => deps.launcherState.prepare())
+      .then(() => deps.chromeOpener.open(deps.waitingPageUrl(request)))
+      .then(
+        () => true,
+        () => false,
+      );
   }, WAITING_PAGE_DELAY_MS);
   return {
     request,

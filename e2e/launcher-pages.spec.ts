@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 import { expect, type Page, test } from '@playwright/test';
 import {
+  ensureLauncherStateFile,
   LAUNCHER_STATE_FILE_NAME,
   type LauncherState,
   writeLauncherState,
@@ -13,7 +14,8 @@ import {
 
 /**
  * Launcher pages (CU-271, Technical Specification 2.18, 6.1): the built pages as `file://` pages
- * in Google Chrome, with a `launcher-state.js` the test rewrites like `open` (T-5).
+ * in Google Chrome, with a `launcher-state.js` the test writes through CU-009 like `open` (T-5,
+ * Nachtrag MAR-470).
  */
 
 const BUILD_SCRIPT = 'tools/launcher-pages/build-launcher-pages.mjs';
@@ -123,13 +125,16 @@ for (const viewport of [
       page,
     }) => {
       const errors = collectErrors(page);
+      // Entries of earlier calls stay in the file, so each viewport is a call of its own.
+      const request = `call-2-${viewport.width}`;
       const stateLoads = countStateLoads(page);
       await page.route(`${APP_URL}**`, (route) =>
         route.fulfill({ contentType: 'text/html', body: '<title>resellr</title>' }),
       );
-      writeState({ request: 'call-2', phase: 'aborted', refNo: 'R-7K3M-Q9TX' });
+      // No entry of the own call yet (FIND-312): only the rule "another request → no change".
+      writeState({ request: 'another-call', phase: 'aborted', refNo: 'R-7K3M-Q9TX' });
 
-      await page.goto(lp01Url('call-2'));
+      await page.goto(lp01Url(request));
       // A state of another call changes nothing, however often the page reads it.
       writeState({ request: 'another-call', phase: 'ready', url: APP_URL });
       const loadsBefore = stateLoads();
@@ -137,7 +142,7 @@ for (const viewport of [
       await expect(page).toHaveTitle('resellr startet');
       const historyLength = await page.evaluate(() => history.length);
 
-      writeState({ request: 'call-2', phase: 'ready', url: APP_URL });
+      writeState({ request, phase: 'ready', url: APP_URL });
 
       await page.waitForURL(APP_URL, { timeout: 5000 });
       // `location.replace`: LP-01 leaves no history entry, so going back does not lead to it.
@@ -186,4 +191,50 @@ test('keeps reading when launcher-state.js does not exist yet and goes on once i
   writeState({ request: 'call-4', phase: 'ready', url: APP_URL });
 
   await page.waitForURL(APP_URL, { timeout: 5000 });
+});
+
+test('F-01 two LP-01 of calls waiting at the same time both go on to the local address', async ({
+  context,
+}) => {
+  await context.route(`${APP_URL}**`, (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<title>resellr</title>' }),
+  );
+  ensureLauncherStateFile(pagesDir);
+  const pages = await Promise.all([context.newPage(), context.newPage()]);
+  const errors = pages.map(collectErrors);
+  const loads = pages.map(countStateLoads);
+  await pages[0]!.goto(lp01Url('call-5'));
+  await pages[1]!.goto(lp01Url('call-6'));
+  // Both pages read the file before either result is there.
+  for (const stateLoads of loads) await expect.poll(stateLoads).toBeGreaterThanOrEqual(1);
+
+  // Like two `open` calls whose results come right after each other.
+  writeState({ request: 'call-5', phase: 'ready', url: APP_URL });
+  writeState({ request: 'call-6', phase: 'ready', url: APP_URL });
+
+  for (const page of pages) await page.waitForURL(APP_URL, { timeout: 5000 });
+  expect(errors).toEqual([[], []]);
+});
+
+test('FIND-311 shows no console error before the first write when open created the file', async ({
+  page,
+}) => {
+  await page.route(`${APP_URL}**`, (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<title>resellr</title>' }),
+  );
+  rmSync(join(pagesDir, LAUNCHER_STATE_FILE_NAME), { force: true });
+  // `open` creates the file through CU-268 before it opens LP-01.
+  ensureLauncherStateFile(pagesDir);
+  const errors = collectErrors(page);
+  const stateLoads = countStateLoads(page);
+
+  await page.goto(lp01Url('call-7'));
+  await expect.poll(stateLoads).toBeGreaterThanOrEqual(3);
+  await expect(page).toHaveTitle('resellr startet');
+  expect(errors).toEqual([]);
+
+  writeState({ request: 'call-7', phase: 'ready', url: APP_URL });
+
+  await page.waitForURL(APP_URL, { timeout: 5000 });
+  expect(errors).toEqual([]);
 });

@@ -1,8 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { readLauncherState } from '@resellr/runtime-shared/runtime-state-files';
+import {
+  LAUNCHER_STATE_FILE_NAME,
+  readLauncherState,
+} from '@resellr/runtime-shared/runtime-state-files';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
@@ -27,42 +30,59 @@ describe('launcher state writer (CU-268)', () => {
   it('writes ready with the local address next to the launcher pages', () => {
     createLauncherStateWriter(programDir).ready(REQUEST, 'http://127.0.0.1:4311/');
 
-    expect(written()).toEqual({
-      request: REQUEST,
-      phase: 'ready',
-      url: 'http://127.0.0.1:4311/',
-      refNo: null,
-      dataDir: null,
-    });
+    expect(written()).toEqual([
+      {
+        request: REQUEST,
+        phase: 'ready',
+        url: 'http://127.0.0.1:4311/',
+        refNo: null,
+        dataDir: null,
+      },
+    ]);
   });
 
   it('writes aborted with the reference number and the address of LP-02 from CU-310', () => {
     createLauncherStateWriter(programDir).aborted(REQUEST, REF_NO);
 
-    expect(written()).toEqual({
-      request: REQUEST,
-      phase: 'aborted',
-      url: launcherPageUrl(programDir, 'lp-02', { ref: REF_NO }),
-      refNo: REF_NO,
-      dataDir: null,
-    });
+    expect(written()).toEqual([
+      {
+        request: REQUEST,
+        phase: 'aborted',
+        url: launcherPageUrl(programDir, 'lp-02', { ref: REF_NO }),
+        refNo: REF_NO,
+        dataDir: null,
+      },
+    ]);
   });
 
   it('leaves out a reference number that does not match the pattern of 2.0.5 (H-11)', () => {
     createLauncherStateWriter(programDir).aborted(REQUEST, '<img src=x>');
 
-    expect(written()).toMatchObject({
-      phase: 'aborted',
-      url: launcherPageUrl(programDir, 'lp-02'),
-      refNo: null,
-    });
+    expect(written()).toMatchObject([
+      { phase: 'aborted', url: launcherPageUrl(programDir, 'lp-02'), refNo: null },
+    ]);
   });
 
-  it('replaces the state of an earlier call', () => {
+  it('F-01 keeps the state of an earlier call that still waits', () => {
     const writer = createLauncherStateWriter(programDir);
     writer.aborted('earlier-request', REF_NO);
     writer.ready(REQUEST, 'http://127.0.0.1:4311/');
 
-    expect(written()).toMatchObject({ request: REQUEST, phase: 'ready' });
+    expect(written()).toMatchObject([
+      { request: 'earlier-request', phase: 'aborted' },
+      { request: REQUEST, phase: 'ready' },
+    ]);
+  });
+
+  it('prepare creates an empty launcher-state.js and keeps existing entries (FIND-311)', () => {
+    const writer = createLauncherStateWriter(programDir);
+    const file = join(launcherPagesDir(programDir), LAUNCHER_STATE_FILE_NAME);
+
+    writer.prepare();
+    expect(readFileSync(file, 'utf8')).toBe('');
+
+    writer.ready(REQUEST, 'http://127.0.0.1:4311/');
+    writer.prepare();
+    expect(written()).toMatchObject([{ request: REQUEST, phase: 'ready' }]);
   });
 });

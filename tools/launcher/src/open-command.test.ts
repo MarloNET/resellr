@@ -59,6 +59,7 @@ function setup({ health = [null], subscribe = [null], supervisor = [], waitMs = 
     newRequestId: () => REQUEST,
     waitingPageUrl: (request: string) => `file:///pages/lp-01.html?request=${request}`,
     launcherState: {
+      prepare: vi.fn<() => void>(),
       ready: vi.fn<(request: string, url: string) => void>(),
       aborted: vi.fn<(request: string, refNo: string | null) => void>(),
     },
@@ -265,6 +266,33 @@ describe('open command (CU-259)', () => {
       await expect(run).resolves.toBe(LauncherExitCode.Success);
     });
 
+    it('creates launcher-state.js before it opens LP-01 (FIND-311)', async () => {
+      const deps = setup({ subscribe: [phase('ready')], waitMs: 3500 });
+
+      const run = runOpenCommand(deps);
+      await vi.advanceTimersByTimeAsync(3500);
+
+      await expect(run).resolves.toBe(LauncherExitCode.Success);
+      expect(deps.launcherState.prepare).toHaveBeenCalledOnce();
+      expect(deps.launcherState.prepare.mock.invocationCallOrder[0]).toBeLessThan(
+        deps.chromeOpener.open.mock.invocationCallOrder[0]!,
+      );
+    });
+
+    it('opens no LP-01 but the result directly when launcher-state.js cannot be created', async () => {
+      const deps = setup({ subscribe: [phase('ready')], waitMs: 3500 });
+      deps.launcherState.prepare.mockImplementation(() => {
+        throw new Error('EACCES');
+      });
+
+      const run = runOpenCommand(deps);
+      await vi.advanceTimersByTimeAsync(3500);
+
+      await expect(run).resolves.toBe(LauncherExitCode.Success);
+      expect(deps.chromeOpener.open).toHaveBeenCalledExactlyOnceWith(APP_URL);
+      expect(deps.launcherState.ready).not.toHaveBeenCalled();
+    });
+
     it('DER-102-04 writes ready with the local address for the open LP-01 instead of opening Chrome again', async () => {
       const deps = setup({ subscribe: [phase('ready', { startId: 's-1' })], waitMs: 3500 });
 
@@ -285,6 +313,7 @@ describe('open command (CU-259)', () => {
 
       await expect(run).resolves.toBe(LauncherExitCode.Success);
       expect(deps.chromeOpener.open).toHaveBeenCalledExactlyOnceWith(APP_URL);
+      expect(deps.launcherState.prepare).not.toHaveBeenCalled();
       expect(deps.launcherState.ready).not.toHaveBeenCalled();
     });
 

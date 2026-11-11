@@ -14,7 +14,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readLauncherState } from '@resellr/runtime-shared/runtime-state-files';
+import {
+  LAUNCHER_STATE_FILE_NAME,
+  readLauncherState,
+} from '@resellr/runtime-shared/runtime-state-files';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -234,13 +237,15 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
         expect(Date.now() - startedAt).toBeGreaterThanOrEqual(3500);
         const request = lp01Request(fakes.chromeCalls());
         expect(request).toMatch(/^[0-9a-f-]{36}$/);
-        expect(launcherState()).toEqual({
-          request,
-          phase: 'aborted',
-          url: startFailedPage(FAKE_REF_NO),
-          refNo: FAKE_REF_NO,
-          dataDir: null,
-        });
+        expect(launcherState()).toEqual([
+          {
+            request,
+            phase: 'aborted',
+            url: startFailedPage(FAKE_REF_NO),
+            refNo: FAKE_REF_NO,
+            dataDir: null,
+          },
+        ]);
       },
       LONG_START_TEST_MS,
     );
@@ -259,7 +264,10 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
           FAKE_SERVER_DELAY_MS: '3500',
         });
 
-        const state = await waitFor(launcherState, LONG_START_TEST_MS - 5000);
+        const [state] = await waitFor(
+          () => (launcherState().length > 0 ? launcherState() : null),
+          LONG_START_TEST_MS - 5000,
+        );
         const request = lp01Request(fakes.chromeCalls());
         expect(state).toEqual({
           request,
@@ -282,7 +290,7 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
       await expect(runOpen(abortingServer())).resolves.toBe(0);
 
       expect(fakes.chromeCalls()).toEqual([startFailedPage(FAKE_REF_NO)]);
-      expect(launcherState()).toBeNull();
+      expect(existsSync(join(launcherPagesDir(programDir), LAUNCHER_STATE_FILE_NAME))).toBe(false);
     });
   });
 });
