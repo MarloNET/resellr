@@ -1,0 +1,35 @@
+import { isReferenceNumber } from '@resellr/runtime-shared/reference-number';
+import { writeLauncherState } from '@resellr/runtime-shared/runtime-state-files';
+
+import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
+
+/**
+ * Launcher state (CU-268, Technical Specification 2.18 "Seitenwechsel"): writes
+ * `launcher-pages/launcher-state.js` next to the pages through CU-009. An open launcher page
+ * reloads it every second and reacts only to the `request` of its own call.
+ */
+export interface LauncherStateWriter {
+  /** `ready`: the page goes on to the local address `url` itself. */
+  ready(request: string, url: string): void;
+  /** `aborted`, also for `gave_up` and `already_running` without a server: the page goes to LP-02. */
+  aborted(request: string, refNo: string | null): void;
+}
+
+export function createLauncherStateWriter(programDir: string): LauncherStateWriter {
+  const pagesDir = launcherPagesDir(programDir);
+  return {
+    ready: (request, url) =>
+      writeLauncherState(pagesDir, { request, phase: 'ready', url, refNo: null, dataDir: null }),
+    aborted: (request, refNo) => {
+      const ref = isReferenceNumber(refNo) ? refNo : null;
+      writeLauncherState(pagesDir, {
+        request,
+        phase: 'aborted',
+        // The address of LP-02 comes from CU-310, like the one `open` opens directly.
+        url: launcherPageUrl(programDir, 'lp-02', { ref }),
+        refNo: ref,
+        dataDir: null,
+      });
+    },
+  };
+}

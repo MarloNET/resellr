@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 
 import { readConfiguredPort } from '@resellr/runtime-shared/configured-port';
@@ -12,6 +13,7 @@ import {
 import { createChromeOpener } from './chrome-opener.ts';
 import { createHealthClient } from './health-client.ts';
 import { launcherPageUrl } from './launcher-pages-location.ts';
+import { createLauncherStateWriter } from './launcher-state-writer.ts';
 import { runOpenCommand } from './open-command.ts';
 import { startServerProcess } from './supervisor/server-process.ts';
 import { runSupervisor } from './supervisor/supervisor.ts';
@@ -22,6 +24,12 @@ import {
   supervisorPipePath,
   type SupervisorPipeServer,
 } from './supervisor/supervisor-pipe.ts';
+
+/**
+ * Test hook: program folder in place of the folder of `process.execPath`, so integration tests
+ * can give the launcher pages and `launcher-state.js` their own folder (#120 test expectation).
+ */
+export const TEST_PROGRAM_DIR_ENV = 'RESELLR_TEST_PROGRAM_DIR';
 
 /** A call of `resellr-launcher` (Technical Specification 2.18, command table). */
 export type LauncherCommand =
@@ -85,7 +93,7 @@ function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
   const { port } = readConfiguredPort(paths.dataDir);
   const operationsLog = createDailyJsonlWriter({ dir: paths.logDir, kind: 'operations' });
   // `resellr-node.exe` lies in the program folder (2.19), like for the server.
-  const programDir = dirname(process.execPath);
+  const programDir = env[TEST_PROGRAM_DIR_ENV] || dirname(process.execPath);
   return runOpenCommand({
     healthClient: createHealthClient({ port }),
     chromeOpener: createChromeOpener({
@@ -99,6 +107,9 @@ function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
       await supervise(pipe, paths, env, onPhase);
       return 'ended';
     },
+    newRequestId: randomUUID,
+    waitingPageUrl: (request) => launcherPageUrl(programDir, 'lp-01', { request }),
+    launcherState: createLauncherStateWriter(programDir),
   });
 }
 

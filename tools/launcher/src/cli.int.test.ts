@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { type ChildProcess, execFile } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -11,8 +11,10 @@ import {
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { readLauncherState } from '@resellr/runtime-shared/runtime-state-files';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -23,6 +25,8 @@ import {
   type FakePrograms,
   waitFor,
 } from '../test/fake-programs.ts';
+import { TEST_PROGRAM_DIR_ENV } from './cli.ts';
+import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
 import { TEST_SERVER_ENTRY_ENV } from './supervisor/server-process.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
@@ -62,6 +66,7 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
   let root: string;
   let dataDir: string;
   let logDir: string;
+  let programDir: string;
   let fakes: FakePrograms;
   let server: TestServer | undefined;
 
@@ -69,6 +74,10 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     root = mkdtempSync(join(tmpdir(), 'resellr-launcher-'));
     dataDir = join(root, 'Daten');
     logDir = join(root, 'Protokolle');
+    // The installation brings the folder of the launcher pages (2.19); a path with a space,
+    // an umlaut and `#` like a user folder.
+    programDir = join(root, 'Programs', 'resellr #1 Jörg');
+    mkdirSync(launcherPagesDir(programDir), { recursive: true });
     mkdirSync(dataDir);
     fakes = createFakePrograms();
   });
@@ -78,6 +87,13 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     server = undefined;
     fakes.remove();
     rmSync(root, { recursive: true, force: true });
+  });
+
+  let launcher: ChildProcess | undefined;
+
+  afterEach(() => {
+    launcher?.kill();
+    launcher = undefined;
   });
 
   /** Runs `resellr-launcher open` as its own process and returns its exit code. */
@@ -90,10 +106,11 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
       RESELLR_LOG_DIR: logDir,
       RESELLR_HANDOVER_DIR: join(root, 'Fotoübergabe'),
       RESELLR_UPDATE_COPY_DIR: join(root, 'Update-Kopien'),
+      [TEST_PROGRAM_DIR_ENV]: programDir,
     };
     return new Promise((resolve) => {
-      const child = execFile(process.execPath, [CLI, 'open'], { env, windowsHide: true });
-      child.on('exit', (code) => resolve(code ?? -1));
+      launcher = execFile(process.execPath, [CLI, 'open'], { env, windowsHide: true });
+      launcher.on('exit', (code) => resolve(code ?? -1));
     });
   }
 
@@ -169,8 +186,9 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     FAKE_SERVER_RUNS: 'aborted',
   });
 
-  const startFailedPage = (refNo: string) =>
-    `${pathToFileURL(join(dirname(process.execPath), 'launcher-pages', 'lp-02.html')).href}?ref=${refNo}`;
+  const startFailedPage = (refNo: string) => launcherPageUrl(programDir, 'lp-02', { ref: refNo });
+
+  const launcherState = () => readLauncherState(launcherPagesDir(programDir));
 
   it('does not create config.json when it is missing', async () => {
     await expect(runOpen(abortingServer())).resolves.toBe(0);
@@ -189,4 +207,91 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     expect(await waitFor(fakes.chromeArgs)).toEqual([startFailedPage(FAKE_REF_NO)]);
     expect(fakes.explorerArgs()).toBeNull();
   });
+
+  describe('LP-01 when waiting takes longer than 3 s (2.18 step 4)', () => {
+    /** Generous limit for a start of 3.5 s on a slow host. */
+    const LONG_START_TEST_MS = 30_000;
+
+    /** The request of the LP-01 the fake Chrome was opened with. */
+    const lp01Request = (calls: string[]): string | null => {
+      expect(calls).toHaveLength(1);
+      const url = new URL(calls[0]!);
+      expect(url.href.split('?')[0]).toBe(launcherPageUrl(programDir, 'lp-01'));
+      return url.searchParams.get('request');
+    };
+
+    it(
+      'opens LP-01 only after 3 s and hands an abort of the own start over through launcher-state.js',
+      async () => {
+        writeConfig(JSON.stringify({ port: await freePort() }));
+        fakes.registerChrome('HKCU', fakes.chromePath);
+
+        const startedAt = Date.now();
+        await expect(runOpen({ ...abortingServer(), FAKE_SERVER_DELAY_MS: '3500' })).resolves.toBe(
+          0,
+        );
+
+        expect(Date.now() - startedAt).toBeGreaterThanOrEqual(3500);
+        const request = lp01Request(fakes.chromeCalls());
+        expect(request).toMatch(/^[0-9a-f-]{36}$/);
+        expect(launcherState()).toEqual({
+          request,
+          phase: 'aborted',
+          url: startFailedPage(FAKE_REF_NO),
+          refNo: FAKE_REF_NO,
+          dataDir: null,
+        });
+      },
+      LONG_START_TEST_MS,
+    );
+
+    it(
+      'DER-102-04 writes ready with the local address for the open LP-01 when the own start is ready after 3 s',
+      async () => {
+        const port = await freePort();
+        writeConfig(JSON.stringify({ port }));
+        fakes.registerChrome('HKCU', fakes.chromePath);
+
+        const exit = runOpen({
+          [TEST_SERVER_ENTRY_ENV]: FAKE_SERVER,
+          FAKE_SERVER_DIR: root,
+          FAKE_SERVER_RUNS: 'ready',
+          FAKE_SERVER_DELAY_MS: '3500',
+        });
+
+        const state = await waitFor(launcherState, LONG_START_TEST_MS - 5000);
+        const request = lp01Request(fakes.chromeCalls());
+        expect(state).toEqual({
+          request,
+          phase: 'ready',
+          url: `http://127.0.0.1:${port}/`,
+          refNo: null,
+          dataDir: null,
+        });
+        // `open` runs on as supervisor; its end is not part of this test.
+        launcher?.kill();
+        await exit;
+      },
+      LONG_START_TEST_MS,
+    );
+
+    it('opens no LP-01 and writes no launcher-state.js when the own start is aborted at once', async () => {
+      writeConfig(JSON.stringify({ port: await freePort() }));
+      fakes.registerChrome('HKCU', fakes.chromePath);
+
+      await expect(runOpen(abortingServer())).resolves.toBe(0);
+
+      expect(fakes.chromeCalls()).toEqual([startFailedPage(FAKE_REF_NO)]);
+      expect(launcherState()).toBeNull();
+    });
+  });
 });
+
+/** A port on 127.0.0.1 that was free a moment ago. */
+async function freePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  await new Promise((resolve) => server.close(resolve));
+  return port;
+}
