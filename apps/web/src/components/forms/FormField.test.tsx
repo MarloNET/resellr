@@ -205,6 +205,26 @@ describe('useDeferredBlurCheck (CU-057, addendum MAR-555)', () => {
     expect(checks).toEqual(['']);
   });
 
+  it('runs the waiting check and releases the pointer when the pointer is cancelled', () => {
+    vi.useFakeTimers();
+    const checks: string[] = [];
+    render(<BlurForm onCheck={(value) => checks.push(value)} />);
+    const name = screen.getByRole('textbox', { name: 'Name' });
+
+    fireEvent.pointerDown(name.closest('form')!);
+    fireEvent.blur(name);
+    expect(checks).toEqual([]);
+
+    fireEvent.pointerCancel(window);
+    expect(checks).toEqual([]);
+    vi.runAllTimers();
+    expect(checks).toEqual(['']);
+
+    fireEvent.change(name, { target: { value: 'HP' } });
+    fireEvent.blur(name);
+    expect(checks).toEqual(['', 'HP']);
+  });
+
   it('runs at most one waiting check and drops it on cancel', () => {
     vi.useFakeTimers();
     const checks: string[] = [];

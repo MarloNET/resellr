@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
-import { idSchema, listResponseSchema, versionSchema } from './common.schema.ts';
+import { idSchema, impactSchema, listResponseSchema, versionSchema } from './common.schema.ts';
 
 // Manufacturer (REQ-100, REQ-101; Technical Specification 2.2, 3.1). The GPSR fields, `gpsr`
 // and `gpsrMissing[]` follow with #165.
@@ -57,13 +57,6 @@ export const manufacturerCreateResultSchema = manufacturerSchema.extend({
   existing: z.boolean(),
 });
 export type ManufacturerCreateResult = z.infer<typeof manufacturerCreateResultSchema>;
-
-/** Counts of REQ-053 (2.8.4); `{0, 0, 0}` while there is no channel content (4.4.0). */
-export const impactSchema = z.object({
-  updated: z.int().nonnegative(),
-  rerelease: z.int().nonnegative(),
-  manualReview: z.int().nonnegative(),
-});
 
 /** Answer of `PATCH /api/manufacturers/{id}`: `{ manufacturer, impact }` (2.2). */
 export const manufacturerUpdateResultSchema = z.object({

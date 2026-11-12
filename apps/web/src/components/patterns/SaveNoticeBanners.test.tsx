@@ -19,7 +19,10 @@ const errorBody = (code: ErrorCode, message = '', referenceNumber: string | null
 const errorText = (referenceNumber: string | null) =>
   `Hersteller konnte nicht angelegt werden. Referenz: ${referenceNumber ?? '–'}`;
 
-function renderBanners(notice: SaveNotice | null, extra: { onClose?: () => void } = {}) {
+function renderBanners(
+  notice: SaveNotice | null,
+  extra: { onClose?: () => void; successText?: string | undefined } = {},
+) {
   const queryClient = new QueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -30,7 +33,7 @@ function renderBanners(notice: SaveNotice | null, extra: { onClose?: () => void 
       notice={notice}
       onClose={extra.onClose ?? (() => {})}
       onReloaded={onReloaded}
-      successText="Gespeichert"
+      successText={'successText' in extra ? extra.successText : 'Gespeichert'}
       errorText={errorText}
     />,
     { wrapper },
@@ -77,6 +80,13 @@ describe('SaveNoticeBanners (CU-314)', () => {
     expect(screen.getByRole('status').textContent).toContain('Gespeichert');
     fireEvent.click(screen.getByRole('button', { name: 'Meldung schließen' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('shows no success banner for a screen without a success text', () => {
+    renderBanners({ kind: 'success' }, { successText: undefined });
+
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('shows the error text of the screen with the reference number', () => {
