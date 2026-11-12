@@ -33,6 +33,8 @@ import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts'
 import { TEST_SERVER_ENTRY_ENV } from './supervisor/server-process.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
+/** Preload that sends the launcher's connections to 4310 to the test server (#329). */
+const PORT_REDIRECT = fileURLToPath(new URL('../test/port-redirect.ts', import.meta.url));
 
 /** A running test server that answers `GET /api/ops/health` and records each request. */
 interface TestServer {
@@ -112,7 +114,10 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
       [TEST_PROGRAM_DIR_ENV]: programDir,
     };
     return new Promise((resolve) => {
-      launcher = execFile(process.execPath, [CLI, 'open'], { env, windowsHide: true });
+      launcher = execFile(process.execPath, ['--import', PORT_REDIRECT, CLI, 'open'], {
+        env,
+        windowsHide: true,
+      });
       launcher.on('exit', (code) => resolve(code ?? -1));
     });
   }
@@ -163,26 +168,27 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     ]);
   });
 
-  it('asks port 4311 from config.json and opens Chrome with http://127.0.0.1:4311/', async () => {
-    server = await startTestServer(4311);
-    writeConfig('{ "port": 4311 }');
+  it('asks the port from config.json and opens Chrome with http://127.0.0.1:<port>/', async () => {
+    server = await startTestServer(0);
+    writeConfig(`{ "port": ${server.port} }`);
     fakes.registerChrome('HKCU', fakes.chromePath);
 
     await expect(runOpen()).resolves.toBe(0);
 
-    expect(server.requests).toEqual(['GET http://127.0.0.1:4311/api/ops/health']);
-    expect(await waitFor(fakes.chromeArgs)).toEqual(['http://127.0.0.1:4311/']);
+    expect(server.requests).toEqual([`GET http://127.0.0.1:${server.port}/api/ops/health`]);
+    expect(await waitFor(fakes.chromeArgs)).toEqual([`http://127.0.0.1:${server.port}/`]);
   });
 
   it.each([
     ['an invalid port', '{ "port": "4311" }'],
     ['a config.json that is no JSON object', '[4311]'],
   ])('uses 4310 for %s, leaves config.json unchanged and writes no warning', async (_, text) => {
-    server = await startTestServer(4310);
+    // The test server listens on a free port; the launcher's connection to 4310 goes there.
+    server = await startTestServer(0);
     writeConfig(text);
     fakes.registerChrome('HKCU', fakes.chromePath);
 
-    await expect(runOpen()).resolves.toBe(0);
+    await expect(runOpen({ PORT_REDIRECT: `4310:${server.port}` })).resolves.toBe(0);
 
     expect(server.requests).toEqual(['GET http://127.0.0.1:4310/api/ops/health']);
     expect(await waitFor(fakes.chromeArgs)).toEqual(['http://127.0.0.1:4310/']);
@@ -202,7 +208,10 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
   const launcherState = () => readLauncherState(launcherPagesDir(programDir));
 
   it('does not create config.json when it is missing', async () => {
-    await expect(runOpen(abortingServer())).resolves.toBe(0);
+    // Without config.json the launcher asks 4310; that connection goes to a free, closed port.
+    await expect(
+      runOpen({ ...abortingServer(), PORT_REDIRECT: `4310:${await freePort()}` }),
+    ).resolves.toBe(0);
 
     expect(existsSync(join(dataDir, 'config.json'))).toBe(false);
   });
