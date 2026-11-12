@@ -11,12 +11,12 @@
 | Prüfmarkierungen | Chip „zu prüfen“ je Feld | REQ-013 | |
 
 ## Eingaben und Validierung
-Gerätewerte wie UI-003 (Regeln REQ-014). Ändert der Nutzer eine Variantenangabe eines zugeordneten Geräts und weicht sie ab: UI-005 mit Wahl „Zuordnung behalten“, „Neues Modell-Inserat anlegen“, „Umbuchen“.
+Gerätewerte wie UI-003 (Regeln REQ-014). **v0.6.4 (REQ-005, AC-REQ-005-12 b):** Fehlt dem Gerät der Wert eines (wieder aktivierten) Pflichtmerkmals, wird „Gerätewerte speichern“ abgelehnt, auch wenn nur ein anderes Feld geändert wurde (z. B. Optik-Note bei Gerät „626198“): Feldfehler „<Merkmal> fehlt“ (M-32, z. B. „RAM fehlt“) am Feld des Merkmals, Fokus dorthin, nichts gespeichert; nach Eintragen des Werts wird gespeichert. Das Merkmal erscheint als leeres Pflichtfeld („*“), weil es nach dem Aktivieren wieder abgefragt wird. Andere Vorgänge in UI-010 (Verkauf, Umbuchen, Zuordnen, WI-Nr korrigieren, Storno, Datenblatt) verlangen den Wert nicht und zeigen M-32 nicht (A-39). Ändert der Nutzer eine Variantenangabe eines zugeordneten Geräts und weicht sie ab: UI-005 mit Wahl „Zuordnung behalten“, „Neues Modell-Inserat anlegen“, „Umbuchen“.
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Gerätewerte speichern | Primärbutton | gültig | Banner „Gerät gespeichert“ | Feldfehler | bleibt |
+| Gerätewerte speichern | Primärbutton | gültig | Banner „Gerät gespeichert“ | Feldfehler (auch „<Merkmal> fehlt“, M-32) | bleibt |
 | Als verkauft markieren | Button | verfügbar, zugeordnet | UI-011 | „Gerät keinem Modell-Inserat zugeordnet“ (Button deaktiviert, Tooltip) | UI-011 |
 | Verkauf zurücknehmen | Button | Status verkauft | Bestätigungsdialog (P-04): „Verkaufsmarkierung zurücknehmen? Stückzahl steigt um 1.“ → Status verfügbar, Protokoll | „Gerät ist nicht als verkauft markiert“ | bleibt |
 | Umbuchen (Should) | Button | verfügbar, zugeordnet | UI-004 im Modus „umbuchen“ | – | UI-004 |

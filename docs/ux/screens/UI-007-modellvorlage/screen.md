@@ -18,13 +18,13 @@ Formular nach Geräteart: Felder aus Merkmalsdefinitionen; Bereich „Vorbelegun
 | Typbezeichnung | Text | nein | max. 50 | „Typbezeichnung: höchstens 50 Zeichen“ |
 | Herstellernummer | Text oder Kontrollkästchen „unbekannt“ | ja | 1–40 Zeichen, Buchstaben, Ziffern, „-“, „/“, „.“ | „Herstellernummer: Wert eingeben oder ‚unbekannt‘ wählen“ (leer; **v0.6.3, DG-17:** Wortlaut wie AC-REQ-008-02). **v0.6.2, O-4 (M-25, M-26; Wortlaut vom Designer, Owner bestätigt mit der Freigabe):** länger als 40 Zeichen: „Herstellernummer: höchstens 40 Zeichen“; unzulässiges Zeichen: „Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt“. Beide am Feld; sind Länge und Zeichen zugleich verletzt, erscheint nur die Längenmeldung (eine Meldung je Feld, wie in den übrigen Feldern); erst nach Kürzen folgt gegebenenfalls die Zeichenmeldung |
 | Original-EAN | Text | nein | 8 oder 13 Ziffern, gültige Prüfziffer | „EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer“ |
-| Merkmale Ebene Modell | je Datentyp | je Definition | Typ/Wertebereich | „<Merkmal>: <Regel>“ |
+| Merkmale Ebene Modell | je Datentyp | je Definition | Typ/Wertebereich | „<Merkmal>: <Regel>“; **fehlt der Wert eines Pflichtmerkmals (v0.6.4, REQ-005, AC-REQ-005-12 a, M-32): „<Merkmal> fehlt“** (z. B. „Prozessor fehlt“) am Feld, wie die übrigen Pflichtangaben (z. B. „Hersteller fehlt“); das Feld ist mit „*“ als Pflicht gekennzeichnet und wird mit Fehler markiert. Gilt auch, wenn die Änderung ein anderes Feld betrifft: das Pflichtmerkmal kann nach dem Wieder-Aktivieren (UI-027, AC-REQ-005-12) wieder als leeres Feld erscheinen; Fokus auf das erste markierte Feld, nichts gespeichert (M-32). Beispiel: Modellvorlage „ThinkPad T14“ ohne Prozessor, Prozessor wieder aktiviert, der Nutzer ändert nur die Typbezeichnung: Speichern wird abgelehnt mit „Prozessor fehlt“ am Feld Prozessor; nach Eintragen wird gespeichert |
 | Vorbelegungswerte Ebene Gerät | je Datentyp | nein | | wie oben |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
-| Modellvorlage speichern | Primärbutton, Strg+S | gültig | Banner „Modellvorlage gespeichert“ | Feldfehler, fehlende Felder benannt | Aufrufseite (UI-003 oder UI-006) |
+| Modellvorlage speichern | Primärbutton, Strg+S | gültig | Banner „Modellvorlage gespeichert“ | Feldfehler, fehlende Felder benannt (auch ein wieder aktiviertes Pflichtmerkmal ohne Wert, M-32) | Aufrufseite (UI-003 oder UI-006) |
 | Hinweis „mögliche Dublette“ | beim Speichern bei gleichem Hersteller + Modellbezeichnung | – | Dialog `UI-007.dublette` (Wortlaut siehe „Dialoge“) mit Treffern: „Vorhandene verwenden“ / „Trotzdem anlegen“ (REQ-011) | – | |
 | Warnung gleiche Herstellernummer (**Could, REQ-058, nur wenn REQ-058 in den Umfang kommt**) | beim Speichern (Anlegen und Ändern), nur bei nicht „unbekannt“ | – | Dialog `UI-007.mpn-warnung` (Wortlaut siehe „Dialoge“); „Trotzdem speichern“ speichert (AC-REQ-058-01) | – | |
 | Löschen | Textbutton | | UI-041 | | UI-041 |

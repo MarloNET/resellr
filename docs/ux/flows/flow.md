@@ -21,6 +21,7 @@ Fehlerpfad: irrtümlich verkauft → [UI-010] (Verkauf zurücknehmen).
 
 ## FLOW-05 Neue Geräteart anlegen (J-05)
 [UI-027] (Geräteart, Merkmale) → [UI-029] (Titelmuster) → [UI-035] (Kategorien) → [UI-036] (Merkmalszuordnung) → [UI-037] (Beschreibungsvorlage, falls abweichend) → [UI-039] (Datenblatt-Layout) → ab sofort FLOW-01.
+Hinweis (v0.6.4, REQ-005): Ein deaktiviertes Merkmal kann in [UI-027] über die Zeilenaktion „Wieder aktivieren“ ohne Rückfrage und ohne Ablehnung wieder aktiviert werden (Banner „Merkmal aktiviert“); fehlt danach einem Datensatz der Pflichtwert, verlangt ihn erst das Speichern in [UI-007], [UI-010]/[UI-003] oder [UI-014] (Inseratswerte) mit „<Merkmal> fehlt“ (M-32).
 
 ## FLOW-06 Veröffentlichtes Modell-Inserat ändern (J-06)
 [UI-014] (Inseratswerte bearbeiten) oder [UI-007] oder Preis → Kanal-Inhalt „Veröffentlicht“ erhält „geändert seit Freigabe“ → [UI-018] (alt/neu) (Änderungsentwurf freigeben) → „Änderung auf Kanal übertragen“ → [UI-019] (neuen Stand kopieren) → [UI-021].
