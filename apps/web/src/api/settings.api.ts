@@ -6,6 +6,12 @@ import type {
   AttributeUpdateInput,
 } from '@resellr/domain/schemas/attribute.schema';
 import type {
+  ConditionCodeCreate,
+  ConditionCodeEntry,
+  ConditionCodeList,
+  ConditionCodeUpdate,
+} from '@resellr/domain/schemas/condition-code.schema';
+import type {
   DeviceType,
   DeviceTypeCreate,
   DeviceTypeList,
@@ -47,7 +53,7 @@ import { queryKeys } from './query-keys.ts';
 
 /**
  * Largest page of a list (2.0.1); UI-027 shows all device types, UI-028 all lists and all values
- * of a list at once.
+ * of a list at once, UI-033 all entries of the condition code table.
  */
 const ALL = 'limit=200';
 
@@ -255,6 +261,55 @@ export function useReorderAttributesMutation() {
         return { ...list, items };
       });
       void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/** Entries of the condition code table of UI-033 (`GET /api/condition-codes`). */
+export function useConditionCodesQuery() {
+  return useQuery<ConditionCodeList, ApiError>({
+    queryKey: queryKeys.settings.conditionCodes(),
+    queryFn: ({ signal }) =>
+      apiClient.get<ConditionCodeList>(`/api/condition-codes?${ALL}`, { signal }),
+  });
+}
+
+/** "Speichern" for a new entry (`POST /api/condition-codes`). */
+export function useCreateConditionCodeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ConditionCodeEntry, ApiError, ConditionCodeCreate>({
+    mutationFn: (body) => apiClient.post<ConditionCodeEntry>('/api/condition-codes', body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.conditionCodes(), saved),
+  });
+}
+
+/** "Speichern" for an existing entry (`PATCH /api/condition-codes/{id}`). */
+export function useUpdateConditionCodeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ConditionCodeEntry, ApiError, ConditionCodeUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) =>
+      apiClient.patch<ConditionCodeEntry>(`/api/condition-codes/${id}`, body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.conditionCodes(), saved),
+  });
+}
+
+/**
+ * Deletes an entry after the confirmation P-04 (`DELETE /api/condition-codes/{id}?version=`).
+ * The body is `{}`, because every write is sent as JSON (2.0.2 G-4).
+ */
+export function useDeleteConditionCodeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<void, ApiError, { id: number; version: number }>({
+    mutationFn: ({ id, version }) =>
+      apiClient.delete<void>(`/api/condition-codes/${id}?version=${version}`, {}),
+    onSuccess: (_result, { id }) => {
+      const queryKey = queryKeys.settings.conditionCodes();
+      queryClient.setQueryData<ConditionCodeList>(queryKey, (list) =>
+        list === undefined
+          ? list
+          : { items: list.items.filter((item) => item.id !== id), total: list.total - 1 },
+      );
+      void queryClient.invalidateQueries({ queryKey });
     },
   });
 }

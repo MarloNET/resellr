@@ -5,6 +5,7 @@ import {
   LastSettingsSectionRedirect,
   SettingsLayout,
 } from '../features/settings/SettingsLayout.tsx';
+import { ConditionCodesPage } from '../features/settings/condition-codes/ConditionCodesPage.tsx';
 import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
 import { ManufacturersPage } from '../features/settings/manufacturers/ManufacturersPage.tsx';
 import { MerchantProfilePage } from '../features/settings/merchant/MerchantProfilePage.tsx';
@@ -60,7 +61,7 @@ export const routes: RouteObject[] = [
           { path: 'textbausteine', element: null },
           { path: 'hersteller', element: <ManufacturersPage /> },
           { path: 'lieferanten', element: <SuppliersPage /> },
-          { path: 'code-uebersetzung', element: null },
+          { path: 'code-uebersetzung', element: <ConditionCodesPage /> },
           { path: 'zustandszuordnung', element: null },
           { path: 'kategoriezuordnung', element: null },
           { path: 'merkmalszuordnung', element: null },
