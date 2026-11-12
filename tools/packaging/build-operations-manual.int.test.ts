@@ -31,7 +31,7 @@ describe('buildOperationsManual (CU-316)', { timeout: 60_000 }, () => {
     expect(existsSync(`${target}.partial`)).toBe(false);
   });
 
-  it('exits with code 1 and writes no PDF when the manual is missing', async () => {
+  it('rejects and writes no PDF when the manual is missing', async () => {
     const programDir = join(root, 'missing');
 
     await expect(
@@ -40,11 +40,12 @@ describe('buildOperationsManual (CU-316)', { timeout: 60_000 }, () => {
     expect(existsSync(join(programDir, PDF_NAME))).toBe(false);
   });
 
-  it('exits with code 1 and a message on stderr when the build fails', () => {
-    // A file in place of the program folder cannot hold the PDF.
+  it('exits with code 1 and a message on stderr when the program folder cannot be created', () => {
+    // The script file itself is passed as the program folder, so mkdir fails with EEXIST.
     const result = spawnSync(process.execPath, [SCRIPT, SCRIPT], { encoding: 'utf8' });
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('Operations manual PDF failed');
+    expect(result.stderr).toContain('EEXIST');
   });
 });

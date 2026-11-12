@@ -67,7 +67,7 @@ Alle Daten liegen nur auf diesem PC. Gegen Diebstahl des PCs schützt die Laufwe
 
 Entfernen Sie resellr über die Liste der installierten Apps in Windows (Eintrag „resellr“). Die Deinstallation beendet ein laufendes resellr zuerst geordnet. Gelingt das nicht, bricht sie ohne Änderung ab mit der Meldung „resellr konnte nicht beendet werden. Bitte später erneut versuchen.“
 
-Die Deinstallation entfernt Programmordner, Autostart-Eintrag und Verknüpfungen. **Datenordner, Protokolle und Kopien vor Updates bleiben erhalten.** Löschen Sie sie bei Bedarf selbst unter `%LOCALAPPDATA%\resellr`, nachdem Sie eine Sicherung angelegt haben.
+Die Deinstallation entfernt Programmordner, Autostart-Eintrag und Verknüpfungen. **Datenordner, Protokolle und Kopien vor Updates bleiben erhalten.**
 
 *Quellen: TS 2.19 (Installationspaket, Build des Pakets), TS 2.18 („Chrome finden“), TS 5 (TH-05 BitLocker-Empfehlung im Betriebshandbuch), TS 6.4, Baseline 8.3 (TH-05), Baseline 10.2 (Unsigniertes Paket, Erster Start), Baseline 10.6, ADR-008, OD-09 Aus.*
 
@@ -111,6 +111,8 @@ Beenden Sie resellr immer geordnet, bevor Sie den Datenordner kopieren oder `con
 
 Gelingt das Beenden nicht, zeigt resellr eine Meldung mit Referenznummer und läuft weiter. Versuchen Sie es erneut; besteht der Fehler weiter, Abschnitt 8.
 
+Antwortet resellr nach 30 Sekunden nicht mehr, zeigt es „Ausgang unbekannt“ ohne Speicherort. **Kopieren Sie den Datenordner dann noch nicht.** Öffnen Sie die Verknüpfung „resellr“ und beenden Sie resellr danach erneut. Läuft resellr noch, öffnet die Verknüpfung die normale Oberfläche.
+
 ### Über das Startmenü
 
 Öffnen Sie im Startmenü die Verknüpfung „resellr beenden“. Es gibt keine Rückfrage. Eine Seite zeigt das Ergebnis:
@@ -127,7 +129,7 @@ Nach dem Beenden startet resellr erst wieder über die Verknüpfung „resellr�
 
 Abmelden und Herunterfahren beenden resellr ohne geordnetes Beenden. Das schadet den Daten nicht: Die Datenbank stellt beim nächsten Start einen konsistenten Stand her. Für eine Sicherung reicht das aber nicht, weil die Ende-Markierung fehlt. Beenden Sie resellr vor einer Sicherung deshalb immer wie oben beschrieben.
 
-*Quellen: TS 2.17 (Hinweis UI-044, Rückfrage und Beenden, Geordnetes Beenden im Server, Startmenü „resellr beenden“), TS 2.18 (Befehl `stop`, LP-03), TS 2.19 (`config.json`), Baseline 9.6 (Geordnetes Beenden, Art des letzten Endes), Baseline 10.4, REQ-105.*
+*Quellen: TS 2.17 (Hinweis UI-044, Rückfrage und Beenden mit UI-045 und UI-046 `success`/`unknown`, Zeitgrenze 30 s, Geordnetes Beenden im Server, Startmenü „resellr beenden“), TS 2.18 (Befehl `stop`, LP-03), TS 2.19 (`config.json`), Baseline 9.6 (Geordnetes Beenden, Art des letzten Endes), Baseline 10.4, REQ-105.*
 
 ## 5. Handsicherung
 
@@ -158,7 +160,13 @@ resellr hat keine eigene Wiederherstellungsfunktion. Sie stellen den Stand aus I
 3. Den **Inhalt des Datenordners** `%LOCALAPPDATA%\resellr\Daten` **vollständig durch den Inhalt Ihrer Kopie ersetzen**.
 4. **resellr starten** über die Verknüpfung „resellr“.
 
-Beim ersten Start nach dem Ersetzen erkennt resellr den neuen Datenordner und prüft ihn vollständig. Das kann je nach Fotobestand Minuten bis Stunden dauern; währenddessen sehen Sie die Seite „resellr startet“.
+Die ganze Wiederherstellung einschließlich des Kopierens kann je nach Fotobestand Minuten bis Stunden dauern.
+
+Beim ersten Start nach dem Ersetzen erkennt resellr den neuen Datenordner und prüft ihn vollständig. Der Start läuft wie in Abschnitt 3 beschrieben:
+
+- Zuerst sehen Sie die Seite „resellr startet“. resellr öffnet sich von selbst, sobald die Prüfung fertig ist.
+- Nach 2 Minuten ohne Ergebnis wechselt die Seite zu „resellr startet länger als erwartet“ mit Referenznummer. Gehen Sie vor wie in Abschnitt 3 beschrieben.
+- Ist der Start nach 10 Minuten noch nicht fertig, bricht resellr ihn ab und zeigt „resellr konnte nicht gestartet werden“ mit Referenznummer. Melden Sie die Referenznummer dann (Abschnitt 8).
 
 | Lage | Folge |
 | --- | --- |
@@ -170,7 +178,7 @@ Beim ersten Start nach dem Ersetzen erkennt resellr den neuen Datenordner und pr
 
 Bei diesem ersten Start löscht resellr keine Dateien, auf die die Datenbank nicht verweist.
 
-*Quellen: Baseline 10.3, 10.4 (Wiederherstellung), Baseline 9.6 (Startprüfung, Tabelle „Was die Startprüfung erkennt und was nicht“), TS 2.19 (Startprüfung Schritte 1 bis 4, Housekeeping), REQ-106.*
+*Quellen: Baseline 10.3, 10.4 (Wiederherstellung, Dauer), TS 2.18 (Ablauf `open` Schritte 4 und 5, Startgrenze K-07, LP-02), Baseline 9.6 (Startprüfung, Tabelle „Was die Startprüfung erkennt und was nicht“), TS 2.19 (Startprüfung Schritte 1 bis 4, Housekeeping), REQ-106.*
 
 ## 7. Update
 
