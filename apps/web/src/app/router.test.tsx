@@ -235,7 +235,8 @@ describe('router and application frame', () => {
   });
 
   it('DER-95-01 shows no backup notice on a route outside the frame like /beendet (UI-046)', () => {
-    // UI-046 (#143) is not built yet; its route will sit outside AppFrame like this one.
+    // A stand-in outside AppFrame like UI-046; UI-046 itself needs a shutdown in this window
+    // and is tested with it in `TerminatedPage.test.tsx`.
     renderAt('/beendet', [
       { path: '/beendet', element: <p>{FIXED_TEXTS.shutdownDone}</p> },
       ...routes,

@@ -24,7 +24,7 @@ export interface ShutdownDialogProps {
  * disabled and Esc does nothing (`UI-045.loading`). An error answer closes the dialog and
  * leaves its outcome in CU-311 for the banner of the frame (CU-312, Nachtrag MAR-421):
  * `503 shutting_down` → P-07, any other (`500`) → `UI-045.error`; resellr keeps running. The
- * waiting state stays after `200` and without an answer: UI-046 replaces the dialog (#143).
+ * waiting state stays after `200` and without an answer: UI-046 replaces the frame (CU-257).
  * While all writes of the page are locked until reload (P-08, CU-049), the action is disabled.
  */
 export function ShutdownDialog({ open, onOpenChange, returnFocusRef }: ShutdownDialogProps) {
@@ -35,7 +35,7 @@ export function ShutdownDialog({ open, onOpenChange, returnFocusRef }: ShutdownD
     shutdownOutcomeStore.clear();
     shutdown.mutate(undefined, {
       onError: (error) => {
-        // Without an answer the outcome is unknown; that is the end state of #143.
+        // Without an answer the outcome is unknown: UI-046.unknown follows (CU-257).
         if (error.status === null) return;
         shutdownOutcomeStore.set(
           error.kind === 'shutting-down' ? { kind: 'shutting-down' } : { kind: 'error', error },
