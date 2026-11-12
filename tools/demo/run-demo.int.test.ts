@@ -2,6 +2,7 @@ import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { createServer, type Socket } from 'node:net';
 import { join } from 'node:path';
 
+import { INITIAL_DEVICE_TYPES } from '@resellr/seed-data/initial-settings';
 import { DEMO_DEVICE_TYPES, DEMO_SUPPLIERS, type SeedArea } from '@resellr/test-data/demo-seed';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -62,7 +63,7 @@ describe('startDemo (CU-004)', () => {
     demo = undefined;
   });
 
-  it('E2 starts on 127.0.0.1:<PORT> with a fresh data folder, the full schema of migration 0001 and no initial settings', async () => {
+  it('E2 starts on 127.0.0.1:<PORT> with a fresh data folder, the full schema, the initial settings and the demo data', async () => {
     const port = await freePort();
     demo = await startDemo({ port });
 
@@ -81,17 +82,35 @@ describe('startDemo (CU-004)', () => {
       expect(tables).toEqual(SCHEMA_TABLES);
 
       const migrations = db.prepare('SELECT name FROM app_migration').pluck().all();
-      expect(migrations).toEqual(['20261110_0001_initial_schema']);
+      expect(migrations).toEqual([
+        '20261110_0001_initial_schema',
+        '20261110_0002_seed_initial_settings',
+      ]);
 
       const filled = SCHEMA_TABLES.filter((table) => !STARTUP_TABLES.has(table)).filter(
         (table) => db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get() !== 0,
       );
-      // Only the demo data written through the API (CU-061): the device types and suppliers of
-      // S2 with their audit entries; the initial settings follow with the seed migration CU-071.
-      expect(filled).toEqual(['audit_entry', 'device_type', 'supplier']);
-      expect(db.prepare('SELECT name, active FROM device_type ORDER BY id').all()).toEqual(
-        DEMO_DEVICE_TYPES.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
-      );
+      // The initial settings of the seed migration CU-071 and the demo data written through the
+      // API on top of them (CU-061): the device types and suppliers of S2 with their audit
+      // entries.
+      expect(filled).toEqual([
+        'attribute',
+        'attribute_mapping',
+        'audit_entry',
+        'channel',
+        'datasheet_layout',
+        'description_template',
+        'device_type',
+        'merchant_profile',
+        'pick_list',
+        'pick_list_value',
+        'supplier',
+        'title_pattern',
+      ]);
+      expect(db.prepare('SELECT name, active FROM device_type ORDER BY sort_order').all()).toEqual([
+        ...INITIAL_DEVICE_TYPES.map((name) => ({ name, active: 1 })),
+        ...DEMO_DEVICE_TYPES.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
+      ]);
       expect(db.prepare('SELECT name, active FROM supplier ORDER BY id').all()).toEqual(
         DEMO_SUPPLIERS.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
       );

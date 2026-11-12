@@ -57,7 +57,8 @@ const POLICIES = [
   },
   {
     from: { element: { type: 'server-db' } },
-    allow: to('server-shared', ...DOMAIN, 'runtime-shared'),
+    // The seed migration CU-071 reads the initial settings of CU-070 (3.8).
+    allow: to('server-shared', ...DOMAIN, 'runtime-shared', 'seed-data'),
   },
   { from: { element: { type: 'server-shared' } }, allow: to(...DOMAIN, 'runtime-shared') },
   {
