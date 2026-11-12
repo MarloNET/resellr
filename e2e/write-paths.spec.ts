@@ -209,15 +209,25 @@ function recordingDemoApi(baseUrl: string, writes: SeedWrite[]): DemoApi {
 }
 
 /**
+ * Collections whose plain `GET` leaves out seeded entries, with the read that shows all of them:
+ * a list with `includeInactive` returns its deactivated entries only on request (2.2).
+ */
+const READ_PATHS: Record<string, string> = {
+  '/api/suppliers': '/api/suppliers?includeInactive=true',
+};
+
+/**
  * What the user sees of the seeded data: the answer of `GET` on every collection the demo data
  * created entries in. A seed area that creates entries in a collection without `GET` fails here
- * and has to name how its data is read.
+ * and has to name how its data is read (`READ_PATHS`).
  */
 async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<unknown> {
   const api = createDemoApi(baseUrl);
   const collections = [...new Set(writes.filter((w) => w.method === 'POST').map((w) => w.path))];
   const state: Record<string, unknown> = {};
-  for (const path of collections.sort()) state[path] = await api.request('GET', path);
+  for (const path of collections.sort()) {
+    state[path] = await api.request('GET', READ_PATHS[path] ?? path);
+  }
   return state;
 }
 
