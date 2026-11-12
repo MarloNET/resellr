@@ -242,7 +242,7 @@ export function ManufacturersPage() {
         renderItem={(item) => (
           <span className="flex flex-wrap items-center justify-between gap-2">
             <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{item.name}</span>
-            <span className="flex shrink-0 gap-1">
+            <span className="flex min-w-0 flex-wrap gap-1">
               <Badge variant={item.active ? 'published' : 'draft'}>
                 {item.active ? TEXTS.active : TEXTS.inactive}
               </Badge>
