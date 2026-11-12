@@ -207,6 +207,39 @@ describe('daily summary (CU-269, Technical Specification 2.18 "Verfügbarkeitsau
     ]);
   });
 
+  it('start_aborted at 9:00 without a later ready: not available until 18:00 (Nachtrag MAR-498)', () => {
+    // The entries the supervisor writes for an aborted start (CU-296), 8:00 and 9:00 in Berlin.
+    const { marks, boots } = marksFromLogEntries({
+      availability: [],
+      operations: [
+        {
+          ts: '2026-11-10T08:00:00.000Z',
+          event: 'supervisor_started',
+          bootTime: '2026-11-10T07:50:00.000Z',
+        },
+        { ts: '2026-11-10T08:00:00.000Z', event: 'start_aborted', refNo: 'R-7K2M-9QX4' },
+        { ts: '2026-11-10T08:00:00.000Z', event: 'supervisor_ended' },
+      ],
+    });
+
+    expect(summarizeDays({ days: [TUESDAY], marks, boots, end: END })).toEqual([
+      day(TUESDAY, { pcOffMs: 1 * HOUR, unavailableMs: 9 * HOUR }),
+    ]);
+  });
+
+  it('a failed check without a later mark: not available for 6 minutes, then a gap', () => {
+    const [summary] = summarizeDays({
+      days: [TUESDAY],
+      marks: [{ at: t('2026-11-10T09:00'), kind: 'probe', ok: false }],
+      boots: [],
+      end: END,
+    });
+
+    expect(summary).toEqual(
+      day(TUESDAY, { unavailableMs: 6 * MINUTE, unmeasuredMs: BUSINESS_DAY_MS - 6 * MINUTE }),
+    );
+  });
+
   it('counts the time after the end of the timeline as nothing', () => {
     const marks = probes('2026-11-10T07:55', '2026-11-10T11:55');
 

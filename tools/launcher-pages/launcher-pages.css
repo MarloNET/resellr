@@ -27,6 +27,8 @@
   --resellr-border: #d1d5db;
   --resellr-text: #1f2937;
   --resellr-primary: #1d4ed8;
+  --resellr-error: #b42318;
+  --resellr-error-bg: #fee4e2;
   --resellr-grid: 8px;
 }
 
@@ -67,6 +69,26 @@ h1 {
 
 p {
   margin: 0;
+}
+
+/* Title strip in the error style across the top of the card (LP-02 "Start abgebrochen"). */
+.card__title {
+  margin: calc(-3 * var(--resellr-grid)) calc(-3 * var(--resellr-grid))
+    calc(2 * var(--resellr-grid));
+  padding: calc(2 * var(--resellr-grid)) calc(3 * var(--resellr-grid));
+  border-radius: 5px 5px 0 0;
+}
+
+.card__title--error {
+  color: var(--resellr-error);
+  background: var(--resellr-error-bg);
+}
+
+/* The reference number on a line of its own; plain text, so the user can select and copy it. */
+.reference-number {
+  margin-top: var(--resellr-grid);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .progress {

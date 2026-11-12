@@ -9,7 +9,7 @@ import {
   type RuntimeEnv,
   type RuntimePaths,
 } from '@resellr/runtime-shared/paths';
-import { updateRuntimeState } from '@resellr/runtime-shared/runtime-state-files';
+import { updateRuntimeState, writeStartResult } from '@resellr/runtime-shared/runtime-state-files';
 
 import { summarizeMissingDays } from './availability/availability-aggregator.ts';
 import { writeAvailabilityReport } from './availability/availability-report.ts';
@@ -138,7 +138,11 @@ async function runSupervise(env: RuntimeEnv): Promise<LauncherExitCode> {
   return LauncherExitCode.Success;
 }
 
-function supervise({
+/**
+ * Runs as supervisor (CU-261) between `supervisor_started` and `supervisor_ended` (CU-296).
+ * Every reference number it reports is logged first (2.18, Nachtrag MAR-382, MAR-498).
+ */
+async function supervise({
   pipe,
   paths,
   env,
@@ -156,18 +160,42 @@ function supervise({
   const healthClient = createHealthClient({ port });
   // Windows start of this boot, for "PC aus" in the daily summary (2.18).
   const bootTime = Date.now() - uptime() * 1000;
-  return runSupervisor({
-    pipe,
-    onPhase,
-    startServer: ({ startId, onReady }) => startServerProcess({ paths, startId, env, onReady }),
-    onCrash: ({ startId, refNo, at, exitCode, signal }) => {
-      launcherLog.crash({ startId, refNo, exitCode, signal });
-      updateRuntimeState(paths.logDir, { lastCrashAt: at.toISOString() });
-    },
-    startHealthProbe: (onProbe) =>
-      startHealthProbe({ healthClient, logDir: paths.logDir, onProbe }),
-    summarizeAvailability: () => summarizeMissingDays({ logDir: paths.logDir, bootTime }),
-  });
+  // A full disk must not keep the supervisor from starting the server.
+  tryToLog(() => launcherLog.supervisorStarted({ bootTime: new Date(bootTime) }));
+  let lastStartId: string | null = null;
+  try {
+    await runSupervisor({
+      pipe,
+      onPhase: (event) => {
+        lastStartId = event.startId ?? lastStartId;
+        onPhase?.(event);
+      },
+      startServer: ({ startId, onReady }) => startServerProcess({ paths, startId, env, onReady }),
+      onCrash: ({ startId, refNo, at, exitCode, signal }) => {
+        launcherLog.crash({ startId, refNo, exitCode, signal });
+        updateRuntimeState(paths.logDir, { lastCrashAt: at.toISOString() });
+      },
+      onStartAborted: (entry) => launcherLog.startAborted(entry),
+      onGaveUp: ({ startId, refNo, at }) => {
+        launcherLog.gaveUp({ startId, refNo });
+        writeStartResult(paths.logDir, { startId, state: 'gave_up', refNo, at: at.toISOString() });
+      },
+      onAlreadyRunning: (entry) => launcherLog.alreadyRunning(entry),
+      startHealthProbe: (onProbe) =>
+        startHealthProbe({ healthClient, logDir: paths.logDir, onProbe }),
+      summarizeAvailability: () => summarizeMissingDays({ logDir: paths.logDir, bootTime }),
+    });
+  } finally {
+    tryToLog(() => launcherLog.supervisorEnded({ startId: lastStartId }));
+  }
+}
+
+function tryToLog(write: () => void): void {
+  try {
+    write();
+  } catch {
+    // ignored: the log is no reason to end the supervisor
+  }
 }
 
 /** The pipe of this user's supervisor, from `%LOCALAPPDATA%` (H-14). */
