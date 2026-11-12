@@ -35,6 +35,15 @@ export const MESSAGES = {
  * the schemas of `packages/domain` set them, so browser and server show the same text (2.0.5).
  */
 export const FIELD_MESSAGES = {
+  /** UI-027 "Auswahlliste", missing at data type "Auswahl aus Liste" (2.1, DER-34-04). */
+  attributePickListMissing: 'Auswahlliste fehlt',
+  /** UI-027 "Mindest-/Höchstwert", minimum above maximum (2.1, DER-34-03). */
+  attributeMinAboveMax: 'Mindestwert darf nicht größer als Höchstwert sein',
+  /**
+   * UI-027 "Einheit", longer than 20 characters (3.1). Text defined by Technical Specification
+   * 8.2 (addendum MAR-493).
+   */
+  attributeUnit: 'Einheit: höchstens 20 Zeichen',
   /** UI-028 "Akku vorhanden", missing in the list battery (REQ-007, DER-35-10). */
   batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
@@ -54,6 +63,7 @@ type MessageText = string | ((...args: string[]) => string);
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.device_type': 'Name ist bereits vergeben',
   'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
   'not_found.default': MESSAGES['M-15'],

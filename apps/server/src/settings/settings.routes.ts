@@ -1,3 +1,10 @@
+import {
+  attributeCreateSchema,
+  attributeListSchema,
+  attributeOrderSchema,
+  attributeSchema,
+  attributeUpdateSchema,
+} from '@resellr/domain/schemas/attribute.schema';
 import { idSchema } from '@resellr/domain/schemas/common.schema';
 import {
   deviceTypeCreateSchema,
@@ -41,7 +48,7 @@ const pageQuery = z.strictObject({
 /**
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
  * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, … Each route calls one service.
- * There is no DELETE route for device types (REQ-004, DER-33-09). There is no route to create or
+ * There is no DELETE route for device types or attributes (REQ-004, REQ-005, DER-33-09). There is no route to create or
  * delete a pick list and none to delete a value (RQ-07,
  * DER-35-09).
  */
@@ -74,6 +81,49 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       },
     },
     async (request) => deviceTypes.update(request.params.id, request.body),
+  );
+
+  app.get(
+    '/api/device-types/:id/attributes',
+    { schema: { params: idParams, response: { 200: attributeListSchema } } },
+    async (request) => deviceTypes.listAttributes(request.params.id),
+  );
+
+  app.post(
+    '/api/device-types/:id/attributes',
+    {
+      schema: {
+        params: idParams,
+        body: attributeCreateSchema,
+        response: { 201: attributeSchema },
+      },
+    },
+    async (request, reply) =>
+      reply.code(201).send(await deviceTypes.createAttribute(request.params.id, request.body)),
+  );
+
+  app.patch(
+    '/api/attributes/:id',
+    {
+      schema: {
+        params: idParams,
+        body: attributeUpdateSchema,
+        response: { 200: attributeSchema },
+      },
+    },
+    async (request) => deviceTypes.updateAttribute(request.params.id, request.body),
+  );
+
+  app.put(
+    '/api/device-types/:id/attribute-order',
+    {
+      schema: {
+        params: idParams,
+        body: attributeOrderSchema,
+        response: { 200: deviceTypeSchema },
+      },
+    },
+    async (request) => deviceTypes.reorderAttributes(request.params.id, request.body),
   );
 
   app.get(

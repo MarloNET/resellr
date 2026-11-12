@@ -86,6 +86,20 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
   });
 
+  it('has the text of name_taken for attributes (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['name_taken.attribute']).toBe(
+      'Bezeichnung ist bei dieser Geräteart bereits vergeben',
+    );
+  });
+
+  it('has the field texts of the attribute panel (UI-027, 8.2)', () => {
+    expect(FIELD_MESSAGES.attributeUnit).toBe('Einheit: höchstens 20 Zeichen');
+    expect(FIELD_MESSAGES.attributeMinAboveMax).toBe(
+      'Mindestwert darf nicht größer als Höchstwert sein',
+    );
+    expect(FIELD_MESSAGES.attributePickListMissing).toBe('Auswahlliste fehlt');
+  });
+
   it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {
     expect(ERROR_MESSAGES['name_taken.pick_list_value']).toBe(
       'Wert gibt es in dieser Liste bereits',
