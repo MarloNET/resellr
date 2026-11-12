@@ -1,14 +1,18 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import {
+  closeSync,
+  constants,
   cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   rmSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { connect, createServer, type AddressInfo, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -230,7 +234,110 @@ describe('server entry (CU-018)', () => {
     },
     20_000,
   );
+
+  it('E1 (#320) a SIGTERM sent in the handler of the IPC message ready ends the server with exit code 0, not by the signal, and leaves no -wal/-shm (10 runs)', async () => {
+    const own = installation(join(root, 'own'), await freePort());
+
+    for (let run = 0; run < 10; run += 1) {
+      const server = startServer(own, `start-ready-${run}`, [], { ipc: true });
+      server.process.on('message', (message) => {
+        if ((message as { type?: unknown }).type === 'ready') server.process.kill('SIGTERM');
+      });
+
+      expect(await server.ended).toStrictEqual({ code: 0, signal: null });
+      expect(readdirSync(own.dataDir).filter((name) => /-(wal|shm)$/.test(name))).toEqual([]);
+    }
+  }, 120_000);
+
+  it('E2 (#320) a SIGTERM after server_started and before ready ends the server after the start with exit code 0, integrity_check ok', async () => {
+    const port = await freePort();
+    const own = installation(join(root, 'own'), port);
+    const configFile = pauseStartAtConfig(own);
+    const server = startServer(own, 'start-during', [], { ipc: true });
+    let reportedReady = false;
+    server.process.on('message', (message) => {
+      if ((message as { type?: unknown }).type === 'ready') reportedReady = true;
+    });
+
+    await waitForOperationsEvent(own.logDir, 'server_started');
+    server.process.kill('SIGTERM');
+    await resumeStart(configFile, { port }, server);
+
+    expect(await server.ended).toStrictEqual({ code: 0, signal: null });
+    // Ended after the start, not during it.
+    expect(reportedReady).toBe(true);
+    expect(readOperationsEvents(own.logDir)).toContain('server_ready');
+    const db = new BetterSqlite3(join(own.dataDir, 'resellr.db'), { readonly: true });
+    try {
+      expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
+    } finally {
+      db.close();
+    }
+  }, 30_000);
+
+  it('E3 (#320) a SIGTERM during a start that is aborted (port in use) leaves the exit code 10', async () => {
+    const { port } = blocker.address() as AddressInfo;
+    const own = installation(join(root, 'own'), port);
+    const configFile = pauseStartAtConfig(own);
+    const server = startServer(own, 'start-aborted');
+
+    await waitForOperationsEvent(own.logDir, 'server_started');
+    server.process.kill('SIGTERM');
+    await resumeStart(configFile, { port }, server);
+
+    expect(await server.ended).toStrictEqual({ code: 10, signal: null });
+  }, 30_000);
 });
+
+/**
+ * Replaces `config.json` by a FIFO: the start reads it synchronously right after `server_started`
+ * and so stops there until the test writes the content (`resumeStart`), without a `sleep`.
+ */
+function pauseStartAtConfig({ dataDir }: Installation): string {
+  const configFile = join(dataDir, 'config.json');
+  rmSync(configFile);
+  execFileSync('mkfifo', [configFile]);
+  return configFile;
+}
+
+/**
+ * Writes the content once the server has opened the FIFO for reading: `server_started` is logged
+ * just before that. Opening without a reader fails with `ENXIO` instead of blocking the test, and
+ * is repeated only while the server runs.
+ */
+async function resumeStart(
+  configFile: string,
+  config: { port: number },
+  server: { process: ChildProcess },
+): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    let fd: number;
+    try {
+      fd = openSync(configFile, constants.O_WRONLY | constants.O_NONBLOCK);
+    } catch (error) {
+      const running = server.process.exitCode === null && server.process.signalCode === null;
+      if ((error as NodeJS.ErrnoException).code !== 'ENXIO' || !running || attempt >= 500) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      continue;
+    }
+    try {
+      writeSync(fd, JSON.stringify(config));
+    } finally {
+      closeSync(fd);
+    }
+    return;
+  }
+}
+
+async function waitForOperationsEvent(logDir: string, event: string): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (existsSync(logDir) && readOperationsEvents(logDir).includes(event)) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`no ${event} in the operations log`);
+}
 
 /** A port on 127.0.0.1 that is free right now. */
 async function freePort(): Promise<number> {
@@ -259,9 +366,16 @@ function startServer(
   { dataDir, logDir, root: dir }: Installation,
   startId: string,
   args: readonly string[] = [],
-): { process: ChildProcess; exited: Promise<number | null>; stderr: () => string } {
+  { ipc = false }: { ipc?: boolean } = {},
+): {
+  process: ChildProcess;
+  exited: Promise<number | null>;
+  ended: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
+  stderr: () => string;
+} {
+  // With `ipc` like the supervisor (2.18): the server reports `ready` over the channel.
   const child = spawn(process.execPath, [MAIN, ...args], {
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: ipc ? ['ignore', 'ignore', 'pipe', 'ipc'] : ['ignore', 'ignore', 'pipe'],
     env: {
       ...process.env,
       RESELLR_DATA_DIR: dataDir,
@@ -273,8 +387,11 @@ function startServer(
   });
   let stderr = '';
   child.stderr?.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
-  const exited = new Promise<number | null>((resolve) => child.once('exit', resolve));
-  return { process: child, exited, stderr: () => stderr };
+  const ended = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) =>
+    child.once('exit', (code, signal) => resolve({ code, signal })),
+  );
+  const exited = ended.then(({ code }) => code);
+  return { process: child, exited, ended, stderr: () => stderr };
 }
 
 async function waitUntilReady(port: number): Promise<void> {
