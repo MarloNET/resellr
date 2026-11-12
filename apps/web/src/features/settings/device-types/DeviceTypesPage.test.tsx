@@ -538,7 +538,7 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     },
   );
 
-  it('UI-027.validation DER-34-02 shows the server text of validation_failed at the field', async () => {
+  it('UI-027.validation DER-34-02 shows the server text of validation_failed at the field with the focus on it', async () => {
     await openAttributes([RAM], {
       'PATCH /api/attributes/12': () =>
         Response.json(
@@ -564,6 +564,7 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
         'Bezeichnung ist für einen festen Platzhalter vergeben: Preis',
       ),
     ).toBeTruthy();
+    expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
     expect(panelField(/^Einheit/).value).toBe('MB');
   });
 
@@ -656,7 +657,7 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     expectAccessiblePanel();
   });
 
-  it('UI-027.validation DER-34-05 name_taken shows "Bezeichnung ist bei dieser Geräteart bereits vergeben" at the field', async () => {
+  it('UI-027.validation DER-34-05 name_taken shows "Bezeichnung ist bei dieser Geräteart bereits vergeben" at the field with the focus on it', async () => {
     await openAttributes([RAM, DISPLAY], {
       'PATCH /api/attributes/13': () =>
         Response.json(
@@ -675,6 +676,7 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
       await within(panel()).findByText('Bezeichnung ist bei dieser Geräteart bereits vergeben'),
     ).toBeTruthy();
     expect(panelField(/^Bezeichnung/).getAttribute('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
   });
 
   it('UI-027.validation shows "Einheit: höchstens 20 Zeichen" for a unit over 20 characters', async () => {

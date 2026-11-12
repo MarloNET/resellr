@@ -14,7 +14,14 @@ import {
   type DatasheetBlock,
 } from '@resellr/domain/schemas/attribute.schema';
 import type { PickList } from '@resellr/domain/schemas/pick-list.schema';
-import { useId, useRef, useState, type ReactNode, type SelectHTMLAttributes } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from 'react';
 
 import {
   FormField,
@@ -164,6 +171,8 @@ export interface AttributePanelProps {
   attribute: AttributeWithUsage | null;
   pickLists: readonly PickList[];
   errors: AttributeFieldErrors;
+  /** Counts the field errors of the server; each new count moves the focus to the first one. */
+  errorFocusRequest: number;
   /** `UI-027.speichert`: inputs and buttons locked, the save button shows "Speichern …" (P-08). */
   saving: boolean;
   /** Writes are locked after an unknown outcome (P-08). */
@@ -185,6 +194,7 @@ export function AttributePanel({
   attribute,
   pickLists,
   errors,
+  errorFocusRequest,
   saving,
   writesLocked,
   onErrors,
@@ -198,6 +208,11 @@ export function AttributePanel({
   const roleLocked = systemRole !== null;
   const locked = saving || writesLocked;
   const change = (next: Partial<AttributeDraft>) => setDraft({ ...draft, ...next });
+
+  // Field errors of the server get the focus like those of the browser (2.0.7 `.validation`).
+  useEffect(() => {
+    if (errorFocusRequest > 0) focusFirstError();
+  }, [errorFocusRequest, focusFirstError]);
 
   function save() {
     const checked = checkDraft(draft, systemRole);

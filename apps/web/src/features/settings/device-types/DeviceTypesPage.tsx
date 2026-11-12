@@ -171,6 +171,7 @@ export function DeviceTypesPage() {
   const pickListsQuery = usePickListsQuery();
   const [editing, setEditing] = useState<AttributeEditing | null>(null);
   const [attributeErrors, setAttributeErrors] = useState<AttributeFieldErrors>({});
+  const [attributeErrorFocus, setAttributeErrorFocus] = useState(0);
 
   // The first device type is open once the list has arrived.
   const firstItem = items[0];
@@ -256,11 +257,13 @@ export function DeviceTypesPage() {
         maxValue: fieldMessage('maxValue'),
         pickListId: fieldMessage('pickListId'),
       });
+      setAttributeErrorFocus((count) => count + 1);
       return;
     }
     // `name_taken.attribute` "Bezeichnung ist bei dieser Geräteart bereits vergeben" (DER-34-05).
     if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
       setAttributeErrors({ label: error.error.message });
+      setAttributeErrorFocus((count) => count + 1);
       return;
     }
     onWriteFailed(error);
@@ -481,6 +484,7 @@ export function DeviceTypesPage() {
                     attribute={editedAttribute}
                     pickLists={pickListsQuery.data?.items ?? []}
                     errors={attributeErrors}
+                    errorFocusRequest={attributeErrorFocus}
                     saving={attributeSaving}
                     writesLocked={writesLocked}
                     onErrors={setAttributeErrors}
