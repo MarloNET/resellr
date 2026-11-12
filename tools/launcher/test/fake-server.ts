@@ -9,6 +9,8 @@
  *   health request
  * - `aborted` / `aborted-other-start`: writes `start-result.json` for this / another start, exit 10
  *
+ * `FAKE_SERVER_DELAY_MS` lets every start wait that long before its behaviour, like a long start.
+ *
  * Every start appends a JSON line with its environment to `starts.jsonl` in `FAKE_SERVER_DIR`.
  * Like the server, it ends with exit code 12 when the IPC channel closes.
  */
@@ -42,6 +44,9 @@ appendFileSync(
 );
 
 process.on('disconnect', () => process.exit(12));
+
+const delayMs = Number(process.env.FAKE_SERVER_DELAY_MS ?? 0);
+if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
 
 function serveHealth(state: 'ready' | 'starting', onRequest: () => void = () => {}) {
   const server = createServer((_, response) => {

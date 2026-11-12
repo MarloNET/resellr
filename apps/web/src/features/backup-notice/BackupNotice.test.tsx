@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
 import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { writeOutcomeStore } from '../../api/write-outcome-store.ts';
@@ -27,7 +28,9 @@ function pending(_input: RequestInfo | URL, init?: RequestInit): Promise<Respons
 function renderNotice() {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <BackupNotice variant="sidebar" />
+      <MemoryRouter>
+        <BackupNotice variant="sidebar" />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
   return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
@@ -43,7 +46,9 @@ async function renderFreshNotice() {
   const { createQueryClient: createFreshQueryClient } = await import('../../app/query-client.ts');
   render(
     <QueryClientProvider client={createFreshQueryClient()}>
-      <FreshBackupNotice variant="sidebar" />
+      <MemoryRouter>
+        <FreshBackupNotice variant="sidebar" />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
   return screen.getByRole('region', { name: FIXED_TEXTS.backupNoticeTitle });
@@ -188,8 +193,10 @@ describe('BackupNotice (UI-044, CU-254)', () => {
       const queryClient = createQueryClient();
       const frame = (content: ReactNode) => (
         <QueryClientProvider client={queryClient}>
-          <BackupNotice variant="sidebar" />
-          <main>{content}</main>
+          <MemoryRouter>
+            <BackupNotice variant="sidebar" />
+            <main>{content}</main>
+          </MemoryRouter>
         </QueryClientProvider>
       );
       const { rerender } = render(frame(null));

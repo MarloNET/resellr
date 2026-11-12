@@ -119,5 +119,18 @@ export default defineConfig(
       ],
     },
   },
+  {
+    // The script of the launcher pages runs in Chrome on `file://` pages (2.18).
+    files: ['tools/launcher-pages/launcher-pages.js'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        location: 'readonly',
+        setTimeout: 'readonly',
+        URLSearchParams: 'readonly',
+        window: 'readonly',
+      },
+    },
+  },
   prettierRecommended,
 );
