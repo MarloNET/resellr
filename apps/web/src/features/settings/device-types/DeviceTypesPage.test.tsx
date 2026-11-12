@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { createQueryClient } from '../../../app/query-client.ts';
@@ -24,18 +24,66 @@ type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
 type DeviceTypeItem = typeof NOTEBOOK;
 
+/** An attribute of a device type as `GET /api/device-types/{id}/attributes` lists it (2.1). */
+type AttributeItem = {
+  id: number;
+  deviceTypeId: number;
+  label: string;
+  dataType: 'text' | 'integer' | 'decimal' | 'boolean' | 'pick' | 'ports';
+  systemRole: 'keyboard_layout' | 'power_supply' | 'battery' | 'battery_capacity' | null;
+  unit: string | null;
+  unitSpacing: boolean;
+  minValue: string | null;
+  maxValue: string | null;
+  pickListId: number | null;
+  level: 'model' | 'device';
+  variantForming: boolean;
+  required: boolean;
+  datasheetBlock:
+    'identification' | 'condition' | 'delivery_scope' | 'technical' | 'ports' | 'software';
+  sortOrder: number;
+  active: boolean;
+  version: number;
+  hasValues: boolean;
+};
+
+const PICK_LISTS = [
+  { id: 4, key: 'battery', name: 'Akku', isBatteryList: true, version: 1 },
+  { id: 5, key: 'storage_type', name: 'Speichertyp', isBatteryList: false, version: 1 },
+];
+
+const ATTRIBUTES_PATH = /^\/api\/device-types\/(\d+)\/attributes/;
+
 /**
- * `fetch` of the page: `GET /api/ops/status` for the frame (UI-044), the device types and one
- * handler per write `METHOD path`. Like the server, a saved device type is part of the next list.
- * Records the writes with their JSON body.
+ * `fetch` of the page: `GET /api/ops/status` for the frame (UI-044), the device types, their
+ * attributes (none unless given), the pick lists and one handler per write `METHOD path`. Like
+ * the server, a saved device type or attribute is part of the next list. Records the writes
+ * with their JSON body.
  */
-function mockApi({ list, writes = {} }: { list?: Route; writes?: Record<string, Route> } = {}) {
+function mockApi({
+  list,
+  writes = {},
+  attributes = {},
+}: {
+  list?: Route;
+  writes?: Record<string, Route>;
+  attributes?: Record<number, AttributeItem[]>;
+} = {}) {
   const items: DeviceTypeItem[] = [NOTEBOOK, TABLET];
+  const attributesOf = (deviceTypeId: number) => (attributes[deviceTypeId] ??= []);
   const sent: { method: string; path: string; body: unknown }[] = [];
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const path = String(input);
     const method = init?.method ?? 'GET';
     if (path === '/api/ops/status') return Response.json(OPS_STATUS);
+    const attributesPath = ATTRIBUTES_PATH.exec(path);
+    if (method === 'GET' && attributesPath) {
+      const listed = attributesOf(Number(attributesPath[1]));
+      return Response.json({ items: listed, total: listed.length });
+    }
+    if (method === 'GET' && path.startsWith('/api/pick-lists')) {
+      return Response.json({ items: PICK_LISTS, total: PICK_LISTS.length });
+    }
     if (method === 'GET' && path.startsWith('/api/device-types')) {
       return list ? list(init) : Response.json({ items, total: items.length });
     }
@@ -44,11 +92,18 @@ function mockApi({ list, writes = {} }: { list?: Route; writes?: Record<string, 
     const handler = writes[key];
     if (!handler) throw new Error(`unexpected request ${key}`);
     const response = await handler(init);
-    if (response.ok) {
-      const saved = (await response.clone().json()) as DeviceTypeItem;
-      const index = items.findIndex((item) => item.id === saved.id);
-      if (index === -1) items.push(saved);
-      else items[index] = saved;
+    if (response.ok && !path.endsWith('/attribute-order')) {
+      const saved = (await response.clone().json()) as DeviceTypeItem | AttributeItem;
+      if ('deviceTypeId' in saved) {
+        const listed = attributesOf(saved.deviceTypeId);
+        const index = listed.findIndex((item) => item.id === saved.id);
+        if (index === -1) listed.push({ ...saved, hasValues: false });
+        else listed[index] = { ...listed[index], ...saved };
+      } else {
+        const index = items.findIndex((item) => item.id === saved.id);
+        if (index === -1) items.push(saved);
+        else items[index] = saved;
+      }
     }
     return response;
   });
@@ -168,6 +223,542 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+const RAM: AttributeItem = {
+  id: 12,
+  deviceTypeId: 1,
+  label: 'RAM',
+  dataType: 'integer',
+  systemRole: null,
+  unit: 'GB',
+  unitSpacing: false,
+  minValue: '1',
+  maxValue: '256',
+  pickListId: null,
+  level: 'device',
+  variantForming: true,
+  required: true,
+  datasheetBlock: 'technical',
+  sortOrder: 1,
+  active: true,
+  version: 2,
+  hasValues: false,
+};
+const DISPLAY: AttributeItem = {
+  ...RAM,
+  id: 13,
+  label: 'Displaygröße',
+  dataType: 'decimal',
+  unit: 'Zoll',
+  unitSpacing: true,
+  minValue: null,
+  maxValue: null,
+  level: 'model',
+  variantForming: false,
+  sortOrder: 2,
+  version: 1,
+};
+const BATTERY_CAPACITY: AttributeItem = {
+  ...RAM,
+  id: 18,
+  label: 'Akkukapazität',
+  systemRole: 'battery_capacity',
+  unit: '%',
+  minValue: null,
+  maxValue: null,
+  variantForming: false,
+  required: false,
+  datasheetBlock: 'condition',
+  sortOrder: 3,
+  version: 1,
+};
+const BATTERY: AttributeItem = {
+  ...RAM,
+  id: 17,
+  label: 'Akku',
+  dataType: 'pick',
+  systemRole: 'battery',
+  unit: null,
+  minValue: null,
+  maxValue: null,
+  pickListId: 4,
+  variantForming: false,
+  datasheetBlock: 'delivery_scope',
+  sortOrder: 4,
+  version: 1,
+};
+
+const attributeRegion = () => screen.getByRole('region', { name: 'Merkmale' });
+const panel = () => screen.getByRole('form', { name: 'Merkmal bearbeiten' });
+const panelField = (name: RegExp | string) =>
+  within(panel()).getByLabelText<HTMLInputElement & HTMLSelectElement>(name);
+const panelSave = () =>
+  within(panel()).getByRole<HTMLButtonElement>('button', {
+    name: /^(Merkmal speichern|Speichern …)$/,
+  });
+const attributeRow = (label: string) =>
+  within(attributeRegion())
+    .getAllByRole('row')
+    .find((row) => within(row).queryByRole('button', { name: label, exact: true })) as HTMLElement;
+
+async function openAttributes(attributes: AttributeItem[], writes: Record<string, Route> = {}) {
+  const api = mockApi({ attributes: { 1: [...attributes] }, writes });
+  await openPage();
+  if (attributes.length > 0) {
+    await within(attributeRegion()).findByRole('button', { name: attributes[0]?.label });
+  }
+  return api;
+}
+
+async function openPanelOf(label: string) {
+  fireEvent.click(within(attributeRegion()).getByRole('button', { name: label, exact: true }));
+  return panel();
+}
+
+/** Accessibility assertion of the panel: named controls, required marks, linked field errors. */
+function expectAccessiblePanel() {
+  const form = panel();
+  for (const control of within(form).queryAllByRole('textbox')) {
+    expect(control.id && form.querySelector(`label[for="${control.id}"]`)).toBeTruthy();
+    const describedBy = control.getAttribute('aria-describedby');
+    if (control.getAttribute('aria-invalid') === 'true') {
+      expect(describedBy && document.getElementById(describedBy)?.textContent).toBeTruthy();
+    }
+  }
+  expect(panelField(/^Bezeichnung/).getAttribute('aria-required')).toBe('true');
+  for (const button of screen.getAllByRole('button')) {
+    expect(button.textContent?.trim() || button.getAttribute('aria-label')).toBeTruthy();
+  }
+}
+
+/** Viewport at least `full` wide (1366 px): the panel stands beside the table (R-1 (3)). */
+function stubViewport({ full }: { full: boolean }) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((media: string) => ({
+      media,
+      matches: full,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })),
+  );
+}
+
+describe('UI-027 attributes (CU-095, REQ-005)', () => {
+  beforeEach(() => stubViewport({ full: true }));
+
+  it('UI-027.default below 1366 px the panel overlays the table as a sheet with "Schließen" (R-1 (3))', async () => {
+    stubViewport({ full: false });
+    await openAttributes([RAM]);
+    await openPanelOf('RAM');
+
+    const sheet = screen.getByRole('dialog', { name: 'Merkmal bearbeiten' });
+    expect(within(sheet).getByRole('form', { name: 'Merkmal bearbeiten' })).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('UI-027.default from 1366 px the panel stands beside the table and closes with "Schließen"', async () => {
+    await openAttributes([RAM]);
+    await openPanelOf('RAM');
+
+    const aside = screen.getByRole('complementary', { name: 'Merkmal bearbeiten' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(attributeRow('RAM').getAttribute('aria-current')).toBe('true');
+    fireEvent.click(within(aside).getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('complementary', { name: 'Merkmal bearbeiten' })).toBeNull();
+  });
+  it('UI-027.empty DER-34-01 a device type without attributes shows "Noch keine Merkmale. Legen Sie das erste Merkmal an."', async () => {
+    await openAttributes([]);
+
+    const region = await screen.findByRole('region', { name: 'Merkmale' });
+    expect(
+      await within(region).findByText('Noch keine Merkmale. Legen Sie das erste Merkmal an.'),
+    ).toBeTruthy();
+    expect(within(region).queryByRole('table')).toBeNull();
+    fireEvent.click(within(region).getByRole('button', { name: 'Merkmal anlegen' }));
+    expect(panelField(/^Bezeichnung/).value).toBe('');
+    expectAccessiblePanel();
+  });
+
+  it('UI-027.default shows the attribute table with the columns of UI-027 and the order controls', async () => {
+    await openAttributes([RAM, DISPLAY]);
+
+    const table = within(attributeRegion()).getByRole('table');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual([
+      'Reihenfolge',
+      'Bezeichnung',
+      'Datentyp',
+      'Einheit',
+      'Ebene',
+      'variantenbildend',
+      'Pflicht',
+      'Datenblatt-Block',
+      'Status',
+    ]);
+    const cells = (label: string) =>
+      within(attributeRow(label))
+        .getAllByRole('cell')
+        .slice(1, -1)
+        .map((cell) => cell.textContent);
+    expect(cells('RAM')).toEqual([
+      'RAM',
+      'Ganzzahl',
+      'GB',
+      'Gerät',
+      'Ja',
+      'Ja',
+      'Technik',
+      'aktiv',
+    ]);
+    expect(cells('Displaygröße')).toEqual([
+      'Displaygröße',
+      'Dezimalzahl',
+      'Zoll',
+      'Modell',
+      '–',
+      'Ja',
+      'Technik',
+      'aktiv',
+    ]);
+    expect(within(attributeRow('RAM')).getByRole('button', { name: 'Hoch' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    expect(screen.queryByRole('button', { name: /löschen/i })).toBeNull();
+    expect(screen.queryByRole('form', { name: 'Merkmal bearbeiten' })).toBeNull();
+  });
+
+  it('UI-027.success DER-34-09 "Merkmal speichern" closes the panel, updates the row and shows "Merkmal gespeichert"', async () => {
+    const { sent } = await openAttributes([RAM, DISPLAY], {
+      'PATCH /api/attributes/12': () =>
+        Response.json({ ...RAM, label: 'Arbeitsspeicher', unit: 'GiB', version: 3 }),
+    });
+    await openPanelOf('RAM');
+
+    fireEvent.change(panelField(/^Bezeichnung/), { target: { value: 'Arbeitsspeicher' } });
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'GiB' } });
+    fireEvent.click(panelSave());
+
+    const banner = await screen.findByText('Merkmal gespeichert');
+    expect(banner).toBeTruthy();
+    expect(screen.queryByRole('form', { name: 'Merkmal bearbeiten' })).toBeNull();
+    expect(within(attributeRow('Arbeitsspeicher')).getByText('GiB')).toBeTruthy();
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/attributes/12',
+        body: {
+          version: 2,
+          label: 'Arbeitsspeicher',
+          dataType: 'integer',
+          unit: 'GiB',
+          unitSpacing: false,
+          minValue: '1',
+          maxValue: '256',
+          pickListId: null,
+          level: 'device',
+          variantForming: true,
+          required: true,
+          datasheetBlock: 'technical',
+        },
+      },
+    ]);
+    // DER-34-12: the answer opens no impact dialog UI-043.
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('UI-027.success AC-REQ-005-01 creates "Bildschirmdiagonale" with unit, range, level model and required', async () => {
+    const created = {
+      ...DISPLAY,
+      id: 20,
+      label: 'Bildschirmdiagonale',
+      minValue: '10',
+      maxValue: '60',
+      sortOrder: 2,
+    };
+    const { sent } = await openAttributes([RAM], {
+      'POST /api/device-types/1/attributes': () => Response.json(created, { status: 201 }),
+    });
+    fireEvent.click(within(attributeRegion()).getByRole('button', { name: /Merkmal anlegen/ }));
+
+    fireEvent.change(panelField(/^Bezeichnung/), { target: { value: 'Bildschirmdiagonale' } });
+    fireEvent.change(panelField(/^Datentyp/), { target: { value: 'decimal' } });
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'Zoll' } });
+    fireEvent.change(panelField(/^Mindestwert/), { target: { value: '10' } });
+    fireEvent.change(panelField(/^Höchstwert/), { target: { value: '60' } });
+    fireEvent.click(within(panel()).getByLabelText('Pflichtmerkmal'));
+    fireEvent.click(panelSave());
+
+    await screen.findByText('Merkmal gespeichert');
+    expect(sent[0]?.body).toEqual({
+      label: 'Bildschirmdiagonale',
+      dataType: 'decimal',
+      unit: 'Zoll',
+      unitSpacing: true,
+      minValue: '10',
+      maxValue: '60',
+      pickListId: null,
+      level: 'model',
+      variantForming: false,
+      required: true,
+      datasheetBlock: 'technical',
+      active: true,
+    });
+    expect(attributeRow('Bildschirmdiagonale')).toBeTruthy();
+  });
+
+  it.each([
+    ['empty', '', 'Bezeichnung: 1 bis 100 Zeichen'],
+    ['101 characters long', 'a'.repeat(101), 'Bezeichnung: 1 bis 100 Zeichen'],
+    ['with braces', 'RAM {GB}', 'Bezeichnung darf { und } nicht enthalten'],
+    [
+      'a fixed placeholder name',
+      'Stückzahl',
+      'Bezeichnung ist für einen festen Platzhalter vergeben: Stückzahl',
+    ],
+  ])(
+    'UI-027.validation DER-34-02 a label that is %s shows its text at "Bezeichnung" with the focus on it',
+    async (_case, label, text) => {
+      const { sent } = await openAttributes([RAM]);
+      await openPanelOf('RAM');
+
+      fireEvent.change(panelField(/^Bezeichnung/), { target: { value: label } });
+      fireEvent.click(panelSave());
+
+      expect(await within(panel()).findByText(text)).toBeTruthy();
+      expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
+      expect(sent).toEqual([]);
+      expectAccessiblePanel();
+    },
+  );
+
+  it('UI-027.validation DER-34-02 shows the server text of validation_failed at the field', async () => {
+    await openAttributes([RAM], {
+      'PATCH /api/attributes/12': () =>
+        Response.json(
+          errorBody('validation_failed', {
+            fields: [
+              {
+                path: 'label',
+                code: 'attribute_label_placeholder',
+                message: 'Bezeichnung ist für einen festen Platzhalter vergeben: Preis',
+              },
+            ],
+          }),
+          { status: 422 },
+        ),
+    });
+    await openPanelOf('RAM');
+
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'MB' } });
+    fireEvent.click(panelSave());
+
+    expect(
+      await within(panel()).findByText(
+        'Bezeichnung ist für einen festen Platzhalter vergeben: Preis',
+      ),
+    ).toBeTruthy();
+    expect(panelField(/^Einheit/).value).toBe('MB');
+  });
+
+  it('UI-027.validation DER-34-02 "Akkukapazität" is allowed for the attribute with the role battery_capacity', async () => {
+    const { sent } = await openAttributes([RAM, BATTERY_CAPACITY], {
+      'PATCH /api/attributes/18': () => Response.json({ ...BATTERY_CAPACITY, version: 2 }),
+    });
+    await openPanelOf('Akkukapazität');
+
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'Prozent' } });
+    fireEvent.click(panelSave());
+
+    await screen.findByText('Merkmal gespeichert');
+    expect(sent).toHaveLength(1);
+  });
+
+  it('UI-027.validation DER-34-03 a minimum above the maximum shows "Mindestwert darf nicht größer als Höchstwert sein"; other data types have no such fields', async () => {
+    const { sent } = await openAttributes([RAM]);
+    await openPanelOf('RAM');
+
+    fireEvent.change(panelField(/^Mindestwert/), { target: { value: '300' } });
+    fireEvent.click(panelSave());
+
+    expect(
+      await within(panel()).findByText('Mindestwert darf nicht größer als Höchstwert sein'),
+    ).toBeTruthy();
+    expect(document.activeElement).toBe(panelField(/^Mindestwert/));
+    expect(sent).toEqual([]);
+
+    for (const dataType of ['text', 'boolean', 'pick', 'ports']) {
+      fireEvent.change(panelField(/^Datentyp/), { target: { value: dataType } });
+      expect(within(panel()).queryByLabelText(/^Mindestwert/)).toBeNull();
+      expect(within(panel()).queryByLabelText(/^Höchstwert/)).toBeNull();
+    }
+    expectAccessiblePanel();
+  });
+
+  it('UI-027.validation DER-34-04 data type "Auswahl aus Liste" without a list shows "Auswahlliste fehlt"', async () => {
+    const { sent } = await openAttributes([RAM]);
+    fireEvent.click(within(attributeRegion()).getByRole('button', { name: /Merkmal anlegen/ }));
+
+    fireEvent.change(panelField(/^Bezeichnung/), { target: { value: 'Speichertyp' } });
+    fireEvent.change(panelField(/^Datentyp/), { target: { value: 'pick' } });
+    fireEvent.click(panelSave());
+
+    expect(await within(panel()).findByText('Auswahlliste fehlt')).toBeTruthy();
+    expect(sent).toEqual([]);
+    const options = within(panelField(/^Auswahlliste/)).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual(['', 'Akku', 'Speichertyp']);
+    expectAccessiblePanel();
+  });
+
+  it('UI-027.validation DER-34-05 name_taken shows "Bezeichnung ist bei dieser Geräteart bereits vergeben" at the field', async () => {
+    await openAttributes([RAM, DISPLAY], {
+      'PATCH /api/attributes/13': () =>
+        Response.json(
+          errorBody('name_taken', {
+            message: 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
+          }),
+          { status: 422 },
+        ),
+    });
+    await openPanelOf('Displaygröße');
+
+    fireEvent.change(panelField(/^Bezeichnung/), { target: { value: 'ram' } });
+    fireEvent.click(panelSave());
+
+    expect(
+      await within(panel()).findByText('Bezeichnung ist bei dieser Geräteart bereits vergeben'),
+    ).toBeTruthy();
+    expect(panelField(/^Bezeichnung/).getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('UI-027.validation shows "Einheit: höchstens 20 Zeichen" for a unit over 20 characters', async () => {
+    await openAttributes([RAM]);
+    await openPanelOf('RAM');
+
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'a'.repeat(21) } });
+    fireEvent.click(panelSave());
+
+    expect(await within(panel()).findByText('Einheit: höchstens 20 Zeichen')).toBeTruthy();
+  });
+
+  it('AC-REQ-005-06 the flag "Variantenbildend" exists at level device only', async () => {
+    await openAttributes([RAM]);
+    await openPanelOf('RAM');
+
+    expect(within(panel()).getByLabelText<HTMLInputElement>('Variantenbildend').checked).toBe(true);
+    fireEvent.change(panelField(/^Ebene/), { target: { value: 'model' } });
+    expect(within(panel()).queryByLabelText('Variantenbildend')).toBeNull();
+  });
+
+  it('AC-REQ-005-07 DER-34-08 battery_capacity keeps "Variantenbildend" at "Nein"; data type, level and list of a system role are locked', async () => {
+    await openAttributes([RAM, BATTERY_CAPACITY, BATTERY]);
+    await openPanelOf('Akkukapazität');
+
+    const flag = within(panel()).getByLabelText<HTMLInputElement>('Variantenbildend');
+    expect(flag.checked).toBe(false);
+    expect(flag.disabled).toBe(true);
+    expect(panelField(/^Datentyp/).disabled).toBe(true);
+    expect(panelField(/^Ebene/).disabled).toBe(true);
+    expect(panelField(/^Bezeichnung/).disabled).toBe(false);
+    expect(within(panel()).getByLabelText<HTMLInputElement>('Pflichtmerkmal').disabled).toBe(false);
+    expect(panelField(/^Datenblatt-Block/).disabled).toBe(false);
+    expectAccessiblePanel();
+
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Abbrechen' }));
+    await openPanelOf('Akku');
+    expect(panelField(/^Auswahlliste/).disabled).toBe(true);
+    expect(panelField(/^Auswahlliste/).value).toBe('4');
+  });
+
+  it('UI-027.speichert shows "Speichern …" and locks the panel and the table without time limit', async () => {
+    await openAttributes([RAM, DISPLAY], { 'PATCH /api/attributes/12': pending });
+    await openPanelOf('RAM');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'GiB' } });
+    fireEvent.click(panelSave());
+
+    expect(
+      (await within(panel()).findByRole('button', { name: 'Speichern …' })).hasAttribute(
+        'disabled',
+      ),
+    ).toBe(true);
+    expect(panelField(/^Bezeichnung/).disabled).toBe(true);
+    expect(panelField(/^Einheit/).disabled).toBe(true);
+    expect(
+      within(attributeRow('Displaygröße')).getByRole<HTMLButtonElement>('button', {
+        name: 'Merkmal deaktivieren',
+      }).disabled,
+    ).toBe(true);
+    expect(
+      within(attributeRow('Displaygröße')).getByRole<HTMLButtonElement>('button', {
+        name: 'Hoch',
+      }).disabled,
+    ).toBe(true);
+    expect(nameInput().disabled).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(within(panel()).getByRole('button', { name: 'Speichern …' })).toBeTruthy();
+    expectAccessiblePanel();
+  });
+
+  it('DER-34-07 "Merkmal deaktivieren" sends active false and the row shows "deaktiviert"', async () => {
+    const { sent } = await openAttributes([RAM, DISPLAY], {
+      'PATCH /api/attributes/12': () => Response.json({ ...RAM, active: false, version: 3 }),
+    });
+
+    fireEvent.click(
+      within(attributeRow('RAM')).getByRole('button', { name: 'Merkmal deaktivieren' }),
+    );
+
+    await screen.findByText('Merkmal gespeichert');
+    expect(sent).toEqual([
+      { method: 'PATCH', path: '/api/attributes/12', body: { version: 2, active: false } },
+    ]);
+    expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
+    expect(
+      within(attributeRow('RAM')).queryByRole('button', { name: 'Merkmal deaktivieren' }),
+    ).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('DER-34-06 "Runter" sends the complete order of the attributes with the version of the device type', async () => {
+    const { sent } = await openAttributes([RAM, DISPLAY], {
+      'PUT /api/device-types/1/attribute-order': () => Response.json({ ...NOTEBOOK, version: 4 }),
+    });
+
+    fireEvent.click(within(attributeRow('RAM')).getByRole('button', { name: 'Runter' }));
+
+    await screen.findByText('Merkmal gespeichert');
+    expect(sent).toEqual([
+      {
+        method: 'PUT',
+        path: '/api/device-types/1/attribute-order',
+        body: { version: 3, attributeIds: [13, 12] },
+      },
+    ]);
+  });
+
+  it('UI-027.conflict shows P-05 when the attribute changed in another window', async () => {
+    await openAttributes([RAM], {
+      'PATCH /api/attributes/12': () =>
+        Response.json(errorBody('version_conflict'), { status: 409 }),
+    });
+    await openPanelOf('RAM');
+
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'GiB' } });
+    fireEvent.click(panelSave());
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert.',
+    );
+    expect(panelField(/^Einheit/).value).toBe('GiB');
+  });
 });
 
 describe('UI-027 device types (CU-095)', () => {
