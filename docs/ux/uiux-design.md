@@ -40,7 +40,7 @@ Du kannst in „Gerätearten und Merkmale“ (UI-027) ein deaktiviertes Merkmal 
    *Beispiel:* Nach dem Klick steht oben „Merkmal aktiviert“ (wie „Merkmal gespeichert“).
    **Wenn falsch:** Reine Textänderung in UI-027.
 3. **Annahme (Wortlaut Ablehnung, M-32):** „<Merkmal> fehlt“ am Feld, z. B. „RAM fehlt“, im Muster von „Zustand fehlt“ und „Hersteller fehlt“; eine Meldung je fehlendem Pflichtmerkmal, Fokus auf das erste.
-   *Beispiel:* Das am 11.11. erfasste Notebook hat keinen RAM-Wert (es entstand während der Deaktivierung entstanden); du änderst nur die Optik-Note und speicherst: „RAM fehlt“ am RAM-Feld, nach Eintragen wird gespeichert.
+   *Beispiel:* Das am 11.11. erfasste Notebook hat keinen RAM-Wert (es entstand während der Deaktivierung); du änderst nur die Optik-Note und speicherst: „RAM fehlt“ am RAM-Feld, nach Eintragen wird gespeichert.
    **Wenn falsch:** Textänderung in M-32 und vier Screens (UI-007, UI-003, UI-010, UI-014).
 4. **Annahme:** Preis erfassen und Fotos zuordnen zeigen die Meldung nie; sie erscheint nur beim Speichern von Modellvorlage (UI-007), Gerätewerten (UI-010, UI-003) und Inseratswerten (UI-014 „Inseratswerte bearbeiten“).
    *Beispiel:* „MI-B“ ohne RAM-Wert: Preis speichern geht, Foto zuordnen geht, Lieferumfang ändern geht nicht ohne RAM.
