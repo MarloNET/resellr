@@ -35,8 +35,15 @@ export const MESSAGES = {
  * the schemas of `packages/domain` set them, so browser and server show the same text (2.0.5).
  */
 export const FIELD_MESSAGES = {
+  /** UI-028 "Akku vorhanden", missing in the list battery (REQ-007, DER-35-10). */
+  batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
+  /**
+   * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
+   * Technical Specification 8.2 (addendum MAR-487).
+   */
+  pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
 } as const;
 
 type MessageText = string | ((...args: string[]) => string);
@@ -48,6 +55,7 @@ type MessageText = string | ((...args: string[]) => string);
  */
 export const ERROR_MESSAGES = {
   'name_taken.device_type': 'Name ist bereits vergeben',
+  'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
   'not_found.default': MESSAGES['M-15'],
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 

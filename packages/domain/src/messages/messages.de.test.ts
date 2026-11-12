@@ -86,6 +86,17 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
   });
 
+  it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {
+    expect(ERROR_MESSAGES['name_taken.pick_list_value']).toBe(
+      'Wert gibt es in dieser Liste bereits',
+    );
+  });
+
+  it('has the field texts of the pick list values (UI-028)', () => {
+    expect(FIELD_MESSAGES.batteryPresentMissing).toBe('Kennzeichen ‚Akku vorhanden‘ fehlt');
+    expect(FIELD_MESSAGES.pickListValueLabel).toBe('Wert: 1 bis 100 Zeichen');
+  });
+
   it('derives the usages of a code from the catalog keys', () => {
     expectTypeOf<ErrorMessageUsage<'not_found'>>().toEqualTypeOf<'default'>();
     // No text in S1, so no usage can be set (MAR-239, F-1).

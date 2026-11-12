@@ -6,6 +6,7 @@ import {
   SettingsLayout,
 } from '../features/settings/SettingsLayout.tsx';
 import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
+import { PickListsPage } from '../features/settings/pick-lists/PickListsPage.tsx';
 import { TerminatedPage } from '../features/shutdown/TerminatedPage.tsx';
 import { AppFrame } from './AppFrame.tsx';
 
@@ -51,7 +52,7 @@ export const routes: RouteObject[] = [
           { index: true, element: <LastSettingsSectionRedirect /> },
           { path: 'haendlermarke', element: null },
           { path: 'geraetearten', element: <DeviceTypesPage /> },
-          { path: 'auswahllisten', element: null },
+          { path: 'auswahllisten', element: <PickListsPage /> },
           { path: 'titelmuster', element: null },
           { path: 'textbausteine', element: null },
           { path: 'hersteller', element: null },
