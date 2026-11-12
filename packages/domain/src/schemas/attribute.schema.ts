@@ -165,8 +165,6 @@ export interface AttributeDefinitionIssue {
   message: string;
 }
 
-const NUMBER_TYPES: readonly AttributeDataType[] = ['integer', 'decimal'];
-
 const BOUND_MESSAGES = {
   minValue: {
     decimal: FIELD_MESSAGES.attributeMinValueNumber,

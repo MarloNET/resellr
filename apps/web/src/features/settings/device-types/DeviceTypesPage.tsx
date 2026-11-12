@@ -160,7 +160,9 @@ export function DeviceTypesPage() {
     createAttributeMutation.isPending ||
     updateAttributeMutation.isPending ||
     reorderAttributesMutation.isPending;
-  const saving = createMutation.isPending || updateMutation.isPending || attributeSaving;
+  const deviceTypeSaving = createMutation.isPending || updateMutation.isPending;
+  // Every write locks the whole page; only the triggering save button shows "Speichern …" (P-08).
+  const saving = deviceTypeSaving || attributeSaving;
   const selectedId = selection?.id ?? null;
   const selected = items.find((item) => item.id === selectedId);
 
@@ -528,10 +530,12 @@ export function DeviceTypesPage() {
           <Button
             type="submit"
             variant="primary"
-            className="full:ml-auto full:mt-6"
+            // Beside the open panel the column is narrow (UI-027): the label wraps instead of
+            // running under the panel.
+            className="h-auto! min-h-control py-1 whitespace-normal! full:ml-auto full:mt-6"
             disabled={formLocked || writesLocked}
           >
-            {saving ? TEXTS.saving : TEXTS.save}
+            {deviceTypeSaving ? TEXTS.saving : TEXTS.save}
           </Button>
         </form>
         {selected !== undefined && (
@@ -588,7 +592,11 @@ function AttributeTable({
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="m-0 text-section font-semibold">{TEXTS.attributeSection}</h2>
         {!loading && !empty && (
-          <Button disabled={locked} onClick={() => onOpen(null)}>
+          <Button
+            disabled={locked}
+            className="h-auto! min-h-control py-1 whitespace-normal!"
+            onClick={() => onOpen(null)}
+          >
             <span aria-hidden="true">+</span>
             {TEXTS.attributeCreate}
           </Button>
@@ -644,11 +652,12 @@ function AttributeTable({
                   />
                 </TableCell>
                 <TableCell className="min-w-32 [overflow-wrap:break-word]">
+                  {/* Scrolled into view, the label stays beside the fixed first column (2.0.10). */}
                   <button
                     type="button"
                     disabled={locked}
                     onClick={() => onOpen(attribute)}
-                    className="cursor-pointer text-left font-semibold text-primary disabled:cursor-not-allowed"
+                    className="scroll-ml-44 cursor-pointer text-left font-semibold text-primary disabled:cursor-not-allowed"
                   >
                     {attribute.label}
                   </button>

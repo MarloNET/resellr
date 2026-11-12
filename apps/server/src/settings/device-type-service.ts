@@ -346,9 +346,9 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
       const { result } = await uow.run(async (tx) => {
         const { repository, audit, at } = inAction(tx);
         const currentRow = await attributeOrThrow(repository, id);
-        if (currentRow.version !== patch.version) throw new ConflictError('version_conflict');
+        const { version, ...fields } = patch;
+        if (currentRow.version !== version) throw new ConflictError('version_conflict');
         const current = toAttribute(currentRow);
-        const { version: _version, ...fields } = patch;
         // The rules apply to the stored state with the changed fields (2.1).
         const merged: Attribute = {
           ...current,

@@ -742,6 +742,11 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
       }).disabled,
     ).toBe(true);
     expect(nameInput().disabled).toBe(true);
+    // Only the triggering save button shows "Speichern …"; the others keep their label (P-08).
+    expect(screen.getAllByRole('button', { name: 'Speichern …' })).toHaveLength(1);
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Geräteart speichern' }).disabled,
+    ).toBe(true);
     await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(within(panel()).getByRole('button', { name: 'Speichern …' })).toBeTruthy();
     expectAccessiblePanel();
