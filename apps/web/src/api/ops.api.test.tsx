@@ -16,10 +16,13 @@ async function loadModules() {
   const ops = await import('./ops.api.ts');
   const store = await import('./write-outcome-store.ts');
   const { QueryClientProvider } = await import('@tanstack/react-query');
+  const { MemoryRouter } = await import('react-router');
   const { createQueryClient } = await import('../app/query-client.ts');
   const client = createQueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
   return { ...ops, ...store, wrapper };
 }

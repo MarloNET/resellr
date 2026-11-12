@@ -7,6 +7,7 @@ import {
 } from '../features/settings/SettingsLayout.tsx';
 import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
 import { PickListsPage } from '../features/settings/pick-lists/PickListsPage.tsx';
+import { TerminatedPage } from '../features/shutdown/TerminatedPage.tsx';
 import { AppFrame } from './AppFrame.tsx';
 
 /**
@@ -34,6 +35,8 @@ function ListingOverviewPlaceholder() {
  * are not built, and `router.test.tsx` checks the table for such paths.
  */
 export const routes: RouteObject[] = [
+  // UI-046 after "resellr beenden" replaces the frame (CU-256, Technical Specification 2.17).
+  { path: '/beendet', element: <TerminatedPage /> },
   {
     path: '/',
     element: <AppFrame />,
