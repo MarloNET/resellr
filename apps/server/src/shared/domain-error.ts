@@ -46,6 +46,22 @@ export class ValidationError extends DomainError {
   }
 }
 
+/**
+ * A structural error a service only finds against the stored state, e.g. a flag the user
+ * interface does not offer for this attribute (2.0.5 rule (4), 2.1): `400 bad_request`, logged
+ * as a warning like a structural error of the schema. `reason` holds field names and rule
+ * codes only, never values.
+ */
+export class BadRequestError extends DomainError {
+  override readonly code = 'bad_request';
+  readonly reason: string;
+
+  constructor(reason: string) {
+    super();
+    this.reason = reason;
+  }
+}
+
 /** Domain rule violated, e.g. `wi_nr_taken` (2.0.6). */
 export class RuleViolation<C extends ErrorCode = ErrorCode> extends DomainError {
   override readonly code: C;

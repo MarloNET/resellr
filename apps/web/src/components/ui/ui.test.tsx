@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Badge } from './Badge.tsx';
 import { Button } from './Button.tsx';
+import { Checkbox } from './Checkbox.tsx';
 import {
   Dialog,
   DialogBody,
@@ -13,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from './Dialog.tsx';
+import { RadioGroup } from './RadioGroup.tsx';
+import { Select } from './Select.tsx';
 import { Sheet, SheetContent, SheetTrigger } from './Sheet.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './Table.tsx';
 
@@ -294,5 +297,86 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     expect(button.className).toContain('bg-primary');
     expect(button.className).toContain('rounded-control');
     expect(screen.getByText('Veröffentlicht').className).toContain('rounded-chip');
+  });
+
+  it('Select passes the control attributes of CU-057 and reports the new value', () => {
+    const onChange = vi.fn();
+    render(
+      <Select
+        id="level"
+        aria-required="true"
+        aria-invalid="true"
+        aria-describedby="level-error"
+        value="model"
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="model">Modell</option>
+        <option value="device">Gerät</option>
+      </Select>,
+    );
+
+    const select = screen.getByRole<HTMLSelectElement>('combobox');
+    expect(select.id).toBe('level');
+    expect(select.getAttribute('aria-required')).toBe('true');
+    expect(select.getAttribute('aria-invalid')).toBe('true');
+    expect(select.getAttribute('aria-describedby')).toBe('level-error');
+    expect(select.className).toContain('aria-invalid:border-error');
+    fireEvent.change(select, { target: { value: 'device' } });
+    expect(onChange).toHaveBeenCalledWith('device');
+  });
+
+  it('Select can be disabled', () => {
+    render(
+      <Select disabled value="a" onChange={() => {}}>
+        <option value="a">A</option>
+      </Select>,
+    );
+
+    expect(screen.getByRole<HTMLSelectElement>('combobox').disabled).toBe(true);
+  });
+
+  it('Checkbox reports the new state and can be disabled', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <Checkbox label="Pflichtmerkmal" checked={false} onChange={onChange} />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Pflichtmerkmal'));
+    expect(onChange).toHaveBeenCalledWith(true);
+
+    rerender(<Checkbox label="Pflichtmerkmal" checked={false} disabled onChange={onChange} />);
+    expect(screen.getByLabelText<HTMLInputElement>('Pflichtmerkmal').disabled).toBe(true);
+  });
+
+  it('RadioGroup reports the chosen value, groups its options and can be disabled', () => {
+    const onChange = vi.fn();
+    const options = [
+      { value: 'true', label: 'Mit Leerzeichen' },
+      { value: 'false', label: 'Ohne Leerzeichen' },
+    ];
+    const { rerender } = render(
+      <RadioGroup legend="Schreibweise" value="true" options={options} onChange={onChange} />,
+    );
+
+    const group = screen.getByRole('group', { name: 'Schreibweise' });
+    const [first, second] = screen.getAllByRole<HTMLInputElement>('radio');
+    expect(group.contains(first ?? null)).toBe(true);
+    expect(first?.checked).toBe(true);
+    expect(first?.name).toBe(second?.name);
+    fireEvent.click(screen.getByLabelText('Ohne Leerzeichen'));
+    expect(onChange).toHaveBeenCalledWith('false');
+
+    rerender(
+      <RadioGroup
+        legend="Schreibweise"
+        value="true"
+        options={options}
+        disabled
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getAllByRole<HTMLInputElement>('radio').every((radio) => radio.disabled)).toBe(
+      true,
+    );
   });
 });

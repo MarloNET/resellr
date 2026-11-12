@@ -5,7 +5,7 @@ import { createReferenceNumber } from '@resellr/runtime-shared/reference-number'
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { ErrorLog } from '../ops/index.ts';
-import { DomainError } from '../shared/domain-error.ts';
+import { BadRequestError, DomainError } from '../shared/domain-error.ts';
 import { setSecurityHeaders } from './security-headers.ts';
 import { schemaErrorToDomainError } from './zod-validation.ts';
 
@@ -114,6 +114,9 @@ const CLIENT_ERROR_CODES: Partial<Record<number, ErrorCode>> = {
  */
 export function createErrorHandler(errorLog: ErrorLog) {
   return (error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply => {
+    if (error instanceof BadRequestError) {
+      return sendBadRequest(errorLog, request, reply, `service: ${error.reason}`);
+    }
     if (error instanceof DomainError) return sendDomainError(reply, error);
 
     const schemaError = schemaErrorToDomainError(error);

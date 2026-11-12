@@ -1,4 +1,11 @@
 import type {
+  Attribute,
+  AttributeCreateInput,
+  AttributeList,
+  AttributeOrder,
+  AttributeUpdateInput,
+} from '@resellr/domain/schemas/attribute.schema';
+import type {
   DeviceType,
   DeviceTypeCreate,
   DeviceTypeList,
@@ -152,6 +159,82 @@ export function useUpdateManufacturerMutation() {
       apiClient.patch<ManufacturerUpdateResult>(`/api/manufacturers/${id}`, body),
     onSuccess: ({ manufacturer }) =>
       storeSaved(queryClient, queryKeys.settings.manufacturers(), manufacturer),
+  });
+}
+
+/** Attributes of a device type in UI-027 (`GET /api/device-types/{id}/attributes`). */
+export function useAttributesQuery(deviceTypeId: number | null) {
+  return useQuery<AttributeList, ApiError>({
+    queryKey: queryKeys.settings.attributes(deviceTypeId ?? 0),
+    queryFn: ({ signal }) =>
+      apiClient.get<AttributeList>(`/api/device-types/${deviceTypeId}/attributes`, { signal }),
+    enabled: deviceTypeId !== null,
+  });
+}
+
+/**
+ * Takes the saved attribute into the cache at once (`hasValues` of the row stays) and loads the
+ * attributes and the device types, with their `attributeCount`, again in the background
+ * (2.0.7 "Wartezustand bei Folgeanfragen").
+ */
+function storeAttribute(queryClient: QueryClient, saved: Attribute) {
+  const key = queryKeys.settings.attributes(saved.deviceTypeId);
+  queryClient.setQueryData<AttributeList>(key, (list) => {
+    if (list === undefined) return list;
+    const known = list.items.find((item) => item.id === saved.id);
+    return known
+      ? {
+          ...list,
+          items: list.items.map((item) => (item.id === saved.id ? { ...item, ...saved } : item)),
+        }
+      : { items: [...list.items, { ...saved, hasValues: false }], total: list.total + 1 };
+  });
+  void queryClient.invalidateQueries({ queryKey: key });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.settings.deviceTypes() });
+}
+
+/** "Merkmal speichern" for a new attribute (`POST /api/device-types/{id}/attributes`). */
+export function useCreateAttributeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Attribute, ApiError, AttributeCreateInput & { deviceTypeId: number }>({
+    mutationFn: ({ deviceTypeId, ...body }) =>
+      apiClient.post<Attribute>(`/api/device-types/${deviceTypeId}/attributes`, body),
+    onSuccess: (saved) => storeAttribute(queryClient, saved),
+  });
+}
+
+/**
+ * "Merkmal speichern" for an existing attribute and "Merkmal deaktivieren"
+ * (`PATCH /api/attributes/{id}`). Fields left `undefined` are not sent, so they stay unchanged.
+ */
+export function useUpdateAttributeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Attribute, ApiError, AttributeUpdateInput & { id: number }>({
+    mutationFn: ({ id, ...body }) => apiClient.patch<Attribute>(`/api/attributes/${id}`, body),
+    onSuccess: (saved) => storeAttribute(queryClient, saved),
+  });
+}
+
+/** New order of the attributes (`PUT /api/device-types/{id}/attribute-order`, DER-34-06). */
+export function useReorderAttributesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeviceType, ApiError, AttributeOrder & { deviceTypeId: number }>({
+    mutationFn: ({ deviceTypeId, ...body }) =>
+      apiClient.put<DeviceType>(`/api/device-types/${deviceTypeId}/attribute-order`, body),
+    onSuccess: (saved, { deviceTypeId, attributeIds }) => {
+      storeSaved(queryClient, queryKeys.settings.deviceTypes(), saved);
+      const key = queryKeys.settings.attributes(deviceTypeId);
+      queryClient.setQueryData<AttributeList>(key, (list) => {
+        if (list === undefined) return list;
+        const byId = new Map(list.items.map((item) => [item.id, item]));
+        const items = attributeIds.flatMap((id, index) => {
+          const item = byId.get(id);
+          return item ? [{ ...item, sortOrder: index + 1 }] : [];
+        });
+        return { ...list, items };
+      });
+      void queryClient.invalidateQueries({ queryKey: key });
+    },
   });
 }
 

@@ -1,8 +1,9 @@
 import type { Kysely, Selectable } from 'kysely';
 
-import type { DB, DeviceTypeTable } from '../db/schema.ts';
+import type { AttributeTable, DB, DeviceTypeTable } from '../db/schema.ts';
 
 export type DeviceTypeRow = Selectable<DeviceTypeTable>;
+export type AttributeRow = Selectable<AttributeTable>;
 
 /** A device type row with the number of its attributes (`attributeCount`, 2.1). */
 export type DeviceTypeWithCount = DeviceTypeRow & { attribute_count: number };
@@ -22,8 +23,35 @@ export interface DeviceTypeChange {
   at: string;
 }
 
+/** Fields of a new attribute; it is appended at the end of the order of its device type. */
+export interface AttributeInsert {
+  deviceTypeId: number;
+  label: string;
+  labelKey: string;
+  dataType: string;
+  unit: string | null;
+  unitSpacing: boolean;
+  minValue: string | null;
+  maxValue: string | null;
+  pickListId: number | null;
+  level: string;
+  variantForming: boolean;
+  required: boolean;
+  datasheetBlock: string;
+  active: boolean;
+  at: string;
+}
+
+/** Changed fields of an attribute with its new version. */
+export type AttributeChange = Partial<Omit<AttributeInsert, 'deviceTypeId' | 'at'>> & {
+  version: number;
+  at: string;
+};
+
+const flag = (value: boolean) => (value ? 1 : 0);
+
 /**
- * Queries on `device_type` (CU-073); `attribute` follows with the attribute endpoints (#151).
+ * Queries on `device_type` and `attribute` (CU-073).
  * Inside an action pass `tx.db`, outside of one the outer `db` (2.0.4, MAR-263).
  */
 export function createDeviceTypeRepository(db: Kysely<DB>) {
@@ -104,6 +132,125 @@ export function createDeviceTypeRepository(db: Kysely<DB>) {
           updated_at: at,
         })
         .where('id', '=', id)
+        .execute();
+    },
+
+    /** Attributes of a device type in their order, active and deactivated. */
+    async listAttributes(deviceTypeId: number): Promise<AttributeRow[]> {
+      return db
+        .selectFrom('attribute')
+        .selectAll()
+        .where('device_type_id', '=', deviceTypeId)
+        .orderBy('sort_order')
+        .orderBy('id')
+        .execute();
+    },
+
+    async findAttribute(id: number): Promise<AttributeRow | undefined> {
+      return db.selectFrom('attribute').selectAll().where('id', '=', id).executeTakeFirst();
+    },
+
+    /** The attribute of the device type that already has this label key, if any (2.1). */
+    async findAttributeIdByLabelKey(
+      deviceTypeId: number,
+      labelKey: string,
+    ): Promise<number | undefined> {
+      const row = await db
+        .selectFrom('attribute')
+        .select('id')
+        .where('device_type_id', '=', deviceTypeId)
+        .where('label_key', '=', labelKey)
+        .executeTakeFirst();
+      return row?.id;
+    },
+
+    /** Inserts an attribute at the end of the order of its device type; returns its id. */
+    async insertAttribute(attribute: AttributeInsert): Promise<number> {
+      const { next } = await db
+        .selectFrom('attribute')
+        .select((eb) => eb(eb.fn.coalesce(eb.fn.max('sort_order'), eb.lit(0)), '+', 1).as('next'))
+        .where('device_type_id', '=', attribute.deviceTypeId)
+        .executeTakeFirstOrThrow();
+      const { id } = await db
+        .insertInto('attribute')
+        .values({
+          device_type_id: attribute.deviceTypeId,
+          label: attribute.label,
+          label_key: attribute.labelKey,
+          data_type: attribute.dataType,
+          system_role: null,
+          unit: attribute.unit,
+          unit_spacing: flag(attribute.unitSpacing),
+          min_value: attribute.minValue,
+          max_value: attribute.maxValue,
+          pick_list_id: attribute.pickListId,
+          level: attribute.level,
+          variant_forming: flag(attribute.variantForming),
+          required: flag(attribute.required),
+          datasheet_block: attribute.datasheetBlock,
+          sort_order: next,
+          active: flag(attribute.active),
+          version: 1,
+          created_at: attribute.at,
+          updated_at: attribute.at,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      return id;
+    },
+
+    /** Stores the changed fields of an attribute with its new version. */
+    async updateAttribute(id: number, change: AttributeChange) {
+      const optionalFlag = (value: boolean | undefined) =>
+        value === undefined ? undefined : flag(value);
+      const set = {
+        label: change.label,
+        label_key: change.labelKey,
+        data_type: change.dataType,
+        unit: change.unit,
+        unit_spacing: optionalFlag(change.unitSpacing),
+        min_value: change.minValue,
+        max_value: change.maxValue,
+        pick_list_id: change.pickListId,
+        level: change.level,
+        variant_forming: optionalFlag(change.variantForming),
+        required: optionalFlag(change.required),
+        datasheet_block: change.datasheetBlock,
+        active: optionalFlag(change.active),
+      };
+      await db
+        .updateTable('attribute')
+        .set({
+          ...Object.fromEntries(Object.entries(set).filter(([, value]) => value !== undefined)),
+          version: change.version,
+          updated_at: change.at,
+        })
+        .where('id', '=', id)
+        .execute();
+    },
+
+    /**
+     * Stores the order of the attributes of a device type (`sort_order` 1, 2, …) and the new
+     * version of the device type, which guards the order as a whole (2.0.3).
+     */
+    async storeAttributeOrder(
+      deviceTypeId: number,
+      attributeIds: readonly number[],
+      version: number,
+      at: string,
+    ) {
+      for (const [index, id] of attributeIds.entries()) {
+        await db
+          .updateTable('attribute')
+          .set({ sort_order: index + 1 })
+          .where('id', '=', id)
+          .where('device_type_id', '=', deviceTypeId)
+          .execute();
+      }
+      await db
+        .updateTable('device_type')
+        .set({ version, updated_at: at })
+        .where('id', '=', deviceTypeId)
         .execute();
     },
   };
