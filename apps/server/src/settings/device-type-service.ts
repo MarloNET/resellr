@@ -288,8 +288,8 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
 
     /**
      * `GET /api/device-types/{id}/attributes`: active and deactivated attributes in their order.
-     * `hasValues` (CU-074) locks data type and level once values are stored; the usage query
-     * follows with #152, until then no attribute has values.
+     * `hasValues` locks data type and level once values are stored; until the usage query
+     * CU-074 exists (Technical Specification 4.4, S2), no attribute has values.
      */
     async listAttributes(deviceTypeId: number): Promise<AttributeList> {
       const repository = createDeviceTypeRepository(db);

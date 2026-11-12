@@ -69,7 +69,7 @@ export const FIELD_MESSAGES = {
   attributeMinAboveMax: 'Mindestwert darf nicht größer als Höchstwert sein',
   /**
    * UI-027 "Einheit", longer than 20 characters (3.1). Text defined by Technical Specification
-   * 8.2 (addendum MAR-493).
+   * 8.2, table "Meldungstexte".
    */
   attributeUnit: 'Einheit: höchstens 20 Zeichen',
   /** UI-028 "Akku vorhanden", missing in the list battery (REQ-007, DER-35-10). */
