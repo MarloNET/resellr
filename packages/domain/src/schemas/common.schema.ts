@@ -22,6 +22,13 @@ export type Timestamp = z.infer<typeof timestampSchema>;
 export const centsSchema = z.int();
 export type Cents = z.infer<typeof centsSchema>;
 
+/** Counts of REQ-053 (2.8.4); `{0, 0, 0}` while there is no channel content (4.4.0). */
+export const impactSchema = z.object({
+  updated: z.int().nonnegative(),
+  rerelease: z.int().nonnegative(),
+  manualReview: z.int().nonnegative(),
+});
+
 /** List response `{ items, total }`. */
 export function listResponseSchema<T extends z.ZodType>(itemSchema: T) {
   return z.object({ items: z.array(itemSchema), total: z.int().nonnegative() });

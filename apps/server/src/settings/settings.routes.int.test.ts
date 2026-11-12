@@ -850,3 +850,360 @@ describe('supplier API (CU-087, Technical Specification 2.2)', () => {
     expect(t.database.sqlite.prepare('SELECT COUNT(*) FROM supplier').pluck().get()).toBe(0);
   });
 });
+
+describe('manufacturer API (CU-087, Technical Specification 2.2)', () => {
+  const list = (query = '') =>
+    t.app.inject({ method: 'GET', url: `/api/manufacturers${query}`, headers: { host: HOST } });
+
+  const listAll = () => list('?includeInactive=true');
+
+  const create = (body: Record<string, unknown>) =>
+    t.app.inject({
+      method: 'POST',
+      url: '/api/manufacturers',
+      headers: SAME_ORIGIN_WRITE,
+      payload: body,
+    });
+
+  const patch = (id: number, body: Record<string, unknown>) =>
+    t.app.inject({
+      method: 'PATCH',
+      url: `/api/manufacturers/${id}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload: body,
+    });
+
+  const auditRows = () =>
+    t.database.sqlite
+      .prepare(
+        "SELECT action, object_id, object_label, old_value, new_value FROM audit_entry WHERE object_type = 'manufacturer' ORDER BY id",
+      )
+      .all();
+
+  const names = (items: { name: string }[]) => items.map((item) => item.name);
+
+  const NO_IMPACT = { updated: 0, rerelease: 0, manualReview: 0 };
+
+  const createLenovo = async () => (await create({ name: 'Lenovo' })).json();
+
+  const manufacturerCount = () =>
+    t.database.sqlite.prepare('SELECT COUNT(*) FROM manufacturer').pluck().get();
+
+  /**
+   * A model template of manufacturer `manufacturerId`. Model templates are created from S3 on
+   * (#50); until then the test writes the rows directly, as the schema of S1 allows.
+   */
+  function insertModelTemplate(manufacturerId: number) {
+    const at = '2026-11-11T08:00:00.000Z';
+    t.database.sqlite.exec(`
+      INSERT INTO device_type (id, name, name_key, active, sort_order, version, created_at, updated_at)
+        VALUES (1, 'Notebook', 'notebook', 1, 1, 1, '${at}', '${at}');
+      INSERT INTO model_template (id, device_type_id, manufacturer_id, model_name, model_name_key,
+          mpn_unknown, model_values, default_device_values, search_key, import_review_pending,
+          import_review_keys, version, created_at, updated_at)
+        VALUES (1, 1, ${manufacturerId}, 'T14', 't14', 1, '{}', '{}', 't14', 0, '[]', 1, '${at}', '${at}');
+    `);
+  }
+
+  it('AC-REQ-100-01 POST " Fujitsu " creates the active manufacturer "Fujitsu" with gpsrComplete false', async () => {
+    const created = await create({ name: ' Fujitsu ' });
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toEqual({
+      id: expect.any(Number),
+      name: 'Fujitsu',
+      active: true,
+      gpsrComplete: false,
+      version: 1,
+      existing: false,
+    });
+    expect((await list()).json()).toEqual({
+      items: [
+        { id: created.json().id, name: 'Fujitsu', active: true, gpsrComplete: false, version: 1 },
+      ],
+      total: 1,
+    });
+  });
+
+  it('AC-REQ-100-02 DER-37-12 "lenovo" creates no second manufacturer and answers 200 with "Lenovo" and existing true', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await create({ name: 'lenovo' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ...lenovo, existing: true });
+    expect(names((await listAll()).json().items)).toEqual(['Lenovo']);
+    expect(auditRows()).toHaveLength(1);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['only spaces', '   '],
+    ['51 characters', 'x'.repeat(51)],
+  ])(
+    'AC-REQ-100-03 rejects a name that is %s with validation_failed "Name: 1 bis 50 Zeichen" at the field',
+    async (_case, name) => {
+      const response = await create({ name });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'validation_failed',
+        message: '',
+        fields: [{ path: 'name', code: expect.any(String), message: 'Name: 1 bis 50 Zeichen' }],
+        details: {},
+        referenceNumber: null,
+      });
+      expect(manufacturerCount()).toBe(0);
+    },
+  );
+
+  it('AC-REQ-100-03 accepts a name of 50 characters', async () => {
+    expect((await create({ name: 'x'.repeat(50) })).statusCode).toBe(201);
+  });
+
+  it('AC-REQ-101-02 a deactivated manufacturer is not in the choice for new model templates, its model templates stay usable', async () => {
+    const lenovo = await createLenovo();
+    await create({ name: 'HP' });
+    insertModelTemplate(lenovo.id);
+
+    const response = await patch(lenovo.id, { version: 1, active: false });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      manufacturer: { ...lenovo, existing: undefined, active: false, version: 2 },
+      impact: NO_IMPACT,
+    });
+    // The choice of UI-007 for new model templates (#50) reads the active manufacturers.
+    expect(names((await list()).json().items)).toEqual(['HP']);
+    // The existing model template keeps its manufacturer, which UI-031 still lists.
+    expect(
+      t.database.sqlite.prepare('SELECT manufacturer_id FROM model_template').pluck().all(),
+    ).toEqual([lenovo.id]);
+    expect((await listAll()).json().items).toEqual([
+      expect.objectContaining({ name: 'HP', active: true }),
+      { id: lenovo.id, name: 'Lenovo', active: false, gpsrComplete: false, version: 2 },
+    ]);
+  });
+
+  it('DER-37-09 "lenovo" with a deactivated "Lenovo" is rejected with manufacturer_deactivated and creates nothing', async () => {
+    const lenovo = await createLenovo();
+    await patch(lenovo.id, { version: 1, active: false });
+
+    const response = await create({ name: 'lenovo' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'manufacturer_deactivated',
+        message: 'Hersteller Lenovo ist deaktiviert',
+        fields: [],
+        details: {},
+        referenceNumber: null,
+      },
+    });
+    expect(manufacturerCount()).toBe(1);
+  });
+
+  it('DER-37-04 renaming to the name of another manufacturer is rejected with name_taken "Name ist bereits vergeben"', async () => {
+    await createLenovo();
+    const hp = (await create({ name: 'HP' })).json();
+
+    const response = await patch(hp.id, { version: 1, name: ' LENOVO ' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toEqual({
+      code: 'name_taken',
+      message: 'Name ist bereits vergeben',
+      fields: [],
+      details: {},
+      referenceNumber: null,
+    });
+    expect(names((await listAll()).json().items)).toEqual(['HP', 'Lenovo']);
+  });
+
+  it('DER-37-04 renaming to the name of a deactivated manufacturer is rejected with name_taken as well', async () => {
+    const lenovo = await createLenovo();
+    await patch(lenovo.id, { version: 1, active: false });
+    const hp = (await create({ name: 'HP' })).json();
+
+    expect((await patch(hp.id, { version: 1, name: 'lenovo' })).json().error.code).toBe(
+      'name_taken',
+    );
+  });
+
+  it('DER-37-04 creating with a name already given answers no name_taken (AC-REQ-100-02 instead)', async () => {
+    await createLenovo();
+
+    const response = await create({ name: 'LENOVO' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().existing).toBe(true);
+  });
+
+  it('DER-37-04 rejects an empty or 51 characters long name on rename with validation_failed', async () => {
+    const lenovo = await createLenovo();
+
+    for (const name of ['', 'x'.repeat(51)]) {
+      const response = await patch(lenovo.id, { version: 1, name });
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error.fields).toEqual([
+        { path: 'name', code: expect.any(String), message: 'Name: 1 bis 50 Zeichen' },
+      ]);
+    }
+  });
+
+  it('renames a manufacturer to "Lenovo" with a new version and answers { manufacturer, impact }', async () => {
+    const lenvo = (await create({ name: 'Lenvo' })).json();
+
+    const response = await patch(lenvo.id, { version: 1, name: 'Lenovo' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      manufacturer: { id: lenvo.id, name: 'Lenovo', active: true, gpsrComplete: false, version: 2 },
+      impact: NO_IMPACT,
+    });
+  });
+
+  it('a rename to the same name in other case is allowed', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await patch(lenovo.id, { version: 1, name: 'LENOVO' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().manufacturer).toMatchObject({ name: 'LENOVO', version: 2 });
+  });
+
+  it('lists the manufacturers by name without regard to case, the active ones without includeInactive', async () => {
+    await create({ name: 'zeta' });
+    const alpha = (await create({ name: 'Alpha' })).json();
+    await create({ name: 'beta' });
+    await patch(alpha.id, { version: 1, active: false });
+
+    expect(names((await listAll()).json().items)).toEqual(['Alpha', 'beta', 'zeta']);
+    expect((await list()).json()).toMatchObject({
+      items: [{ name: 'beta' }, { name: 'zeta' }],
+      total: 2,
+    });
+  });
+
+  it('DER-37-08 reports gpsrComplete from the stored manufacturer', async () => {
+    const lenovo = await createLenovo();
+    t.database.sqlite
+      .prepare('UPDATE manufacturer SET gpsr_complete = 1 WHERE id = ?')
+      .run(lenovo.id);
+    await create({ name: 'Fujitsu' });
+
+    expect((await listAll()).json().items).toEqual([
+      expect.objectContaining({ name: 'Fujitsu', gpsrComplete: false }),
+      expect.objectContaining({ name: 'Lenovo', gpsrComplete: true }),
+    ]);
+  });
+
+  it('pages the list with limit and offset (2.0.1)', async () => {
+    for (const name of ['A', 'B', 'C']) await create({ name });
+
+    expect((await list('?limit=1&offset=1')).json()).toMatchObject({
+      items: [{ name: 'B' }],
+      total: 3,
+    });
+  });
+
+  it('there is no DELETE route for manufacturers (2.2, REQ-101)', () => {
+    expect(t.app.hasRoute({ method: 'DELETE', url: '/api/manufacturers/:id' })).toBe(false);
+  });
+
+  it('DER-37-06 (a) rejects a change with an outdated version with 409 version_conflict and changes nothing', async () => {
+    const lenovo = await createLenovo();
+    await patch(lenovo.id, { version: 1, name: 'Lenovo neu' });
+
+    const response = await patch(lenovo.id, { version: 1, active: false });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('version_conflict');
+    expect((await listAll()).json().items).toEqual([
+      expect.objectContaining({ name: 'Lenovo neu', active: true, version: 2 }),
+    ]);
+  });
+
+  it('answers 404 not_found with M-15 for an unknown manufacturer', async () => {
+    const response = await patch(99, { version: 1, name: 'HP' });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error).toMatchObject({
+      code: 'not_found',
+      message: 'Dieser Eintrag ist nicht mehr vorhanden.',
+    });
+  });
+
+  it('writes one audit entry per change: created, updated, deactivated, activated (2.0.9, 3.6)', async () => {
+    const lenvo = (await create({ name: 'Lenvo' })).json();
+    await patch(lenvo.id, { version: 1, name: 'Lenovo', active: false });
+    await patch(lenvo.id, { version: 2, active: true });
+
+    expect(auditRows()).toEqual([
+      {
+        action: 'created',
+        object_id: lenvo.id,
+        object_label: 'Hersteller Lenvo',
+        old_value: null,
+        new_value: JSON.stringify({ Name: 'Lenvo', Status: 'aktiv' }),
+      },
+      {
+        action: 'updated',
+        object_id: lenvo.id,
+        object_label: 'Hersteller Lenovo',
+        old_value: JSON.stringify({ Name: 'Lenvo' }),
+        new_value: JSON.stringify({ Name: 'Lenovo' }),
+      },
+      {
+        action: 'deactivated',
+        object_id: lenvo.id,
+        object_label: 'Hersteller Lenovo',
+        old_value: JSON.stringify({ Status: 'aktiv' }),
+        new_value: JSON.stringify({ Status: 'deaktiviert' }),
+      },
+      {
+        action: 'activated',
+        object_id: lenvo.id,
+        object_label: 'Hersteller Lenovo',
+        old_value: JSON.stringify({ Status: 'deaktiviert' }),
+        new_value: JSON.stringify({ Status: 'aktiv' }),
+      },
+    ]);
+  });
+
+  it('a change without a difference keeps the version and writes no audit entry', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await patch(lenovo.id, { version: 1, name: 'Lenovo', active: true });
+
+    expect(response.json().manufacturer).toMatchObject({ version: 1 });
+    expect(auditRows()).toHaveLength(1);
+  });
+
+  it('DER-37-10 a technical error answers 500 internal_error with the reference number of the error log and stores nothing', async () => {
+    t.database.sqlite.exec(
+      "CREATE TRIGGER fail_manufacturer BEFORE INSERT ON manufacturer BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+    );
+
+    const response = await create({ name: 'Lenovo' });
+
+    expect(response.statusCode).toBe(500);
+    const { error } = response.json();
+    expect(error.code).toBe('internal_error');
+    expect(error.referenceNumber).toMatch(/^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(t.readErrorLog()).toEqual([expect.objectContaining({ refNo: error.referenceNumber })]);
+    expect(manufacturerCount()).toBe(0);
+    expect(auditRows()).toEqual([]);
+  });
+
+  it('DER-37-06 (c) rejects a write while shutting down with 503 shutting_down and stores nothing', async () => {
+    t.lifecycle.set('stopping');
+
+    const response = await create({ name: 'Lenovo' });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toMatchObject({ code: 'shutting_down', referenceNumber: null });
+    expect(manufacturerCount()).toBe(0);
+  });
+});

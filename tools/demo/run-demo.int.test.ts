@@ -3,7 +3,12 @@ import { createServer, type Socket } from 'node:net';
 import { join } from 'node:path';
 
 import { INITIAL_DEVICE_TYPES } from '@resellr/seed-data/initial-settings';
-import { DEMO_DEVICE_TYPES, DEMO_SUPPLIERS, type SeedArea } from '@resellr/test-data/demo-seed';
+import {
+  DEMO_DEVICE_TYPES,
+  DEMO_MANUFACTURERS,
+  DEMO_SUPPLIERS,
+  type SeedArea,
+} from '@resellr/test-data/demo-seed';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -91,8 +96,8 @@ describe('startDemo (CU-004)', () => {
         (table) => db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get() !== 0,
       );
       // The initial settings of the seed migration CU-071 and the demo data written through the
-      // API on top of them (CU-061): the device types and suppliers of S2 with their audit
-      // entries.
+      // API on top of them (CU-061): the device types, suppliers and manufacturers of S2 with
+      // their audit entries.
       expect(filled).toEqual([
         'attribute',
         'attribute_mapping',
@@ -101,6 +106,7 @@ describe('startDemo (CU-004)', () => {
         'datasheet_layout',
         'description_template',
         'device_type',
+        'manufacturer',
         'merchant_profile',
         'pick_list',
         'pick_list_value',
@@ -113,6 +119,9 @@ describe('startDemo (CU-004)', () => {
       ]);
       expect(db.prepare('SELECT name, active FROM supplier ORDER BY id').all()).toEqual(
         DEMO_SUPPLIERS.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
+      );
+      expect(db.prepare('SELECT name, active FROM manufacturer ORDER BY id').all()).toEqual(
+        DEMO_MANUFACTURERS.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
       );
     } finally {
       db.close();
