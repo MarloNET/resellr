@@ -5,8 +5,11 @@
 // scripts.
 
 const RELOAD_MS = 1000;
+/** Pattern of a reference number (Technical Specification 2.0.5, H-11). */
+const REFERENCE_NUMBER = /^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
 
-const request = new URLSearchParams(location.search).get('request');
+const params = new URLSearchParams(location.search);
+const request = params.get('request');
 const page = document.body.dataset.page;
 let done = false;
 
@@ -16,9 +19,22 @@ let done = false;
 const reactions = {
   /** @param {LauncherState} state */
   'lp-01': (state) => {
-    if (state.phase === 'ready' && typeof state.url === 'string') goTo(state.url);
+    // `aborted` (also for `gave_up` and `already_running` without a server) leads to LP-02, whose
+    // address with the reference number `open` wrote through CU-310 (2.18 "Seitenwechsel").
+    if ((state.phase === 'ready' || state.phase === 'aborted') && typeof state.url === 'string') {
+      goTo(state.url);
+    }
   },
 };
+
+/** LP-02 shows the reference number of its address, but only one that matches the pattern. */
+function showReferenceNumber() {
+  const refNo = params.get('ref');
+  const element = document.getElementById('reference-number');
+  if (element === null || refNo === null || !REFERENCE_NUMBER.test(refNo)) return;
+  element.textContent = refNo;
+  element.hidden = false;
+}
 
 /** @param {string} url */
 function goTo(url) {
@@ -49,4 +65,5 @@ function loadState() {
 }
 
 Object.assign(window, { __resellrLauncherState: onLauncherState });
+if (page === 'lp-02') showReferenceNumber();
 if (request !== null) loadState();

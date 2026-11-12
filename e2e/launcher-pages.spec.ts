@@ -22,6 +22,13 @@ const BUILD_SCRIPT = 'tools/launcher-pages/build-launcher-pages.mjs';
 /** The local address the page goes on to; the test answers it instead of a server. */
 const APP_URL = 'http://127.0.0.1:4311/';
 
+const LP_02_TITLE = 'resellr konnte nicht gestartet werden';
+const LP_02_TEXT =
+  'Der Start von resellr wurde abgebrochen. Bitte versuchen Sie es erneut: Öffnen Sie im ' +
+  'Startmenü die Verknüpfung „resellr“. Besteht der Fehler weiter, informieren Sie den ' +
+  'Betreiber und nennen Sie ihm diese Referenznummer:';
+const REF_NO = 'R-7K2M-9QX4';
+
 const LP_01_TEXT =
   'Bitte haben Sie einen Moment Geduld. Der Start dauert diesmal länger als sonst, zum Beispiel ' +
   'weil resellr Ihre Daten prüft. Lassen Sie dieses Fenster geöffnet. resellr öffnet sich von ' +
@@ -45,6 +52,17 @@ function lp01Url(request: string): string {
   url.searchParams.set('request', request);
   return url.href;
 }
+
+/** Address of LP-02 with the URL parameter `ref`, encoded like CU-310 does it. */
+function lp02Url(ref: string | null): string {
+  const url = pathToFileURL(join(pagesDir, 'lp-02.html'));
+  if (ref !== null) url.searchParams.set('ref', ref);
+  return url.href;
+}
+
+/** The lines of visible text on the page. */
+const visibleLines = async (page: Page) =>
+  (await page.locator('body').innerText()).split('\n').filter(Boolean);
 
 const writeState = (state: Partial<LauncherState> & Pick<LauncherState, 'request' | 'phase'>) =>
   writeLauncherState(pagesDir, { url: null, refNo: null, dataDir: null, ...state });
@@ -150,7 +168,107 @@ for (const viewport of [
       expect(errors).toEqual([]);
     });
   });
+
+  test.describe(`LP-02 at ${viewport.width} px`, () => {
+    test.use({ viewport });
+
+    test('LP-02.default DER-103-01 shows the title, the text and the reference number as selectable text, nothing else', async ({
+      page,
+    }) => {
+      const errors = collectErrors(page);
+
+      await page.goto(lp02Url(REF_NO));
+
+      await expect(page).toHaveTitle(LP_02_TITLE);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+      await expect(page.locator('body')).toMatchAriaSnapshot(`
+        - main:
+          - heading "${LP_02_TITLE}" [level=1]
+          - paragraph: "${LP_02_TEXT}"
+          - paragraph: ${REF_NO}
+      `);
+      // No error codes, file paths or table names: the page holds only these texts (REQ-073).
+      expect(await visibleLines(page)).toEqual([LP_02_TITLE, LP_02_TEXT, REF_NO]);
+
+      // Selectable: the user can select the number and copy it.
+      const refNo = page.getByText(REF_NO, { exact: true });
+      await expect(refNo).toHaveCSS('user-select', 'auto');
+      await refNo.selectText();
+      expect(await page.evaluate(() => window.getSelection()?.toString().trim())).toBe(REF_NO);
+
+      // Error style for the title strip only (DESIGN.md: error #B42318 on #FEE4E2).
+      const title = page.getByRole('heading', { level: 1 });
+      await expect(title).toHaveCSS('color', 'rgb(180, 35, 24)');
+      await expect(title).toHaveCSS('background-color', 'rgb(254, 228, 226)');
+      await expect(page.getByText(LP_02_TEXT)).toHaveCSS('color', 'rgb(31, 41, 55)');
+
+      // Fully readable: the card fits the window, nothing scrolls sideways.
+      const card = await page.locator('main').boundingBox();
+      expect(card!.x).toBeGreaterThanOrEqual(0);
+      expect(card!.x + card!.width).toBeLessThanOrEqual(viewport.width);
+      expect(card!.width).toBeLessThanOrEqual(560);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      expect(errors).toEqual([]);
+    });
+  });
 }
+
+test.describe('LP-02.default reference number', () => {
+  for (const [name, ref] of [
+    ['a letter outside Crockford Base32', 'R-7K2M-9QXI'],
+    ['lower case', 'r-7k2m-9qx4'],
+    ['a path', 'C:\\Users\\resellr\\Protokolle'],
+    ['markup', '<b>R-7K2M-9QX4</b>'],
+    ['an error code', 'internal_error'],
+  ] as const) {
+    test(`DER-103-01 does not show a number with ${name}`, async ({ page }) => {
+      const errors = collectErrors(page);
+
+      await page.goto(lp02Url(ref));
+
+      expect(await visibleLines(page)).toEqual([LP_02_TITLE, LP_02_TEXT]);
+      expect(await page.locator('b').count()).toBe(0);
+      expect(errors).toEqual([]);
+    });
+  }
+
+  test('DER-103-01 shows no number without the parameter ref and reads no launcher-state.js', async ({
+    page,
+  }) => {
+    const stateLoads = countStateLoads(page);
+
+    await page.goto(lp02Url(null));
+
+    expect(await visibleLines(page)).toEqual([LP_02_TITLE, LP_02_TEXT]);
+    await page.waitForTimeout(1500);
+    expect(stateLoads()).toBe(0);
+  });
+});
+
+test('DER-103-01 LP-01 goes on to LP-02 with the reference number when open writes aborted for its request', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  // Like CU-268 writes `aborted`: the address of LP-02 with `ref`, also for `gave_up`.
+  const aborted = (request: string, refNo: string) =>
+    writeState({ request, phase: 'aborted', url: lp02Url(refNo), refNo });
+  aborted('another-call', 'R-ABCD-EFGH');
+
+  await page.goto(lp01Url('call-8'));
+  await expect(page).toHaveTitle('resellr startet');
+  const historyLength = await page.evaluate(() => history.length);
+
+  aborted('call-8', REF_NO);
+
+  await page.waitForURL((url) => url.pathname.endsWith('/lp-02.html'), { timeout: 5000 });
+  await expect(page).toHaveTitle(LP_02_TITLE);
+  expect(await visibleLines(page)).toEqual([LP_02_TITLE, LP_02_TEXT, REF_NO]);
+  // `location.replace`: going back does not lead to LP-01.
+  expect(await page.evaluate(() => history.length)).toBe(historyLength);
+  expect(errors).toEqual([]);
+});
 
 test('DER-102-04 reloads launcher-state.js every second over the fixed relative path', async ({
   page,
