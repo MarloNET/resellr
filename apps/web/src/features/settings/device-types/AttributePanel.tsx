@@ -14,23 +14,14 @@ import {
   type DatasheetBlock,
 } from '@resellr/domain/schemas/attribute.schema';
 import type { PickList } from '@resellr/domain/schemas/pick-list.schema';
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-  type SelectHTMLAttributes,
-} from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import {
-  FormField,
-  useFocusFirstError,
-  type FormFieldControlProps,
-} from '../../../components/forms/FormField.tsx';
+import { FormField, useFocusFirstError } from '../../../components/forms/FormField.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
-import { cn } from '../../../components/ui/cn.ts';
+import { Checkbox } from '../../../components/ui/Checkbox.tsx';
 import { Input } from '../../../components/ui/Input.tsx';
+import { RadioGroup } from '../../../components/ui/RadioGroup.tsx';
+import { Select } from '../../../components/ui/Select.tsx';
 
 // Texts of the panel "Merkmal bearbeiten" in UI-027 `screen.md` (UI/UX design v0.6.1).
 export const PANEL_TEXTS = {
@@ -399,84 +390,5 @@ export function AttributePanel({
         </Button>
       </div>
     </form>
-  );
-}
-
-function Select({
-  className,
-  children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & Partial<FormFieldControlProps>) {
-  return (
-    <select
-      className={cn(
-        'h-control w-full min-w-0 rounded-control border border-border-input bg-surface px-2',
-        'text-body text-text aria-invalid:border-error disabled:bg-bg',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </select>
-  );
-}
-
-function Checkbox({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center gap-2 text-body text-text">
-      <input
-        type="checkbox"
-        className="size-4 accent-primary"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      {label}
-    </label>
-  );
-}
-
-function RadioGroup({
-  legend,
-  value,
-  options,
-  disabled,
-  onChange,
-}: {
-  legend: string;
-  value: string;
-  options: { value: string; label: ReactNode }[];
-  disabled: boolean;
-  onChange: (value: string) => void;
-}) {
-  const name = useId();
-  return (
-    <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
-      <legend className="mb-1 p-0 text-label font-semibold text-text">{legend}</legend>
-      {options.map((option) => (
-        <label key={option.value} className="flex items-center gap-2 text-body text-text">
-          <input
-            type="radio"
-            name={name}
-            className="size-4 accent-primary"
-            value={option.value}
-            checked={value === option.value}
-            disabled={disabled}
-            onChange={() => onChange(option.value)}
-          />
-          {option.label}
-        </label>
-      ))}
-    </fieldset>
   );
 }
