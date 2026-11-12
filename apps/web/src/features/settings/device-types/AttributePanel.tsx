@@ -199,13 +199,57 @@ export function AttributePanel({
   const roleLocked = systemRole !== null;
   const locked = saving || writesLocked;
   const change = (next: Partial<AttributeDraft>) => setDraft({ ...draft, ...next });
+  const pointerPressed = useRef(false);
+  const cancelDeferredCheck = useRef(() => {});
 
   // Field errors of the server get the focus like those of the browser (2.0.7 `.validation`).
   useEffect(() => {
     if (errorFocusRequest > 0) focusFirstError();
   }, [errorFocusRequest, focusFirstError]);
 
+  useEffect(() => () => cancelDeferredCheck.current(), []);
+
+  function pressPointer() {
+    pointerPressed.current = true;
+    const release = () => {
+      pointerPressed.current = false;
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+  }
+
+  /**
+   * Check of one field on leaving it (2.0.7). During a click in the panel the check waits until
+   * after the click: a new or vanished error line would move "Merkmal speichern" between
+   * `mousedown` and `mouseup`, and the browser would drop the click (Q-1, as QA-D1 in the form of
+   * the device type).
+   */
+  function checkOnBlur(field: 'label' | 'unit', message: string | undefined) {
+    const apply = () => onErrors({ ...errors, [field]: message });
+    if (!pointerPressed.current) {
+      apply();
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = () => {
+      cancelDeferredCheck.current();
+      // `click` follows `pointerup` in the same task, so the timeout runs after it.
+      timer = setTimeout(apply);
+    };
+    window.addEventListener('pointerup', run);
+    window.addEventListener('pointercancel', run);
+    cancelDeferredCheck.current = () => {
+      window.removeEventListener('pointerup', run);
+      window.removeEventListener('pointercancel', run);
+      clearTimeout(timer);
+    };
+  }
+
   function save() {
+    // The save checks all fields itself; a later check on leaving must not change its result.
+    cancelDeferredCheck.current();
     const checked = checkDraft(draft, systemRole);
     if (hasErrors(checked)) {
       onErrors(checked);
@@ -222,6 +266,7 @@ export function AttributePanel({
       aria-label={PANEL_TEXTS.title}
       noValidate
       className="flex flex-col gap-4"
+      onPointerDown={pressPointer}
       onSubmit={(event) => {
         event.preventDefault();
         save();
@@ -234,7 +279,7 @@ export function AttributePanel({
             value={draft.label}
             disabled={locked}
             onChange={(event) => change({ label: event.target.value })}
-            onBlur={() => onErrors({ ...errors, label: checkLabel(draft.label, systemRole) })}
+            onBlur={() => checkOnBlur('label', checkLabel(draft.label, systemRole))}
           />
         )}
       </FormField>
@@ -288,7 +333,7 @@ export function AttributePanel({
             disabled={locked}
             onChange={(event) => change({ unit: event.target.value })}
             onBlur={() =>
-              onErrors({ ...errors, unit: firstMessage(attributeUnitSchema.safeParse(draft.unit)) })
+              checkOnBlur('unit', firstMessage(attributeUnitSchema.safeParse(draft.unit)))
             }
           />
         )}

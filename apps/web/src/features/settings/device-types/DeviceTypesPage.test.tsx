@@ -538,6 +538,74 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     },
   );
 
+  // Q-1: the check on leaving a field must not change an error line while the mouse button is
+  // pressed on "Merkmal speichern"; otherwise the button moves and the click is lost.
+  it('UI-027.success DER-34-09 a mouse click on "Merkmal speichern" after a corrected label saves the new attribute', async () => {
+    const created = { ...DISPLAY, id: 21, label: 'Gewicht', dataType: 'text' as const };
+    const { sent } = await openAttributes([RAM], {
+      'POST /api/device-types/1/attributes': () => Response.json(created, { status: 201 }),
+    });
+    fireEvent.click(within(attributeRegion()).getByRole('button', { name: /Merkmal anlegen/ }));
+    fireEvent.click(panelSave());
+    expect(await within(panel()).findByText('Bezeichnung: 1 bis 100 Zeichen')).toBeTruthy();
+    expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
+    fireEvent.change(panelField(/^Bezeichnung/), { target: { value: 'Gewicht' } });
+
+    pressPointer(panelSave());
+    expect(within(panel()).getByText('Bezeichnung: 1 bis 100 Zeichen')).toBeTruthy();
+    await releasePointerAndClick(panelSave());
+
+    expect(await screen.findByText('Merkmal gespeichert')).toBeTruthy();
+    expect(screen.queryByRole('form', { name: 'Merkmal bearbeiten' })).toBeNull();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      method: 'POST',
+      path: '/api/device-types/1/attributes',
+      body: { label: 'Gewicht' },
+    });
+  });
+
+  it('UI-027.success DER-34-09 a mouse click on "Merkmal speichern" after a corrected unit saves the attribute', async () => {
+    const { sent } = await openAttributes([RAM, DISPLAY], {
+      'PATCH /api/attributes/12': () => Response.json({ ...RAM, unit: 'GiB', version: 3 }),
+    });
+    await openPanelOf('RAM');
+    act(() => panelField(/^Einheit/).focus());
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'x'.repeat(21) } });
+    act(() => panelField(/^Bezeichnung/).focus());
+    expect(within(panel()).getByText('Einheit: höchstens 20 Zeichen')).toBeTruthy();
+    act(() => panelField(/^Einheit/).focus());
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'GiB' } });
+
+    pressPointer(panelSave());
+    expect(within(panel()).getByText('Einheit: höchstens 20 Zeichen')).toBeTruthy();
+    await releasePointerAndClick(panelSave());
+
+    expect(await screen.findByText('Merkmal gespeichert')).toBeTruthy();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      method: 'PATCH',
+      path: '/api/attributes/12',
+      body: { unit: 'GiB' },
+    });
+  });
+
+  it('UI-027.validation DER-34-02 a mouse click on "Merkmal speichern" after an invalid label shows the error after the click, without request', async () => {
+    const { sent } = await openAttributes([RAM]);
+    await openPanelOf('RAM');
+    act(() => panelField(/^Bezeichnung/).focus());
+    fireEvent.change(panelField(/^Bezeichnung/), { target: { value: 'a'.repeat(101) } });
+
+    pressPointer(panelSave());
+    expect(within(panel()).queryByText('Bezeichnung: 1 bis 100 Zeichen')).toBeNull();
+    await releasePointerAndClick(panelSave());
+
+    expect(within(panel()).getByText('Bezeichnung: 1 bis 100 Zeichen')).toBeTruthy();
+    expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
+    expect(sent).toEqual([]);
+    expectAccessiblePanel();
+  });
+
   it('UI-027.validation DER-34-02 shows the server text of validation_failed at the field with the focus on it', async () => {
     await openAttributes([RAM], {
       'PATCH /api/attributes/12': () =>
