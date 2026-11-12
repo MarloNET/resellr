@@ -239,9 +239,12 @@ export function MerchantProfilePage() {
                 disabled={formLocked}
                 onChange={(event) => change('contactText', event.target.value)}
                 onBlur={() => checkOnBlur('contactText')}
+                // The 1 px input border as an inset ring: Playwright scrolls a text area into
+                // view without its CSS border, which the reachability check (6.3) would count as
+                // 1 px outside the viewport.
                 className={cn(
-                  'w-full min-w-0 rounded-control border border-border-input bg-surface px-2 py-1',
-                  'text-body text-text aria-invalid:border-error disabled:bg-bg',
+                  'w-full min-w-0 rounded-control bg-surface px-2 py-1 ring-1 ring-border-input ring-inset',
+                  'text-body text-text aria-invalid:ring-error disabled:bg-bg',
                 )}
               />
             )}
