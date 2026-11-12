@@ -21,6 +21,8 @@ const WINDOW_SIZE_MATRIX = [
 const FM_7_TAG = /@fm-7/;
 
 const DEMO_START_SPEC = 'demo-start.spec.ts';
+/** The launcher pages are `file://` pages without a server (2.18, 6.1); they set their own viewports. */
+const LAUNCHER_PAGES_SPEC = 'launcher-pages.spec.ts';
 /** The complete run of REQ-106 under `strace` does not depend on the window size; it runs once. */
 const WRITE_PATHS_SPEC = 'write-paths.spec.ts';
 
@@ -31,6 +33,7 @@ const WRITE_PATHS_SPEC = 'write-paths.spec.ts';
  * folder (`e2e/fixtures/app-fixture.ts`). The project `demo-start` runs `npm run demo` first; it
  * also builds the user interface the matrix projects serve. The project `write-paths` observes
  * the file writes of the server along a complete run once (REQ-106, Technical Specification 6.2).
+ * The project `launcher-pages` checks the built launcher pages without a server.
  */
 export default defineConfig<object, AppFixtureOptions>({
   testDir: 'e2e',
@@ -49,6 +52,11 @@ export default defineConfig<object, AppFixtureOptions>({
       use: { viewport: { width: 1366, height: 600 }, deviceScaleFactor: 1 },
     },
     {
+      name: 'launcher-pages',
+      testMatch: LAUNCHER_PAGES_SPEC,
+      use: { viewport: { width: 480, height: 600 }, deviceScaleFactor: 1 },
+    },
+    {
       name: 'write-paths',
       testMatch: WRITE_PATHS_SPEC,
       dependencies: ['demo-start'],
@@ -60,7 +68,7 @@ export default defineConfig<object, AppFixtureOptions>({
     },
     ...WINDOW_SIZE_MATRIX.map(({ name, width, height, deviceScaleFactor }) => ({
       name,
-      testIgnore: [DEMO_START_SPEC, WRITE_PATHS_SPEC],
+      testIgnore: [DEMO_START_SPEC, LAUNCHER_PAGES_SPEC, WRITE_PATHS_SPEC],
       dependencies: ['demo-start'],
       ...(name === 'FM-7' && { grep: FM_7_TAG }),
       use: { viewport: { width, height }, deviceScaleFactor },

@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // `launcher-pages.js` runs in Chrome on the launcher pages.
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": ["*.mjs", "*.js", "*.ts"],
+  "exclude": ["dist"]
+}
