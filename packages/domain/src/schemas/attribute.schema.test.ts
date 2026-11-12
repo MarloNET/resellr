@@ -8,9 +8,9 @@ import {
   attributeOrderSchema,
   attributeUpdateSchema,
   attributeWithUsageSchema,
-  FIXED_PLACEHOLDER_NAMES,
   type AttributeCreateInput,
 } from './attribute.schema.ts';
+import { FIXED_PLACEHOLDER_NAMES } from '../placeholders/placeholder-catalog.ts';
 
 const messagesOf = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.error?.issues.map((issue) => issue.message) ?? [];
@@ -97,9 +97,14 @@ describe('attribute label and placeholders (M-04, DER-34-02)', () => {
     ]);
   });
 
-  it('names the entered label after trimming', () => {
-    expect(messagesOf(attributeLabelSchema.safeParse(' Hersteller '))).toEqual([
-      'Bezeichnung ist für einen festen Platzhalter vergeben: Hersteller',
+  it.each([
+    ['hersteller', 'hersteller'],
+    [' Hersteller ', 'Hersteller'],
+    ['Baustein:Abholung', 'Baustein:Abholung'],
+    [' stückzahl', 'stückzahl'],
+  ])('rejects %j without regard to case and names the label after trimming', (label, name) => {
+    expect(messagesOf(attributeLabelSchema.safeParse(label))).toEqual([
+      `Bezeichnung ist für einen festen Platzhalter vergeben: ${name}`,
     ]);
   });
 
@@ -107,6 +112,9 @@ describe('attribute label and placeholders (M-04, DER-34-02)', () => {
     expect(attributeLabelSchemaFor('battery_capacity').parse('Akkukapazität')).toBe(
       'Akkukapazität',
     );
+    expect(messagesOf(attributeLabelSchemaFor(null).safeParse('Akkukapazität'))).toEqual([
+      'Bezeichnung ist für einen festen Platzhalter vergeben: Akkukapazität',
+    ]);
     expect(attributeLabelSchemaFor('battery').safeParse('Akkukapazität').success).toBe(false);
     expect(messagesOf(attributeLabelSchemaFor('battery_capacity').safeParse('Hersteller'))).toEqual(
       ['Bezeichnung ist für einen festen Platzhalter vergeben: Hersteller'],
@@ -140,6 +148,31 @@ describe('attribute create request (2.1)', () => {
     expect(attributeCreateSchema.safeParse({ ...newAttribute, unit: 'a'.repeat(20) }).success).toBe(
       true,
     );
+  });
+
+  it.each([
+    ['"abc" for a decimal', 'decimal', { minValue: 'abc' }, 'minValue', 'Mindestwert: Zahl'],
+    ['"1,5" for an integer', 'integer', { minValue: '1,5' }, 'minValue', 'Mindestwert: ganze Zahl'],
+    ['"1.2.3" for a decimal', 'decimal', { maxValue: '1.2.3' }, 'maxValue', 'Höchstwert: Zahl'],
+    ['"x" for an integer', 'integer', { maxValue: 'x' }, 'maxValue', 'Höchstwert: ganze Zahl'],
+  ])('rejects the bound %s with the text of 8.2', (_case, dataType, bounds, path, message) => {
+    expect(
+      issuesOf(
+        attributeCreateSchema.safeParse({
+          ...newAttribute,
+          dataType,
+          minValue: null,
+          maxValue: null,
+          ...bounds,
+        }),
+      ),
+    ).toEqual([{ path, message }]);
+  });
+
+  it('accepts "5,0" as a whole bound of an integer and stores "5"', () => {
+    expect(
+      attributeCreateSchema.parse({ ...newAttribute, dataType: 'integer', minValue: '5,0' }),
+    ).toMatchObject({ minValue: '5', maxValue: '60' });
   });
 
   it('DER-34-03 rejects a minimum above the maximum at the field "Mindestwert"', () => {

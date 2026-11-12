@@ -1,4 +1,3 @@
-import { parseDecimal } from '@resellr/domain/format/parse-decimal';
 import {
   ATTRIBUTE_DATA_TYPES,
   ATTRIBUTE_LEVELS,
@@ -110,7 +109,8 @@ export function requestOf(
   systemRole: AttributeSystemRole | null,
 ): Omit<AttributeCreateInput, 'active'> {
   const numbers = isNumberType(draft.dataType);
-  const bound = (value: string) => (numbers && value.trim() !== '' ? value.trim() : null);
+  // As entered; the server turns it into the canonical form (2.1, CU-013).
+  const bound = (value: string) => (numbers && value.trim() !== '' ? value : null);
   return {
     label: draft.label,
     dataType: draft.dataType,
@@ -140,25 +140,17 @@ export function checkLabel(label: string, systemRole: AttributeSystemRole | null
 
 /**
  * The field rules of 2.1 in the browser with the schemas of the server (2.0.7): label, unit,
- * minimum ≤ maximum and the pick list for data type pick.
+ * minimum and maximum (format, minimum ≤ maximum) and the pick list for data type pick.
  */
 export function checkDraft(
   draft: AttributeDraft,
   systemRole: AttributeSystemRole | null,
 ): AttributeFieldErrors {
-  const request = requestOf(draft, systemRole);
-  const canonical = (value: string | null) => (value === null ? null : parseDecimal(value));
   const errors: AttributeFieldErrors = {
     label: checkLabel(draft.label, systemRole),
     unit: firstMessage(attributeUnitSchema.safeParse(draft.unit)),
   };
-  const issues = attributeDefinitionIssues({
-    ...request,
-    systemRole,
-    minValue: canonical(request.minValue),
-    maxValue: canonical(request.maxValue),
-  });
-  for (const issue of issues) {
+  for (const issue of attributeDefinitionIssues({ ...requestOf(draft, systemRole), systemRole })) {
     if (issue.path !== undefined) errors[issue.path] ??= issue.message;
   }
   return errors;
@@ -313,8 +305,7 @@ export function AttributePanel({
             {(control) => (
               <Input
                 {...control}
-                type="number"
-                step="any"
+                inputMode="decimal"
                 value={draft.minValue}
                 disabled={locked}
                 onChange={(event) => change({ minValue: event.target.value })}
@@ -325,8 +316,7 @@ export function AttributePanel({
             {(control) => (
               <Input
                 {...control}
-                type="number"
-                step="any"
+                inputMode="decimal"
                 value={draft.maxValue}
                 disabled={locked}
                 onChange={(event) => change({ maxValue: event.target.value })}

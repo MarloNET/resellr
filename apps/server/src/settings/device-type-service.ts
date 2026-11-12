@@ -1,7 +1,10 @@
+import type { FieldError } from '@resellr/domain/errors/error-response';
 import {
   ATTRIBUTE_VALUE_LABELS,
   attributeDefinitionIssues,
   attributeLabelSchemaFor,
+  canonicalBound,
+  type AttributeDefinitionIssue,
   type Attribute,
   type AttributeCreate,
   type AttributeDataType,
@@ -26,6 +29,7 @@ import type { DB } from '../db/schema.ts';
 import type { UnitOfWork, UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
 import {
+  BadRequestError,
   ConflictError,
   NotFoundError,
   RuleViolation,
@@ -117,13 +121,19 @@ async function assertLabelFree(
   }
 }
 
-/** Label rule with the exception of the role `battery_capacity` (2.1, M-02 to M-04). */
-function checkLabel(label: string, systemRole: AttributeSystemRole | null): string {
+/**
+ * Label rule with the exception of the role `battery_capacity` (2.1, M-02 to M-04): the trimmed
+ * label, or its field error.
+ */
+function labelRule(
+  label: string,
+  systemRole: AttributeSystemRole | null,
+): { value: string; error?: FieldError } {
   const result = attributeLabelSchemaFor(systemRole).safeParse(label);
-  if (result.success) return result.data;
+  if (result.success) return { value: result.data };
   const issue = result.error.issues[0];
   const code = (issue as { params?: { code?: string } } | undefined)?.params?.code ?? 'custom';
-  throw new ValidationError([{ path: 'label', code, message: issue?.message ?? '' }]);
+  return { value: label, error: { path: 'label', code, message: issue?.message ?? '' } };
 }
 
 /** Fields of an attribute with their names and readable values for the audit entry (2.0.9). */
@@ -189,7 +199,7 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
     const pickLists = createPickListRepository(tx.db);
     return async (id: number) => {
       const list = await pickLists.findPickList(id);
-      if (list === undefined) throw new NotFoundError();
+      if (list === undefined) throw new BadRequestError('pickListId attribute_pick_list_unknown');
       return list.name;
     };
   };
@@ -339,17 +349,32 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
         if (currentRow.version !== patch.version) throw new ConflictError('version_conflict');
         const current = toAttribute(currentRow);
         const { version: _version, ...fields } = patch;
-        const label =
-          fields.label === undefined ? current.label : checkLabel(fields.label, current.systemRole);
-        const next: Attribute = {
+        // The rules apply to the stored state with the changed fields (2.1).
+        const merged: Attribute = {
           ...current,
           ...Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)),
-          label,
         };
 
-        if (current.systemRole !== null) assertSystemRoleFieldsKept(current, next);
-        assertDefinition(next);
+        // Order of the checks (2.1): structural errors (400), field rules (422), name_taken.
+        if (current.systemRole !== null) assertSystemRoleFieldsKept(current, merged);
+        const issues = attributeDefinitionIssues(merged);
+        assertNoStructuralIssue(issues);
+        const pickListName = pickListNames(tx);
+        if (merged.pickListId !== null && merged.pickListId !== current.pickListId) {
+          await pickListName(merged.pickListId);
+        }
+        const label =
+          fields.label === undefined
+            ? { value: current.label }
+            : labelRule(fields.label, current.systemRole);
+        assertFieldRules([...(label.error ? [label.error] : []), ...issues]);
 
+        const next: Attribute = {
+          ...merged,
+          label: label.value,
+          minValue: canonicalBound(merged.minValue),
+          maxValue: canonicalBound(merged.maxValue),
+        };
         const changed = (Object.keys(fields) as (keyof typeof fields)[]).filter(
           (field) => next[field] !== current[field],
         );
@@ -360,10 +385,6 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
         const labelKey = renamed ? toKey(next.label) : undefined;
         if (labelKey !== undefined) {
           await assertLabelFree(repository, current.deviceTypeId, labelKey, id);
-        }
-        const pickListName = pickListNames(tx);
-        if (next.pickListId !== null && next.pickListId !== current.pickListId) {
-          await pickListName(next.pickListId);
         }
 
         await repository.updateAttribute(id, {
@@ -417,8 +438,8 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
     /**
      * `PUT /api/device-types/{id}/attribute-order` (DER-34-06): the version of the device type
      * guards the order as a whole (2.0.3); the ids must be exactly the attributes of the device
-     * type, otherwise `validation_failed` (2.1). The answer is the device type with its new
-     * version.
+     * type, otherwise `409 version_conflict` as well (2.1). The answer is the device type with its
+     * new version.
      */
     async reorderAttributes(
       deviceTypeId: number,
@@ -434,7 +455,9 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
           attributeIds.length === known.size &&
           new Set(attributeIds).size === attributeIds.length &&
           attributeIds.every((attributeId) => known.has(attributeId));
-        if (!complete) throw incompleteOrder();
+        // Missing, repeated or foreign ids: the order was read before another window created
+        // an attribute, which does not change the version of the device type (2.1, P-05).
+        if (!complete) throw new ConflictError('version_conflict');
 
         const unchanged = attributes.every(
           (attribute, index) => attribute.id === attributeIds[index],
@@ -467,40 +490,31 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
 
 /**
  * Data type, level and pick list of an attribute with a system role are fixed (2.1, DER-34-08);
- * UI-027 locks these fields, so a change is a program error of the user interface.
+ * UI-027 locks these fields, so a different value is a structural error. Sending the stored
+ * value again is no change.
  */
 function assertSystemRoleFieldsKept(current: Attribute, next: Attribute) {
   const fixed = ['dataType', 'level', 'pickListId'] as const;
-  if (fixed.some((field) => next[field] !== current[field])) {
-    throw programError('attribute_system_role_fixed');
+  const changed = fixed.filter((field) => next[field] !== current[field]);
+  if (changed.length > 0) {
+    throw new BadRequestError(`${changed.join(', ')} attribute_system_role_fixed`);
   }
 }
 
-/** Cross-field rules of 2.1 on the merged state of a change. */
-function assertDefinition(next: Attribute) {
-  const issues = attributeDefinitionIssues(next);
-  const withoutField = issues.find((issue) => issue.path === undefined);
-  if (withoutField) throw programError(withoutField.code);
-  if (issues.length > 0) {
-    throw new ValidationError(
-      issues.map(({ path, code, message }) => ({ path: path ?? '', code, message })),
-    );
+/** Cross-field rules without a field are structural errors (2.1, 2.0.5 rule (4)). */
+function assertNoStructuralIssue(issues: readonly AttributeDefinitionIssue[]) {
+  const structural = issues.filter((issue) => issue.path === undefined);
+  if (structural.length > 0) {
+    throw new BadRequestError(structural.map((issue) => issue.code).join(', '));
   }
 }
 
-/** An incomplete or foreign list of attribute ids in the order (2.1, DER-34-06). */
-function incompleteOrder() {
-  return new ValidationError([
-    { path: 'attributeIds', code: 'attribute_order_incomplete', message: '' },
-  ]);
+/** Field rules: one entry per field, the first violated rule (2.0.5). */
+function assertFieldRules(issues: readonly (FieldError | AttributeDefinitionIssue)[]) {
+  const fields: FieldError[] = [];
+  for (const { path, code, message } of issues) {
+    if (path === undefined || fields.some((field) => field.path === path)) continue;
+    fields.push({ path, code, message });
+  }
+  if (fields.length > 0) throw new ValidationError(fields);
 }
-
-/**
- * A rule UI-027 cannot violate, because it does not offer the input (2.0.5 rule (4)).
- * PENDING MAR-543 F-3: the form of this rejection.
- */
-function programError(code: string) {
-  return new ValidationError([{ path: '', code, message: '' }]);
-}
-
-export type DeviceTypeService = ReturnType<typeof createDeviceTypeService>;

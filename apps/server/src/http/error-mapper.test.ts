@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import {
+  BadRequestError,
   ConfirmationRequired,
   ConflictError,
   NotFoundError,
@@ -62,6 +63,9 @@ beforeEach(async () => {
   });
   t.app.post('/api/test/stopping', async () => {
     throw new ShuttingDownError();
+  });
+  t.app.post('/api/test/bad-request', async () => {
+    throw new BadRequestError('variantForming attribute_variant_flag_not_allowed');
   });
   await t.app.ready();
 });
@@ -220,6 +224,34 @@ describe('domain errors are mapped to the error format (2.0.5)', () => {
     });
 
     expect(parse(response.body).details).toEqual({ kind: 'possible_duplicate' });
+  });
+});
+
+describe('structural errors found by a service (2.1, BadRequestError)', () => {
+  it('answer 400 bad_request without fields and are logged as warning with the reason only', async () => {
+    const response = await t.app.inject({
+      method: 'POST',
+      url: '/api/test/bad-request',
+      headers: SAME_ORIGIN_WRITE,
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(parse(response.body)).toEqual({
+      code: 'bad_request',
+      message: '',
+      fields: [],
+      details: {},
+      referenceNumber: null,
+    });
+    expect(t.readErrorLog()).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        refNo: null,
+        function: 'http POST /api/test/bad-request',
+        message: 'bad_request service: variantForming attribute_variant_flag_not_allowed',
+      }),
+    ]);
   });
 });
 

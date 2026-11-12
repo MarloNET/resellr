@@ -37,6 +37,11 @@ export const MESSAGES = {
 export const FIELD_MESSAGES = {
   /** UI-027 "Auswahlliste", missing at data type "Auswahl aus Liste" (2.1, DER-34-04). */
   attributePickListMissing: 'Auswahlliste fehlt',
+  /** UI-027 "Mindestwert"/"Höchstwert", not a number; not a whole number for data type integer (8.2). */
+  attributeMinValueNumber: 'Mindestwert: Zahl',
+  attributeMinValueInteger: 'Mindestwert: ganze Zahl',
+  attributeMaxValueNumber: 'Höchstwert: Zahl',
+  attributeMaxValueInteger: 'Höchstwert: ganze Zahl',
   /** UI-027 "Mindest-/Höchstwert", minimum above maximum (2.1, DER-34-03). */
   attributeMinAboveMax: 'Mindestwert darf nicht größer als Höchstwert sein',
   /**

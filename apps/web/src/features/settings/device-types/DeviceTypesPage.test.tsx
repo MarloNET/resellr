@@ -300,7 +300,7 @@ const panelSave = () =>
 const attributeRow = (label: string) =>
   within(attributeRegion())
     .getAllByRole('row')
-    .find((row) => within(row).queryByRole('button', { name: label, exact: true })) as HTMLElement;
+    .find((row) => within(row).queryByRole('button', { name: label })) as HTMLElement;
 
 async function openAttributes(attributes: AttributeItem[], writes: Record<string, Route> = {}) {
   const api = mockApi({ attributes: { 1: [...attributes] }, writes });
@@ -312,7 +312,7 @@ async function openAttributes(attributes: AttributeItem[], writes: Record<string
 }
 
 async function openPanelOf(label: string) {
-  fireEvent.click(within(attributeRegion()).getByRole('button', { name: label, exact: true }));
+  fireEvent.click(within(attributeRegion()).getByRole('button', { name: label }));
   return panel();
 }
 
@@ -599,6 +599,46 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
       expect(within(panel()).queryByLabelText(/^Höchstwert/)).toBeNull();
     }
     expectAccessiblePanel();
+  });
+
+  it('UI-027.validation a bound that is no number shows "Mindestwert: Zahl" or "Höchstwert: ganze Zahl"', async () => {
+    const { sent } = await openAttributes([RAM, DISPLAY]);
+    await openPanelOf('RAM');
+
+    fireEvent.change(panelField(/^Höchstwert/), { target: { value: '1,5' } });
+    fireEvent.click(panelSave());
+    expect(await within(panel()).findByText('Höchstwert: ganze Zahl')).toBeTruthy();
+
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Abbrechen' }));
+    await openPanelOf('Displaygröße');
+    fireEvent.change(panelField(/^Mindestwert/), { target: { value: 'abc' } });
+    fireEvent.click(panelSave());
+    expect(await within(panel()).findByText('Mindestwert: Zahl')).toBeTruthy();
+    expect(panelField(/^Mindestwert/).getAttribute('inputmode')).toBe('decimal');
+    expect(panelField(/^Mindestwert/).type).toBe('text');
+    expect(sent).toEqual([]);
+  });
+
+  it('sends no bounds, no pick list and no flag that the changed data type or level does not allow (2.1)', async () => {
+    const { sent } = await openAttributes([RAM], {
+      'PATCH /api/attributes/12': () =>
+        Response.json({ ...RAM, dataType: 'text', level: 'model', version: 3 }),
+    });
+    await openPanelOf('RAM');
+
+    fireEvent.change(panelField(/^Datentyp/), { target: { value: 'text' } });
+    fireEvent.change(panelField(/^Ebene/), { target: { value: 'model' } });
+    fireEvent.click(panelSave());
+
+    await screen.findByText('Merkmal gespeichert');
+    expect(sent[0]?.body).toMatchObject({
+      dataType: 'text',
+      level: 'model',
+      minValue: null,
+      maxValue: null,
+      pickListId: null,
+      variantForming: false,
+    });
   });
 
   it('UI-027.validation DER-34-04 data type "Auswahl aus Liste" without a list shows "Auswahlliste fehlt"', async () => {

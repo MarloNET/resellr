@@ -157,7 +157,7 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
 
     // Moving a variant attribute to level model keeps no flag either.
     const toModel = await patchAttribute(panel.json().id, { version: 1, level: 'model' });
-    expect(toModel.statusCode).not.toBe(200);
+    expect(toModel.statusCode).toBe(400);
     expect((await listAttributes(monitor.id)).items).toHaveLength(1);
   });
 
@@ -167,7 +167,7 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
 
     const response = await patchAttribute(id, { version: 1, variantForming: true });
 
-    expect(response.statusCode).not.toBe(200);
+    expect(response.statusCode).toBe(400);
     const [stored] = (await listAttributes(notebook.id)).items;
     expect(stored).toMatchObject({ variantForming: false });
   });
@@ -221,6 +221,18 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     expect(renamed.json()).toEqual(fieldError('label', text));
   });
 
+  it('DER-34-02 compares fixed placeholder names without regard to case, also "Baustein:…"', async () => {
+    const notebook = await createDeviceType('Notebook');
+    for (const [label, name] of [
+      [' stückzahl', 'stückzahl'],
+      ['Baustein:Abholung', 'Baustein:Abholung'],
+    ]) {
+      expect((await createAttribute(notebook.id, { label })).json()).toEqual(
+        fieldError('label', `Bezeichnung ist für einen festen Platzhalter vergeben: ${name}`),
+      );
+    }
+  });
+
   it('DER-34-02 allows "Akkukapazität" for the attribute with the role battery_capacity only', async () => {
     const notebook = await createDeviceType('Notebook');
     const id = insertSystemRoleAttribute(notebook.id, 'battery_capacity', 'Akku-Kapazität');
@@ -243,7 +255,7 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     expect(created.json()).toEqual(fieldError('minValue', message));
 
     const ram = (await createAttribute(notebook.id, { minValue: '1', maxValue: '256' })).json();
-    const changed = await patchAttribute(ram.id, { version: 1, maxValue: '0,5' });
+    const changed = await patchAttribute(ram.id, { version: 1, maxValue: '0' });
     expect(changed.json()).toEqual(fieldError('minValue', message));
   });
 
@@ -277,7 +289,7 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
       { level: 'model' },
       { pickListId: pickListId('power_supply') },
     ]) {
-      expect((await patchAttribute(id, { version: 1, ...change })).statusCode).not.toBe(200);
+      expect((await patchAttribute(id, { version: 1, ...change })).statusCode).toBe(400);
     }
     const response = await patchAttribute(id, {
       version: 1,
@@ -338,21 +350,45 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     ['misses an attribute', (ids: number[]) => ids.slice(1)],
     ['repeats an attribute', (ids: number[]) => [ids[0], ...ids.slice(0, -1)]],
     ['holds a foreign id', (ids: number[]) => [...ids.slice(1), 999]],
-  ])('DER-34-06 rejects an order that %s with validation_failed', async (_case, change) => {
+  ])(
+    'DER-34-06 answers 409 version_conflict to an order that %s and changes nothing',
+    async (_case, change) => {
+      const notebook = await createDeviceType('Notebook');
+      const ids = [
+        (await createAttribute(notebook.id, { label: 'Prozessor' })).json().id,
+        (await createAttribute(notebook.id, { label: 'RAM' })).json().id,
+      ];
+
+      const response = await write('PUT', `/api/device-types/${notebook.id}/attribute-order`, {
+        version: notebook.version,
+        attributeIds: change(ids),
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error.code).toBe('version_conflict');
+      expect((await listAttributes(notebook.id)).items.map((item) => item.id)).toEqual(ids);
+      expect((await get('/api/device-types')).json().items[0].version).toBe(notebook.version);
+    },
+  );
+
+  it.each([
+    ['"abc" for a decimal', { dataType: 'decimal', minValue: 'abc' }, 'Mindestwert: Zahl'],
+    ['"1,5" for an integer', { dataType: 'integer', minValue: '1,5' }, 'Mindestwert: ganze Zahl'],
+  ])('rejects the minimum %s at the field', async (_case, change, message) => {
     const notebook = await createDeviceType('Notebook');
-    const ids = [
-      (await createAttribute(notebook.id, { label: 'Prozessor' })).json().id,
-      (await createAttribute(notebook.id, { label: 'RAM' })).json().id,
-    ];
-
-    const response = await write('PUT', `/api/device-types/${notebook.id}/attribute-order`, {
-      version: notebook.version,
-      attributeIds: change(ids),
-    });
-
+    const response = await createAttribute(notebook.id, change);
     expect(response.statusCode).toBe(422);
-    expect(response.json().error.code).toBe('validation_failed');
-    expect((await listAttributes(notebook.id)).items.map((item) => item.id)).toEqual(ids);
+    expect(response.json()).toEqual(fieldError('minValue', message));
+  });
+
+  it('stores bounds entered with a comma in the canonical form', async () => {
+    const notebook = await createDeviceType('Notebook');
+    const response = await createAttribute(notebook.id, {
+      dataType: 'decimal',
+      minValue: '0,50',
+      maxValue: ' 6 ',
+    });
+    expect(response.json()).toMatchObject({ minValue: '0.5', maxValue: '6' });
   });
 
   it('answers 409 version_conflict to an outdated version of an attribute or of the order', async () => {
@@ -391,6 +427,80 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     expect(response.statusCode).toBe(404);
     expect(t.app.hasRoute({ method: 'DELETE', url: '/api/attributes/:id' })).toBe(false);
     expect((await listAttributes(notebook.id)).total).toBe(1);
+  });
+
+  it.each([
+    ['bounds for data type text (POST)', 'post', { dataType: 'text', minValue: '1' }],
+    ['a pick list for data type integer (POST)', 'post', { pickListId: 5 }],
+    ['an unknown pick list (POST)', 'post', { dataType: 'pick', pickListId: 99, unit: null }],
+    ['the flag at level model (POST)', 'post', { level: 'model', variantForming: true }],
+    ['a system role in the request (POST)', 'post', { systemRole: 'battery' }],
+    ['the flag after moving to level model (PATCH)', 'patch', { level: 'model' }],
+    ['bounds after changing to data type text (PATCH)', 'patch', { dataType: 'text' }],
+    ['a pick list after changing nothing else (PATCH)', 'patch', { pickListId: 5 }],
+    [
+      'an unknown pick list (PATCH)',
+      'patch',
+      { dataType: 'pick', pickListId: 99, minValue: null, maxValue: null },
+    ],
+  ] as const)(
+    'answers 400 bad_request to %s and logs a warning without values',
+    async (_case, method, change) => {
+      const notebook = await createDeviceType('Notebook');
+      const ram = (await createAttribute(notebook.id, { minValue: '1', maxValue: '256' })).json();
+
+      const response =
+        method === 'post'
+          ? await createAttribute(notebook.id, { label: 'Neu', ...change })
+          : await patchAttribute(ram.id, { version: 1, ...change });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: { code: 'bad_request', message: '', fields: [], details: {}, referenceNumber: null },
+      });
+      const warnings = t.readErrorLog().filter((entry) => entry.level === 'warn');
+      expect(warnings).toHaveLength(1);
+      // The timestamp may contain any digits; the function and the message must not.
+      const logged = JSON.stringify(
+        warnings.map(({ function: fn, message }) => ({ function: fn, message })),
+      );
+      for (const value of ['Neu', 'RAM', '256', '99']) expect(logged).not.toContain(value);
+      expect((await listAttributes(notebook.id)).items).toEqual([
+        expect.objectContaining({ id: ram.id, version: 1 }),
+      ]);
+    },
+  );
+
+  it('DER-34-08 answers 400 to a different data type, level or pick list of a system role and accepts the stored values', async () => {
+    const notebook = await createDeviceType('Notebook');
+    const id = insertSystemRoleAttribute(notebook.id, 'battery', 'Akku');
+
+    for (const change of [
+      { dataType: 'text', pickListId: null },
+      { level: 'model' },
+      { pickListId: pickListId('power_supply') },
+    ]) {
+      expect((await patchAttribute(id, { version: 1, ...change })).statusCode).toBe(400);
+    }
+    const same = await patchAttribute(id, {
+      version: 1,
+      dataType: 'pick',
+      level: 'device',
+      pickListId: pickListId('battery'),
+      required: true,
+    });
+    expect(same.statusCode).toBe(200);
+  });
+
+  it('checks the version before every other rule (2.1)', async () => {
+    const notebook = await createDeviceType('Notebook');
+    const ram = (await createAttribute(notebook.id)).json();
+    await createAttribute(notebook.id, { label: 'SSD' });
+    await patchAttribute(ram.id, { version: 1, unit: 'GiB' });
+
+    for (const change of [{ level: 'model' }, { label: '' }, { label: 'ssd' }]) {
+      expect((await patchAttribute(ram.id, { version: 1, ...change })).statusCode).toBe(409);
+    }
   });
 
   it('writes created, updated, deactivated and reordered to the audit log with readable values', async () => {

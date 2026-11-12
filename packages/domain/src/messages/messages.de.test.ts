@@ -98,6 +98,10 @@ describe('message catalog (E1)', () => {
       'Mindestwert darf nicht größer als Höchstwert sein',
     );
     expect(FIELD_MESSAGES.attributePickListMissing).toBe('Auswahlliste fehlt');
+    expect(FIELD_MESSAGES.attributeMinValueNumber).toBe('Mindestwert: Zahl');
+    expect(FIELD_MESSAGES.attributeMinValueInteger).toBe('Mindestwert: ganze Zahl');
+    expect(FIELD_MESSAGES.attributeMaxValueNumber).toBe('Höchstwert: Zahl');
+    expect(FIELD_MESSAGES.attributeMaxValueInteger).toBe('Höchstwert: ganze Zahl');
   });
 
   it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {

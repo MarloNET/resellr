@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { compareDecimal, parseDecimal } from '../format/parse-decimal.ts';
 import { FIELD_MESSAGES, MESSAGES } from '../messages/messages.de.ts';
+import { isFixedPlaceholderName } from '../placeholders/placeholder-catalog.ts';
+import { toKey } from '../text/normalize-key.ts';
 import { idSchema, listResponseSchema, versionSchema } from './common.schema.ts';
 
 // Attribute of a device type (REQ-005; Technical Specification 2.1, 3.1): values, field rules,
@@ -78,39 +80,14 @@ export const ATTRIBUTE_LABEL_MAX = 100;
 /** Longest unit of an attribute after trimming (2.1, 3.1). */
 export const ATTRIBUTE_UNIT_MAX = 20;
 
-/**
- * Names of the fixed placeholders of Requirements chapter 9.7. An attribute label must not
- * equal one of them, so that `{Name}` stays unambiguous (2.1, M-04).
- */
-export const FIXED_PLACEHOLDER_NAMES: readonly string[] = [
-  'Hersteller',
-  'Modellbezeichnung',
-  'Typbezeichnung',
-  'Herstellernummer',
-  'Geräteart',
-  'Artikelnummer',
-  'EAN',
-  'Zustand',
-  'Optik-Note',
-  'Zustandsbeschreibung',
-  'Lieferumfang',
-  'Preis',
-  'Zustandsbezeichnung Kanal',
-  'Händlermarke',
-  'Händler-Kontakt',
-  'Merkmalsliste',
-  'WI-Nr',
-  'Stückzahl',
-  'Akkukapazität',
-];
-
 /** The attribute with the role `battery_capacity` is the stock placeholder of its label (2.1). */
-const BATTERY_CAPACITY_LABEL = 'Akkukapazität';
+const BATTERY_CAPACITY_KEY = toKey('Akkukapazität');
 
 /**
  * Label rule of an attribute with the given system role (2.1): 1–100 characters after trimming
- * (M-02), without `{` and `}` (M-03), not equal to a fixed placeholder name (M-04), except
- * "Akkukapazität" for the role `battery_capacity`. One refinement, so a field gets exactly one
+ * (M-02), without `{` and `}` (M-03), not taken by a fixed placeholder of the catalog CU-068
+ * (M-04, compared without regard to case), except "Akkukapazität" for the role
+ * `battery_capacity`. M-04 names the label after trimming. One refinement, so a field gets one
  * message in the order length, characters, placeholder (2.0.5). Uniqueness per device type is a
  * rule of the service (`name_taken.attribute`).
  */
@@ -132,8 +109,8 @@ export function attributeLabelSchemaFor(systemRole: AttributeSystemRole | null) 
           params: { code: 'attribute_label_braces' },
         });
       } else if (
-        FIXED_PLACEHOLDER_NAMES.includes(label) &&
-        !(systemRole === 'battery_capacity' && label === BATTERY_CAPACITY_LABEL)
+        isFixedPlaceholderName(label) &&
+        !(systemRole === 'battery_capacity' && toKey(label) === BATTERY_CAPACITY_KEY)
       ) {
         context.addIssue({
           code: 'custom',
@@ -156,27 +133,24 @@ export const attributeUnitSchema = z
   .transform((unit) => (unit === '' ? null : unit));
 
 /**
- * Minimum or maximum: a decimal with comma or point, turned into the canonical string (2.0.1,
- * CU-013); empty is `null`. UI-027 enters it as a number, so a format error is a program error
- * of the user interface and rejected without a field (2.0.5 rule (4)).
+ * Minimum or maximum as entered (2.1): a decimal with comma or point, turned into the canonical
+ * string by `canonicalBound`; `""` and `null` mean no bound. Its rules depend on the data type,
+ * so `attributeDefinitionIssues` checks them.
  */
-export const attributeBoundSchema = z
-  .string()
-  .nullable()
-  .transform((input, context) => {
-    if (input === null || input.trim() === '') return null;
-    const canonical = parseDecimal(input);
-    if (canonical === null) {
-      context.addIssue({ code: 'custom', path: [], message: '', params: { code: 'bound_format' } });
-      return z.NEVER;
-    }
-    return canonical;
-  });
+export const attributeBoundSchema = z.string().nullable();
+
+/** A bound as entered in its canonical form (CU-013), `null` for none or a format error. */
+export function canonicalBound(input: string | null): string | null {
+  return input === null || input.trim() === '' ? null : parseDecimal(input);
+}
+
+const hasBound = (input: string | null) => input !== null && input.trim() !== '';
 
 /** The definition of an attribute as far as the cross-field rules of 2.1 need it. */
 export interface AttributeDefinition {
   dataType: AttributeDataType;
   systemRole: AttributeSystemRole | null;
+  /** As entered or stored. */
   minValue: string | null;
   maxValue: string | null;
   pickListId: number | null;
@@ -184,31 +158,59 @@ export interface AttributeDefinition {
   variantForming: boolean;
 }
 
-/** A violated cross-field rule; without `path` it is a program error of the user interface. */
+/** A violated cross-field rule; without `path` it is a structural error (`400`, 2.1). */
 export interface AttributeDefinitionIssue {
-  path?: 'minValue' | 'pickListId';
+  path?: 'minValue' | 'maxValue' | 'pickListId';
   code: string;
   message: string;
 }
 
 const NUMBER_TYPES: readonly AttributeDataType[] = ['integer', 'decimal'];
 
+const BOUND_MESSAGES = {
+  minValue: {
+    decimal: FIELD_MESSAGES.attributeMinValueNumber,
+    integer: FIELD_MESSAGES.attributeMinValueInteger,
+  },
+  maxValue: {
+    decimal: FIELD_MESSAGES.attributeMaxValueNumber,
+    integer: FIELD_MESSAGES.attributeMaxValueInteger,
+  },
+} as const;
+
 /**
  * Cross-field rules of an attribute (2.1), used by the create schema, by the service on the
- * merged state of a change and by UI-027 before saving:
- * - minimum and maximum only for integer and decimal, minimum ≤ maximum (DER-34-03);
+ * state after a change and by UI-027 before saving:
+ * - minimum and maximum only for integer and decimal: a number, for integer a whole number, and
+ *   minimum ≤ maximum at the field "Mindestwert" (DER-34-03);
  * - pick list required for data type `pick` (DER-34-04) and only there;
  * - "variantenbildend" only at level device and never for the role `battery_capacity`
  *   (AC-REQ-005-06, AC-REQ-005-07).
  * UI-027 offers neither bounds outside numbers, a pick list outside `pick`, nor the flag at
- * level model or for `battery_capacity`; those rules have no field (2.0.5 rule (4)).
+ * level model or for `battery_capacity`; those rules are structural errors without a field.
  */
 export function attributeDefinitionIssues(
   definition: AttributeDefinition,
 ): AttributeDefinitionIssue[] {
   const issues: AttributeDefinitionIssue[] = [];
-  const { dataType, minValue, maxValue, pickListId } = definition;
-  if (NUMBER_TYPES.includes(dataType)) {
+  const { dataType, pickListId } = definition;
+  if (dataType === 'integer' || dataType === 'decimal') {
+    const canonical = { minValue: null as string | null, maxValue: null as string | null };
+    for (const field of ['minValue', 'maxValue'] as const) {
+      const input = definition[field];
+      if (!hasBound(input)) continue;
+      const value = canonicalBound(input);
+      if (value === null || (dataType === 'integer' && value.includes('.'))) {
+        issues.push({
+          path: field,
+          code: 'attribute_bound_format',
+          message: BOUND_MESSAGES[field][dataType],
+        });
+      } else {
+        canonical[field] = value;
+      }
+    }
+    const { minValue, maxValue } = canonical;
     if (minValue !== null && maxValue !== null && compareDecimal(minValue, maxValue) > 0) {
       issues.push({
         path: 'minValue',
@@ -216,7 +218,7 @@ export function attributeDefinitionIssues(
         message: FIELD_MESSAGES.attributeMinAboveMax,
       });
     }
-  } else if (minValue !== null || maxValue !== null) {
+  } else if (hasBound(definition.minValue) || hasBound(definition.maxValue)) {
     issues.push({ code: 'attribute_bounds_not_allowed', message: '' });
   }
   if (dataType === 'pick') {
@@ -272,7 +274,12 @@ export const attributeCreateSchema = z
         params: { code: issue.code },
       });
     }
-  });
+  })
+  .transform((attribute) => ({
+    ...attribute,
+    minValue: canonicalBound(attribute.minValue),
+    maxValue: canonicalBound(attribute.maxValue),
+  }));
 export type AttributeCreate = z.infer<typeof attributeCreateSchema>;
 export type AttributeCreateInput = z.input<typeof attributeCreateSchema>;
 
