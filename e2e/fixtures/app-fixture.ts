@@ -107,7 +107,10 @@ export interface FileWrite {
  * descriptor it is relative to (or, without `path`, of the file descriptor the call changes).
  * Writing through a file descriptor (`write`, `ftruncate`, `fallocate`, ...) needs one opened for
  * writing, so the `open` calls with a writing flag cover it. A `?` lets `strace` skip a call the
- * architecture lacks.
+ * architecture lacks. Limits: operations submitted through io_uring bypass these system calls, so
+ * the observed server runs with `UV_USE_IO_URING=0`; for the calls except `open` the path is
+ * taken from the argument, so an operation through a symbolic link is seen at the link (the
+ * server creates none, and creating one is observed).
  */
 const WRITE_SYSCALLS: Record<string, { dir?: number; path?: number }[]> = {
   open: [{ path: 0 }],
@@ -230,20 +233,31 @@ function descriptorPath(arg: string | undefined): string | undefined {
 
 /**
  * The write operations in the output of `strace` with `fileWriteTraceArgs` for one process.
- * Paths without a folder file descriptor are relative to `cwd`. A line it does not understand
- * fails the parsing, so nothing is lost unnoticed.
+ * Paths without a folder file descriptor are relative to `cwd`. For an `open` call the path is
+ * the one the kernel resolved for the returned file descriptor (`= 4</real/path>`), so a symbolic
+ * link does not hide the target; a call cut off by the end of the process has none and keeps the
+ * argument. A line it does not understand fails the parsing, so nothing is lost unnoticed.
  */
 export function parseFileWrites(trace: string, cwd: string): FileWrite[] {
   const writes: FileWrite[] = [];
   for (const line of trace.split('\n')) {
     if (line.trim() === '') continue;
-    const { syscall = '', list = '' } =
-      /^(?<syscall>\w+)\((?<list>.*)\)\s+=\s+\S+/.exec(line)?.groups ?? {};
+    const {
+      syscall = '',
+      list = '',
+      result = '',
+    } = /^(?<syscall>\w+)\((?<list>.*)\)\s+=\s+(?<result>.+)$/.exec(line)?.groups ?? {};
     const pathArgs = WRITE_SYSCALLS[syscall];
     if (!pathArgs) throw new Error(`Unexpected line of strace: ${line}`);
     const args = splitArguments(list);
     const flagsArg = OPEN_FLAGS_ARG[syscall];
     if (flagsArg !== undefined && !WRITING_OPEN_FLAGS.test(args[flagsArg] ?? '')) continue;
+    const opened =
+      syscall === 'creat' || flagsArg !== undefined ? descriptorPath(result) : undefined;
+    if (opened !== undefined) {
+      writes.push({ syscall, path: opened });
+      continue;
+    }
     for (const { dir, path } of pathArgs) {
       const base = dir === undefined ? cwd : (descriptorPath(args[dir]) ?? cwd);
       const literal = path === undefined ? undefined : /^"(.*)"$/.exec(args[path] ?? '')?.[1];
@@ -387,6 +401,8 @@ async function startServer({ observeFileWrites }: { observeFileWrites: boolean }
         RESELLR_LOG_DIR: paths.logDir,
         RESELLR_HANDOVER_DIR: paths.handoverDir,
         RESELLR_UPDATE_COPY_DIR: paths.updateCopyDir,
+        // libuv may submit file operations through io_uring, which `strace` does not see.
+        ...(observeFileWrites && { UV_USE_IO_URING: '0' }),
       },
     });
     const exited = new Promise<number | null>((resolve) =>

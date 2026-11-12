@@ -1,14 +1,17 @@
 import { spawnSync } from 'node:child_process';
 import {
   closeSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   openSync,
   readdirSync,
+  readFileSync,
   readSync,
+  renameSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
-import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -16,7 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { test as base } from '@playwright/test';
 import { CONFIG_FILE_NAME } from '@resellr/runtime-shared/configured-port';
 import { isInRuntimeFolder } from '@resellr/runtime-shared/paths';
-import { createDemoApi, seedDemoData } from '@resellr/test-data/demo-seed';
+import { createDemoApi, type DemoApi, seedDemoData } from '@resellr/test-data/demo-seed';
 
 import {
   expect,
@@ -95,6 +98,9 @@ base.describe('REQ-106 observation of the file writes (Technical Specification 6
         db.exec('PRAGMA journal_mode = WAL; CREATE TABLE t (x); INSERT INTO t VALUES (1)');
         db.close();
         fs.unlinkSync('Fotoübergabe/a "b".txt');
+        fs.mkdirSync('target');
+        fs.symlinkSync('target', 'linked');
+        fs.writeFileSync('linked/through.txt', 'x');
         spawnSync(process.execPath, ['-e', "require('node:fs').writeFileSync('child.txt', 'x')"]);
       `;
         const result = spawnSync(
@@ -129,10 +135,15 @@ base.describe('REQ-106 observation of the file writes (Technical Specification 6
             { syscall: 'openat', path: 'native.db' },
             { syscall: 'openat', path: 'native.db-wal' },
             { syscall: 'unlink', path: 'Fotoübergabe/a "b".txt' },
+            { syscall: 'symlink', path: 'linked' },
+            // Seen at the target of the link, not at the link (FIND-321).
+            { syscall: 'openat', path: 'target/through.txt' },
             { syscall: 'openat', path: 'child.txt' },
           ]),
         );
-        expect(written.map(({ path }) => path)).not.toContain('only-read.txt');
+        const paths = written.map(({ path }) => path);
+        expect(paths).not.toContain('only-read.txt');
+        expect(paths).not.toContain('linked/through.txt');
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
@@ -145,6 +156,9 @@ base.describe('REQ-106 observation of the file writes (Technical Specification 6
       const trace = [
         'openat2(3</data>, "media/x.jpg", {flags=O_WRONLY|O_CREAT, mode=0644, resolve=0}, 24) = 4</data/media/x.jpg>',
         'openat(AT_FDCWD</cwd>, "../config.json", O_RDONLY|O_CLOEXEC) = 5</config.json>',
+        // A link in an allowed folder pointing outside: the path the kernel resolved counts.
+        'openat(3</data>, "link/x.json", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 6</outside/x.json>',
+        'creat("/data/link.txt", 0644) = 7</outside/link.txt>',
         'renameat2(3</data>, "a.tmp", 4</logs>, "b", RENAME_NOREPLACE) = 0',
         'linkat(AT_FDCWD</cwd>, "a", 3</data>, "b", 0) = 0',
         'unlinkat(3</data/media/.incoming>, "upload", 0) = 0',
@@ -157,6 +171,8 @@ base.describe('REQ-106 observation of the file writes (Technical Specification 6
 
       expect(parseFileWrites(trace, '/start')).toEqual([
         { syscall: 'openat2', path: '/data/media/x.jpg' },
+        { syscall: 'openat', path: '/outside/x.json' },
+        { syscall: 'creat', path: '/outside/link.txt' },
         { syscall: 'renameat2', path: '/data/a.tmp' },
         { syscall: 'renameat2', path: '/logs/b' },
         { syscall: 'linkat', path: '/data/b' },
@@ -173,9 +189,72 @@ base.describe('REQ-106 observation of the file writes (Technical Specification 6
   );
 });
 
+/** A changing request of the demo data (CU-061), as it went to the API. */
+interface SeedWrite {
+  method: string;
+  path: string;
+  body: unknown;
+}
+
+/** The demo API, recording every changing request in `writes`. */
+function recordingDemoApi(baseUrl: string, writes: SeedWrite[]): DemoApi {
+  const api = createDemoApi(baseUrl);
+  return {
+    ...api,
+    request: (method, path, body) => {
+      if (method !== 'GET' && method !== 'HEAD') writes.push({ method, path, body });
+      return api.request(method, path, body);
+    },
+  };
+}
+
+/**
+ * What the user sees of the seeded data: the answer of `GET` on every collection the demo data
+ * created entries in. A seed area that creates entries in a collection without `GET` fails here
+ * and has to name how its data is read.
+ */
+async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<unknown> {
+  const api = createDemoApi(baseUrl);
+  const collections = [...new Set(writes.filter((w) => w.method === 'POST').map((w) => w.path))];
+  const state: Record<string, unknown> = {};
+  for (const path of collections.sort()) state[path] = await api.request('GET', path);
+  return state;
+}
+
+/** Text values shorter than this are too common to tell seeded data from other content. */
+const MIN_SEEDED_TEXT_LENGTH = 4;
+
+/** Every text value of the seeded requests that is long enough to be recognised in any file. */
+function seededTexts(writes: SeedWrite[]): string[] {
+  const texts = new Set<string>();
+  const collect = (value: unknown): void => {
+    if (typeof value === 'string' && value.length >= MIN_SEEDED_TEXT_LENGTH) texts.add(value);
+    else if (Array.isArray(value)) value.forEach(collect);
+    else if (value !== null && typeof value === 'object') Object.values(value).forEach(collect);
+  };
+  writes.forEach(({ body }) => collect(body));
+  return [...texts];
+}
+
+/** The texts that occur in `file` as UTF-8 or UTF-16 (whatever the format of the file is). */
+function textsIn(file: string, texts: string[]): string[] {
+  const content = readFileSync(file);
+  return texts.filter(
+    (text) =>
+      content.includes(Buffer.from(text, 'utf8')) || content.includes(Buffer.from(text, 'utf16le')),
+  );
+}
+
 test.describe('REQ-106 no data outside the data folder (Technical Specification 2.19, 6.2)', () => {
   // Both tests use the same server, observed by the project `write-paths` (playwright.config.ts).
   test.describe.configure({ mode: 'serial' });
+
+  /** Handed from the run to the check of the data folder. */
+  const run = {
+    writes: [] as SeedWrite[],
+    stateBeforeEnd: undefined as unknown,
+    clock: new Date(Date.now() + 8 * DAY_MS),
+  };
 
   test('a complete run writes only in the data, log, handover and update-copy folder', async ({
     page,
@@ -184,7 +263,7 @@ test.describe('REQ-106 no data outside the data folder (Technical Specification 
     test.setTimeout(120_000);
     // Use: the demo data of every finished build step through the API (entities, photos, logo,
     // settings), then every area of the navigation in the browser.
-    await seedDemoData(createDemoApi(server.baseUrl));
+    await seedDemoData(recordingDemoApi(server.baseUrl, run.writes));
     await page.goto('/');
     const navigation = page.getByRole('navigation', { name: 'Hauptnavigation' });
     for (const label of NAVIGATION) {
@@ -194,6 +273,7 @@ test.describe('REQ-106 no data outside the data folder (Technical Specification 
         'page',
       );
     }
+    run.stateBeforeEnd = await readSeededState(server.baseUrl, run.writes);
     // Orderly end with checkpoint and end marker (2.17).
     await server.shutdown();
 
@@ -206,7 +286,7 @@ test.describe('REQ-106 no data outside the data folder (Technical Specification 
       )
       .run(OLDER_APP_VERSION);
     database.close();
-    await server.restart({ testClockAt: new Date(Date.now() + 8 * DAY_MS) });
+    await server.restart({ testClockAt: run.clock });
     await page.goto('/');
     await expect(page.getByRole('navigation', { name: 'Hauptnavigation' })).toBeVisible();
     await server.shutdown();
@@ -219,24 +299,18 @@ test.describe('REQ-106 no data outside the data folder (Technical Specification 
     expect(paths.some((path) => path.startsWith(`${server.paths.logDir}/`))).toBe(true);
   });
 
-  test('after the run the data folder holds all entities, photos, the logo and all settings, nothing lies outside', ({
+  test('after the run the data folder holds all entities, photos, the logo and all settings, nothing lies outside', async ({
     server,
   }) => {
-    const { dataDir, handoverDir, updateCopyDir } = server.paths;
-    const dataFiles = filesBelow(dataDir).map((file) => relative(dataDir, file));
-    expect(dataFiles).toEqual(expect.arrayContaining([DATABASE_FILE, CONFIG_FILE_NAME]));
+    const { dataDir, logDir, handoverDir, updateCopyDir } = server.paths;
+    const texts = seededTexts(run.writes);
+    // Without seeded texts the checks below would prove nothing.
+    expect(texts.length, 'seeded text values').toBeGreaterThan(0);
 
+    const dataFiles = filesBelow(dataDir).map((file) => relative(dataDir, file));
     const database = new DatabaseSync(join(dataDir, DATABASE_FILE), { readOnly: true });
     try {
       expect(database.prepare('PRAGMA quick_check').get()).toEqual({ quick_check: 'ok' });
-      const tables = database
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-        .all()
-        .map(({ name }) => String(name));
-      // Entities and settings (merchant_profile, channel settings, ...) are rows of resellr.db.
-      expect(tables).toEqual(
-        expect.arrayContaining(['merchant_profile', 'media_file', 'app_meta']),
-      );
       // Every photo and the logo the database knows lies as a file below media in the data folder.
       const mediaFiles = database.prepare('SELECT hash, kind FROM media_file').all();
       for (const { hash, kind } of mediaFiles) {
@@ -250,14 +324,23 @@ test.describe('REQ-106 no data outside the data folder (Technical Specification 
       database.close();
     }
 
-    // Outside the data folder lie only logs, photo handovers and the copies before an update:
-    // no database and no config.json except those copies, no image except in the handover folder.
+    // Outside the data folder lie only logs, photo handovers and the copies of the data folder
+    // before an update (2.19). No seeded value lies as UTF-8 or UTF-16 text in a log or handover
+    // file, whatever the file format (JSON, log lines, ...); the binary forms are recognised by
+    // their signature: no database and no config.json except the update copies, no image except
+    // in the handover folder.
     const outside = [
-      ...filesBelow(server.paths.logDir),
+      ...filesBelow(logDir),
       ...filesBelow(handoverDir),
       ...filesBelow(updateCopyDir),
     ];
     const isUpdateCopy = (file: string) => file.startsWith(`${updateCopyDir}/`);
+    expect(
+      outside
+        .filter((file) => !isUpdateCopy(file))
+        .map((file) => ({ file, texts: textsIn(file, texts) }))
+        .filter(({ texts: found }) => found.length > 0),
+    ).toEqual([]);
     expect(
       outside.filter(
         (file) =>
@@ -272,5 +355,17 @@ test.describe('REQ-106 no data outside the data folder (Technical Specification 
           IMAGE_SIGNATURES.some((signature) => startsWith(file, signature)),
       ),
     ).toEqual([]);
+
+    // The data folder alone holds everything: a start with the log, handover and update-copy
+    // folder moved away shows the same seeded data as the run before its end.
+    for (const dir of [logDir, handoverDir, updateCopyDir]) {
+      if (existsSync(dir)) renameSync(dir, `${dir}.after-run`);
+    }
+    await server.restart({ testClockAt: run.clock });
+    const state = await readSeededState(server.baseUrl, run.writes);
+    expect(state).toEqual(run.stateBeforeEnd);
+    const shown = JSON.stringify(state);
+    expect(texts.filter((text) => !shown.includes(JSON.stringify(text).slice(1, -1)))).toEqual([]);
+    await server.shutdown();
   });
 });
