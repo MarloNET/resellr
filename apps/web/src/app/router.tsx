@@ -6,6 +6,7 @@ import {
   SettingsLayout,
 } from '../features/settings/SettingsLayout.tsx';
 import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
+import { ManufacturersPage } from '../features/settings/manufacturers/ManufacturersPage.tsx';
 import { MerchantProfilePage } from '../features/settings/merchant/MerchantProfilePage.tsx';
 import { SuppliersPage } from '../features/settings/suppliers/SuppliersPage.tsx';
 import { PickListsPage } from '../features/settings/pick-lists/PickListsPage.tsx';
@@ -57,7 +58,7 @@ export const routes: RouteObject[] = [
           { path: 'auswahllisten', element: <PickListsPage /> },
           { path: 'titelmuster', element: null },
           { path: 'textbausteine', element: null },
-          { path: 'hersteller', element: null },
+          { path: 'hersteller', element: <ManufacturersPage /> },
           { path: 'lieferanten', element: <SuppliersPage /> },
           { path: 'code-uebersetzung', element: null },
           { path: 'zustandszuordnung', element: null },

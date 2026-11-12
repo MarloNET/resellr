@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import {
   DEMO_DEVICE_TYPES,
+  DEMO_MANUFACTURERS,
   DEMO_MERCHANT_PROFILE,
   DEMO_SUPPLIERS,
   type SeedArea,
@@ -91,15 +92,24 @@ describe('startDemo (CU-004)', () => {
       const filled = SCHEMA_TABLES.filter((table) => !STARTUP_TABLES.has(table)).filter(
         (table) => db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get() !== 0,
       );
-      // Only the demo data written through the API (CU-061): the device types, suppliers and the
-      // merchant profile of S2 with their audit entries; the initial settings follow with the
-      // seed migration CU-071.
-      expect(filled.sort()).toEqual(['audit_entry', 'device_type', 'merchant_profile', 'supplier']);
+      // Only the demo data written through the API (CU-061): the device types, suppliers,
+      // manufacturers and the merchant profile of S2 with their audit entries; the initial
+      // settings follow with the seed migration CU-071.
+      expect(filled.sort()).toEqual([
+        'audit_entry',
+        'device_type',
+        'manufacturer',
+        'merchant_profile',
+        'supplier',
+      ]);
       expect(db.prepare('SELECT name, active FROM device_type ORDER BY id').all()).toEqual(
         DEMO_DEVICE_TYPES.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
       );
       expect(db.prepare('SELECT name, active FROM supplier ORDER BY id').all()).toEqual(
         DEMO_SUPPLIERS.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
+      );
+      expect(db.prepare('SELECT name, active FROM manufacturer ORDER BY id').all()).toEqual(
+        DEMO_MANUFACTURERS.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
       );
       expect(db.prepare('SELECT brand_name, contact_text FROM merchant_profile').all()).toEqual([
         {

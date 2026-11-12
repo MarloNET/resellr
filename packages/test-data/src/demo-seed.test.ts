@@ -8,6 +8,7 @@ import {
   SEED_AREAS,
   seedDeviceTypes,
   seedDemoData,
+  seedManufacturers,
   type SeedArea,
   seedMerchantProfile,
   seedSuppliers,
@@ -113,8 +114,13 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers and merchant profile', () => {
-    expect(SEED_AREAS).toEqual([seedDeviceTypes, seedSuppliers, seedMerchantProfile]);
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers and merchant profile', () => {
+    expect(SEED_AREAS).toEqual([
+      seedDeviceTypes,
+      seedSuppliers,
+      seedManufacturers,
+      seedMerchantProfile,
+    ]);
   });
 
   it('creates the demo device types through POST /api/device-types', async () => {
@@ -151,6 +157,29 @@ describe('seedDemoData', () => {
       ['POST', '/api/suppliers', { name: 'Lieferant A', active: true }],
       ['POST', '/api/suppliers', { name: 'Lieferant B', active: true }],
       ['POST', '/api/suppliers', { name: 'Lieferant C', active: false }],
+    ]);
+  });
+
+  it('creates the demo manufacturers through POST /api/manufacturers and deactivates Toshiba', async () => {
+    const requests: unknown[][] = [];
+    let id = 0;
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (...args: unknown[]) => {
+        requests.push(args);
+        id += 1;
+        return { id, version: 1 } as never;
+      },
+    };
+
+    await seedManufacturers(recording);
+
+    expect(requests).toEqual([
+      ['POST', '/api/manufacturers', { name: 'Lenovo' }],
+      ['POST', '/api/manufacturers', { name: 'HP' }],
+      ['POST', '/api/manufacturers', { name: 'Fujitsu' }],
+      ['POST', '/api/manufacturers', { name: 'Toshiba' }],
+      ['PATCH', '/api/manufacturers/4', { version: 1, active: false }],
     ]);
   });
 

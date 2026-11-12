@@ -1,3 +1,10 @@
+import {
+  attributeCreateSchema,
+  attributeListSchema,
+  attributeOrderSchema,
+  attributeSchema,
+  attributeUpdateSchema,
+} from '@resellr/domain/schemas/attribute.schema';
 import { idSchema } from '@resellr/domain/schemas/common.schema';
 import {
   deviceTypeCreateSchema,
@@ -5,6 +12,13 @@ import {
   deviceTypeSchema,
   deviceTypeUpdateSchema,
 } from '@resellr/domain/schemas/device-type.schema';
+import {
+  manufacturerCreateResultSchema,
+  manufacturerCreateSchema,
+  manufacturerListSchema,
+  manufacturerUpdateResultSchema,
+  manufacturerUpdateSchema,
+} from '@resellr/domain/schemas/manufacturer.schema';
 import {
   merchantProfileSchema,
   merchantProfileUpdateSchema,
@@ -32,6 +46,7 @@ import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
 import { createDeviceTypeService } from './device-type-service.ts';
+import { createManufacturerService } from './manufacturer-service.ts';
 import { createMerchantProfileService } from './merchant-profile-service.ts';
 import { createPickListService } from './pick-list-service.ts';
 import { createSupplierService } from './supplier-service.ts';
@@ -62,8 +77,9 @@ const includeInactiveQuery = pageQuery.extend({
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
  * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, `/api/merchant-profile`, … Each
  * route calls one service.
- * There is no DELETE route for device types (REQ-004, DER-33-09) or suppliers (2.2, DER-36-08).
- * There is no route to create or delete a pick list and none to delete a value (RQ-07,
+ * There is no DELETE route for device types or attributes (REQ-004, REQ-005, DER-33-09),
+ * manufacturers (2.2) or suppliers (2.2, DER-36-08). There is no route to create or delete a
+ * pick list and none to delete a value (RQ-07,
  * DER-35-09).
  */
 export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = async (
@@ -72,6 +88,7 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
 ) => {
   const deviceTypes = createDeviceTypeService({ db, uow, clock });
   const pickLists = createPickListService({ db, uow, clock });
+  const manufacturers = createManufacturerService({ db, uow, clock });
   const suppliers = createSupplierService({ db, uow, clock });
   const merchantProfile = createMerchantProfileService({ db, uow, clock });
 
@@ -97,6 +114,49 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       },
     },
     async (request) => deviceTypes.update(request.params.id, request.body),
+  );
+
+  app.get(
+    '/api/device-types/:id/attributes',
+    { schema: { params: idParams, response: { 200: attributeListSchema } } },
+    async (request) => deviceTypes.listAttributes(request.params.id),
+  );
+
+  app.post(
+    '/api/device-types/:id/attributes',
+    {
+      schema: {
+        params: idParams,
+        body: attributeCreateSchema,
+        response: { 201: attributeSchema },
+      },
+    },
+    async (request, reply) =>
+      reply.code(201).send(await deviceTypes.createAttribute(request.params.id, request.body)),
+  );
+
+  app.patch(
+    '/api/attributes/:id',
+    {
+      schema: {
+        params: idParams,
+        body: attributeUpdateSchema,
+        response: { 200: attributeSchema },
+      },
+    },
+    async (request) => deviceTypes.updateAttribute(request.params.id, request.body),
+  );
+
+  app.put(
+    '/api/device-types/:id/attribute-order',
+    {
+      schema: {
+        params: idParams,
+        body: attributeOrderSchema,
+        response: { 200: deviceTypeSchema },
+      },
+    },
+    async (request) => deviceTypes.reorderAttributes(request.params.id, request.body),
   );
 
   app.get(
@@ -152,6 +212,40 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       },
     },
     async (request) => pickLists.reorderValues(request.params.id, request.body),
+  );
+
+  app.get(
+    '/api/manufacturers',
+    { schema: { querystring: includeInactiveQuery, response: { 200: manufacturerListSchema } } },
+    async (request) => manufacturers.list(request.query),
+  );
+
+  // `201` for a new manufacturer, `200` with `existing: true` for an active one with the name
+  // (AC-REQ-100-02).
+  app.post(
+    '/api/manufacturers',
+    {
+      schema: {
+        body: manufacturerCreateSchema,
+        response: { 200: manufacturerCreateResultSchema, 201: manufacturerCreateResultSchema },
+      },
+    },
+    async (request, reply) => {
+      const { manufacturer, existing } = await manufacturers.create(request.body);
+      return reply.code(existing ? 200 : 201).send({ ...manufacturer, existing });
+    },
+  );
+
+  app.patch(
+    '/api/manufacturers/:id',
+    {
+      schema: {
+        params: idParams,
+        body: manufacturerUpdateSchema,
+        response: { 200: manufacturerUpdateResultSchema },
+      },
+    },
+    async (request) => manufacturers.update(request.params.id, request.body),
   );
 
   app.get(

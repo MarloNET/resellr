@@ -86,6 +86,59 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
   });
 
+  it('has the text of name_taken for manufacturers (2.0.6, UI-031, DER-37-04)', () => {
+    expect(ERROR_MESSAGES['name_taken.manufacturer']).toBe('Name ist bereits vergeben');
+  });
+
+  it('names the deactivated manufacturer in manufacturer_deactivated (2.0.6, UI-008)', () => {
+    expect(ERROR_MESSAGES['manufacturer_deactivated.default']('Lenovo')).toBe(
+      'Hersteller Lenovo ist deaktiviert',
+    );
+  });
+
+  it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
+    expect(FIELD_MESSAGES.manufacturerName).toBe('Name: 1 bis 50 Zeichen');
+  });
+
+  it('has the text of name_taken for attributes (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['name_taken.attribute']).toBe(
+      'Bezeichnung ist bei dieser Geräteart bereits vergeben',
+    );
+  });
+
+  it('has the field texts of the attribute panel (UI-027, 8.2)', () => {
+    expect(FIELD_MESSAGES.attributeUnit).toBe('Einheit: höchstens 20 Zeichen');
+    expect(FIELD_MESSAGES.attributeMinAboveMax).toBe(
+      'Mindestwert darf nicht größer als Höchstwert sein',
+    );
+    expect(FIELD_MESSAGES.attributePickListMissing).toBe('Auswahlliste fehlt');
+    expect(FIELD_MESSAGES.attributeMinValueNumber).toBe('Mindestwert: Zahl');
+    expect(FIELD_MESSAGES.attributeMinValueInteger).toBe('Mindestwert: ganze Zahl');
+    expect(FIELD_MESSAGES.attributeMaxValueNumber).toBe('Höchstwert: Zahl');
+    expect(FIELD_MESSAGES.attributeMaxValueInteger).toBe('Höchstwert: ganze Zahl');
+  });
+
+  it('has the texts of the attribute values (2.5, 8.2)', () => {
+    expect(FIELD_MESSAGES.attributeValueMissing('RAM')).toBe('RAM fehlt');
+    expect(FIELD_MESSAGES.attributeValueNumber('RAM', 'integer', '1', '1024')).toBe(
+      'RAM: ganze Zahl von 1 bis 1024',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('Takt', 'decimal', '0,5', null)).toBe(
+      'Takt: Zahl ab 0,5',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('Takt', 'decimal', null, '6')).toBe(
+      'Takt: Zahl bis 6',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('RAM', 'integer', null, null)).toBe(
+      'RAM: ganze Zahl',
+    );
+    expect(FIELD_MESSAGES.attributeValueTextLength('Farbe')).toBe('Farbe: höchstens 200 Zeichen');
+    expect(FIELD_MESSAGES.attributeValuePortCount('Anschlüsse')).toBe(
+      'Anschlüsse: Anzahl als ganze Zahl ab 1',
+    );
+    expect(FIELD_MESSAGES.attributeValuePortType('Anschlüsse')).toBe('Anschlüsse: Typ fehlt');
+  });
+
   it('has the text of name_taken for suppliers (2.0.6, UI-032)', () => {
     expect(ERROR_MESSAGES['name_taken.supplier']).toBe('Name ist bereits vergeben');
   });

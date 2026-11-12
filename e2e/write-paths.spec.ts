@@ -213,6 +213,7 @@ function recordingDemoApi(baseUrl: string, writes: SeedWrite[]): DemoApi {
  * a list with `includeInactive` returns its deactivated entries only on request (2.2).
  */
 const READ_PATHS: Record<string, string> = {
+  '/api/manufacturers': '/api/manufacturers?includeInactive=true',
   '/api/suppliers': '/api/suppliers?includeInactive=true',
 };
 

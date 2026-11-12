@@ -56,6 +56,25 @@ describe('maintenance table P-01 (CU-094)', () => {
     expect(screen.getByText('Detail')).toBeTruthy();
   });
 
+  it('shows the row actions beside the row, outside of the button that chooses it', () => {
+    const onAction = vi.fn();
+    const { region, onSelect } = renderTable({
+      renderActions: (entry) => (
+        <button type="button" onClick={() => onAction(entry.id)}>
+          Deaktivieren
+        </button>
+      ),
+    });
+
+    const actions = within(region).getAllByRole('button', { name: 'Deaktivieren' });
+    expect(actions).toHaveLength(2);
+    expect(actions[1]!.closest('li')!.textContent).toContain('Tablet');
+    expect(actions[1]!.parentElement!.closest('button')).toBeNull();
+    fireEvent.click(actions[1]!);
+    expect(onAction).toHaveBeenCalledWith(2);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('chooses an entry and creates a new one', () => {
     const { onSelect, onCreate } = renderTable();
 

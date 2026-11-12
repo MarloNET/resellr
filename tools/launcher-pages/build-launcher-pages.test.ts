@@ -26,6 +26,7 @@ describe('page build (CU-272)', () => {
       'launcher-pages.css',
       'launcher-pages.js',
       'lp-01.html',
+      'lp-02.html',
     ]);
   });
 
@@ -47,8 +48,10 @@ describe('page build (CU-272)', () => {
   it('keeps the pages free of scripts and style sheets from elsewhere', () => {
     buildLauncherPages(outDir);
 
-    const html = readFileSync(join(outDir, 'lp-01.html'), 'utf8');
-    const sources = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((match) => match[1]);
-    expect(sources).toEqual(['./launcher-pages.css', './launcher-pages.js']);
+    for (const name of ['lp-01.html', 'lp-02.html']) {
+      const html = readFileSync(join(outDir, name), 'utf8');
+      const sources = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((match) => match[1]);
+      expect(sources).toEqual(['./launcher-pages.css', './launcher-pages.js']);
+    }
   });
 });

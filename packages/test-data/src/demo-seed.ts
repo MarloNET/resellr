@@ -80,6 +80,34 @@ export const seedSuppliers: SeedArea = async (api) => {
 };
 
 /**
+ * Manufacturers (S2, UI-031): the delivered list is empty (REQ-006); the demo has three active
+ * manufacturers and a deactivated one. A new manufacturer is always active (REQ-100), so the
+ * deactivated one is switched off after creating it.
+ */
+export const DEMO_MANUFACTURERS = [
+  { name: 'Lenovo', active: true },
+  { name: 'HP', active: true },
+  { name: 'Fujitsu', active: true },
+  { name: 'Toshiba', active: false },
+] as const;
+
+export const seedManufacturers: SeedArea = async (api) => {
+  for (const { name, active } of DEMO_MANUFACTURERS) {
+    const created = await api.request<{ id: number; version: number }>(
+      'POST',
+      '/api/manufacturers',
+      { name },
+    );
+    if (!active) {
+      await api.request('PATCH', `/api/manufacturers/${created.id}`, {
+        version: created.version,
+        active: false,
+      });
+    }
+  }
+};
+
+/**
  * Merchant profile (S2, UI-026): the delivery has no brand (REQ-074); the demo uses a synthetic
  * one. The profile is a single row, saved on top of the version read.
  */
@@ -101,6 +129,7 @@ export const seedMerchantProfile: SeedArea = async (api) => {
 export const SEED_AREAS: readonly SeedArea[] = [
   seedDeviceTypes,
   seedSuppliers,
+  seedManufacturers,
   seedMerchantProfile,
 ];
 

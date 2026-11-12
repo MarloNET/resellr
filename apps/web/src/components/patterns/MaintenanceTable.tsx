@@ -1,7 +1,36 @@
-import { useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useState, type DragEvent, type ReactNode } from 'react';
 
 import { Button } from '../ui/Button.tsx';
 import { cn } from '../ui/cn.ts';
+import { Sheet, SheetContent } from '../ui/Sheet.tsx';
+
+/** The breakpoint `full` of the Tailwind theme (CU-059, Technical Specification 2.0.10). */
+const FULL_QUERY = '(min-width: 1366px)';
+
+/** Whether the viewport is at least `full` wide; follows changes of the window size. */
+function useIsFull(): boolean {
+  const mediaQuery = () =>
+    typeof window.matchMedia === 'function' ? window.matchMedia(FULL_QUERY) : null;
+  const [matches, setMatches] = useState(() => mediaQuery()?.matches ?? false);
+  useEffect(() => {
+    const query = mediaQuery();
+    if (query === null) return;
+    const update = () => setMatches(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return matches;
+}
+
+/** Side panel of a detail area, e.g. "Merkmal bearbeiten" of UI-027. */
+export interface MaintenancePanel {
+  title: string;
+  /** Design width in px. */
+  width: number;
+  content: ReactNode;
+  onClose: () => void;
+}
 
 export interface MaintenanceTableProps<T> {
   /** Heading of the list, e.g. "Gerätearten". */
@@ -13,6 +42,11 @@ export interface MaintenanceTableProps<T> {
   onSelect: (item: T) => void;
   /** Content of a row, e.g. name and status chip. */
   renderItem: (item: T) => ReactNode;
+  /**
+   * Row actions of P-01, e.g. "Deaktivieren" (UI-031): beside the row, not inside the button
+   * that chooses it.
+   */
+  renderActions?: (item: T) => ReactNode;
   /** Number of entries beside the heading; off where the screen does not show it (UI-028). */
   showCount?: boolean;
   /**
@@ -32,13 +66,19 @@ export interface MaintenanceTableProps<T> {
   emptyText?: string;
   /** Detail area of the chosen entry. */
   children: ReactNode;
+  /**
+   * Side panel while it is open: from `full` on beside the detail area, below it as `Sheet`
+   * over the content (R-1 (3), Technical Specification 2.0.10).
+   */
+  panel?: MaintenancePanel | null;
 }
 
 /**
  * Maintenance table P-01 (CU-094, design chapter 5): list of the entries with "Anlegen" and
  * the detail area of the chosen entry. Single column as base form, so the detail area stands
  * below the list below the breakpoint `full`; from `full` on it stands beside it (R-1 (1),
- * Technical Specification 2.0.10). The order of the rows of a detail area follows P-01 with
+ * Technical Specification 2.0.10). A side panel stands beside the detail area from `full` on and
+ * overlays the content below it. The order of the rows of a detail area follows P-01 with
  * `OrderControls` and `useDragOrder` below.
  */
 export function MaintenanceTable<T>({
@@ -48,6 +88,7 @@ export function MaintenanceTable<T>({
   selectedId,
   onSelect,
   renderItem,
+  renderActions,
   showCount = true,
   createLabel,
   onCreate,
@@ -55,7 +96,9 @@ export function MaintenanceTable<T>({
   placeholder,
   emptyText,
   children,
+  panel = null,
 }: MaintenanceTableProps<T>) {
+  const isFull = useIsFull();
   const empty = placeholder === undefined && emptyText !== undefined && items.length === 0;
   const canCreate = createLabel !== undefined && onCreate !== undefined;
   const createButton = (variant: 'primary' | 'secondary', className: string) => (
@@ -91,20 +134,21 @@ export function MaintenanceTable<T>({
                 const id = getId(item);
                 const current = id === selectedId;
                 return (
-                  <li key={id}>
+                  <li key={id} className="flex items-center gap-1">
                     <button
                       type="button"
                       aria-current={current ? 'true' : undefined}
                       disabled={disabled}
                       onClick={() => onSelect(item)}
                       className={cn(
-                        'flex w-full cursor-pointer flex-col rounded-control border px-4 py-2 text-left',
+                        'flex w-full min-w-0 flex-1 cursor-pointer flex-col rounded-control border px-4 py-2 text-left',
                         'disabled:cursor-not-allowed',
                         current ? 'border-primary bg-bg' : 'border-transparent hover:bg-bg',
                       )}
                     >
                       {renderItem(item)}
                     </button>
+                    {renderActions?.(item)}
                   </li>
                 );
               })}
@@ -118,6 +162,28 @@ export function MaintenanceTable<T>({
         )}
       </section>
       <div className="min-w-0 flex-1">{children}</div>
+      {panel !== null && isFull && (
+        <aside
+          aria-label={panel.title}
+          className="flex shrink-0 flex-col rounded-control border border-border bg-surface"
+          style={{ width: panel.width }}
+        >
+          <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+            <h2 className="m-0 text-section font-semibold">{panel.title}</h2>
+            <Button aria-label="Schließen" className="h-8 min-w-8 px-2" onClick={panel.onClose}>
+              <span aria-hidden="true">×</span>
+            </Button>
+          </header>
+          <div className="min-w-0 p-4 [overflow-wrap:anywhere]">{panel.content}</div>
+        </aside>
+      )}
+      {panel !== null && !isFull && (
+        <Sheet open onOpenChange={(open) => !open && panel.onClose()}>
+          <SheetContent title={panel.title} width={panel.width}>
+            {panel.content}
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

@@ -35,6 +35,43 @@ export const MESSAGES = {
  * the schemas of `packages/domain` set them, so browser and server show the same text (2.0.5).
  */
 export const FIELD_MESSAGES = {
+  /**
+   * Values of the attributes in the input masks (Technical Specification 2.5 "Regeln und Texte
+   * je Datentyp", 8.2): `label` is the current label of the attribute, bounds are formatted with
+   * a decimal comma and without thousands separators.
+   */
+  attributeValueMissing: (label: string) => `${label} fehlt`,
+  attributeValueNumber: (
+    label: string,
+    kind: 'integer' | 'decimal',
+    min: string | null,
+    max: string | null,
+  ) => {
+    const rule = kind === 'integer' ? 'ganze Zahl' : 'Zahl';
+    if (min !== null && max !== null) return `${label}: ${rule} von ${min} bis ${max}`;
+    if (min !== null) return `${label}: ${rule} ab ${min}`;
+    if (max !== null) return `${label}: ${rule} bis ${max}`;
+    return `${label}: ${rule}`;
+  },
+  attributeValueTextLength: (label: string) => `${label}: höchstens 200 Zeichen`,
+  attributeValuePortCount: (label: string) => `${label}: Anzahl als ganze Zahl ab 1`,
+  attributeValuePortType: (label: string) => `${label}: Typ fehlt`,
+  /** Value of the attribute with the role `battery_capacity` (2.5, AC-REQ-014-02). */
+  batteryCapacityFormat: 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“',
+  /** UI-027 "Auswahlliste", missing at data type "Auswahl aus Liste" (2.1, DER-34-04). */
+  attributePickListMissing: 'Auswahlliste fehlt',
+  /** UI-027 "Mindestwert"/"Höchstwert", not a number; not a whole number for data type integer (8.2). */
+  attributeMinValueNumber: 'Mindestwert: Zahl',
+  attributeMinValueInteger: 'Mindestwert: ganze Zahl',
+  attributeMaxValueNumber: 'Höchstwert: Zahl',
+  attributeMaxValueInteger: 'Höchstwert: ganze Zahl',
+  /** UI-027 "Mindest-/Höchstwert", minimum above maximum (2.1, DER-34-03). */
+  attributeMinAboveMax: 'Mindestwert darf nicht größer als Höchstwert sein',
+  /**
+   * UI-027 "Einheit", longer than 20 characters (3.1). Text defined by Technical Specification
+   * 8.2, table "Meldungstexte".
+   */
+  attributeUnit: 'Einheit: höchstens 20 Zeichen',
   /** UI-028 "Akku vorhanden", missing in the list battery (REQ-007, DER-35-10). */
   batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
   /** UI-026 "Name der Händlermarke", empty or longer than 100 characters after trimming. */
@@ -43,6 +80,8 @@ export const FIELD_MESSAGES = {
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
+  /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
+  manufacturerName: 'Name: 1 bis 50 Zeichen',
   /**
    * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
    * Technical Specification 8.2 (addendum MAR-487).
@@ -60,7 +99,10 @@ type MessageText = string | ((...args: string[]) => string);
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
+  'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.device_type': 'Name ist bereits vergeben',
+  'name_taken.manufacturer': 'Name ist bereits vergeben',
   'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
   'name_taken.supplier': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
