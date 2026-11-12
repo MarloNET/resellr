@@ -110,6 +110,14 @@ export const FIXED_TEXTS = {
     'resellr konnte nicht beendet werden. resellr läuft weiter. Bitte versuchen Sie es erneut. ' +
     `Besteht der Fehler weiter, informieren Sie den Betreiber mit der Referenznummer ${referenceNumber}.`,
   shutdownDone: 'resellr ist beendet. Sie können den Datenordner jetzt kopieren.',
+  /** UI-046.success: lead of the data folder path from the answer `200`. */
+  shutdownDoneLocationLead: BACKUP_NOTICE_LINES.backupNoticeLocationLead,
+  /** UI-046.unknown: no answer within 30 s or connection lost; without the path. */
+  shutdownUnknownTitle: 'Es ließ sich nicht feststellen, ob resellr beendet wurde.',
+  shutdownUnknownText:
+    'Ausgang unbekannt. resellr antwortet nicht mehr. Kopieren Sie den Datenordner deshalb ' +
+    'noch nicht. Starten Sie resellr über die Verknüpfung „resellr“ im Startmenü und beenden ' +
+    'Sie es danach erneut. Läuft resellr noch, öffnet die Verknüpfung die normale Oberfläche.',
   conflictBanner:
     'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert. ' +
     'Bitte neu laden und erneut prüfen.',

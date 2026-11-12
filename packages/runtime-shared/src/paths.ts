@@ -1,4 +1,4 @@
-import { join, win32 } from 'node:path';
+import { isAbsolute, join, relative, sep, win32 } from 'node:path';
 
 export interface RuntimePaths {
   dataDir: string;
@@ -69,4 +69,27 @@ export function programFolderPaths(programDir: string): ProgramFolderPaths {
     webRoot: join(appDir, 'web'),
     nativeModulesDir: join(appDir, 'node_modules'),
   };
+}
+
+/**
+ * The data, log, handover and update-copy folder: the only folders the server writes in
+ * (REQ-106, Technical Specification 2.19, 6.2).
+ */
+export function runtimeFolders(paths: RuntimePaths): string[] {
+  return [paths.dataDir, paths.logDir, paths.handoverDir, paths.updateCopyDir];
+}
+
+/**
+ * Whether `target` is one of the runtime folders or lies below one (REQ-106). Compared with
+ * `node:path` of the platform after resolving `..` steps, so a sibling like `Daten-Kopie` or a
+ * way out over `Daten/..` does not count as inside.
+ */
+export function isInRuntimeFolder(target: string, paths: RuntimePaths): boolean {
+  return runtimeFolders(paths).some((folder) => {
+    const fromFolder = relative(folder, target);
+    return (
+      fromFolder === '' ||
+      (!isAbsolute(fromFolder) && fromFolder !== '..' && !fromFolder.startsWith(`..${sep}`))
+    );
+  });
 }
