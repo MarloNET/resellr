@@ -29,7 +29,7 @@
 | Zustandsbeschreibung | Mehrzeilentext | nein | max. 1.000 Zeichen | „Zustandsbeschreibung: höchstens 1.000 Zeichen“ |
 | Tastaturlayout, Netzteil, Akku | Auswahl | ja, wenn Geräteart das Merkmal hat | | „<Feld> fehlt“ |
 | Akkukapazität | Ganzzahl 0–100 oder „nicht ermittelbar“ | ja, wenn Akku-Wert „Akku vorhanden“ trägt | Feld erscheint/entfällt abhängig vom Akku-Wert | „Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar““ |
-| weitere Merkmale | je Datentyp | je Merkmalsdefinition | keine Typumwandlung (Zahl bleibt Zahl, kein Datum) | „<Merkmal>: <Regel>“; **fehlt der Wert eines Pflichtmerkmals (v0.6.4, AC-REQ-005-12 b, M-32): „<Merkmal> fehlt“** (z. B. „RAM fehlt“), Muster wie „<Feld> fehlt“ oben. Beim Ändern eines bereits gespeicherten Geräts (UI-010 öffnet dasselbe Formular) auch dann, wenn die Änderung ein anderes Feld betrifft; Fokus auf das erste markierte Feld, nichts gespeichert |
+| weitere Merkmale | je Datentyp | je Merkmalsdefinition | keine Typumwandlung (Zahl bleibt Zahl, kein Datum) | „<Merkmal>: <Regel>“ (Wortlaut je Datentyp: meldungskatalog.md, Ergänzung v0.6.13, MAR-548); **fehlt der Wert eines Pflichtmerkmals (v0.6.4, AC-REQ-005-12 b, M-32): „<Merkmal> fehlt“** (z. B. „RAM fehlt“), Muster wie „<Feld> fehlt“ oben. Beim Ändern eines bereits gespeicherten Geräts (UI-010 öffnet dasselbe Formular) auch dann, wenn die Änderung ein anderes Feld betrifft; Fokus auf das erste markierte Feld, nichts gespeichert |
 
 ## Meldung „WI-Nr bereits vergeben“ (v0.6.9, MAR-970)
 Klärung des Wortlauts der Meldung `wi_nr_taken`; sie gilt auch in UI-013.
