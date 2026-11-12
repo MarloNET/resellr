@@ -1,3 +1,5 @@
+import { attributeValuesSchema } from '@resellr/domain/schemas/attribute-values.schema';
+import { attributeListSchema } from '@resellr/domain/schemas/attribute.schema';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
@@ -131,6 +133,37 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     expect(list.items[0]).toMatchObject({ label: 'Bildschirmdiagonale', hasValues: false });
     const deviceTypes = (await get('/api/device-types')).json();
     expect(deviceTypes.items[0]).toMatchObject({ name: 'Monitor', attributeCount: 1 });
+  });
+
+  it('AC-REQ-005-01 "Bildschirmdiagonale" of "Monitor" is a required field of the values schema of the model template', async () => {
+    const monitor = await createDeviceType('Monitor');
+    await createAttribute(monitor.id, {
+      label: 'Bildschirmdiagonale',
+      dataType: 'decimal',
+      unit: 'Zoll',
+      minValue: '10',
+      maxValue: '60',
+      level: 'model',
+      variantForming: false,
+      required: true,
+    });
+    await createAttribute(monitor.id, { label: 'Panel', dataType: 'text', required: true });
+
+    const { items } = attributeListSchema.parse(
+      (await get(`/api/device-types/${monitor.id}/attributes`)).json(),
+    );
+    const modelTemplateValues = attributeValuesSchema(items, 'model');
+    const [diagonal] = items;
+
+    expect(modelTemplateValues.safeParse({}).error?.issues).toEqual([
+      expect.objectContaining({
+        path: [String(diagonal?.id)],
+        message: 'Bildschirmdiagonale fehlt',
+      }),
+    ]);
+    expect(modelTemplateValues.parse({ [String(diagonal?.id)]: '27' })).toEqual({
+      [String(diagonal?.id)]: '27',
+    });
   });
 
   it('AC-REQ-005-06 an attribute of level device can be variant forming, at level model the flag is rejected', async () => {

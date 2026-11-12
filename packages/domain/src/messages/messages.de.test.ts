@@ -104,6 +104,27 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.attributeMaxValueInteger).toBe('Höchstwert: ganze Zahl');
   });
 
+  it('has the texts of the attribute values (2.5, 8.2)', () => {
+    expect(FIELD_MESSAGES.attributeValueMissing('RAM')).toBe('RAM fehlt');
+    expect(FIELD_MESSAGES.attributeValueNumber('RAM', 'integer', '1', '1024')).toBe(
+      'RAM: ganze Zahl von 1 bis 1024',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('Takt', 'decimal', '0,5', null)).toBe(
+      'Takt: Zahl ab 0,5',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('Takt', 'decimal', null, '6')).toBe(
+      'Takt: Zahl bis 6',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('RAM', 'integer', null, null)).toBe(
+      'RAM: ganze Zahl',
+    );
+    expect(FIELD_MESSAGES.attributeValueTextLength('Farbe')).toBe('Farbe: höchstens 200 Zeichen');
+    expect(FIELD_MESSAGES.attributeValuePortCount('Anschlüsse')).toBe(
+      'Anschlüsse: Anzahl als ganze Zahl ab 1',
+    );
+    expect(FIELD_MESSAGES.attributeValuePortType('Anschlüsse')).toBe('Anschlüsse: Typ fehlt');
+  });
+
   it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {
     expect(ERROR_MESSAGES['name_taken.pick_list_value']).toBe(
       'Wert gibt es in dieser Liste bereits',

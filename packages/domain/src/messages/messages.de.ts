@@ -35,6 +35,29 @@ export const MESSAGES = {
  * the schemas of `packages/domain` set them, so browser and server show the same text (2.0.5).
  */
 export const FIELD_MESSAGES = {
+  /**
+   * Values of the attributes in the input masks (Technical Specification 2.5 "Regeln und Texte
+   * je Datentyp", 8.2): `label` is the current label of the attribute, bounds are formatted with
+   * a decimal comma and without thousands separators.
+   */
+  attributeValueMissing: (label: string) => `${label} fehlt`,
+  attributeValueNumber: (
+    label: string,
+    kind: 'integer' | 'decimal',
+    min: string | null,
+    max: string | null,
+  ) => {
+    const rule = kind === 'integer' ? 'ganze Zahl' : 'Zahl';
+    if (min !== null && max !== null) return `${label}: ${rule} von ${min} bis ${max}`;
+    if (min !== null) return `${label}: ${rule} ab ${min}`;
+    if (max !== null) return `${label}: ${rule} bis ${max}`;
+    return `${label}: ${rule}`;
+  },
+  attributeValueTextLength: (label: string) => `${label}: höchstens 200 Zeichen`,
+  attributeValuePortCount: (label: string) => `${label}: Anzahl als ganze Zahl ab 1`,
+  attributeValuePortType: (label: string) => `${label}: Typ fehlt`,
+  /** Value of the attribute with the role `battery_capacity` (2.5, AC-REQ-014-02). */
+  batteryCapacityFormat: 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“',
   /** UI-027 "Auswahlliste", missing at data type "Auswahl aus Liste" (2.1, DER-34-04). */
   attributePickListMissing: 'Auswahlliste fehlt',
   /** UI-027 "Mindestwert"/"Höchstwert", not a number; not a whole number for data type integer (8.2). */
