@@ -1,6 +1,6 @@
 # UI-027 – Gerätearten und Merkmale
 
-- Zweck: Gerätearten anlegen/ändern/deaktivieren und ihre Merkmale (Datentyp, Ebene, Variantenkennzeichen, Pflicht, Datenblatt-Block) pflegen.
+- Zweck: Gerätearten anlegen/ändern/deaktivieren/wieder aktivieren und ihre Merkmale (Datentyp, Ebene, Variantenkennzeichen, Pflicht, Datenblatt-Block) pflegen.
 - Flows: FLOW-05
 - Anforderungen: REQ-004, REQ-005, REQ-006, REQ-076; AC zu REQ-004/005, **v0.6.4: AC-REQ-005-11, AC-REQ-005-12 (Wieder aktivieren)**
 - Rollen: Nutzer
