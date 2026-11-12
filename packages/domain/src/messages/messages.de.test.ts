@@ -86,6 +86,20 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
   });
 
+  it('has the text of name_taken for manufacturers (2.0.6, UI-031, DER-37-04)', () => {
+    expect(ERROR_MESSAGES['name_taken.manufacturer']).toBe('Name ist bereits vergeben');
+  });
+
+  it('names the deactivated manufacturer in manufacturer_deactivated (2.0.6, UI-008)', () => {
+    expect(ERROR_MESSAGES['manufacturer_deactivated.default']('Lenovo')).toBe(
+      'Hersteller Lenovo ist deaktiviert',
+    );
+  });
+
+  it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
+    expect(FIELD_MESSAGES.manufacturerName).toBe('Name: 1 bis 50 Zeichen');
+  });
+
   it('has the text of name_taken for suppliers (2.0.6, UI-032)', () => {
     expect(ERROR_MESSAGES['name_taken.supplier']).toBe('Name ist bereits vergeben');
   });
