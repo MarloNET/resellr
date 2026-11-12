@@ -125,6 +125,14 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.attributeValuePortType('Anschlüsse')).toBe('Anschlüsse: Typ fehlt');
   });
 
+  it('has the text of name_taken for suppliers (2.0.6, UI-032)', () => {
+    expect(ERROR_MESSAGES['name_taken.supplier']).toBe('Name ist bereits vergeben');
+  });
+
+  it('has the field text of the supplier name (UI-032)', () => {
+    expect(FIELD_MESSAGES.supplierName).toBe('Name: 1 bis 100 Zeichen');
+  });
+
   it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {
     expect(ERROR_MESSAGES['name_taken.pick_list_value']).toBe(
       'Wert gibt es in dieser Liste bereits',
