@@ -1347,7 +1347,6 @@ describe('merchant profile API (CU-087, Technical Specification 2.2)', () => {
   });
 });
 
-
 describe('condition code API (CU-087, Technical Specification 2.2)', () => {
   const BASE = '/api/condition-codes';
 
