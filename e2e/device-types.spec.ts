@@ -1,4 +1,7 @@
+import { join } from 'node:path';
+
 import type { Page } from '@playwright/test';
+import Database from 'better-sqlite3';
 
 import { expect, test } from './fixtures/app-fixture.ts';
 import { expectReachable } from './fixtures/reachability.ts';
@@ -229,5 +232,189 @@ test.describe('UI-027 device types (CU-095)', () => {
       page.getByRole('alert').filter({ hasText: 'resellr wird gerade beendet.' }),
     ).toBeVisible();
     await expect(nameField(page)).toHaveValue(`${name} neu`);
+  });
+});
+
+/** File of the database in the data folder (`DATABASE_FILE_NAME`, CU-040). */
+const DATABASE_FILE = 'resellr.db';
+
+const attributes = (page: Page) => page.getByRole('region', { name: 'Merkmale' });
+const attributeRow = (page: Page, label: string) =>
+  attributes(page)
+    .getByRole('row')
+    .filter({ has: page.getByRole('button', { name: label, exact: true }) });
+
+/** Creates an attribute through the API like the user interface (`local-guard` G-2, G-4). */
+async function createAttribute(
+  page: Page,
+  baseUrl: string,
+  deviceTypeId: number,
+  change: Record<string, unknown>,
+) {
+  const response = await page.request.post(
+    `${baseUrl}/api/device-types/${deviceTypeId}/attributes`,
+    {
+      headers: { origin: baseUrl },
+      data: {
+        label: 'Merkmal',
+        dataType: 'text',
+        unit: null,
+        unitSpacing: true,
+        minValue: null,
+        maxValue: null,
+        pickListId: null,
+        level: 'device',
+        variantForming: false,
+        required: false,
+        datasheetBlock: 'technical',
+        active: true,
+        ...change,
+      },
+    },
+  );
+  expect(response.status()).toBe(201);
+  return (await response.json()) as { id: number; version: number };
+}
+
+async function attributeList(page: Page, baseUrl: string, deviceTypeId: number) {
+  const response = await page.request.get(`${baseUrl}/api/device-types/${deviceTypeId}/attributes`);
+  return (
+    (await response.json()) as {
+      items: { id: number; label: string; active: boolean; variantForming: boolean }[];
+    }
+  ).items;
+}
+
+test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(!FRAME_ROWS.includes(testInfo.project.name), 'full frame only');
+  });
+
+  test('UI-027.default DER-34-06 the order changes by dragging and with "Runter", each sent as the complete attribute-order', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const cpu = await createAttribute(page, server.baseUrl, deviceType.id, { label: 'Prozessor' });
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, { label: 'RAM' });
+    const ssd = await createAttribute(page, server.baseUrl, deviceType.id, { label: 'SSD' });
+    await openDeviceType(page, name);
+    await expect(attributeRow(page, 'SSD')).toBeVisible();
+    await expectReachable(page);
+
+    // Keyboard alternative: "Runter" in the row of "Prozessor".
+    const byKeyboard = page.waitForRequest(
+      (request) => request.method() === 'PUT' && request.url().endsWith('/attribute-order'),
+    );
+    await attributeRow(page, 'Prozessor').getByRole('button', { name: 'Runter' }).focus();
+    await page.keyboard.press('Enter');
+    expect(((await byKeyboard).postDataJSON() as { attributeIds: number[] }).attributeIds).toEqual([
+      ram.id,
+      cpu.id,
+      ssd.id,
+    ]);
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal gespeichert' })).toBeVisible();
+
+    // Dragging "SSD" onto the first row.
+    const byDragging = page.waitForRequest(
+      (request) => request.method() === 'PUT' && request.url().endsWith('/attribute-order'),
+    );
+    await attributeRow(page, 'SSD').dragTo(attributeRow(page, 'RAM'));
+    expect(((await byDragging).postDataJSON() as { attributeIds: number[] }).attributeIds).toEqual([
+      ssd.id,
+      ram.id,
+      cpu.id,
+    ]);
+    await expect
+      .poll(async () =>
+        (await attributeList(page, server.baseUrl, deviceType.id)).map((item) => item.label),
+      )
+      .toEqual(['SSD', 'RAM', 'Prozessor']);
+    await expect(
+      attributes(page).getByRole('button', { name: /^(Prozessor|RAM|SSD)$/ }),
+    ).toHaveText(['SSD', 'RAM', 'Prozessor']);
+
+    // An incomplete list is a state from before another window created an attribute (2.1).
+    const devices = await page.request.get(`${server.baseUrl}/api/device-types?limit=200`);
+    const { version } = (
+      (await devices.json()) as { items: { id: number; version: number }[] }
+    ).items.find((item) => item.id === deviceType.id) ?? { version: 0 };
+    const incomplete = await page.request.put(
+      `${server.baseUrl}/api/device-types/${deviceType.id}/attribute-order`,
+      { headers: { origin: server.baseUrl }, data: { version, attributeIds: [ssd.id, ram.id] } },
+    );
+    expect(incomplete.status()).toBe(409);
+  });
+
+  test('UI-027.default DER-34-07 deactivating a variant attribute answers 200, shows "deaktiviert", keeps the stored values and the variant set', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      variantForming: true,
+    });
+    // A stored value of RAM: there is no API for model templates before S3, so the test writes
+    // one into the database of the running server (WAL mode allows the second connection).
+    const sqlite = new Database(join(server.paths.dataDir, DATABASE_FILE));
+    let modelTemplateId: number;
+    try {
+      const now = new Date().toISOString();
+      const manufacturer = sqlite
+        .prepare(
+          `INSERT INTO manufacturer (name, name_key, active, gpsr_complete, version, created_at, updated_at)
+           VALUES (?, ?, 1, 0, 1, ?, ?)`,
+        )
+        .run(name, name.toLowerCase(), now, now);
+      modelTemplateId = Number(
+        sqlite
+          .prepare(
+            `INSERT INTO model_template (device_type_id, manufacturer_id, model_name, model_name_key,
+               mpn_unknown, model_values, default_device_values, search_key, import_review_pending,
+               import_review_keys, version, created_at, updated_at)
+             VALUES (?, ?, 'MacBook Air', 'macbookair', 1, '{}', ?, 'macbook air', 0, '[]', 1, ?, ?)`,
+          )
+          .run(
+            deviceType.id,
+            manufacturer.lastInsertRowid,
+            JSON.stringify({ [ram.id]: 16 }),
+            now,
+            now,
+          ).lastInsertRowid,
+      );
+    } finally {
+      sqlite.close();
+    }
+    await openDeviceType(page, name);
+
+    const response = page.waitForResponse(
+      (answer) =>
+        answer.request().method() === 'PATCH' && answer.url().endsWith(`/api/attributes/${ram.id}`),
+    );
+    await attributeRow(page, 'RAM').getByRole('button', { name: 'Merkmal deaktivieren' }).click();
+
+    const answer = await response;
+    expect(answer.status()).toBe(200);
+    expect(await answer.text()).not.toContain('variant_flag_would_merge_listings');
+    await expect(attributeRow(page, 'RAM').getByText('deaktiviert')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal gespeichert' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const [stored] = await attributeList(page, server.baseUrl, deviceType.id);
+    expect(stored).toMatchObject({ id: ram.id, active: false, variantForming: true });
+    const check = new Database(join(server.paths.dataDir, DATABASE_FILE), { readonly: true });
+    try {
+      const row = check
+        .prepare('SELECT default_device_values FROM model_template WHERE id = ?')
+        .get(modelTemplateId) as { default_device_values: string };
+      expect(JSON.parse(row.default_device_values)).toEqual({ [ram.id]: 16 });
+    } finally {
+      check.close();
+    }
   });
 });
