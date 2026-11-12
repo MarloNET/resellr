@@ -536,3 +536,315 @@ describe('pick list API (CU-087, Technical Specification 2.1)', () => {
     expect(actions).toEqual(['created', 'deactivated']);
   });
 });
+
+describe('supplier API (CU-087, Technical Specification 2.2)', () => {
+  const list = (query = '') =>
+    t.app.inject({ method: 'GET', url: `/api/suppliers${query}`, headers: { host: HOST } });
+
+  const listAll = () => list('?includeInactive=true');
+
+  const create = (body: Record<string, unknown>) =>
+    t.app.inject({
+      method: 'POST',
+      url: '/api/suppliers',
+      headers: SAME_ORIGIN_WRITE,
+      payload: body,
+    });
+
+  const patch = (id: number, body: Record<string, unknown>) =>
+    t.app.inject({
+      method: 'PATCH',
+      url: `/api/suppliers/${id}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload: body,
+    });
+
+  const auditRows = () =>
+    t.database.sqlite
+      .prepare(
+        "SELECT action, object_id, object_label, old_value, new_value FROM audit_entry WHERE object_type = 'supplier' ORDER BY id",
+      )
+      .all();
+
+  const names = (items: { name: string }[]) => items.map((item) => item.name);
+
+  const createL1 = async () => (await create({ name: 'L1', active: true })).json();
+
+  /**
+   * A device of supplier `supplierId` with the rows it refers to. Devices are captured from S4 on
+   * (#54); until then the test writes the rows directly, as the schema of S1 allows.
+   */
+  function insertDevice(supplierId: number) {
+    const at = '2026-11-11T08:00:00.000Z';
+    t.database.sqlite.exec(`
+      INSERT INTO device_type (id, name, name_key, active, sort_order, version, created_at, updated_at)
+        VALUES (1, 'Notebook', 'notebook', 1, 1, 1, '${at}', '${at}');
+      INSERT INTO manufacturer (id, name, name_key, active, gpsr_complete, version, created_at, updated_at)
+        VALUES (1, 'Lenovo', 'lenovo', 1, 0, 1, '${at}', '${at}');
+      INSERT INTO pick_list_value (id, pick_list_id, label, label_key, sort_order, active, version)
+        VALUES (1, ${CONDITION}, 'Gebraucht', 'gebraucht', 1, 1, 1);
+      INSERT INTO model_template (id, device_type_id, manufacturer_id, model_name, model_name_key,
+          mpn_unknown, model_values, default_device_values, search_key, import_review_pending,
+          import_review_keys, version, created_at, updated_at)
+        VALUES (1, 1, 1, 'T14', 't14', 1, '{}', '{}', 'lenovo t14', 0, '[]', 1, '${at}', '${at}');
+    `);
+    t.database.sqlite
+      .prepare(
+        `INSERT INTO device (wi_nr, wi_nr_key, model_template_id, supplier_id, condition_value_id,
+           visual_grade, condition_description, device_values, review_keys, capture_status,
+           stock_status, captured_at, captured_on, version, updated_at)
+         VALUES ('626198', '626198', 1, ?, 1, 2, '', '{}', '[]', 'checked', 'available', ?,
+           '2026-11-11', 1, ?)`,
+      )
+      .run(supplierId, at, at);
+  }
+
+  it('AC-REQ-099-01 a new supplier "L1" is available as active through GET /api/suppliers', async () => {
+    const created = await create({ name: 'L1', active: true });
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toEqual({
+      id: expect.any(Number),
+      name: 'L1',
+      active: true,
+      version: 1,
+    });
+    const response = await list();
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ items: [created.json()], total: 1 });
+  });
+
+  it('AC-REQ-099-02 a second supplier "l1" is rejected with name_taken "Name ist bereits vergeben"', async () => {
+    await createL1();
+
+    const response = await create({ name: 'l1', active: true });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'name_taken',
+        message: 'Name ist bereits vergeben',
+        fields: [],
+        details: {},
+        referenceNumber: null,
+      },
+    });
+    expect((await listAll()).json().total).toBe(1);
+  });
+
+  it('AC-REQ-099-02 renaming to the name of another supplier in other case is rejected as well', async () => {
+    await createL1();
+    const l2 = (await create({ name: 'L2', active: false })).json();
+
+    const response = await patch(l2.id, { version: 1, name: ' l1 ' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('name_taken');
+    expect(names((await listAll()).json().items)).toEqual(['L1', 'L2']);
+  });
+
+  it('AC-REQ-099-03 a deactivated supplier stays at its devices and is no longer in the choice for new entries', async () => {
+    const l1 = await createL1();
+    await create({ name: 'L2', active: true });
+    insertDevice(l1.id);
+
+    const response = await patch(l1.id, { version: 1, active: false });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ id: l1.id, name: 'L1', active: false, version: 2 });
+    expect(t.database.sqlite.prepare('SELECT supplier_id FROM device').pluck().all()).toEqual([
+      l1.id,
+    ]);
+    // The choice for new devices and condition codes (#54, #160) reads the active suppliers.
+    expect(names((await list()).json().items)).toEqual(['L2']);
+    // UI-032 keeps listing it with its status.
+    expect((await listAll()).json().items).toEqual([
+      { id: l1.id, name: 'L1', active: false, version: 2 },
+      expect.objectContaining({ name: 'L2', active: true }),
+    ]);
+  });
+
+  it('DER-36-08 there is no DELETE route for suppliers, deactivating is possible', async () => {
+    const l1 = await createL1();
+
+    const response = await t.app.inject({
+      method: 'DELETE',
+      url: `/api/suppliers/${l1.id}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(t.app.hasRoute({ method: 'DELETE', url: '/api/suppliers/:id' })).toBe(false);
+    expect((await listAll()).json().items).toEqual([l1]);
+    expect((await patch(l1.id, { version: 1, active: false })).statusCode).toBe(200);
+  });
+
+  it('trims the name and lists the suppliers by name without regard to case', async () => {
+    await create({ name: '  zeta ', active: true });
+    await create({ name: 'Alpha', active: false });
+    await create({ name: 'beta', active: true });
+
+    expect((await listAll()).json()).toEqual({
+      items: [
+        { id: 2, name: 'Alpha', active: false, version: 1 },
+        { id: 3, name: 'beta', active: true, version: 1 },
+        { id: 1, name: 'zeta', active: true, version: 1 },
+      ],
+      total: 3,
+    });
+    expect((await list()).json().total).toBe(2);
+  });
+
+  it('pages the list with limit and offset (2.0.1)', async () => {
+    for (const name of ['A', 'B', 'C']) await create({ name, active: true });
+
+    const response = await list('?limit=1&offset=1');
+
+    expect(response.json()).toMatchObject({ items: [{ name: 'B' }], total: 3 });
+  });
+
+  it('rejects an unknown value of includeInactive as bad_request', async () => {
+    expect((await list('?includeInactive=yes')).statusCode).toBe(400);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['only spaces', '   '],
+    ['101 characters', 'x'.repeat(101)],
+  ])(
+    'DER-36-05 rejects a name that is %s with validation_failed "Name: 1 bis 100 Zeichen" at the field',
+    async (_case, name) => {
+      const response = await create({ name, active: true });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'validation_failed',
+        message: '',
+        fields: [{ path: 'name', code: expect.any(String), message: 'Name: 1 bis 100 Zeichen' }],
+        details: {},
+        referenceNumber: null,
+      });
+      expect((await listAll()).json().total).toBe(0);
+    },
+  );
+
+  it('DER-36-05 accepts a name of 100 characters', async () => {
+    expect((await create({ name: 'x'.repeat(100), active: true })).statusCode).toBe(201);
+  });
+
+  it('DER-36-05 rejects an empty name on rename with validation_failed', async () => {
+    const l1 = await createL1();
+
+    const response = await patch(l1.id, { version: 1, name: '' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
+      { path: 'name', code: expect.any(String), message: 'Name: 1 bis 100 Zeichen' },
+    ]);
+  });
+
+  it('DER-36-06 (a) rejects a change with an outdated version with 409 version_conflict and changes nothing', async () => {
+    const l1 = await createL1();
+    await patch(l1.id, { version: 1, name: 'L1 neu' });
+
+    const response = await patch(l1.id, { version: 1, name: 'L1 alt' });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('version_conflict');
+    expect((await listAll()).json().items).toEqual([
+      { id: l1.id, name: 'L1 neu', active: true, version: 2 },
+    ]);
+  });
+
+  it('answers 404 not_found with M-15 for an unknown supplier', async () => {
+    const response = await patch(99, { version: 1, name: 'L9' });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error).toMatchObject({
+      code: 'not_found',
+      message: 'Dieser Eintrag ist nicht mehr vorhanden.',
+    });
+  });
+
+  it('writes one audit entry per change: created, updated, deactivated, activated (2.0.9, 3.6)', async () => {
+    const l1 = await createL1();
+    await patch(l1.id, { version: 1, name: 'Lieferant Eins', active: false });
+    await patch(l1.id, { version: 2, active: true });
+
+    expect(auditRows()).toEqual([
+      {
+        action: 'created',
+        object_id: l1.id,
+        object_label: 'Lieferant L1',
+        old_value: null,
+        new_value: JSON.stringify({ Name: 'L1', Status: 'aktiv' }),
+      },
+      {
+        action: 'updated',
+        object_id: l1.id,
+        object_label: 'Lieferant Lieferant Eins',
+        old_value: JSON.stringify({ Name: 'L1' }),
+        new_value: JSON.stringify({ Name: 'Lieferant Eins' }),
+      },
+      {
+        action: 'deactivated',
+        object_id: l1.id,
+        object_label: 'Lieferant Lieferant Eins',
+        old_value: JSON.stringify({ Status: 'aktiv' }),
+        new_value: JSON.stringify({ Status: 'deaktiviert' }),
+      },
+      {
+        action: 'activated',
+        object_id: l1.id,
+        object_label: 'Lieferant Lieferant Eins',
+        old_value: JSON.stringify({ Status: 'deaktiviert' }),
+        new_value: JSON.stringify({ Status: 'aktiv' }),
+      },
+    ]);
+  });
+
+  it('a change without a difference keeps the version and writes no audit entry', async () => {
+    const l1 = await createL1();
+
+    const response = await patch(l1.id, { version: 1, name: 'L1', active: true });
+
+    expect(response.json()).toEqual(l1);
+    expect(auditRows()).toHaveLength(1);
+  });
+
+  it('a rename to the same name in other case is allowed', async () => {
+    const l1 = await createL1();
+
+    const response = await patch(l1.id, { version: 1, name: 'l1' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ name: 'l1', version: 2 });
+  });
+
+  it('DER-36-04 a technical error answers 500 internal_error with the reference number of the error log and stores nothing', async () => {
+    t.database.sqlite.exec(
+      "CREATE TRIGGER fail_supplier BEFORE INSERT ON supplier BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+    );
+
+    const response = await create({ name: 'L1', active: true });
+
+    expect(response.statusCode).toBe(500);
+    const { error } = response.json();
+    expect(error.code).toBe('internal_error');
+    expect(error.referenceNumber).toMatch(/^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(t.readErrorLog()).toEqual([expect.objectContaining({ refNo: error.referenceNumber })]);
+    expect(t.database.sqlite.prepare('SELECT COUNT(*) FROM supplier').pluck().get()).toBe(0);
+    expect(auditRows()).toEqual([]);
+  });
+
+  it('DER-36-06 (c) rejects a write while shutting down with 503 shutting_down and stores nothing', async () => {
+    t.lifecycle.set('stopping');
+
+    const response = await create({ name: 'L1', active: true });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toMatchObject({ code: 'shutting_down', referenceNumber: null });
+    expect(t.database.sqlite.prepare('SELECT COUNT(*) FROM supplier').pluck().get()).toBe(0);
+  });
+});

@@ -64,11 +64,27 @@ export const seedDeviceTypes: SeedArea = async (api) => {
 };
 
 /**
+ * Suppliers (S2, UI-032): the delivered list is empty (REQ-006); the demo has two active
+ * suppliers and a deactivated one.
+ */
+export const DEMO_SUPPLIERS = [
+  { name: 'Lieferant A', active: true },
+  { name: 'Lieferant B', active: true },
+  { name: 'Lieferant C', active: false },
+] as const;
+
+export const seedSuppliers: SeedArea = async (api) => {
+  for (const supplier of DEMO_SUPPLIERS) {
+    await api.request('POST', '/api/suppliers', supplier);
+  }
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
  */
-export const SEED_AREAS: readonly SeedArea[] = [seedDeviceTypes];
+export const SEED_AREAS: readonly SeedArea[] = [seedDeviceTypes, seedSuppliers];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */
 export async function seedDemoData(

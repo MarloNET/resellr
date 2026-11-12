@@ -44,6 +44,8 @@ export const FIELD_MESSAGES = {
    * Technical Specification 8.2 (addendum MAR-487).
    */
   pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
+  /** UI-032 "Name", empty or longer than 100 characters after trimming. */
+  supplierName: 'Name: 1 bis 100 Zeichen',
 } as const;
 
 type MessageText = string | ((...args: string[]) => string);
@@ -56,6 +58,7 @@ type MessageText = string | ((...args: string[]) => string);
 export const ERROR_MESSAGES = {
   'name_taken.device_type': 'Name ist bereits vergeben',
   'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
+  'name_taken.supplier': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 

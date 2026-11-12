@@ -25,6 +25,11 @@ export interface MaintenanceTableProps<T> {
   disabled?: boolean;
   /** Text or placeholder instead of the rows, e.g. the loading text of the screen. */
   placeholder?: ReactNode;
+  /**
+   * Text of `.empty` (e.g. "Noch keine Lieferanten"): without entries it stands in the middle
+   * of the list area, with the "Anlegen" button as primary button below it.
+   */
+  emptyText?: string;
   /** Detail area of the chosen entry. */
   children: ReactNode;
 }
@@ -48,8 +53,18 @@ export function MaintenanceTable<T>({
   onCreate,
   disabled = false,
   placeholder,
+  emptyText,
   children,
 }: MaintenanceTableProps<T>) {
+  const empty = placeholder === undefined && emptyText !== undefined && items.length === 0;
+  const canCreate = createLabel !== undefined && onCreate !== undefined;
+  const createButton = (variant: 'primary' | 'secondary', className: string) => (
+    <Button variant={variant} className={className} disabled={disabled} onClick={onCreate}>
+      <span aria-hidden="true">+</span>
+      {createLabel}
+    </Button>
+  );
+
   return (
     <div className="flex flex-col gap-4 full:flex-row full:items-start">
       <section
@@ -64,37 +79,41 @@ export function MaintenanceTable<T>({
             </span>
           )}
         </header>
-        {placeholder ?? (
-          <ul className="m-0 flex list-none flex-col gap-1 p-2">
-            {items.map((item) => {
-              const id = getId(item);
-              const current = id === selectedId;
-              return (
-                <li key={id}>
-                  <button
-                    type="button"
-                    aria-current={current ? 'true' : undefined}
-                    disabled={disabled}
-                    onClick={() => onSelect(item)}
-                    className={cn(
-                      'flex w-full cursor-pointer flex-col rounded-control border px-4 py-2 text-left',
-                      'disabled:cursor-not-allowed',
-                      current ? 'border-primary bg-bg' : 'border-transparent hover:bg-bg',
-                    )}
-                  >
-                    {renderItem(item)}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        {empty ? (
+          <div className="flex flex-col items-center gap-4 px-4 py-8 text-center">
+            <p className="m-0 text-body text-text-secondary">{emptyText}</p>
+            {canCreate && createButton('primary', '')}
+          </div>
+        ) : (
+          (placeholder ?? (
+            <ul className="m-0 flex list-none flex-col gap-1 p-2">
+              {items.map((item) => {
+                const id = getId(item);
+                const current = id === selectedId;
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      aria-current={current ? 'true' : undefined}
+                      disabled={disabled}
+                      onClick={() => onSelect(item)}
+                      className={cn(
+                        'flex w-full cursor-pointer flex-col rounded-control border px-4 py-2 text-left',
+                        'disabled:cursor-not-allowed',
+                        current ? 'border-primary bg-bg' : 'border-transparent hover:bg-bg',
+                      )}
+                    >
+                      {renderItem(item)}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ))
         )}
-        {createLabel !== undefined && onCreate !== undefined && (
+        {!empty && canCreate && (
           <footer className="border-t border-border p-2">
-            <Button className="w-full" disabled={disabled} onClick={onCreate}>
-              <span aria-hidden="true">+</span>
-              {createLabel}
-            </Button>
+            {createButton('secondary', 'w-full')}
           </footer>
         )}
       </section>
