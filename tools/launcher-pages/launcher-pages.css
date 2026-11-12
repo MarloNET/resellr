@@ -29,6 +29,8 @@
   --resellr-primary: #1d4ed8;
   --resellr-error: #b42318;
   --resellr-error-bg: #fee4e2;
+  --resellr-warn: #92400e;
+  --resellr-warn-bg: #fef3c7;
   --resellr-grid: 8px;
 }
 
@@ -71,7 +73,15 @@ p {
   margin: 0;
 }
 
-/* Title strip in the error style across the top of the card (LP-02 "Start abgebrochen"). */
+/* Paragraphs of one text follow each other with a gap (LP-02.zeitueberschreitung). */
+p + p {
+  margin-top: var(--resellr-grid);
+}
+
+/*
+ * Title strip across the top of the card: error style for LP-02 "Start abgebrochen", warn style
+ * for LP-02.zeitueberschreitung, which is no abort (K-07).
+ */
 .card__title {
   margin: calc(-3 * var(--resellr-grid)) calc(-3 * var(--resellr-grid))
     calc(2 * var(--resellr-grid));
@@ -82,6 +92,11 @@ p {
 .card__title--error {
   color: var(--resellr-error);
   background: var(--resellr-error-bg);
+}
+
+.card__title--warn {
+  color: var(--resellr-warn);
+  background: var(--resellr-warn-bg);
 }
 
 /* The reference number on a line of its own; plain text, so the user can select and copy it. */

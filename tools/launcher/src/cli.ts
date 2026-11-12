@@ -20,7 +20,7 @@ import { createLauncherLog, type LauncherLog } from './launcher-log.ts';
 import { launcherPageUrl } from './launcher-pages-location.ts';
 import { createLauncherStateWriter } from './launcher-state-writer.ts';
 import { runOpenCommand } from './open-command.ts';
-import { startServerProcess } from './supervisor/server-process.ts';
+import { startServerProcess, testStartTimeouts } from './supervisor/server-process.ts';
 import { runSupervisor } from './supervisor/supervisor.ts';
 import {
   listenSupervisorPipe,
@@ -119,6 +119,8 @@ function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
     newRequestId: randomUUID,
     waitingPageUrl: (request) => launcherPageUrl(programDir, 'lp-01', { request }),
     launcherState: createLauncherStateWriter(programDir),
+    log: launcherLog,
+    startTimeoutMs: testStartTimeouts(env)?.timeoutMs,
   });
 }
 
@@ -175,7 +177,15 @@ async function supervise({
         launcherLog.crash({ startId, refNo, exitCode, signal });
         updateRuntimeState(paths.logDir, { lastCrashAt: at.toISOString() });
       },
-      onStartAborted: (entry) => launcherLog.startAborted(entry),
+      onStartAborted: (entry) => {
+        launcherLog.startAborted(entry);
+        // At the start limit no server wrote a start result; the supervisor writes it (K-07).
+        if (entry.cause === 'start_limit') {
+          const { startId, refNo } = entry;
+          const at = new Date().toISOString();
+          writeStartResult(paths.logDir, { startId, state: 'aborted', refNo, at });
+        }
+      },
       onGaveUp: ({ startId, refNo, at }) => {
         launcherLog.gaveUp({ startId, refNo });
         writeStartResult(paths.logDir, { startId, state: 'gave_up', refNo, at: at.toISOString() });

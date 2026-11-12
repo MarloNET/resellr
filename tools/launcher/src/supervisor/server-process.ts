@@ -25,12 +25,29 @@ export const SERVER_ENTRY = IS_BUNDLED
  */
 export const TEST_SERVER_ENTRY_ENV = 'RESELLR_TEST_SERVER_ENTRY';
 
+/** Start limit (2.18 step 5, K-07): a start without `ready` 10 minutes after the spawn hangs. */
+export const START_LIMIT_MS = 10 * 60 * 1000;
+
+/**
+ * Test hook (6.2 g): `<time-out>,<start limit>` in milliseconds, e.g. `2000,6000`, shortens the
+ * time-out of `open` (120 s) and the start limit (10 min) for integration tests.
+ */
+export const TEST_START_TIMEOUTS_ENV = 'RESELLR_TEST_START_TIMEOUTS';
+
+/** The shortened limits of the test hook; null without a valid value. */
+export function testStartTimeouts(env: RuntimeEnv): { timeoutMs: number; limitMs: number } | null {
+  const match = /^(\d+),(\d+)$/.exec(env[TEST_START_TIMEOUTS_ENV] ?? '');
+  return match ? { timeoutMs: Number(match[1]), limitMs: Number(match[2]) } : null;
+}
+
 /** How a run of the server process ended, from its exit code (2.18 "Exit-Codes"). */
 export type ServerEnd =
   | { kind: 'stopped' }
   /** `refNo` from `start-result.json` of this start, null if the file names another start. */
   | { kind: 'aborted'; refNo: string | null }
   | { kind: 'already_running' }
+  /** No `ready` within the start limit; the supervisor ended the process (K-07), no crash. */
+  | { kind: 'start_limit' }
   /** Every other exit code, also 12 and an end by a signal. */
   | { kind: 'crashed'; exitCode: number | null; signal: NodeJS.Signals | null };
 
@@ -41,6 +58,8 @@ export interface ServerProcessOptions {
   /** Environment of the supervisor, passed on to the server. */
   env: RuntimeEnv;
   serverEntry?: string;
+  /** Start limit until `ready`; the test hook shortens it. */
+  limitMs?: number;
   /** Called once when the server reports `{ type: 'ready', startId }` with this `startId`. */
   onReady(): void;
 }
@@ -54,12 +73,18 @@ export interface ServerProcess {
  * Starts `resellr-server` (CU-264, Technical Specification 2.18 "Überwachung") with the same
  * Node.js (`resellr-node.exe`, no console window, S-2), hidden and not detached: Node.js puts it in
  * the job object of the supervisor, and the IPC channel ends with the supervisor (H-13, S-3).
+ *
+ * Start limit (K-07): without `ready` of this start within 10 minutes it ends the process and
+ * reports `start_limit`, whatever exit code follows. Windows ends a process at once on every
+ * `kill()`; `SIGKILL` does the same under Linux, where the server would wait out its hanging start
+ * on SIGTERM (#320). A migration run lost this way is rolled back by SQLite (CU-029).
  */
 export function startServerProcess({
   paths,
   startId,
   env,
   serverEntry = env[TEST_SERVER_ENTRY_ENV] || SERVER_ENTRY,
+  limitMs = testStartTimeouts(env)?.limitMs ?? START_LIMIT_MS,
   onReady,
 }: ServerProcessOptions): ServerProcess {
   const child = spawn(process.execPath, [serverEntry], {
@@ -76,19 +101,34 @@ export function startServerProcess({
   });
 
   let ready = false;
+  let limitReached = false;
+  const limit = setTimeout(() => {
+    limitReached = true;
+    child.kill('SIGKILL');
+  }, limitMs);
+
   child.on('message', (message: unknown) => {
     const { type, startId: reported } = (message ?? {}) as { type?: unknown; startId?: unknown };
-    if (ready || type !== 'ready' || reported !== startId) return;
+    if (ready || limitReached || type !== 'ready' || reported !== startId) return;
     ready = true;
+    clearTimeout(limit);
     onReady();
   });
 
   const ended = new Promise<ServerEnd>((resolve) => {
     // `error` without `exit` means the process could not be started at all.
-    child.once('error', () => resolve({ kind: 'crashed', exitCode: null, signal: null }));
-    child.once('exit', (exitCode, signal) =>
-      resolve(classifyServerExit(exitCode, signal, () => abortRefNo(paths.logDir, startId))),
-    );
+    child.once('error', () => {
+      clearTimeout(limit);
+      resolve({ kind: 'crashed', exitCode: null, signal: null });
+    });
+    child.once('exit', (exitCode, signal) => {
+      clearTimeout(limit);
+      resolve(
+        limitReached
+          ? { kind: 'start_limit' }
+          : classifyServerExit(exitCode, signal, () => abortRefNo(paths.logDir, startId)),
+      );
+    });
   });
 
   return { ended };

@@ -21,6 +21,11 @@ export interface LauncherStateWriter {
   ready(request: string, url: string): void;
   /** `aborted`, also for `gave_up` and `already_running` without a server: the page goes to LP-02. */
   aborted(request: string, refNo: string | null): void;
+  /**
+   * `timeout` after 120 s without a result (K-07): the page goes to `LP-02.zeitueberschreitung`
+   * with the number of `start_timeout`; the `request` in its address lets LP-02 read on.
+   */
+  timeout(request: string, refNo: string): void;
 }
 
 export function createLauncherStateWriter(programDir: string): LauncherStateWriter {
@@ -36,6 +41,16 @@ export function createLauncherStateWriter(programDir: string): LauncherStateWrit
         phase: 'aborted',
         // The address of LP-02 comes from CU-310, like the one `open` opens directly.
         url: launcherPageUrl(programDir, 'lp-02', { ref }),
+        refNo: ref,
+        dataDir: null,
+      });
+    },
+    timeout: (request, refNo) => {
+      const ref = isReferenceNumber(refNo) ? refNo : null;
+      writeLauncherState(pagesDir, {
+        request,
+        phase: 'timeout',
+        url: launcherPageUrl(programDir, 'lp-02', { request, ref }),
         refNo: ref,
         dataDir: null,
       });
