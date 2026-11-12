@@ -6,6 +6,15 @@ import {
   deviceTypeUpdateSchema,
 } from '@resellr/domain/schemas/device-type.schema';
 import {
+  pickListListSchema,
+  pickListSchema,
+  pickListValueCreateSchema,
+  pickListValueListSchema,
+  pickListValueOrderSchema,
+  pickListValueSchema,
+  pickListValueUpdateSchema,
+} from '@resellr/domain/schemas/pick-list.schema';
+import {
   supplierCreateSchema,
   supplierListSchema,
   supplierSchema,
@@ -19,6 +28,7 @@ import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
 import { createDeviceTypeService } from './device-type-service.ts';
+import { createPickListService } from './pick-list-service.ts';
 import { createSupplierService } from './supplier-service.ts';
 
 export interface SettingsRoutesOptions {
@@ -47,12 +57,16 @@ const includeInactiveQuery = pageQuery.extend({
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
  * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, … Each route calls one service.
  * There is no DELETE route for device types (REQ-004, DER-33-09) or suppliers (2.2, DER-36-08).
+ * There is no route to create or delete a pick list and none to delete a value (RQ-07,
+ * DER-35-09).
  */
 export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = async (
   app,
   { db, uow, clock },
 ) => {
   const deviceTypes = createDeviceTypeService({ db, uow, clock });
+  const pickLists = createPickListService({ db, uow, clock });
+  const suppliers = createSupplierService({ db, uow, clock });
 
   app.get(
     '/api/device-types',
@@ -78,7 +92,60 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
     async (request) => deviceTypes.update(request.params.id, request.body),
   );
 
-  const suppliers = createSupplierService({ db, uow, clock });
+  app.get(
+    '/api/pick-lists',
+    { schema: { querystring: pageQuery, response: { 200: pickListListSchema } } },
+    async (request) => pickLists.list(request.query),
+  );
+
+  app.get(
+    '/api/pick-lists/:id/values',
+    {
+      schema: {
+        params: idParams,
+        querystring: pageQuery,
+        response: { 200: pickListValueListSchema },
+      },
+    },
+    async (request) => pickLists.listValues(request.params.id, request.query),
+  );
+
+  app.post(
+    '/api/pick-lists/:id/values',
+    {
+      schema: {
+        params: idParams,
+        body: pickListValueCreateSchema,
+        response: { 201: pickListValueSchema },
+      },
+    },
+    async (request, reply) =>
+      reply.code(201).send(await pickLists.createValue(request.params.id, request.body)),
+  );
+
+  app.patch(
+    '/api/pick-list-values/:id',
+    {
+      schema: {
+        params: idParams,
+        body: pickListValueUpdateSchema,
+        response: { 200: pickListValueSchema },
+      },
+    },
+    async (request) => pickLists.updateValue(request.params.id, request.body),
+  );
+
+  app.put(
+    '/api/pick-lists/:id/value-order',
+    {
+      schema: {
+        params: idParams,
+        body: pickListValueOrderSchema,
+        response: { 200: pickListSchema },
+      },
+    },
+    async (request) => pickLists.reorderValues(request.params.id, request.body),
+  );
 
   app.get(
     '/api/suppliers',

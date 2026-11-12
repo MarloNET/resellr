@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { uptime } from 'node:os';
 import { dirname } from 'node:path';
 
@@ -17,6 +18,7 @@ import { createHealthClient } from './health-client.ts';
 import { startHealthProbe } from './health-probe.ts';
 import { createLauncherLog, type LauncherLog } from './launcher-log.ts';
 import { launcherPageUrl } from './launcher-pages-location.ts';
+import { createLauncherStateWriter } from './launcher-state-writer.ts';
 import { runOpenCommand } from './open-command.ts';
 import { startServerProcess } from './supervisor/server-process.ts';
 import { runSupervisor } from './supervisor/supervisor.ts';
@@ -29,6 +31,12 @@ import {
 } from './supervisor/supervisor-pipe.ts';
 
 const APP_VERSION = '0.1.0';
+
+/**
+ * Test hook: program folder in place of the folder of `process.execPath`, so integration tests
+ * can give the launcher pages and `launcher-state.js` their own folder (#120 test expectation).
+ */
+export const TEST_PROGRAM_DIR_ENV = 'RESELLR_TEST_PROGRAM_DIR';
 
 /** A call of `resellr-launcher` (Technical Specification 2.18, command table). */
 export type LauncherCommand =
@@ -95,7 +103,7 @@ function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
   const { port } = readConfiguredPort(paths.dataDir);
   const launcherLog = createLauncherLog({ dir: paths.logDir, appVersion: APP_VERSION });
   // `resellr-node.exe` lies in the program folder (2.19), like for the server.
-  const programDir = dirname(process.execPath);
+  const programDir = env[TEST_PROGRAM_DIR_ENV] || dirname(process.execPath);
   return runOpenCommand({
     healthClient: createHealthClient({ port }),
     // The only warning of CU-267 is `chrome_not_found` (2.19, Nachtrag MAR-366).
@@ -108,6 +116,9 @@ function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
       await supervise({ pipe, paths, env, port, launcherLog, onPhase });
       return 'ended';
     },
+    newRequestId: randomUUID,
+    waitingPageUrl: (request) => launcherPageUrl(programDir, 'lp-01', { request }),
+    launcherState: createLauncherStateWriter(programDir),
   });
 }
 
