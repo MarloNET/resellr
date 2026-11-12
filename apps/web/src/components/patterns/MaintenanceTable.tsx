@@ -13,6 +13,11 @@ export interface MaintenanceTableProps<T> {
   onSelect: (item: T) => void;
   /** Content of a row, e.g. name and status chip. */
   renderItem: (item: T) => ReactNode;
+  /**
+   * Row actions of P-01, e.g. "Deaktivieren" (UI-031): beside the row, not inside the button
+   * that chooses it.
+   */
+  renderActions?: (item: T) => ReactNode;
   /** Number of entries beside the heading; off where the screen does not show it (UI-028). */
   showCount?: boolean;
   /**
@@ -48,6 +53,7 @@ export function MaintenanceTable<T>({
   selectedId,
   onSelect,
   renderItem,
+  renderActions,
   showCount = true,
   createLabel,
   onCreate,
@@ -91,20 +97,21 @@ export function MaintenanceTable<T>({
                 const id = getId(item);
                 const current = id === selectedId;
                 return (
-                  <li key={id}>
+                  <li key={id} className="flex items-center gap-1">
                     <button
                       type="button"
                       aria-current={current ? 'true' : undefined}
                       disabled={disabled}
                       onClick={() => onSelect(item)}
                       className={cn(
-                        'flex w-full cursor-pointer flex-col rounded-control border px-4 py-2 text-left',
+                        'flex w-full min-w-0 flex-1 cursor-pointer flex-col rounded-control border px-4 py-2 text-left',
                         'disabled:cursor-not-allowed',
                         current ? 'border-primary bg-bg' : 'border-transparent hover:bg-bg',
                       )}
                     >
                       {renderItem(item)}
                     </button>
+                    {renderActions?.(item)}
                   </li>
                 );
               })}
