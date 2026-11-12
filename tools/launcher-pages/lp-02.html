@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- LP-02 "Start abgebrochen" (CU-271, design docs/ux/launcher-pages/LP-02-start-abgebrochen). -->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>resellr konnte nicht gestartet werden</title>
+    <link rel="stylesheet" href="./launcher-pages.css" />
+    <script src="./launcher-pages.js" defer></script>
+  </head>
+  <body data-page="lp-02">
+    <main class="card">
+      <h1 class="card__title card__title--error">resellr konnte nicht gestartet werden</h1>
+      <p>
+        Der Start von resellr wurde abgebrochen. Bitte versuchen Sie es erneut: Öffnen Sie im
+        Startmenü die Verknüpfung „resellr“. Besteht der Fehler weiter, informieren Sie den
+        Betreiber und nennen Sie ihm diese Referenznummer:
+      </p>
+      <!-- Filled from the URL parameter `ref` only if it matches the pattern (2.0.5, H-11). -->
+      <p class="reference-number" id="reference-number" hidden></p>
+    </main>
+  </body>
+</html>

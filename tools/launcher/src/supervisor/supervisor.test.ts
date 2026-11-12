@@ -102,6 +102,13 @@ describe('supervisor (CU-261)', () => {
     const server = fakeServer();
     const phases: PhaseEvent[] = [];
     const crashes: CrashReport[] = [];
+    /** Log entries and reported phases in the order they happen. */
+    const order: string[] = [];
+    const logged: Record<string, unknown>[] = [];
+    const log = (kind: string) => (entry: object) => {
+      order.push(`log ${kind}`);
+      logged.push({ kind, ...entry });
+    };
     const waits = controlledWaits();
     const probes = fakeProbes();
     const summaries = { count: 0 };
@@ -109,17 +116,26 @@ describe('supervisor (CU-261)', () => {
     const ended = runSupervisor({
       pipe,
       startServer: server.startServer,
-      onPhase: (event) => phases.push(event),
+      onPhase: (event) => {
+        phases.push(event);
+        order.push(`phase ${event.phase}`);
+      },
       createStartId: () => `start-${++startCount}`,
       createRefNo: () => REF_NO,
       now: () => SUPERVISOR_START,
       sleep: waits.sleep,
-      onCrash: (crash) => crashes.push(crash),
+      onCrash: (crash) => {
+        crashes.push(crash);
+        order.push('log crash');
+      },
+      onStartAborted: log('start_aborted'),
+      onGaveUp: log('gave_up'),
+      onAlreadyRunning: log('already_running'),
       startHealthProbe: probes.start,
       summarizeAvailability: () => summaries.count++,
       ...options,
     });
-    return { server, phases, crashes, waits, probes, summaries, ended };
+    return { server, phases, crashes, order, logged, waits, probes, summaries, ended };
   }
 
   it('starts one server in starting and reports ready with the startId of this attempt', async () => {
@@ -181,6 +197,53 @@ describe('supervisor (CU-261)', () => {
     expect(await subscribeToSupervisor(path)).toBeNull();
   });
 
+  it.each<[string, ServerEnd, Record<string, unknown>]>([
+    [
+      'exit code 10 with a start result of this start',
+      { kind: 'aborted', refNo: 'R-ABCD-EFGH' },
+      { kind: 'start_aborted', startId: 'start-1', refNo: 'R-ABCD-EFGH', cause: 'start_aborted' },
+    ],
+    [
+      'exit code 10 without a start result of this start',
+      { kind: 'aborted', refNo: null },
+      { kind: 'start_aborted', startId: 'start-1', refNo: REF_NO, cause: 'start_result_missing' },
+    ],
+    [
+      'exit code 11',
+      { kind: 'already_running' },
+      { kind: 'already_running', startId: 'start-1', refNo: REF_NO },
+    ],
+  ])(
+    'DER-103-02 logs the reference number of %s before it reports the event',
+    async (_, end, entry) => {
+      const { server, order, logged, ended } = await start();
+
+      server.end(end);
+      await ended;
+
+      expect(logged).toEqual([entry]);
+      expect(order).toEqual(['phase starting', `log ${String(entry.kind)}`, `phase ${end.kind}`]);
+    },
+  );
+
+  it('reports aborted with its reference number also when writing the log fails', async () => {
+    const { server, phases, ended } = await start({
+      onStartAborted: () => {
+        throw new Error('disk full');
+      },
+    });
+
+    server.end({ kind: 'aborted', refNo: 'R-ABCD-EFGH' });
+    await ended;
+
+    expect(phases.at(-1)).toEqual({
+      event: 'phase',
+      phase: 'aborted',
+      startId: 'start-1',
+      refNo: 'R-ABCD-EFGH',
+    });
+  });
+
   it.each<[string, Extract<ServerEnd, { kind: 'crashed' }>]>([
     ['exit code 1', { kind: 'crashed', exitCode: 1, signal: null }],
     ['exit code 12', { kind: 'crashed', exitCode: 12, signal: null }],
@@ -240,11 +303,15 @@ describe('supervisor (CU-261)', () => {
     await ended;
   });
 
-  it('restarts only as long as the restart rule allows and then ends without a restart', async () => {
+  it('DER-103-03 restarts only as long as the restart rule allows, then logs crash and gave_up with numbers of their own, reports gave_up and ends', async () => {
     let allowed = 2;
-    const { server, crashes, waits, ended } = await start({
+    const refNos = ['R-0000-0001', 'R-0000-0002', 'R-0000-0003', 'R-0000-0004'];
+    const { server, crashes, order, logged, waits, ended } = await start({
       restartPolicy: { mayRestart: () => allowed-- > 0 },
+      createRefNo: () => refNos.shift()!,
     });
+    const client = await subscriber(path);
+    expect(await client.next()).toMatchObject({ phase: 'starting', startId: 'start-1' });
 
     for (let crash = 1; crash <= 3; crash++) {
       server.end({ kind: 'crashed', exitCode: 1, signal: null });
@@ -254,10 +321,50 @@ describe('supervisor (CU-261)', () => {
     }
 
     await ended;
-    // The third crash is logged too; `gave_up` with its reference number follows in #121.
-    expect(crashes.map((crash) => crash.startId)).toEqual(['start-1', 'start-2', 'start-3']);
+    // The last crash is logged too, with its own number (Nachtrag MAR-498).
+    expect(crashes.map(({ startId, refNo }) => [startId, refNo])).toEqual([
+      ['start-1', 'R-0000-0001'],
+      ['start-2', 'R-0000-0002'],
+      ['start-3', 'R-0000-0003'],
+    ]);
+    expect(logged).toEqual([
+      { kind: 'gave_up', startId: 'start-3', refNo: 'R-0000-0004', at: CRASH_AT },
+    ]);
+    // `gave_up` is written before it goes out, after the crash of the last start.
+    expect(order.slice(-3)).toEqual(['log crash', 'log gave_up', 'phase gave_up']);
     expect(server.startIds).toEqual(['start-1', 'start-2', 'start-3']);
+    const events: unknown[] = [];
+    for (let next = await client.next(); next !== 'closed'; next = await client.next()) {
+      events.push(next);
+    }
+    expect(events.at(-1)).toEqual({
+      event: 'phase',
+      phase: 'gave_up',
+      startId: 'start-3',
+      refNo: 'R-0000-0004',
+    });
     expect(await subscribeToSupervisor(path)).toBeNull();
+  });
+
+  it('reports gave_up also when writing it fails', async () => {
+    const { server, phases, waits, ended } = await start({
+      restartPolicy: { mayRestart: () => false },
+      onGaveUp: () => {
+        throw new Error('disk full');
+      },
+    });
+
+    server.end({ kind: 'crashed', exitCode: 1, signal: null });
+    await expect.poll(() => waits.pending()).toBe(1);
+    waits.release();
+    await ended;
+
+    expect(phases.at(-1)).toEqual({
+      event: 'phase',
+      phase: 'gave_up',
+      startId: 'start-1',
+      refNo: REF_NO,
+    });
   });
 
   it('keeps the restart going when writing the crash fails', async () => {
