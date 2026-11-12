@@ -8,6 +8,7 @@
 ; Build: iscc /DAppVersion=<version> [/DStageDir=<program folder>] [/O<output folder>] resellr.iss
 ; The staged program folder holds resellr-node.exe (CU-274), node.exe (CU-275), app\ (CU-276)
 ; and the other files of the program folder (2.19); it is packaged as it is.
+; Betriebshandbuch.pdf (CU-316, Nachtrag MAR-599) has its own entry, so iscc fails without it.
 
 #ifndef AppVersion
   #error AppVersion is not defined; call iscc with /DAppVersion=<version>
@@ -45,7 +46,8 @@ ShowLanguageDialog=no
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 
 [Files]
-Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#StageDir}\*"; Excludes: "\Betriebshandbuch.pdf"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#StageDir}\Betriebshandbuch.pdf"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
 ; Starts the supervisor at sign-in (S-1); removed with the uninstallation.

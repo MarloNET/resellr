@@ -131,12 +131,24 @@ describe('installer script resellr.iss (CU-273)', () => {
   });
 
   it('packages the staged program folder as it is', () => {
-    expect(section('Files').map(entry)).toEqual([
+    expect(section('Files').map(entry)[0]).toEqual({
+      Source: '..\\..\\..\\build\\package\\*',
+      Excludes: '\\Betriebshandbuch.pdf',
+      DestDir: '{app}',
+      Flags: 'ignoreversion recursesubdirs createallsubdirs',
+    });
+  });
+
+  it('requires Betriebshandbuch.pdf (CU-316) in its own entry, so the build fails without it (Nachtrag MAR-599)', () => {
+    const files = section('Files').map(entry);
+
+    expect(files.slice(1)).toEqual([
       {
-        Source: '..\\..\\..\\build\\package\\*',
+        Source: '..\\..\\..\\build\\package\\Betriebshandbuch.pdf',
         DestDir: '{app}',
-        Flags: 'ignoreversion recursesubdirs createallsubdirs',
+        Flags: 'ignoreversion',
       },
     ]);
+    expect(SCRIPT).not.toMatch(/skipifsourcedoesntexist/i);
   });
 });
