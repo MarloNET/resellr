@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useId, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 
 /** Attributes the field passes to its control (`Input`, select, text area). */
 export interface FormFieldControlProps {
@@ -70,4 +79,82 @@ export function useFocusFirstError(containerRef: RefObject<HTMLElement | null>):
   }, [request, containerRef]);
 
   return useCallback(() => setRequest((count) => count + 1), []);
+}
+
+/** Check on leaving a field that waits for a click in the form (`useDeferredBlurCheck`). */
+export interface DeferredBlurCheck {
+  /** For `onPointerDown` of the element around all controls a new error line could move. */
+  pressPointer: () => void;
+  /** For `onBlur`: runs `check` at once, or after the click if a pointer is pressed. */
+  checkOnBlur: (check: () => void) => void;
+  /** Drops the waiting check, e.g. before saving, on changing the entry or on "Abbrechen". */
+  cancel: () => void;
+}
+
+/**
+ * Check of a field on leaving it (Technical Specification 2.0.7 `.validation`; addendum
+ * MAR-555, FIND-324). During a click in the form the check waits until after the click: a new
+ * or vanished error line would move the button between `mousedown` and `mouseup`, and the
+ * browser would drop the click. At most one check waits; unmounting drops it. The returned
+ * object is stable.
+ */
+export function useDeferredBlurCheck(): DeferredBlurCheck {
+  const pointerPressed = useRef(false);
+  const cancelWaiting = useRef(() => {});
+  const releasePointer = useRef(() => {});
+
+  useEffect(
+    () => () => {
+      cancelWaiting.current();
+      releasePointer.current();
+    },
+    [],
+  );
+
+  return useMemo(() => {
+    const cancel = () => {
+      cancelWaiting.current();
+      cancelWaiting.current = () => {};
+    };
+
+    return {
+      pressPointer() {
+        releasePointer.current();
+        pointerPressed.current = true;
+        const release = () => {
+          pointerPressed.current = false;
+          window.removeEventListener('pointerup', release);
+          window.removeEventListener('pointercancel', release);
+        };
+        window.addEventListener('pointerup', release);
+        window.addEventListener('pointercancel', release);
+        releasePointer.current = release;
+      },
+      checkOnBlur(check: () => void) {
+        cancel();
+        if (!pointerPressed.current) {
+          check();
+          return;
+        }
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const run = () => {
+          window.removeEventListener('pointerup', run);
+          window.removeEventListener('pointercancel', run);
+          // `click` follows `pointerup` in the same task, so the timeout runs after it.
+          timer = setTimeout(() => {
+            cancelWaiting.current = () => {};
+            check();
+          });
+        };
+        window.addEventListener('pointerup', run);
+        window.addEventListener('pointercancel', run);
+        cancelWaiting.current = () => {
+          window.removeEventListener('pointerup', run);
+          window.removeEventListener('pointercancel', run);
+          clearTimeout(timer);
+        };
+      },
+      cancel,
+    };
+  }, []);
 }

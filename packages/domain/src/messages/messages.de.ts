@@ -76,6 +76,8 @@ export const FIELD_MESSAGES = {
   batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
+  /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
+  manufacturerName: 'Name: 1 bis 50 Zeichen',
   /**
    * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
    * Technical Specification 8.2 (addendum MAR-487).
@@ -97,8 +99,10 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.device_type': 'Name ist bereits vergeben',
+  'name_taken.manufacturer': 'Name ist bereits vergeben',
   'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
   'name_taken.supplier': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],

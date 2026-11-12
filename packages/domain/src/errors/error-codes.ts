@@ -11,6 +11,7 @@ export const ERROR_CODES = {
   forbidden_host: 403,
   forbidden_origin: 403,
   internal_error: 500,
+  manufacturer_deactivated: 422,
   method_not_allowed: 405,
   name_taken: 422,
   not_found: 404,
