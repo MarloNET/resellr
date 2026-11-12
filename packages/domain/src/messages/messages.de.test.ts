@@ -125,6 +125,15 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.attributeValuePortType('Anschlüsse')).toBe('Anschlüsse: Typ fehlt');
   });
 
+  it('has the texts of attribute_has_values for data type and level (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['attribute_has_values.data_type']).toBe(
+      'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+    expect(ERROR_MESSAGES['attribute_has_values.level']).toBe(
+      'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+  });
+
   it('has the text of name_taken for suppliers (2.0.6, UI-032)', () => {
     expect(ERROR_MESSAGES['name_taken.supplier']).toBe('Name ist bereits vergeben');
   });

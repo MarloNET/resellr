@@ -21,7 +21,10 @@ const GENERAL_CODES: [string, number][] = [
 ];
 
 // Domain codes of 2.0.6, added by the feature tasks that raise them.
-const DOMAIN_CODES: [string, number][] = [['name_taken', 422]];
+const DOMAIN_CODES: [string, number][] = [
+  ['attribute_has_values', 422],
+  ['name_taken', 422],
+];
 
 describe('error codes (E7)', () => {
   it.each(GENERAL_CODES)('maps %s to HTTP %i', (code, status) => {

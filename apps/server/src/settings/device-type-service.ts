@@ -35,6 +35,7 @@ import {
   RuleViolation,
   ValidationError,
 } from '../shared/domain-error.ts';
+import { createAttributeUsageQuery } from './attribute-usage-query.ts';
 import {
   createDeviceTypeRepository,
   type AttributeRow,
@@ -288,15 +289,15 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
 
     /**
      * `GET /api/device-types/{id}/attributes`: active and deactivated attributes in their order.
-     * `hasValues` locks data type and level once values are stored; until the usage query
-     * CU-074 exists (Technical Specification 4.4, S2), no attribute has values.
+     * `hasValues` (CU-074) locks data type and level once values are stored (2.1, DER-34-10).
      */
     async listAttributes(deviceTypeId: number): Promise<AttributeList> {
       const repository = createDeviceTypeRepository(db);
       await readOrThrow(repository, deviceTypeId);
       const rows = await repository.listAttributes(deviceTypeId);
+      const withValues = await createAttributeUsageQuery(db).attributeIdsWithValues(deviceTypeId);
       return {
-        items: rows.map((row) => ({ ...toAttribute(row), hasValues: false })),
+        items: rows.map((row) => ({ ...toAttribute(row), hasValues: withValues.has(row.id) })),
         total: rows.length,
       };
     },
@@ -339,6 +340,7 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
      * the version read differs (2.0.3). The rules apply to the merged state: label with the
      * exception of `battery_capacity` (DER-34-02), uniqueness (DER-34-05), the cross-field rules
      * (DER-34-03, DER-34-04, AC-REQ-005-07) and the fixed fields of a system role (DER-34-08).
+     * Data type and level are locked once values are stored (AC-REQ-005-04, AC-REQ-005-08).
      * Deactivating is never rejected and keeps the attribute in the variant set (K-03,
      * DER-34-07); removing the flag "variantenbildend" reports `VariantSetChanging` (CU-075).
      */
@@ -368,6 +370,7 @@ export function createDeviceTypeService({ db, uow, clock }: DeviceTypeServiceDep
             ? { value: current.label }
             : labelRule(fields.label, current.systemRole);
         assertFieldRules([...(label.error ? [label.error] : []), ...issues]);
+        await assertValuesNotStored(tx, current, merged);
 
         const next: Attribute = {
           ...merged,
@@ -498,6 +501,23 @@ function assertSystemRoleFieldsKept(current: Attribute, next: Attribute) {
   const changed = fixed.filter((field) => next[field] !== current[field]);
   if (changed.length > 0) {
     throw new BadRequestError(`${changed.join(', ')} attribute_system_role_fixed`);
+  }
+}
+
+/**
+ * Data type and level are locked from the first stored value on (2.1, CU-074): `422
+ * attribute_has_values` with the text of the changed field, the data type first.
+ */
+async function assertValuesNotStored(tx: UnitOfWork<DB>, current: Attribute, next: Attribute) {
+  const usage =
+    next.dataType !== current.dataType
+      ? 'data_type'
+      : next.level !== current.level
+        ? 'level'
+        : undefined;
+  if (usage === undefined) return;
+  if (await createAttributeUsageQuery(tx.db).hasValues(current.id)) {
+    throw new RuleViolation('attribute_has_values', { usage });
   }
 }
 
