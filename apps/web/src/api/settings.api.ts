@@ -5,6 +5,14 @@ import type {
   DeviceTypeUpdate,
 } from '@resellr/domain/schemas/device-type.schema';
 import type {
+  Manufacturer,
+  ManufacturerCreate,
+  ManufacturerCreateResult,
+  ManufacturerList,
+  ManufacturerUpdate,
+  ManufacturerUpdateResult,
+} from '@resellr/domain/schemas/manufacturer.schema';
+import type {
   PickList,
   PickListList,
   PickListValue,
@@ -34,6 +42,9 @@ const ALL = 'limit=200';
 
 /** Largest page of a list (2.0.1); UI-032 shows all suppliers, active and deactivated. */
 const ALL_SUPPLIERS = '/api/suppliers?includeInactive=true&limit=200';
+
+/** Largest page of a list (2.0.1); UI-031 shows all manufacturers, active and deactivated. */
+const ALL_MANUFACTURERS = '/api/manufacturers?includeInactive=true&limit=200';
 
 /**
  * Takes the saved entry into the cached list at once and loads the list again in the
@@ -103,6 +114,44 @@ export function useUpdateSupplierMutation() {
   return useMutation<Supplier, ApiError, SupplierUpdate & { id: number }>({
     mutationFn: ({ id, ...body }) => apiClient.patch<Supplier>(`/api/suppliers/${id}`, body),
     onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.suppliers(), saved),
+  });
+}
+
+/** Manufacturers of UI-031, active and deactivated (`GET /api/manufacturers?includeInactive=true`). */
+export function useManufacturersQuery() {
+  return useQuery<ManufacturerList, ApiError>({
+    queryKey: queryKeys.settings.manufacturers(),
+    queryFn: ({ signal }) => apiClient.get<ManufacturerList>(ALL_MANUFACTURERS, { signal }),
+  });
+}
+
+/**
+ * "Hersteller anlegen" of UI-008 (`POST /api/manufacturers`): the new manufacturer, or the active
+ * one with the same name and `existing: true` (AC-REQ-100-02).
+ */
+export function useCreateManufacturerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ManufacturerCreateResult, ApiError, ManufacturerCreate>({
+    mutationFn: (body) => apiClient.post<ManufacturerCreateResult>('/api/manufacturers', body),
+    onSuccess: ({ id, name, active, gpsrComplete, version }) =>
+      storeSaved<Manufacturer>(queryClient, queryKeys.settings.manufacturers(), {
+        id,
+        name,
+        active,
+        gpsrComplete,
+        version,
+      }),
+  });
+}
+
+/** "Speichern" and "Deaktivieren" of UI-031 (`PATCH /api/manufacturers/{id}`). */
+export function useUpdateManufacturerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ManufacturerUpdateResult, ApiError, ManufacturerUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) =>
+      apiClient.patch<ManufacturerUpdateResult>(`/api/manufacturers/${id}`, body),
+    onSuccess: ({ manufacturer }) =>
+      storeSaved(queryClient, queryKeys.settings.manufacturers(), manufacturer),
   });
 }
 
