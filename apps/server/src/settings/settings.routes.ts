@@ -6,6 +6,10 @@ import {
   deviceTypeUpdateSchema,
 } from '@resellr/domain/schemas/device-type.schema';
 import {
+  merchantProfileSchema,
+  merchantProfileUpdateSchema,
+} from '@resellr/domain/schemas/merchant-profile.schema';
+import {
   pickListListSchema,
   pickListSchema,
   pickListValueCreateSchema,
@@ -28,6 +32,7 @@ import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
 import { createDeviceTypeService } from './device-type-service.ts';
+import { createMerchantProfileService } from './merchant-profile-service.ts';
 import { createPickListService } from './pick-list-service.ts';
 import { createSupplierService } from './supplier-service.ts';
 
@@ -55,7 +60,8 @@ const includeInactiveQuery = pageQuery.extend({
 
 /**
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
- * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, … Each route calls one service.
+ * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, `/api/merchant-profile`, … Each
+ * route calls one service.
  * There is no DELETE route for device types (REQ-004, DER-33-09) or suppliers (2.2, DER-36-08).
  * There is no route to create or delete a pick list and none to delete a value (RQ-07,
  * DER-35-09).
@@ -67,6 +73,7 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
   const deviceTypes = createDeviceTypeService({ db, uow, clock });
   const pickLists = createPickListService({ db, uow, clock });
   const suppliers = createSupplierService({ db, uow, clock });
+  const merchantProfile = createMerchantProfileService({ db, uow, clock });
 
   app.get(
     '/api/device-types',
@@ -165,5 +172,17 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       schema: { params: idParams, body: supplierUpdateSchema, response: { 200: supplierSchema } },
     },
     async (request) => suppliers.update(request.params.id, request.body),
+  );
+
+  app.get(
+    '/api/merchant-profile',
+    { schema: { response: { 200: merchantProfileSchema } } },
+    async () => merchantProfile.get(),
+  );
+
+  app.put(
+    '/api/merchant-profile',
+    { schema: { body: merchantProfileUpdateSchema, response: { 200: merchantProfileSchema } } },
+    async (request) => merchantProfile.update(request.body),
   );
 };

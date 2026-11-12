@@ -164,6 +164,9 @@ export async function findReachabilityProblems(page: Page): Promise<string[]> {
     );
     if (skip) continue;
     await element.scrollIntoViewIfNeeded();
+    // Playwright aligns a `<textarea>` by its inner box without the border, so its bottom border
+    // stays 1 px outside; the browser's own scroll brings the whole element into view.
+    await element.evaluate((node) => node.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
     const problem = await element.evaluate(checkOperableElement);
     if (problem !== null) {
       const name = await element.evaluate(

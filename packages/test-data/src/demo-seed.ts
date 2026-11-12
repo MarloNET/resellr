@@ -80,11 +80,29 @@ export const seedSuppliers: SeedArea = async (api) => {
 };
 
 /**
+ * Merchant profile (S2, UI-026): the delivery has no brand (REQ-074); the demo uses a synthetic
+ * one. The profile is a single row, saved on top of the version read.
+ */
+export const DEMO_MERCHANT_PROFILE = {
+  brandName: 'Demo-Händler',
+  contactText: 'Demo-Händler GmbH\nMusterstraße 1\n12345 Musterstadt\nTel. 0000 000000',
+} as const;
+
+export const seedMerchantProfile: SeedArea = async (api) => {
+  const { version } = await api.request<{ version: number }>('GET', '/api/merchant-profile');
+  await api.request('PUT', '/api/merchant-profile', { version, ...DEMO_MERCHANT_PROFILE });
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
  */
-export const SEED_AREAS: readonly SeedArea[] = [seedDeviceTypes, seedSuppliers];
+export const SEED_AREAS: readonly SeedArea[] = [
+  seedDeviceTypes,
+  seedSuppliers,
+  seedMerchantProfile,
+];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */
 export async function seedDemoData(
