@@ -321,6 +321,28 @@ describe('UI-028 pick lists (CU-096)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('DER-35-12 a rename of "mit Akku (defekt)" keeps "Akku vorhanden" unchanged', async () => {
+    const { sent } = mockApi({
+      writes: {
+        'PATCH /api/pick-list-values/20': () =>
+          Response.json({ ...MIT_AKKU, label: 'Akku defekt', version: 2 }),
+      },
+    });
+    await openPage();
+    await openList('Akku');
+    await screen.findByRole('row', { name: /ohne Akku/ });
+
+    edit('mit Akku');
+    expect(batterySelect().value).toBe('true');
+    fireEvent.change(valueInput(), { target: { value: 'Akku defekt' } });
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByText('Gespeichert')).toBeTruthy();
+    expect(sent.map((entry) => entry.body)).toEqual([
+      { version: 1, label: 'Akku defekt', active: true, batteryPresent: true },
+    ]);
+  });
+
   it('DER-35-11 says before saving that a rename applies to all records', async () => {
     mockApi();
     await openPage();
