@@ -17,6 +17,19 @@ const searchField = (page: Page) => page.getByRole('searchbox', { name: 'Suchbeg
 const hitList = (page: Page) => page.getByRole('table', { name: 'Modellvorlagen' });
 const createLink = (page: Page) => page.getByRole('link', { name: 'Modellvorlage anlegen' });
 
+/**
+ * Types the search term and waits for the answer of its search: until then the previous list is
+ * still shown and is then replaced by the loading state.
+ */
+async function search(page: Page, term: string) {
+  const answered = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/model-templates' && url.searchParams.get('q') === term;
+  });
+  await searchField(page).fill(term);
+  await answered;
+}
+
 /** The server keeps its data per worker: each test uses its own names. */
 function uniqueName(base: string, title: string, project: string) {
   let hash = 0;
@@ -119,7 +132,7 @@ test.describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     await expect(page.getByText(/^\d+ Modellvorlagen$/)).toBeVisible();
     await expectReachable(page);
 
-    await searchField(page).fill(`macbook pro`);
+    await search(page, 'macbook pro');
     const row = hitList(page).getByRole('row').filter({ hasText: manufacturer });
     await expect(row.getByRole('cell')).toHaveText([
       'Notebook',
@@ -140,7 +153,7 @@ test.describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     await insertMvA(page, server, manufacturer);
     await page.goto(PAGE);
 
-    await searchField(page).fill('MHGT3');
+    await search(page, 'MHGT3');
 
     await expect(hitList(page).getByRole('row').filter({ hasText: manufacturer })).toHaveCount(1);
   });
@@ -178,7 +191,7 @@ test.describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     const id = await insertMvA(page, server, manufacturer);
     await page.goto(PAGE);
 
-    await searchField(page).fill(manufacturer);
+    await search(page, manufacturer);
     await hitList(page)
       .getByRole('row')
       .filter({ hasText: manufacturer })
@@ -187,7 +200,7 @@ test.describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     await expect(page).toHaveURL(new RegExp(`/modelle/${id}$`));
 
     await page.goto(PAGE);
-    await searchField(page).fill(manufacturer);
+    await search(page, manufacturer);
     await expect(hitList(page).getByRole('row')).toHaveCount(2);
     await searchField(page).press('ArrowDown');
     await expect(hitList(page).getByRole('link', { name: 'MacBook Pro 13' })).toBeFocused();
