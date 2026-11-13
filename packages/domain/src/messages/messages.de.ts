@@ -76,6 +76,15 @@ export const FIELD_MESSAGES = {
   batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
   /** UI-026 "Name der Händlermarke", empty or longer than 100 characters after trimming. */
   brandName: 'Name: 1 bis 100 Zeichen',
+  /**
+   * UI-033 "Zustandscode", empty or longer than 20 characters after trimming (REQ-022, 3.1).
+   */
+  conditionCode: 'Zustandscode: 1 bis 20 Zeichen',
+  /**
+   * UI-033 "Klartext", empty or longer than 500 characters after trimming; one text for both,
+   * there is no "Klartext fehlt" (design v0.6.2 O-2, AC-REQ-022-04).
+   */
+  conditionCodePlainText: 'Klartext: 1 bis 500 Zeichen',
   /** UI-026 "Kontaktangaben", longer than 500 characters. */
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
@@ -89,6 +98,8 @@ export const FIELD_MESSAGES = {
   pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
   /** UI-032 "Name", empty or longer than 100 characters after trimming. */
   supplierName: 'Name: 1 bis 100 Zeichen',
+  /** UI-033 "Vorschlag Optik-Note", not a whole number from 1 to 5 (REQ-022). */
+  visualGrade: 'Optik-Note: ganze Zahl von 1 bis 5',
 } as const;
 
 type MessageText = string | ((...args: string[]) => string);
@@ -105,6 +116,7 @@ export const ERROR_MESSAGES = {
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
+  'name_taken.condition_code': 'Diesen Code gibt es für diesen Lieferanten bereits',
   'name_taken.device_type': 'Name ist bereits vergeben',
   'name_taken.manufacturer': 'Name ist bereits vergeben',
   'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
