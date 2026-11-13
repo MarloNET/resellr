@@ -786,6 +786,71 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     expect(panelField(/^Auswahlliste/).value).toBe('4');
   });
 
+  it('UI-027.disabled DER-34-10 with hasValues data type and level are locked and the reason stands inline at each field', async () => {
+    const { sent } = await openAttributes([{ ...RAM, hasValues: true }, DISPLAY], {
+      'PATCH /api/attributes/12': () => Response.json({ ...RAM, unit: 'GiB', version: 3 }),
+    });
+    await openPanelOf('RAM');
+
+    const reasons = [
+      [/^Datentyp/, 'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.'],
+      [/^Ebene/, 'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.'],
+    ] as const;
+    for (const [field, reason] of reasons) {
+      const control = panelField(field);
+      expect(control.disabled).toBe(true);
+      expect(control.getAttribute('aria-invalid')).toBeNull();
+      const describedBy = control.getAttribute('aria-describedby') ?? '';
+      expect(document.getElementById(describedBy)?.textContent).toBe(reason);
+      // Inline at the field: the reason stands in the field's own container.
+      expect(control.parentElement?.textContent).toContain(reason);
+    }
+    expect(panelField(/^Bezeichnung/).disabled).toBe(false);
+    expect(panelField(/^Einheit/).disabled).toBe(false);
+    expect(within(panel()).getByLabelText<HTMLInputElement>('Variantenbildend').disabled).toBe(
+      false,
+    );
+    expectAccessiblePanel();
+
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'GiB' } });
+    fireEvent.click(panelSave());
+
+    expect(await screen.findByText('Merkmal gespeichert')).toBeTruthy();
+    expect(sent[0]?.body).toMatchObject({ dataType: 'integer', level: 'device', unit: 'GiB' });
+
+    await openPanelOf('Displaygröße');
+    expect(panelField(/^Datentyp/).disabled).toBe(false);
+    expect(panelField(/^Ebene/).disabled).toBe(false);
+    expect(within(panel()).queryByText(/weil bereits Werte gespeichert sind/)).toBeNull();
+  });
+
+  it.each([
+    [
+      'Datentyp',
+      'text',
+      'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    ],
+    ['Ebene', 'model', 'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.'],
+  ])(
+    'UI-027.validation attribute_has_values from the server stands at "%s" with the focus on it',
+    async (label, value, message) => {
+      await openAttributes([RAM], {
+        'PATCH /api/attributes/12': () =>
+          Response.json(errorBody('attribute_has_values', { message }), { status: 422 }),
+      });
+      await openPanelOf('RAM');
+
+      const control = () => panelField(new RegExp(`^${label}`));
+      fireEvent.change(control(), { target: { value } });
+      fireEvent.click(panelSave());
+
+      expect(await within(panel()).findByText(message)).toBeTruthy();
+      expect(control().getAttribute('aria-invalid')).toBe('true');
+      expect(document.activeElement).toBe(control());
+      expectAccessiblePanel();
+    },
+  );
+
   it('UI-027.speichert shows "Speichern …" and locks the panel and the table without time limit', async () => {
     await openAttributes([RAM, DISPLAY], { 'PATCH /api/attributes/12': pending });
     await openPanelOf('RAM');

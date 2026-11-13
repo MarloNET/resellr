@@ -95,6 +95,10 @@ type MessageText = string | ((...args: string[]) => string);
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  'attribute_has_values.data_type':
+    'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  'attribute_has_values.level':
+    'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.device_type': 'Name ist bereits vergeben',
