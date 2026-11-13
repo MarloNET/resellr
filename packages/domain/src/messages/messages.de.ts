@@ -102,6 +102,8 @@ export const FIELD_MESSAGES = {
    * Technical Specification 8.2 (addendum MAR-487).
    */
   pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
+  /** UI-006 "Suchbegriff" with 1 character (AC-REQ-009-04, Technical Specification 2.4). */
+  searchTermMinLength: 'Mindestens 2 Zeichen',
   /** UI-032 "Name", empty or longer than 100 characters after trimming. */
   supplierName: 'Name: 1 bis 100 Zeichen',
   /**

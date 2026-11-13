@@ -1,0 +1,31 @@
+import type { ModelTemplateList } from '@resellr/domain/schemas/model-template.schema';
+import { useQuery } from '@tanstack/react-query';
+
+import { apiClient, type ApiError } from './api-client.ts';
+import { queryKeys } from './query-keys.ts';
+
+// Hooks of the model templates of F-04 (CU-110, Technical Specification 2.4).
+
+/** Search of UI-006: `q` with at least 2 characters or none, optional device type. */
+export interface ModelTemplateFilter {
+  q?: string;
+  deviceTypeId?: number;
+}
+
+/**
+ * Model templates of UI-006 (`GET /api/model-templates`): without `q` the 50 latest created,
+ * with `q` the hits of the search (2.4).
+ */
+export function useModelTemplatesQuery(filter: ModelTemplateFilter) {
+  return useQuery<ModelTemplateList, ApiError>({
+    queryKey: queryKeys.catalog.modelTemplates(filter),
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams();
+      if (filter.q !== undefined) params.set('q', filter.q);
+      if (filter.deviceTypeId !== undefined)
+        params.set('deviceTypeId', String(filter.deviceTypeId));
+      const query = params.size > 0 ? `?${params.toString()}` : '';
+      return apiClient.get<ModelTemplateList>(`/api/model-templates${query}`, { signal });
+    },
+  });
+}
