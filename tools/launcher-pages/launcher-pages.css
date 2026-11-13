@@ -138,3 +138,8 @@ p + p {
     left: 100%;
   }
 }
+
+/* LP-03.success: a long data folder path wraps inside the card instead of scrolling sideways. */
+.data-dir {
+  overflow-wrap: anywhere;
+}

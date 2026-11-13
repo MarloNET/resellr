@@ -2,7 +2,8 @@
  * Stand-in for `resellr-server`, started by the supervisor through the test hook
  * `RESELLR_TEST_SERVER_ENTRY`. `FAKE_SERVER_RUNS` lists one behaviour per start, in order:
  *
- * - `ready`: answers `GET /api/ops/health` with `ready` and reports IPC `ready` with its `startId`
+ * - `ready`: answers `GET /api/ops/health` with `ready` and reports IPC `ready` with its `startId`;
+ *   answers `POST /api/ops/shutdown` with 200 and ends with exit code 0, like an orderly shutdown
  * - `ready-other-start`: reports IPC `ready` with another `startId`
  * - `exit-<code>`: ends at once with this exit code
  * - `exit-<code>-after-health`: answers `starting` and ends with this code 300 ms after the first
@@ -14,12 +15,15 @@
  *   `half_done` with rows, a row in `app_migration`, then a line `in-migration` in `FAKE_SERVER_DIR`
  *
  * `FAKE_SERVER_DELAY_MS` lets every start wait that long before its behaviour, like a long start.
+ * With `FAKE_SERVER_SHUTDOWN_GATE` the answer to `POST /api/ops/shutdown` waits until that file
+ * exists, like a shutdown that takes a while. Every shutdown request appends a JSON line with its
+ * `Origin` header to `shutdowns.jsonl` in `FAKE_SERVER_DIR`.
  *
  * Every start appends a JSON line with its environment to `starts.jsonl` in `FAKE_SERVER_DIR`.
  * Like the server, it ends with exit code 12 when the IPC channel closes.
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -54,13 +58,29 @@ const delayMs = Number(process.env.FAKE_SERVER_DELAY_MS ?? 0);
 if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
 
 function serveHealth(state: 'ready' | 'starting', onRequest: () => void = () => {}) {
-  const server = createServer((_, response) => {
+  const server = createServer((request, response) => {
+    if (state === 'ready' && request.method === 'POST' && request.url === '/api/ops/shutdown') {
+      appendFileSync(
+        join(dir, 'shutdowns.jsonl'),
+        `${JSON.stringify({ origin: request.headers.origin ?? null })}\n`,
+      );
+      void shutDown(response);
+      return;
+    }
     onRequest();
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ state, startId }));
   });
   server.listen(readConfiguredPort(dataDir).port, '127.0.0.1');
   return server;
+}
+
+/** Answers the shutdown once the gate file exists, then ends with exit code 0. */
+async function shutDown(response: ServerResponse) {
+  const gate = process.env.FAKE_SERVER_SHUTDOWN_GATE;
+  while (gate && !existsSync(gate)) await new Promise((resolve) => setTimeout(resolve, 50));
+  response.writeHead(200, { 'content-type': 'application/json' });
+  response.end(JSON.stringify({ dataDirPath: dataDir }), () => process.exit(0));
 }
 
 const exitMatch = /^exit-(\d+)(-after-health)?$/.exec(behaviour);

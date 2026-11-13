@@ -33,6 +33,7 @@ import {
 import { TEST_PROGRAM_DIR_ENV } from './cli.ts';
 import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
 import { TEST_SERVER_ENTRY_ENV, TEST_START_TIMEOUTS_ENV } from './supervisor/server-process.ts';
+import { subscribeToSupervisor, supervisorPipePath } from './supervisor/supervisor-pipe.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
 /** Preload that sends the launcher's connections to 4310 to the test server (#329). */
@@ -42,6 +43,8 @@ const PORT_REDIRECT = fileURLToPath(new URL('../test/port-redirect.ts', import.m
 interface TestServer {
   port: number;
   requests: string[];
+  /** `Origin` header of each request, in the same order. */
+  origins: (string | undefined)[];
   close(): Promise<void>;
 }
 
@@ -50,8 +53,10 @@ async function startTestServer(
   state: 'starting' | 'ready' | 'stopping' = 'ready',
 ): Promise<TestServer> {
   const requests: string[] = [];
+  const origins: (string | undefined)[] = [];
   const server: Server = createServer((request, response) => {
     requests.push(`${request.method} http://${request.headers.host}${request.url}`);
+    origins.push(request.headers.origin);
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ state, startId: 'start-1' }));
   });
@@ -62,6 +67,7 @@ async function startTestServer(
   return {
     port: (server.address() as AddressInfo).port,
     requests,
+    origins,
     close: () => {
       server.closeAllConnections();
       return new Promise((resolve) => server.close(() => resolve()));
@@ -470,6 +476,183 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
     });
   });
 });
+
+describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', () => {
+  let root: string;
+  let dataDir: string;
+  let logDir: string;
+  let programDir: string;
+  let fakes: FakePrograms;
+  let server: TestServer | undefined;
+  const processes: ChildProcess[] = [];
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'resellr-launcher-stop-'));
+    dataDir = join(root, 'Daten');
+    logDir = join(root, 'Protokolle');
+    programDir = join(root, 'Programs', 'resellr #1 Jörg');
+    mkdirSync(launcherPagesDir(programDir), { recursive: true });
+    mkdirSync(dataDir);
+    fakes = createFakePrograms();
+    fakes.registerChrome('HKCU', fakes.chromePath);
+  });
+
+  afterEach(async () => {
+    for (const child of processes.splice(0)) child.kill();
+    await server?.close();
+    server = undefined;
+    fakes.remove();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  /** Runs `resellr-launcher <args>` as its own process; resolves with its exit code. */
+  function runLauncher(args: string[], extraEnv: Record<string, string> = {}): Promise<number> {
+    const env = {
+      ...extraEnv,
+      PATH: fakes.path,
+      LOCALAPPDATA: root,
+      RESELLR_DATA_DIR: dataDir,
+      RESELLR_LOG_DIR: logDir,
+      RESELLR_HANDOVER_DIR: join(root, 'Fotoübergabe'),
+      RESELLR_UPDATE_COPY_DIR: join(root, 'Update-Kopien'),
+      [TEST_PROGRAM_DIR_ENV]: programDir,
+      FAKE_SERVER_DIR: root,
+      [TEST_SERVER_ENTRY_ENV]: FAKE_SERVER,
+      // The pipe is a socket in the temporary folder; the test connects to it too.
+      TMPDIR: tmpdir(),
+    };
+    return new Promise((resolve) => {
+      const child = execFile(process.execPath, ['--import', PORT_REDIRECT, CLI, ...args], {
+        env,
+        windowsHide: true,
+      });
+      processes.push(child);
+      child.on('exit', (code) => resolve(code ?? -1));
+    });
+  }
+
+  const writeConfig = (text: string) => writeFileSync(join(dataDir, 'config.json'), text);
+  const launcherState = () => readLauncherState(launcherPagesDir(programDir));
+  const stateFile = () => join(launcherPagesDir(programDir), LAUNCHER_STATE_FILE_NAME);
+  const lines = (name: string) =>
+    existsSync(join(root, name))
+      ? readFileSync(join(root, name), 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+      : [];
+
+  /** The request of the LP-03 the fake Chrome was opened with. */
+  const lp03Request = (): string => {
+    const calls = fakes.chromeCalls();
+    expect(calls).toHaveLength(1);
+    const url = new URL(calls[0]!);
+    expect(url.href.split('?')[0]).toBe(launcherPageUrl(programDir, 'lp-03'));
+    expect([...url.searchParams.keys()]).toEqual(['request']);
+    return url.searchParams.get('request')!;
+  };
+
+  /**
+   * Starts `supervise` with the fake server and waits until it reports ready over the pipe.
+   * Returns the exit of the supervisor wrapped, so awaiting this call does not wait for it.
+   */
+  async function startSupervisor(): Promise<{ exit: Promise<number> }> {
+    writeConfig(JSON.stringify({ port: await freePort() }));
+    const exit = runLauncher(['supervise']);
+    const pipePath = supervisorPipePath(root);
+    // `subscribe` resolves with null until the supervisor holds the pipe, then with `ready`.
+    const deadline = Date.now() + 10_000;
+    let result = await subscribeToSupervisor(pipePath);
+    while (result === null && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      result = await subscribeToSupervisor(pipePath);
+    }
+    expect(result).toMatchObject({ phase: 'ready' });
+    return { exit };
+  }
+
+  it('DER-104-01 opens LP-03, sends stop over the pipe, the supervisor stops the server and stop writes stopped with the data folder', async () => {
+    const supervisor = await startSupervisor();
+
+    await expect(runLauncher(['stop'])).resolves.toBe(0);
+
+    const request = lp03Request();
+    expect(request).toMatch(/^[0-9a-f-]{36}$/);
+    expect(launcherState()).toEqual([
+      { request, phase: 'stopped', url: null, refNo: null, dataDir },
+    ]);
+    // The supervisor sent the request without Origin (G-3), and the server ended without a restart.
+    expect(lines('shutdowns.jsonl')).toEqual([{ origin: null }]);
+    await expect(supervisor.exit).resolves.toBe(0);
+    expect(lines('starts.jsonl')).toHaveLength(1);
+    expect(operationsLog(logDir).map((entry) => entry.event)).toEqual([
+      'supervisor_started',
+      'supervisor_ended',
+    ]);
+  });
+
+  it('stop --for-update stops over the pipe without a page, waits for the free pipe and ends with exit code 0', async () => {
+    const supervisor = await startSupervisor();
+
+    await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
+
+    // The pipe is free: the supervisor has ended.
+    expect(await subscribeToSupervisor(supervisorPipePath(root))).toBeNull();
+    await expect(supervisor.exit).resolves.toBe(0);
+    expect(fakes.chromeCalls()).toEqual([]);
+    expect(existsSync(stateFile())).toBe(false);
+  });
+
+  it('DER-104-03 shows not_running without a data folder when neither a server nor a supervisor runs', async () => {
+    writeConfig(JSON.stringify({ port: await freePort() }));
+
+    await expect(runLauncher(['stop'])).resolves.toBe(0);
+
+    const request = lp03Request();
+    expect(launcherState()).toEqual([
+      { request, phase: 'not_running', url: null, refNo: null, dataDir: null },
+    ]);
+  });
+
+  it('DER-104-03 stop --for-update ends with exit code 0 when resellr does not run', async () => {
+    writeConfig(JSON.stringify({ port: await freePort() }));
+
+    await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
+
+    expect(fakes.chromeCalls()).toEqual([]);
+    expect(existsSync(stateFile())).toBe(false);
+  });
+
+  it('sends POST /api/ops/shutdown to 127.0.0.1:4311 of config.json when a server runs without a supervisor', async () => {
+    // The test server listens on a free port; the launcher's connection to 4311 goes there.
+    server = await startTestServer(0);
+    const config = '{ "port": 4311 }';
+    writeConfig(config);
+
+    await expect(runLauncher(['stop'], { PORT_REDIRECT: `4311:${server.port}` })).resolves.toBe(0);
+
+    expect(server.requests).toEqual(['POST http://127.0.0.1:4311/api/ops/shutdown']);
+    expect(server.origins).toEqual([undefined]);
+    const request = lp03Request();
+    expect(launcherState()).toEqual([
+      { request, phase: 'stopped', url: null, refNo: null, dataDir },
+    ]);
+    // Read only: no warning and no write of config.json (Nachtrag MAR-296).
+    expect(readFileSync(join(dataDir, 'config.json'), 'utf8')).toBe(config);
+    expect(operationsLog(logDir)).toEqual([]);
+  });
+});
+
+/** All entries of the operations log in `logDir`, oldest first. */
+function operationsLog(logDir: string): Record<string, unknown>[] {
+  return existsSync(logDir)
+    ? readdirSync(logDir)
+        .filter((name) => name.startsWith('operations-'))
+        .flatMap((name) => readFileSync(join(logDir, name), 'utf8').split('\n'))
+        .filter((line) => line !== '')
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+    : [];
+}
 
 /** A port on 127.0.0.1 that was free a moment ago. */
 async function freePort(): Promise<number> {

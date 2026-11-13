@@ -13,8 +13,8 @@ import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts'
  */
 export interface LauncherStateWriter {
   /**
-   * Creates `launcher-state.js` if it is missing, before `open` opens LP-01 (later `stop`
-   * LP-03), so the page finds the file from its first load (FIND-311, Nachtrag MAR-470).
+   * Creates `launcher-state.js` if it is missing, before `open` opens LP-01 and `stop` LP-03,
+   * so the page finds the file from its first load (FIND-311, Nachtrag MAR-470).
    */
   prepare(): void;
   /** `ready`: the page goes on to the local address `url` itself. */
@@ -26,6 +26,12 @@ export interface LauncherStateWriter {
    * with the number of `start_timeout`; the `request` in its address lets LP-02 read on.
    */
   timeout(request: string, refNo: string): void;
+  /** `stopped`: LP-03 shows `.success` with the data folder `dataDir` (REQ-105, REQ-106). */
+  stopped(request: string, dataDir: string): void;
+  /** `error`: LP-03 shows `.error` with the reference number of the failed stop. */
+  error(request: string, refNo: string | null): void;
+  /** `not_running`: LP-03 shows `.nicht-aktiv`, without a data folder. */
+  notRunning(request: string): void;
 }
 
 export function createLauncherStateWriter(programDir: string): LauncherStateWriter {
@@ -55,5 +61,24 @@ export function createLauncherStateWriter(programDir: string): LauncherStateWrit
         dataDir: null,
       });
     },
+    // LP-03 shows each result itself and goes nowhere, so these phases carry no address.
+    stopped: (request, dataDir) =>
+      writeLauncherState(pagesDir, { request, phase: 'stopped', url: null, refNo: null, dataDir }),
+    error: (request, refNo) =>
+      writeLauncherState(pagesDir, {
+        request,
+        phase: 'error',
+        url: null,
+        refNo: isReferenceNumber(refNo) ? refNo : null,
+        dataDir: null,
+      }),
+    notRunning: (request) =>
+      writeLauncherState(pagesDir, {
+        request,
+        phase: 'not_running',
+        url: null,
+        refNo: null,
+        dataDir: null,
+      }),
   };
 }

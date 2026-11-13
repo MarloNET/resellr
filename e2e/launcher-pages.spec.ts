@@ -1,5 +1,15 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -537,4 +547,292 @@ test('FIND-311 shows no console error before the first write when open created t
 
   await page.waitForURL(APP_URL, { timeout: 5000 });
   expect(errors).toEqual([]);
+});
+
+const LP_03_LOADING = 'resellr wird beendet …';
+const LP_03_SUCCESS = [
+  'resellr ist beendet.',
+  'Sie können den Datenordner jetzt kopieren.',
+  'Der Datenordner liegt hier:',
+] as const;
+const LP_03_ERROR_TITLE = 'resellr konnte nicht beendet werden';
+const LP_03_ERROR_TEXT =
+  'resellr läuft weiter. Bitte versuchen Sie es erneut. Besteht der Fehler weiter, informieren ' +
+  'Sie den Betreiber und nennen Sie ihm diese Referenznummer:';
+const LP_03_NOT_RUNNING = [
+  'resellr läuft nicht',
+  'Es gibt nichts zu beenden. Zum Starten öffnen Sie im Startmenü die Verknüpfung „resellr“.',
+] as const;
+/** A data folder under a user profile with a space and an umlaut, long enough to wrap. */
+const DATA_DIR =
+  'C:\\Users\\Jörg Müller\\AppData\\Local\\resellr\\Daten\\Ein sehr langer Ordnername für den Test';
+
+/** Address of LP-03 for a call of `stop`, encoded like CU-310 does it. */
+function lp03Url(request: string, dir = pagesDir): string {
+  const url = pathToFileURL(join(dir, 'lp-03.html'));
+  url.searchParams.set('request', request);
+  return url.href;
+}
+
+/** The card fits the window and nothing scrolls sideways (480 px and up). */
+async function expectCardFits(page: Page, width: number) {
+  const card = await page.locator('main:visible').boundingBox();
+  expect(card!.x).toBeGreaterThanOrEqual(0);
+  expect(card!.x + card!.width).toBeLessThanOrEqual(width);
+  expect(card!.width).toBeLessThanOrEqual(560);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+}
+
+for (const viewport of [
+  { width: 480, height: 600 },
+  { width: 1366, height: 600 },
+]) {
+  test.describe(`LP-03 at ${viewport.width} px`, () => {
+    test.use({ viewport });
+
+    test('LP-03.loading DER-104-01 shows only the line "resellr wird beendet …" until the result of its call', async ({
+      page,
+    }) => {
+      const errors = collectErrors(page);
+      const stateLoads = countStateLoads(page);
+      const request = `stop-1-${viewport.width}`;
+      // A result of another call changes nothing.
+      writeState({ request: 'another-stop', phase: 'stopped', dataDir: DATA_DIR });
+
+      await page.goto(lp03Url(request));
+      const loadsBefore = stateLoads();
+      await expect.poll(stateLoads).toBeGreaterThanOrEqual(loadsBefore + 2);
+
+      await expect(page).toHaveTitle('resellr wird beendet');
+      await expect(page.locator('body')).toMatchAriaSnapshot(`
+        - main:
+          - status: ${LP_03_LOADING}
+      `);
+      expect(await visibleLines(page)).toEqual([LP_03_LOADING]);
+      await expectCardFits(page, viewport.width);
+      expect(errors).toEqual([]);
+    });
+
+    test('LP-03.success DER-104-01 shows the title, both sentences and the data folder as selectable text', async ({
+      page,
+    }) => {
+      const errors = collectErrors(page);
+      const request = `stop-2-${viewport.width}`;
+      await page.goto(lp03Url(request));
+      await expect(page).toHaveTitle('resellr wird beendet');
+
+      writeState({ request, phase: 'stopped', dataDir: DATA_DIR });
+
+      await expect(page).toHaveTitle('resellr ist beendet', { timeout: 5000 });
+      await expect(page.locator('body')).toMatchAriaSnapshot(`
+        - main:
+          - heading "${LP_03_SUCCESS[0]}" [level=1]
+          - paragraph: ${LP_03_SUCCESS[1]}
+          - paragraph: "${LP_03_SUCCESS[2]}"
+          - paragraph: "${DATA_DIR.replaceAll('\\', '\\\\')}"
+      `);
+      await expect(page.getByRole('main')).toHaveCount(1);
+      expect(await visibleLines(page)).toEqual([...LP_03_SUCCESS, DATA_DIR]);
+
+      const dataDir = page.getByText(DATA_DIR, { exact: true });
+      await expect(dataDir).toHaveCSS('user-select', 'auto');
+      await dataDir.selectText();
+      expect(await page.evaluate(() => window.getSelection()?.toString().trim())).toBe(DATA_DIR);
+      await expectCardFits(page, viewport.width);
+      expect(errors).toEqual([]);
+    });
+
+    test('LP-03.error shows the title, the text and the reference number as selectable text', async ({
+      page,
+    }) => {
+      const errors = collectErrors(page);
+      const request = `stop-3-${viewport.width}`;
+      await page.goto(lp03Url(request));
+
+      writeState({ request, phase: 'error', refNo: REF_NO });
+
+      await expect(page).toHaveTitle(LP_03_ERROR_TITLE, { timeout: 5000 });
+      await expect(page.locator('body')).toMatchAriaSnapshot(`
+        - main:
+          - heading "${LP_03_ERROR_TITLE}" [level=1]
+          - paragraph: "${LP_03_ERROR_TEXT}"
+          - paragraph: ${REF_NO}
+      `);
+      // No error codes, file paths or table names (REQ-073).
+      expect(await visibleLines(page)).toEqual([LP_03_ERROR_TITLE, LP_03_ERROR_TEXT, REF_NO]);
+      await page.getByText(REF_NO, { exact: true }).selectText();
+      expect(await page.evaluate(() => window.getSelection()?.toString().trim())).toBe(REF_NO);
+      await expectCardFits(page, viewport.width);
+      expect(errors).toEqual([]);
+    });
+
+    test('LP-03.nicht-aktiv DER-104-03 shows "resellr läuft nicht" and the text without a data folder', async ({
+      page,
+    }) => {
+      const errors = collectErrors(page);
+      const request = `stop-4-${viewport.width}`;
+      await page.goto(lp03Url(request));
+
+      writeState({ request, phase: 'not_running' });
+
+      await expect(page).toHaveTitle('resellr läuft nicht', { timeout: 5000 });
+      await expect(page.locator('body')).toMatchAriaSnapshot(`
+        - main:
+          - heading "${LP_03_NOT_RUNNING[0]}" [level=1]
+          - paragraph: "${LP_03_NOT_RUNNING[1]}"
+      `);
+      expect(await visibleLines(page)).toEqual([...LP_03_NOT_RUNNING]);
+      await expectCardFits(page, viewport.width);
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+test.describe('LP-03 values from launcher-state.js', () => {
+  for (const [name, refNo] of [
+    ['markup', '<b>R-7K2M-9QX4</b>'],
+    ['an error code', 'internal_error'],
+    ['no number', null],
+  ] as const) {
+    test(`LP-03.error shows no reference number with ${name} (H-11)`, async ({ page }) => {
+      const request = `stop-5-${name}`;
+      await page.goto(lp03Url(request));
+
+      writeState({ request, phase: 'error', refNo });
+
+      await expect(page).toHaveTitle(LP_03_ERROR_TITLE, { timeout: 5000 });
+      expect(await visibleLines(page)).toEqual([LP_03_ERROR_TITLE, LP_03_ERROR_TEXT]);
+      expect(await page.locator('b').count()).toBe(0);
+    });
+  }
+
+  test('LP-03.success shows the data folder as text, never as markup', async ({ page }) => {
+    const request = 'stop-6';
+    await page.goto(lp03Url(request));
+
+    writeState({ request, phase: 'stopped', dataDir: 'C:\\<b>Daten</b>' });
+
+    await expect(page).toHaveTitle('resellr ist beendet', { timeout: 5000 });
+    expect(await visibleLines(page)).toEqual([...LP_03_SUCCESS, 'C:\\<b>Daten</b>']);
+    expect(await page.locator('b').count()).toBe(0);
+  });
+
+  test('LP-03 stops reading launcher-state.js once it shows the result', async ({ page }) => {
+    const request = 'stop-7';
+    const stateLoads = countStateLoads(page);
+    await page.goto(lp03Url(request));
+    writeState({ request, phase: 'not_running' });
+    await expect(page).toHaveTitle('resellr läuft nicht', { timeout: 5000 });
+
+    const loadsAfter = stateLoads();
+    // A later entry of the same call changes nothing on the page.
+    writeState({ request, phase: 'stopped', dataDir: DATA_DIR });
+    await page.waitForTimeout(2500);
+
+    expect(stateLoads()).toBe(loadsAfter);
+    expect(await visibleLines(page)).toEqual([...LP_03_NOT_RUNNING]);
+  });
+});
+
+/**
+ * DER-104-01 with the launcher, the supervisor and a stand-in server as processes: `stop` opens
+ * LP-03, sends `stop` over the pipe, and after the end the page shows `.success`. Without the
+ * registry under Linux the launcher opens LP-03 through the default browser; a stand-in
+ * `explorer.exe` records its address, and the test opens it in Chrome.
+ */
+test.describe('LP-03 with resellr-launcher stop', () => {
+  const LAUNCHER = 'tools/launcher/src/cli.ts';
+  const FAKE_SERVER = 'tools/launcher/test/fake-server.ts';
+  let stopRoot: string;
+  const children: ChildProcess[] = [];
+
+  test.beforeEach(() => {
+    stopRoot = mkdtempSync(join(tmpdir(), 'resellr-lp-03-e2e-'));
+  });
+
+  test.afterEach(() => {
+    for (const child of children.splice(0)) child.kill();
+    rmSync(stopRoot, { recursive: true, force: true });
+  });
+
+  function freePort(): Promise<number> {
+    return new Promise((resolve) => {
+      const server = createServer().listen(0, '127.0.0.1', () => {
+        const { port } = server.address() as { port: number };
+        server.close(() => resolve(port));
+      });
+    });
+  }
+
+  test('DER-104-01 shows loading while the server stops, then .success with the data folder', async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    const programDir = join(stopRoot, 'Programs', 'resellr #1 Jörg');
+    const stopPagesDir = join(programDir, 'launcher-pages');
+    execFileSync(process.execPath, [BUILD_SCRIPT, stopPagesDir]);
+    const dataDir = join(stopRoot, 'Daten von Jörg');
+    const logDir = join(stopRoot, 'Protokolle');
+    mkdirSync(dataDir);
+    writeFileSync(join(dataDir, 'config.json'), JSON.stringify({ port: await freePort() }));
+    const fakesDir = join(stopRoot, 'fakes');
+    mkdirSync(fakesDir);
+    const opened = join(stopRoot, 'opened.txt');
+    writeFileSync(join(fakesDir, 'explorer.exe'), `#!/bin/sh\nprintf '%s' "$1" > "${opened}"\n`);
+    chmodSync(join(fakesDir, 'explorer.exe'), 0o755);
+    const gate = join(stopRoot, 'shutdown-gate');
+    const env = {
+      PATH: `${fakesDir}:${process.env.PATH}`,
+      LOCALAPPDATA: stopRoot,
+      RESELLR_DATA_DIR: dataDir,
+      RESELLR_LOG_DIR: logDir,
+      RESELLR_HANDOVER_DIR: join(stopRoot, 'Fotoübergabe'),
+      RESELLR_UPDATE_COPY_DIR: join(stopRoot, 'Update-Kopien'),
+      RESELLR_TEST_PROGRAM_DIR: programDir,
+      RESELLR_TEST_SERVER_ENTRY: FAKE_SERVER,
+      FAKE_SERVER_DIR: stopRoot,
+      // The stand-in server answers the shutdown only once this file exists.
+      FAKE_SERVER_SHUTDOWN_GATE: gate,
+      TMPDIR: tmpdir(),
+    };
+    const run = (command: string[]) => {
+      const child = spawn(process.execPath, [LAUNCHER, ...command], { env, stdio: 'ignore' });
+      children.push(child);
+      return new Promise<number | null>((resolve) => child.on('exit', resolve));
+    };
+
+    const supervisor = run(['supervise']);
+    // The supervisor checks the server only from `ready` on (CU-262).
+    await expect
+      .poll(
+        () =>
+          existsSync(logDir) &&
+          readdirSync(logDir)
+            .filter((name) => name.startsWith('availability-'))
+            .some((name) => readFileSync(join(logDir, name), 'utf8').includes('"ok":true')),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+
+    const stop = run(['stop']);
+    await expect.poll(() => existsSync(opened), { timeout: 10_000 }).toBe(true);
+    const lp03 = readFileSync(opened, 'utf8');
+    expect(lp03.split('?')[0]).toBe(pathToFileURL(join(stopPagesDir, 'lp-03.html')).href);
+
+    await page.goto(lp03);
+    await expect(page).toHaveTitle('resellr wird beendet');
+    expect(await visibleLines(page)).toEqual([LP_03_LOADING]);
+
+    writeFileSync(gate, '');
+
+    await expect(page).toHaveTitle('resellr ist beendet', { timeout: 10_000 });
+    expect(await visibleLines(page)).toEqual([...LP_03_SUCCESS, dataDir]);
+    await page.getByText(dataDir, { exact: true }).selectText();
+    expect(await page.evaluate(() => window.getSelection()?.toString().trim())).toBe(dataDir);
+    expect(await stop).toBe(0);
+    expect(await supervisor).toBe(0);
+    expect(errors).toEqual([]);
+  });
 });

@@ -97,6 +97,34 @@ describe('launcher state writer (CU-268)', () => {
     ]);
   });
 
+  it('DER-104-01 writes stopped with the data folder and without an address for LP-03', () => {
+    const dataDir = 'C:\\Users\\Jörg #1\\AppData\\Local\\resellr\\Daten';
+    createLauncherStateWriter(programDir).stopped(REQUEST, dataDir);
+
+    expect(written()).toEqual([
+      { request: REQUEST, phase: 'stopped', url: null, refNo: null, dataDir },
+    ]);
+  });
+
+  it('writes error with the reference number and leaves out one that does not match the pattern', () => {
+    const writer = createLauncherStateWriter(programDir);
+    writer.error(REQUEST, REF_NO);
+    writer.error('another-request', '<img src=x>');
+
+    expect(written()).toEqual([
+      { request: REQUEST, phase: 'error', url: null, refNo: REF_NO, dataDir: null },
+      { request: 'another-request', phase: 'error', url: null, refNo: null, dataDir: null },
+    ]);
+  });
+
+  it('DER-104-03 writes not_running without a data folder', () => {
+    createLauncherStateWriter(programDir).notRunning(REQUEST);
+
+    expect(written()).toEqual([
+      { request: REQUEST, phase: 'not_running', url: null, refNo: null, dataDir: null },
+    ]);
+  });
+
   it('prepare creates an empty launcher-state.js and keeps existing entries (FIND-311)', () => {
     const writer = createLauncherStateWriter(programDir);
     const file = join(launcherPagesDir(programDir), LAUNCHER_STATE_FILE_NAME);

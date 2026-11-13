@@ -1,3 +1,5 @@
+import { isReferenceNumber } from '@resellr/runtime-shared/reference-number';
+
 /** Time limit of `GET /api/ops/health` in the flow `open` (Technical Specification 2.18, step 1). */
 export const HEALTH_TIMEOUT_MS = 1000;
 
@@ -10,6 +12,8 @@ const HEALTH_STATES: readonly unknown[] = ['starting', 'ready', 'stopping'];
 export interface ShutdownResponse {
   status: number;
   body: unknown;
+  /** Reference number of a failed shutdown (`error.referenceNumber`, 2.0.5), else null. */
+  refNo: string | null;
 }
 
 export interface HealthClient {
@@ -70,8 +74,14 @@ export function createHealthClient({ port }: HealthClientOptions): HealthClient 
     } catch {
       // The status code alone tells the result.
     }
-    return { status: response.status, body };
+    return { status: response.status, body, refNo: referenceNumberOf(body) };
   };
 
   return { appUrl, getHealth, shutdown };
+}
+
+/** `error.referenceNumber` of an error body (2.0.5), only if it matches the pattern (H-11). */
+function referenceNumberOf(body: unknown): string | null {
+  const refNo = (body as { error?: { referenceNumber?: unknown } } | null)?.error?.referenceNumber;
+  return isReferenceNumber(refNo) ? refNo : null;
 }

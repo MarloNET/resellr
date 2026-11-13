@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- LP-03 "Ergebnis von resellr beenden" (CU-271, design docs/ux/launcher-pages/LP-03-beenden-ergebnis). -->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>resellr wird beendet</title>
+    <link rel="stylesheet" href="./launcher-pages.css" />
+    <script src="./launcher-pages.js" defer></script>
+  </head>
+  <body data-page="lp-03">
+    <!-- State `loading`: until `stop` writes the result of its call into `launcher-state.js`. -->
+    <main class="card" id="lp-03-loading">
+      <p role="status">resellr wird beendet …</p>
+    </main>
+    <!-- State `success` (phase `stopped`): the data folder from `dataDir` as selectable text. -->
+    <main class="card" id="lp-03-success" hidden>
+      <h1>resellr ist beendet.</h1>
+      <p>Sie können den Datenordner jetzt kopieren.</p>
+      <p>Der Datenordner liegt hier:</p>
+      <p class="data-dir"></p>
+    </main>
+    <!-- State `error`: resellr still runs; the reference number only if it matches the pattern. -->
+    <main class="card" id="lp-03-error" hidden>
+      <h1>resellr konnte nicht beendet werden</h1>
+      <p>
+        resellr läuft weiter. Bitte versuchen Sie es erneut. Besteht der Fehler weiter, informieren
+        Sie den Betreiber und nennen Sie ihm diese Referenznummer:
+      </p>
+      <p class="reference-number" hidden></p>
+    </main>
+    <!-- State `nicht-aktiv` (phase `not_running`): deliberately without the data folder. -->
+    <main class="card" id="lp-03-nicht-aktiv" hidden>
+      <h1>resellr läuft nicht</h1>
+      <p>
+        Es gibt nichts zu beenden. Zum Starten öffnen Sie im Startmenü die Verknüpfung „resellr“.
+      </p>
+    </main>
+  </body>
+</html>
