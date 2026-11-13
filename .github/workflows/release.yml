@@ -3,7 +3,7 @@
 # publishes it in GitHub Releases of MarloNET/resellr. A tag `v<version>` on a commit of `main`
 # publishes; the version comes from the root `package.json`. A manual run (`workflow_dispatch`)
 # builds the same package without tag check and without release and keeps package and license
-# notices as artifact. Notes after AR-04 are added to the release by whoever sets the tag.
+# notices as artifact, also when started with a tag as ref (FIND-365). Notes after AR-04 are added to the release by whoever sets the tag.
 name: Release
 
 on:
@@ -47,7 +47,7 @@ jobs:
 
       # Fails before the build if the tag does not name the version or its commit is not on main.
       - name: Check tag against version and main
-        if: github.ref_type == 'tag'
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -125,7 +125,7 @@ jobs:
   publish:
     name: Publish in GitHub Releases
     needs: build
-    if: github.ref_type == 'tag'
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Only this job of this workflow may write releases (Nachtrag MAR-687).
