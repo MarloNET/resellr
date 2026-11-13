@@ -27,6 +27,7 @@ describe('page build (CU-272)', () => {
       'launcher-pages.js',
       'lp-01.html',
       'lp-02.html',
+      'lp-03.html',
     ]);
   });
 
@@ -48,7 +49,7 @@ describe('page build (CU-272)', () => {
   it('keeps the pages free of scripts and style sheets from elsewhere', () => {
     buildLauncherPages(outDir);
 
-    for (const name of ['lp-01.html', 'lp-02.html']) {
+    for (const name of ['lp-01.html', 'lp-02.html', 'lp-03.html']) {
       const html = readFileSync(join(outDir, name), 'utf8');
       const sources = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((match) => match[1]);
       expect(sources).toEqual(['./launcher-pages.css', './launcher-pages.js']);

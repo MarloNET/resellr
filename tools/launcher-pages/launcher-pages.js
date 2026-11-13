@@ -13,10 +13,17 @@ const request = params.get('request');
 const page = document.body.dataset.page;
 let done = false;
 
-/** @typedef {{ request?: unknown, phase?: unknown, url?: unknown }} LauncherState */
+/** @typedef {{ request?: unknown, phase?: unknown, url?: unknown, refNo?: unknown, dataDir?: unknown }} LauncherState */
 
 /** Title of `LP-02.zeitueberschreitung` (K-07). */
 const TIMEOUT_TITLE = 'resellr startet länger als erwartet';
+
+/** Card and title of LP-03 for each result phase `stop` writes (2.18 "Seitenwechsel"). */
+const LP_03_RESULTS = {
+  stopped: { card: 'lp-03-success', title: 'resellr ist beendet' },
+  error: { card: 'lp-03-error', title: 'resellr konnte nicht beendet werden' },
+  not_running: { card: 'lp-03-nicht-aktiv', title: 'resellr läuft nicht' },
+};
 
 /**
  * Reaction of each page to a state of its own call. Every target address was written by `open`
@@ -42,6 +49,20 @@ const reactions = {
       goTo(state.url);
     }
   },
+  /** @param {LauncherState} state */
+  'lp-03': (state) => {
+    // LP-03 goes nowhere: it shows the result of its `stop` call in place of `loading`.
+    const result = LP_03_RESULTS[/** @type {keyof typeof LP_03_RESULTS} */ (state.phase)];
+    if (result === undefined) return;
+    done = true;
+    const card = document.getElementById(result.card);
+    if (card === null) return;
+    document.getElementById('lp-03-loading')?.setAttribute('hidden', '');
+    if (state.phase === 'stopped') showDataDir(card, state.dataDir);
+    if (state.phase === 'error') showReferenceNumber(card, state.refNo);
+    card.hidden = false;
+    document.title = result.title;
+  },
 };
 
 /**
@@ -60,17 +81,28 @@ function showLp02State() {
 }
 
 /**
- * LP-02 shows the reference number of its address, but only one that matches the pattern.
+ * Shows a reference number in the card, but only one that matches the pattern (H-11): LP-02 takes
+ * it from its address, LP-03 from `launcher-state.js`.
  * @param {HTMLElement | null} card
+ * @param {unknown} refNo
  */
-function showReferenceNumber(card) {
-  const refNo = params.get('ref');
+function showReferenceNumber(card, refNo) {
   const element = /** @type {HTMLElement | null | undefined} */ (
     card?.querySelector('.reference-number')
   );
-  if (!element || refNo === null || !REFERENCE_NUMBER.test(refNo)) return;
+  if (!element || typeof refNo !== 'string' || !REFERENCE_NUMBER.test(refNo)) return;
   element.textContent = refNo;
   element.hidden = false;
+}
+
+/**
+ * LP-03.success shows the data folder as plain, selectable text (REQ-105, X-6).
+ * @param {HTMLElement} card
+ * @param {unknown} dataDir
+ */
+function showDataDir(card, dataDir) {
+  const element = card.querySelector('.data-dir');
+  if (element !== null && typeof dataDir === 'string') element.textContent = dataDir;
 }
 
 /** @param {string} url */
@@ -102,5 +134,5 @@ function loadState() {
 }
 
 Object.assign(window, { __resellrLauncherState: onLauncherState });
-if (page === 'lp-02') showReferenceNumber(showLp02State());
+if (page === 'lp-02') showReferenceNumber(showLp02State(), params.get('ref'));
 if (request !== null) loadState();
