@@ -7,14 +7,16 @@ import { insertAttributeValueRecords } from '../../test/attribute-values.ts';
 import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { runMigrations } from '../db/migrator.ts';
-import { migrations } from '../db/migrations/index.ts';
+import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 
 type TestApp = ReturnType<typeof createTestApp>;
 let t: TestApp;
 
 beforeEach(async () => {
   t = createTestApp();
-  await runMigrations(t.database, migrations, () => new Date());
+  // Schema only: the tests write their own settings; the initial settings have their own
+  // tests (CU-071).
+  await runMigrations(t.database, [initialSchema], () => new Date());
   insertPickLists(t.database.sqlite);
   await t.app.ready();
 });

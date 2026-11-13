@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { openDatabase, type Database } from '../db/database.ts';
 import { runMigrations } from '../db/migrator.ts';
-import { migrations } from '../db/migrations/index.ts';
+import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import type { DB } from '../db/schema.ts';
 import { createUnitOfWork } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
@@ -60,7 +60,9 @@ function serverSourceFiles(folder = SERVER_SRC): string[] {
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'resellr-audit-'));
   database = openDatabase<DB>(join(dir, 'resellr.db'));
-  await runMigrations(database, migrations, () => OCCURRED_AT);
+  // Schema only: the tests write their own settings; the initial settings have their own
+  // tests (CU-071).
+  await runMigrations(database, [initialSchema], () => OCCURRED_AT);
 });
 
 afterEach(async () => {
