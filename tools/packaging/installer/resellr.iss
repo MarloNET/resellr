@@ -3,7 +3,8 @@
 ; %LOCALAPPDATA%\Programs\resellr, with the autostart entry under HKCU, the shortcuts "resellr" and
 ; "resellr beenden", and `open` after the installation. The uninstaller removes the program
 ; folder (with `launcher-state.js` and its lock file), the autostart entry and the shortcuts; data
-; folder, logs and update copies under %LOCALAPPDATA%\resellr stay.
+; folder, logs and update copies under %LOCALAPPDATA%\resellr stay. Update and uninstallation first
+; end resellr with `stop --for-update` and change nothing if that fails (#131, Nachtrag MAR-471).
 ;
 ; Build: iscc /DAppVersion=<version> [/DStageDir=<program folder>] [/O<output folder>] resellr.iss
 ; The staged program folder holds resellr-node.exe (CU-274), node.exe (CU-275), app\ (CU-276)
@@ -67,3 +68,49 @@ Filename: "{#Runtime}"; Parameters: """{#Launcher}"" open"; WorkingDir: "{app}";
 ; lock file is left behind only by an interrupted write.
 Type: files; Name: "{app}\launcher-pages\launcher-state.js"
 Type: files; Name: "{app}\launcher-pages\launcher-state.js.lock"
+
+[Code]
+// Stopping before an update and before the uninstallation (2.18 `stop --for-update`, 2.19
+// "Installationspaket", Nachtrag MAR-471): the same call and evaluation for both.
+
+// The umlaut as a character code, since iscc reads a script without BOM in the ANSI code page.
+function StopFailedMessage(): String;
+begin
+  Result := 'resellr konnte nicht beendet werden. Bitte sp' + #$00E4 + 'ter erneut versuchen.';
+end;
+
+// Runs `stop --for-update` of the installed resellr and waits for its end. True: go on (exit code
+// 0, or the call cannot be started, e.g. because resellr-node.exe is missing, so no resellr runs
+// from the program folder); False: stopping failed, change nothing.
+function StopResellr(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  if not Exec(ExpandConstant('{#Runtime}'), '"' + ExpandConstant('{#Launcher}') + '" stop --for-update',
+    ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    Result := True;
+    exit;
+  end;
+  Result := ResultCode = 0;
+end;
+
+// Update: before Setup replaces files; a non-empty result stops Setup without any change.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  if StopResellr() then
+    Result := ''
+  else
+    Result := StopFailedMessage();
+end;
+
+// Uninstallation: after the question whether to remove resellr and before the first file and the
+// autostart entry are removed.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if (CurUninstallStep = usAppMutexCheck) and not StopResellr() then
+  begin
+    SuppressibleMsgBox(StopFailedMessage(), mbError, MB_OK, IDOK);
+    Abort;
+  end;
+end;

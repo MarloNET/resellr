@@ -24,13 +24,22 @@ interface Setup {
   shutdown?: ShutdownResponse | null;
   /** Whether the pipe is free within 30 s. */
   pipeFree?: boolean;
+  /** Test hook `RESELLR_TEST_STOP_FAILS`. */
+  failForTest?: boolean;
 }
 
-function setup({ forUpdate = false, pipe = null, shutdown = null, pipeFree = true }: Setup = {}) {
+function setup({
+  forUpdate = false,
+  pipe = null,
+  shutdown = null,
+  pipeFree = true,
+  failForTest = false,
+}: Setup = {}) {
   /** Every step in the order it happens. */
   const order: string[] = [];
   const deps = {
     forUpdate,
+    failForTest,
     dataDir: DATA_DIR,
     stopSupervisor: vi.fn(async () => {
       order.push('pipe stop');
@@ -193,5 +202,21 @@ describe('stop command (CU-260)', () => {
 
       await expect(runStopCommand(deps)).resolves.toBe(LauncherExitCode.Success);
     });
+
+    it('DER-105-03 ends with exit code 1 without stopping when the test hook lets stopping fail', async () => {
+      const { deps, order } = setup({ forUpdate: true, pipe: phase('stopped'), failForTest: true });
+
+      await expect(runStopCommand(deps)).resolves.toBe(LauncherExitCode.Failed);
+
+      expect(order).toEqual([]);
+    });
+  });
+
+  it('shows error without a reference number and stops nothing when the test hook lets stopping fail', async () => {
+    const { deps, order } = setup({ pipe: phase('stopped'), failForTest: true });
+
+    await expect(runStopCommand(deps)).resolves.toBe(LauncherExitCode.Failed);
+
+    expect(order).toEqual(['prepare', `open ${LP_03_URL}`, `error ${REQUEST} null`]);
   });
 });

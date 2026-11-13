@@ -20,7 +20,7 @@ import { createLauncherLog, type LauncherLog } from './launcher-log.ts';
 import { launcherPageUrl } from './launcher-pages-location.ts';
 import { createLauncherStateWriter } from './launcher-state-writer.ts';
 import { runOpenCommand } from './open-command.ts';
-import { runStopCommand } from './stop-command.ts';
+import { runStopCommand, TEST_STOP_FAILS_ENV } from './stop-command.ts';
 import { startServerProcess, testStartTimeouts } from './supervisor/server-process.ts';
 import { runSupervisor } from './supervisor/supervisor.ts';
 import {
@@ -139,6 +139,7 @@ function runStop(env: RuntimeEnv, forUpdate: boolean): Promise<LauncherExitCode>
   const launcherLog = createLauncherLog({ dir: paths.logDir, appVersion: APP_VERSION });
   return runStopCommand({
     forUpdate,
+    failForTest: env[TEST_STOP_FAILS_ENV] === '1',
     dataDir: paths.dataDir,
     stopSupervisor: () => requestStop(pipePath),
     healthClient: createHealthClient({ port }),
