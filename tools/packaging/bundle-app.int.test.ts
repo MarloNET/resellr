@@ -11,14 +11,16 @@ import {
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { programFolderPaths } from '@resellr/runtime-shared/paths';
 
-import { bundleApp, sourceTreeTraces } from './bundle-app.mjs';
+import { bundleApp, sourceTreeTraces, writeMetafile } from './bundle-app.mjs';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
+const SCRIPT = fileURLToPath(new URL('./bundle-app.mjs', import.meta.url));
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -36,6 +38,7 @@ describe('bundleApp', { timeout: 60_000 }, () => {
   let programDir: string;
   let app: ReturnType<typeof programFolderPaths>;
   let shipped: string[];
+  let metafile: Awaited<ReturnType<typeof bundleApp>>['metafile'];
 
   beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), 'resellr-bundle-'));
@@ -48,7 +51,11 @@ describe('bundleApp', { timeout: 60_000 }, () => {
     mkdirSync(join(programDir, 'app'), { recursive: true });
     writeFileSync(join(programDir, 'app', 'stale.mjs'), '');
 
-    ({ nativePackages: shipped } = await bundleApp({ repoRoot: REPO_ROOT, programDir, webDist }));
+    ({ nativePackages: shipped, metafile } = await bundleApp({
+      repoRoot: REPO_ROOT,
+      programDir,
+      webDist,
+    }));
     app = programFolderPaths(programDir);
   });
 
@@ -85,6 +92,28 @@ describe('bundleApp', { timeout: 60_000 }, () => {
     expect(existsSync(join(sqlite, 'deps'))).toBe(false);
     expect(existsSync(join(sqlite, 'src'))).toBe(false);
     expect(existsSync(join(app.nativeModulesDir, 'prebuild-install'))).toBe(false);
+  });
+
+  it('returns the merged esbuild metafile of server and launcher (Nachtrag MAR-687)', () => {
+    const inputs = Object.keys(metafile.inputs);
+
+    expect(inputs).toContain('apps/server/src/main.ts');
+    expect(inputs).toContain('tools/launcher/src/cli.ts');
+    expect(inputs.some((input) => input.startsWith('node_modules/fastify/'))).toBe(true);
+    expect(Object.keys(metafile.outputs).map((output) => basename(output))).toEqual(
+      expect.arrayContaining(['server.mjs', 'launcher.mjs']),
+    );
+  });
+
+  it('writes the metafile outside the program folder and rejects a path inside it (Nachtrag MAR-687)', () => {
+    const target = join(root, 'build', 'bundle-meta.json');
+
+    writeMetafile(target, programDir, metafile);
+
+    expect(JSON.parse(readFileSync(target, 'utf8'))).toEqual(metafile);
+    const inside = join(programDir, 'bundle-meta.json');
+    expect(() => writeMetafile(inside, programDir, metafile)).toThrow(/outside the program folder/);
+    expect(existsSync(inside)).toBe(false);
   });
 
   it('builds a launcher that starts and rejects an unknown command with exit code 1', () => {
@@ -129,6 +158,26 @@ describe('bundleApp', { timeout: 60_000 }, () => {
     } finally {
       supervisor.kill('SIGTERM');
       await ended;
+    }
+  });
+});
+
+describe('bundle-app.mjs --metafile', () => {
+  it('rejects a metafile path in the program folder with exit code 1 before bundling (Nachtrag MAR-687)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'resellr-bundle-cli-'));
+    try {
+      const programDir = join(root, 'resellr');
+      const run = spawnSync(
+        process.execPath,
+        [SCRIPT, programDir, '--metafile', join(programDir, 'bundle-meta.json')],
+        { encoding: 'utf8', timeout: 20_000 },
+      );
+
+      expect(run.status).toBe(1);
+      expect(run.stderr).toMatch(/must lie outside the program folder/);
+      expect(existsSync(programDir)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });
