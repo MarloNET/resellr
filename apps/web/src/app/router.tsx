@@ -10,6 +10,7 @@ import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPa
 import { ManufacturersPage } from '../features/settings/manufacturers/ManufacturersPage.tsx';
 import { MerchantProfilePage } from '../features/settings/merchant/MerchantProfilePage.tsx';
 import { SuppliersPage } from '../features/settings/suppliers/SuppliersPage.tsx';
+import { TextBlocksPage } from '../features/settings/text-blocks/TextBlocksPage.tsx';
 import { PickListsPage } from '../features/settings/pick-lists/PickListsPage.tsx';
 import { TerminatedPage } from '../features/shutdown/TerminatedPage.tsx';
 import { AppFrame } from './AppFrame.tsx';
@@ -58,7 +59,7 @@ export const routes: RouteObject[] = [
           { path: 'geraetearten', element: <DeviceTypesPage /> },
           { path: 'auswahllisten', element: <PickListsPage /> },
           { path: 'titelmuster', element: null },
-          { path: 'textbausteine', element: null },
+          { path: 'textbausteine', element: <TextBlocksPage /> },
           { path: 'hersteller', element: <ManufacturersPage /> },
           { path: 'lieferanten', element: <SuppliersPage /> },
           { path: 'code-uebersetzung', element: <ConditionCodesPage /> },

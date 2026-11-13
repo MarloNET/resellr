@@ -45,6 +45,12 @@ import {
   supplierSchema,
   supplierUpdateSchema,
 } from '@resellr/domain/schemas/supplier.schema';
+import {
+  textBlockCreateSchema,
+  textBlockListSchema,
+  textBlockSaveResultSchema,
+  textBlockUpdateSchema,
+} from '@resellr/domain/schemas/text-block.schema';
 import type { Kysely } from 'kysely';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -58,6 +64,7 @@ import { createManufacturerService } from './manufacturer-service.ts';
 import { createMerchantProfileService } from './merchant-profile-service.ts';
 import { createPickListService } from './pick-list-service.ts';
 import { createSupplierService } from './supplier-service.ts';
+import { createTextBlockService } from './text-block-service.ts';
 
 export interface SettingsRoutesOptions {
   db: Kysely<DB>;
@@ -102,9 +109,9 @@ const resolveQuery = z.strictObject({
  * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, `/api/merchant-profile`, … Each
  * route calls one service.
  * There is no DELETE route for device types or attributes (REQ-004, REQ-005, DER-33-09),
- * manufacturers (2.2) or suppliers (2.2, DER-36-08). There is no route to create or delete a
- * pick list and none to delete a value (RQ-07, DER-35-09). Entries of the condition code table
- * can be deleted (2.2, REQ-022).
+ * manufacturers (2.2), suppliers (2.2, DER-36-08) or text blocks (2.2, DER-39-13). There is no
+ * route to create or delete a pick list and none to delete a value (RQ-07, DER-35-09). Entries
+ * of the condition code table can be deleted (2.2, REQ-022).
  */
 export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = async (
   app,
@@ -116,6 +123,7 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
   const suppliers = createSupplierService({ db, uow, clock });
   const merchantProfile = createMerchantProfileService({ db, uow, clock });
   const conditionCodes = createConditionCodeService({ db, uow, clock });
+  const textBlocks = createTextBlockService({ db, uow, clock });
 
   app.get(
     '/api/device-types',
@@ -291,6 +299,30 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       schema: { params: idParams, body: supplierUpdateSchema, response: { 200: supplierSchema } },
     },
     async (request) => suppliers.update(request.params.id, request.body),
+  );
+
+  app.get(
+    '/api/text-blocks',
+    { schema: { querystring: pageQuery, response: { 200: textBlockListSchema } } },
+    async (request) => textBlocks.list(request.query),
+  );
+
+  app.post(
+    '/api/text-blocks',
+    { schema: { body: textBlockCreateSchema, response: { 201: textBlockSaveResultSchema } } },
+    async (request, reply) => reply.code(201).send(await textBlocks.create(request.body)),
+  );
+
+  app.patch(
+    '/api/text-blocks/:id',
+    {
+      schema: {
+        params: idParams,
+        body: textBlockUpdateSchema,
+        response: { 200: textBlockSaveResultSchema },
+      },
+    },
+    async (request) => textBlocks.update(request.params.id, request.body),
   );
 
   app.get(

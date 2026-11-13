@@ -317,8 +317,9 @@ test.describe('Backup notice UI-044 without state (#138)', () => {
     for (const label of await sections.allInnerTexts()) {
       expect(label).not.toMatch(/Sicherung|Hinweis/i);
       await sections.filter({ hasText: label }).click();
+      // "Akku-Hinweis" is a text block type of UI-030, not a setting of the notice.
       await expect(page.getByTestId('settings-layout')).not.toContainText(
-        /Sicherung|Hinweis|ausblenden/i,
+        /Sicherung|(?<!Akku-)Hinweis|ausblenden/i,
       );
       expect(await region.innerText()).toBe(expected);
     }

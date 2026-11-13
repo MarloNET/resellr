@@ -122,6 +122,55 @@ export const seedMerchantProfile: SeedArea = async (api) => {
 };
 
 /**
+ * Text blocks (S2, UI-030): the texts are not part of the delivery (REQ-006); the demo has
+ * synthetic texts of three kinds with placeholders of Requirements chapter 9.7 and a
+ * deactivated one. A new text block is always active, so the deactivated one is switched off
+ * after creating it.
+ */
+export const DEMO_TEXT_BLOCKS = [
+  {
+    name: 'Akku-Hinweis',
+    kind: 'battery_notice',
+    body: 'Die Akkukapazität beträgt {Akkukapazität}. Bei gebrauchten Akkus ist eine verringerte Laufzeit normal.',
+    active: true,
+  },
+  {
+    name: 'Lieferumfang Standard',
+    kind: 'delivery_scope',
+    body: 'Gerät mit passendem Netzteil',
+    active: true,
+  },
+  {
+    name: 'Abholung',
+    kind: 'pickup_contact',
+    body: 'Abholung nach Absprache bei {Händlermarke}:\n{Händler-Kontakt}',
+    active: true,
+  },
+  {
+    name: 'Hinweis Zubehör',
+    kind: 'other',
+    body: 'Zubehör auf Anfrage.',
+    active: false,
+  },
+] as const;
+
+export const seedTextBlocks: SeedArea = async (api) => {
+  for (const { active, ...textBlock } of DEMO_TEXT_BLOCKS) {
+    const created = await api.request<{ textBlock: { id: number; version: number } }>(
+      'POST',
+      '/api/text-blocks',
+      textBlock,
+    );
+    if (!active) {
+      await api.request('PATCH', `/api/text-blocks/${created.textBlock.id}`, {
+        version: created.textBlock.version,
+        active: false,
+      });
+    }
+  }
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
@@ -131,6 +180,7 @@ export const SEED_AREAS: readonly SeedArea[] = [
   seedSuppliers,
   seedManufacturers,
   seedMerchantProfile,
+  seedTextBlocks,
 ];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */

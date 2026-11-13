@@ -44,6 +44,12 @@ import type {
   SupplierList,
   SupplierUpdate,
 } from '@resellr/domain/schemas/supplier.schema';
+import type {
+  TextBlockCreate,
+  TextBlockList,
+  TextBlockSaveResult,
+  TextBlockUpdate,
+} from '@resellr/domain/schemas/text-block.schema';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { apiClient, type ApiError } from './api-client.ts';
@@ -62,6 +68,9 @@ const ALL_SUPPLIERS = '/api/suppliers?includeInactive=true&limit=200';
 
 /** Largest page of a list (2.0.1); UI-031 shows all manufacturers, active and deactivated. */
 const ALL_MANUFACTURERS = '/api/manufacturers?includeInactive=true&limit=200';
+
+/** Largest page of a list (2.0.1); UI-030 shows all text blocks, active and deactivated. */
+const ALL_TEXT_BLOCKS = `/api/text-blocks?${ALL}`;
 
 /**
  * Takes the saved entry into the cached list at once and loads the list again in the
@@ -131,6 +140,35 @@ export function useUpdateSupplierMutation() {
   return useMutation<Supplier, ApiError, SupplierUpdate & { id: number }>({
     mutationFn: ({ id, ...body }) => apiClient.patch<Supplier>(`/api/suppliers/${id}`, body),
     onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.suppliers(), saved),
+  });
+}
+
+/** Text blocks of UI-030, active and deactivated (`GET /api/text-blocks`). */
+export function useTextBlocksQuery() {
+  return useQuery<TextBlockList, ApiError>({
+    queryKey: queryKeys.settings.textBlocks(),
+    queryFn: ({ signal }) => apiClient.get<TextBlockList>(ALL_TEXT_BLOCKS, { signal }),
+  });
+}
+
+/** "Speichern" for a new text block (`POST /api/text-blocks`). */
+export function useCreateTextBlockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<TextBlockSaveResult, ApiError, TextBlockCreate>({
+    mutationFn: (body) => apiClient.post<TextBlockSaveResult>('/api/text-blocks', body),
+    onSuccess: ({ textBlock }) =>
+      storeSaved(queryClient, queryKeys.settings.textBlocks(), textBlock),
+  });
+}
+
+/** "Speichern" and "Deaktivieren" of UI-030 (`PATCH /api/text-blocks/{id}`). */
+export function useUpdateTextBlockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<TextBlockSaveResult, ApiError, TextBlockUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) =>
+      apiClient.patch<TextBlockSaveResult>(`/api/text-blocks/${id}`, body),
+    onSuccess: ({ textBlock }) =>
+      storeSaved(queryClient, queryKeys.settings.textBlocks(), textBlock),
   });
 }
 

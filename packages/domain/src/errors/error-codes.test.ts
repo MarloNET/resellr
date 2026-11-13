@@ -25,6 +25,7 @@ const DOMAIN_CODES: [string, number][] = [
   ['attribute_has_values', 422],
   ['name_taken', 422],
   ['manufacturer_deactivated', 422],
+  ['placeholder_not_allowed', 422],
 ];
 
 describe('error codes (E7)', () => {

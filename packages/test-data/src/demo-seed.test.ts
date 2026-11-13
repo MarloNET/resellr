@@ -12,6 +12,7 @@ import {
   type SeedArea,
   seedMerchantProfile,
   seedSuppliers,
+  seedTextBlocks,
 } from './demo-seed.ts';
 
 interface Received {
@@ -114,12 +115,13 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers and merchant profile', () => {
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile and text blocks', () => {
     expect(SEED_AREAS).toEqual([
       seedDeviceTypes,
       seedSuppliers,
       seedManufacturers,
       seedMerchantProfile,
+      seedTextBlocks,
     ]);
   });
 
@@ -207,6 +209,35 @@ describe('seedDemoData', () => {
         },
       ],
     ]);
+  });
+
+  it('creates the demo text blocks through POST /api/text-blocks and deactivates "Hinweis Zubehör"', async () => {
+    const requests: unknown[][] = [];
+    let id = 0;
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (...args: unknown[]) => {
+        requests.push(args);
+        id += 1;
+        return { textBlock: { id, version: 1 } } as never;
+      },
+    };
+
+    await seedTextBlocks(recording);
+
+    expect(requests.map(([method, path]) => `${method} ${path}`)).toEqual([
+      'POST /api/text-blocks',
+      'POST /api/text-blocks',
+      'POST /api/text-blocks',
+      'POST /api/text-blocks',
+      'PATCH /api/text-blocks/4',
+    ]);
+    expect(requests[0]?.[2]).toEqual({
+      name: 'Akku-Hinweis',
+      kind: 'battery_notice',
+      body: 'Die Akkukapazität beträgt {Akkukapazität}. Bei gebrauchten Akkus ist eine verringerte Laufzeit normal.',
+    });
+    expect(requests[4]?.[2]).toEqual({ version: 1, active: false });
   });
 
   it('runs the seed functions one after the other in list order with the API', async () => {
