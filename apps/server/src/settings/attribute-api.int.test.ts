@@ -198,7 +198,12 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
         path: issue.path.join('.'),
         message: issue.message,
       })),
-    ).toEqual([{ path: String(capacityId), message: 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“' }]);
+    ).toEqual([
+      {
+        path: String(capacityId),
+        message: 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“',
+      },
+    ]);
     expect(
       deviceValues.safeParse({ [batteryId]: akkuDefekt?.id, [capacityId]: { percent: 85 } })
         .success,
