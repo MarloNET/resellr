@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openDatabase, type Database } from '../db/database.ts';
 import { runMigrations } from '../db/migrator.ts';
-import { migrations } from '../db/migrations/index.ts';
+import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import type { DB } from '../db/schema.ts';
 import { createUnitOfWork, emptyChangeReport, type EventHandlers } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
@@ -22,7 +22,9 @@ let database: Database<DB>;
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'resellr-merchant-profile-'));
   database = openDatabase<DB>(join(dir, 'resellr.db'));
-  await runMigrations(database, migrations, () => NOW);
+  // Schema only: the tests write their own settings; the initial settings have their own
+  // tests (CU-071).
+  await runMigrations(database, [initialSchema], () => NOW);
 });
 
 afterEach(async () => {

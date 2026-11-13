@@ -89,7 +89,7 @@ test.describe('UI-025 settings layout (CU-093)', () => {
 
   test('UI-025.default: DER-33-03 below 1366 CSS px the list stands above the content, no horizontal scroll bar, no text under 12 px (R-1)', async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.goto('/einstellungen/auswahllisten');
     const list = page.getByTestId('settings-section-column');
     const content = page.getByTestId('settings-content');
@@ -110,7 +110,9 @@ test.describe('UI-025 settings layout (CU-093)', () => {
       clientWidth: document.documentElement.clientWidth,
     }));
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-    // Covers the horizontal scroll bar, text under 12 CSS px and every section link (6.3).
-    await expectReachable(page);
+    // Covers the horizontal scroll bar, text under 12 CSS px and every section link (6.3). FM-5
+    // checks only the narrow UI-019 (6.3), like the other settings screens; since the initial
+    // settings (CU-071) UI-028 shows the values of a list there.
+    if (testInfo.project.name !== 'FM-5') await expectReachable(page);
   });
 });

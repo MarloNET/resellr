@@ -167,14 +167,18 @@ afterEach(async () => {
 });
 
 describe('migration list (CU-308)', () => {
-  it('E8 contains 20261110_0001_initial_schema as the only migration', () => {
-    expect(migrations.map((migration) => migration.name)).toEqual(['20261110_0001_initial_schema']);
+  it('E8 contains the initial schema and the seed migration in this order', () => {
+    expect(migrations.map((migration) => migration.name)).toEqual([
+      '20261110_0001_initial_schema',
+      '20261110_0002_seed_initial_settings',
+    ]);
   });
 
   it('E8 the migration run applies exactly this list and records it in app_migration', () => {
     const rows = database.sqlite.prepare('SELECT name, applied_at FROM app_migration').all();
     expect(rows).toEqual([
       { name: '20261110_0001_initial_schema', applied_at: MIGRATED_AT.toISOString() },
+      { name: '20261110_0002_seed_initial_settings', applied_at: MIGRATED_AT.toISOString() },
     ]);
   });
 

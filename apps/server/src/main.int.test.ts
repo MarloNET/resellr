@@ -425,31 +425,27 @@ function writeMiAShopPrice(file: string): void {
   const ts = '2026-11-10T08:00:00.000Z';
   const db = new BetterSqlite3(file);
   try {
+    // Device type Notebook, condition "gebraucht" and channel Shop come with the initial
+    // settings (CU-071).
     db.exec(`
-      INSERT INTO device_type (id, name, name_key, active, sort_order, version, created_at, updated_at)
-        VALUES (1, 'Notebook', 'notebook', 1, 1, 1, '${ts}', '${ts}');
       INSERT INTO manufacturer (id, name, name_key, active, gpsr_complete, version, created_at, updated_at)
         VALUES (1, 'Apple', 'apple', 1, 0, 1, '${ts}', '${ts}');
       INSERT INTO model_template (id, device_type_id, manufacturer_id, model_name, model_name_key,
           type_designation, mpn_unknown, model_values, default_device_values, search_key,
           import_review_pending, import_review_keys, version, created_at, updated_at)
-        VALUES (1, 1, 1, 'MacBook Pro 13', 'macbook pro 13', 'A1989', 1, '{}', '{}',
-          'apple macbook pro 13 a1989', 0, '[]', 1, '${ts}', '${ts}');
-      INSERT INTO pick_list (id, key, name, is_battery_list, version)
-        VALUES (1, 'condition', 'Zustand', 0, 1);
-      INSERT INTO pick_list_value (id, pick_list_id, label, label_key, sort_order, active, version)
-        VALUES (1, 1, 'gebraucht', 'gebraucht', 1, 1, 1);
-      INSERT INTO channel (id, code, name, active, title_max_length, vb_allowed, sort_order,
-          condition_mappings_version, version, created_at, updated_at)
-        VALUES (1, 'shop', 'Shop', 1, 128, 0, 1, 1, 1, '${ts}', '${ts}');
+        SELECT 1, id, 1, 'MacBook Pro 13', 'macbook pro 13', 'A1989', 1, '{}', '{}',
+          'apple macbook pro 13 a1989', 0, '[]', 1, '${ts}', '${ts}'
+        FROM device_type WHERE name_key = 'notebook';
       INSERT INTO listing (id, model_template_id, condition_value_id, visual_grade,
           condition_description, condition_description_key, variant_values, other_device_values,
           article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
           stock_hash, version, created_at, updated_at)
-        VALUES (1, 1, 1, 2, 'leichte Gebrauchsspuren', 'leichte gebrauchsspuren', '{}', '{}',
-          '626198', '626198', 'original', 'MI-A', 0, '{}', '', 1, '${ts}', '${ts}');
+        SELECT 1, 1, v.id, 2, 'leichte Gebrauchsspuren', 'leichte gebrauchsspuren', '{}', '{}',
+          '626198', '626198', 'original', 'MI-A', 0, '{}', '', 1, '${ts}', '${ts}'
+        FROM pick_list_value v JOIN pick_list l ON l.id = v.pick_list_id
+        WHERE l.key = 'condition' AND v.label_key = 'gebraucht';
       INSERT INTO listing_price (listing_id, channel_id, amount_cents, vb, source)
-        VALUES (1, 1, 27900, 0, 'manual');
+        SELECT 1, id, 27900, 0, 'manual' FROM channel WHERE code = 'shop';
     `);
   } finally {
     db.close();

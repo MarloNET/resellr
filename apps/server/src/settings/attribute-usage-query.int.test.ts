@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { insertPickLists } from '../../test/pick-lists.ts';
 import { openDatabase, type Database } from '../db/database.ts';
 import { runMigrations } from '../db/migrator.ts';
-import { migrations } from '../db/migrations/index.ts';
+import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import type { DB } from '../db/schema.ts';
 import { createAttributeUsageQuery } from './attribute-usage-query.ts';
 import { insertAttributeValueRecords, type StoredValues } from '../../test/attribute-values.ts';
@@ -20,7 +20,9 @@ let database: Database<DB>;
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'resellr-attribute-usage-'));
   database = openDatabase<DB>(join(dir, 'resellr.db'));
-  await runMigrations(database, migrations, () => NOW);
+  // Schema only: the tests write their own settings; the initial settings have their own
+  // tests (CU-071).
+  await runMigrations(database, [initialSchema], () => NOW);
   insertPickLists(database.sqlite);
 });
 

@@ -425,6 +425,45 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
       check.close();
     }
   });
+
+  test('AC-REQ-006-02 UI-027.default an attribute of the initial device type Notebook is renamed and keeps its new name after reloading', async ({
+    page,
+    server,
+  }, testInfo) => {
+    // Notebook comes with the initial settings (CU-071) and is the first device type. The
+    // server keeps its data per worker, so the test renames whatever the first attribute is
+    // called now.
+    const listResponse = await page.request.get(`${server.baseUrl}/api/device-types`);
+    const { items } = (await listResponse.json()) as { items: { id: number; name: string }[] };
+    const notebook = items.find(({ name }) => name === 'Notebook');
+    expect(notebook).toBeDefined();
+    const [first] = await attributeList(page, server.baseUrl, notebook?.id ?? 0);
+    const label = first?.label ?? '';
+    const renamed = uniqueName('Prozessor', testInfo.title, testInfo.project.name);
+
+    const openNotebook = async () => {
+      await deviceTypes(page)
+        .getByRole('button', { name: /^Notebook/ })
+        .first()
+        .click();
+      await expect(nameField(page)).toHaveValue('Notebook');
+    };
+    await page.goto(PAGE);
+    await openNotebook();
+    await attributes(page).getByRole('button', { name: label, exact: true }).click();
+    const panel = page.getByRole('form', { name: 'Merkmal bearbeiten' });
+    await panel.getByLabel(/^Bezeichnung/).fill(renamed);
+    await panel.getByRole('button', { name: 'Merkmal speichern' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal gespeichert' })).toBeVisible();
+
+    await page.reload();
+    await openNotebook();
+    await expect(
+      attributes(page).getByRole('button', { name: renamed, exact: true }),
+    ).toBeVisible();
+    await expect(attributes(page).getByRole('button', { name: label, exact: true })).toHaveCount(0);
+  });
+
   test('UI-027.disabled DER-34-10 with stored values data type and level are locked with the reason inline, and the server rejects a change', async ({
     page,
     server,
