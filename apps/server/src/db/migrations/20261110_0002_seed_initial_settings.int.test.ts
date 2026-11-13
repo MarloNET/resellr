@@ -536,6 +536,12 @@ describe('seed migration 20261110_0002_seed_initial_settings (CU-071)', () => {
     expect(
       rows('SELECT id, brand_name, contact_text, logo_hash, version FROM merchant_profile'),
     ).toEqual([{ id: 1, brand_name: '', contact_text: '', logo_hash: null, version: 1 }]);
+    expect(await get('/api/merchant-profile')).toEqual({
+      brandName: '',
+      contactText: '',
+      logo: null,
+      version: 1,
+    });
   });
 
   it('writes no audit entries and leaves no foreign key findings', () => {
