@@ -168,7 +168,7 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     });
   });
 
-  it('AC-REQ-007-04 after renaming "mit Akku (defekt)" to "Akku defekt", a device with "Akku defekt" without battery capacity is rejected with "Akkukapazität fehlt"', async () => {
+  it('AC-REQ-007-04 after renaming "mit Akku (defekt)" to "Akku defekt", a device with "Akku defekt" without battery capacity is rejected with the rule of the battery capacity', async () => {
     const notebook = await createDeviceType('Notebook');
     const batteryId = insertSystemRoleAttribute(notebook.id, 'battery', 'Akku');
     const capacityId = insertSystemRoleAttribute(notebook.id, 'battery_capacity', 'Akkukapazität');
@@ -198,7 +198,7 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
         path: issue.path.join('.'),
         message: issue.message,
       })),
-    ).toEqual([{ path: String(capacityId), message: 'Akkukapazität fehlt' }]);
+    ).toEqual([{ path: String(capacityId), message: 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“' }]);
     expect(
       deviceValues.safeParse({ [batteryId]: akkuDefekt?.id, [capacityId]: { percent: 85 } })
         .success,

@@ -297,7 +297,8 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
     const DEFECTIVE = { id: 5, label: 'mit Akku (defekt)', batteryPresent: true };
     const WITHOUT_BATTERY = { id: 6, label: 'ohne Akku', batteryPresent: false };
     const BATTERY_VALUES = [WITH_BATTERY, DEFECTIVE, WITHOUT_BATTERY];
-    const CAPACITY_MISSING = [{ path: '18', message: 'Akkukapazität fehlt' }];
+    const CAPACITY_RULE = 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“';
+    const CAPACITY_MISSING = [{ path: '18', message: CAPACITY_RULE }];
 
     const deviceValues = (
       attributes: AttributeValueDefinition[],
@@ -324,7 +325,7 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
       );
       expect(issuesOf(deviceValues([BATTERY, CAPACITY, RAM], { 12: 'viel', 17: 4 }))).toEqual([
         { path: '12', message: 'RAM: ganze Zahl' },
-        { path: '18', message: 'Akkukapazität fehlt' },
+        { path: '18', message: CAPACITY_RULE },
       ]);
     });
 
@@ -356,8 +357,14 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
       });
     });
 
-    it('capacity active, no value: "Akkukapazität fehlt"', () => {
+    it('capacity active, no value: the rule of the battery capacity', () => {
       expect(issuesOf(deviceValues([BATTERY, CAPACITY], { 17: 4 }))).toEqual(CAPACITY_MISSING);
+    });
+
+    it('battery value with the flag and an invalid capacity: exactly one field error', () => {
+      expect(issuesOf(deviceValues([BATTERY, CAPACITY], { 17: 4, 18: { percent: 101 } }))).toEqual(
+        CAPACITY_MISSING,
+      );
     });
 
     it('battery deactivated with the stored value "mit Akku", capacity active without value: no error', () => {

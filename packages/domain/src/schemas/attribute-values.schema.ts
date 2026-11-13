@@ -204,7 +204,8 @@ function valueSchema(attribute: AttributeValueDefinition): z.ZodType<AttributeVa
 /**
  * Rule of the role `battery_capacity` (2.5, FIND-353): a value is required exactly when the
  * attribute is active and the chosen value of the active attribute with the role `battery`
- * carries the flag "Akku vorhanden", whatever its label (DER-35-12). `undefined` without both
+ * carries the flag "Akku vorhanden", whatever its label (DER-35-12). A missing value gets the
+ * same text as an invalid one, the wording of the design (2.0.6). `undefined` without both
  * attributes at the level.
  */
 function batteryCapacityRule(
@@ -224,7 +225,7 @@ function batteryCapacityRule(
     if (values[String(capacity.id)] !== undefined) return;
     context.addIssue({
       code: 'custom',
-      message: FIELD_MESSAGES.attributeValueMissing(capacity.label),
+      message: FIELD_MESSAGES.batteryCapacityFormat,
       params: { code: 'value_missing' },
       path: [String(capacity.id)],
     });
