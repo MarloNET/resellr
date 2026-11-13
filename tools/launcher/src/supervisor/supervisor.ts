@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createReferenceNumber } from '@resellr/runtime-shared/reference-number';
 
 import { berlinDay } from '../availability/availability-aggregator.ts';
+import type { ShutdownResponse } from '../health-client.ts';
 import type { HealthProbe } from '../health-probe.ts';
 import type { ShownRefNo, StartAbortCause } from '../launcher-log.ts';
 import { CRASH_GRACE_MS, createRestartPolicy, type RestartPolicy } from './restart-policy.ts';
@@ -53,6 +54,8 @@ export interface SupervisorOptions {
   startHealthProbe?(onProbe: (at: Date) => void): HealthProbe;
   /** Summarises the missing days of the availability (CU-269). */
   summarizeAvailability?(): void;
+  /** `POST /api/ops/shutdown` to the own server (CU-266), the answer to `stop` in `ready`. */
+  shutdownServer?(): Promise<ShutdownResponse | null>;
 }
 
 /**
@@ -75,7 +78,12 @@ export interface SupervisorOptions {
  * the supervisor writes it into the logs before it reports the event, so a number LP-02 shows is
  * already logged (FIND-210, Nachtrag MAR-498). A start without `ready` within the start limit of
  * 10 minutes (CU-264) is reported as `aborted` with a number of its own and ends the supervisor
- * without a restart (2.18 step 5, K-07). Not built yet: the answer to `stop` (#123, #124).
+ * without a restart (2.18 step 5, K-07).
+ *
+ * `stop` over the pipe in `ready` sends `POST /api/ops/shutdown` once; the server then ends with
+ * exit code 0, which the supervisor reports as `stopped` and ends (2.18 command `stop`). Every
+ * client that sent `stop` gets the phases from then on, so it learns the result. Not built yet:
+ * the answer to `stop` in the other states and the failure `error` (#124).
  */
 export async function runSupervisor({
   pipe,
@@ -92,16 +100,37 @@ export async function runSupervisor({
   onAlreadyRunning = () => {},
   startHealthProbe,
   summarizeAvailability = () => {},
+  shutdownServer,
 }: SupervisorOptions): Promise<void> {
   let current: PhaseEvent = { event: 'phase', phase: 'starting' };
+  /** Clients that sent `stop`; they get every later phase like a subscriber. */
+  const stopClients: ((event: PhaseEvent) => void)[] = [];
   const report = (event: PhaseEvent) => {
     current = event;
     pipe.broadcast(event);
+    for (const reply of stopClients) reply(event);
     onPhase?.(event);
   };
 
+  let shuttingDown = false;
+  const shutDown = () => {
+    if (shuttingDown || shutdownServer === undefined) return;
+    shuttingDown = true;
+    // Accepted, the server ends with exit code 0 and the end reports `stopped`; otherwise a later
+    // `stop` tries again.
+    void shutdownServer().then(
+      (response) => (shuttingDown = response?.status === 200),
+      () => (shuttingDown = false),
+    );
+  };
+
   pipe.onRequest((request, reply) => {
-    if (request.cmd === 'subscribe') reply(current);
+    if (request.cmd === 'subscribe') {
+      reply(current);
+      return;
+    }
+    stopClients.push(reply);
+    if (current.phase === 'ready') shutDown();
   });
 
   // Neither the summary nor a log entry may end the supervisor or hold back an event.

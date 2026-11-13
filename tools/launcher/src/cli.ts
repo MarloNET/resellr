@@ -20,14 +20,17 @@ import { createLauncherLog, type LauncherLog } from './launcher-log.ts';
 import { launcherPageUrl } from './launcher-pages-location.ts';
 import { createLauncherStateWriter } from './launcher-state-writer.ts';
 import { runOpenCommand } from './open-command.ts';
+import { runStopCommand } from './stop-command.ts';
 import { startServerProcess, testStartTimeouts } from './supervisor/server-process.ts';
 import { runSupervisor } from './supervisor/supervisor.ts';
 import {
   listenSupervisorPipe,
   type PhaseEvent,
+  requestStop,
   subscribeToSupervisor,
   supervisorPipePath,
   type SupervisorPipeServer,
+  waitForFreePipe,
 } from './supervisor/supervisor-pipe.ts';
 
 const APP_VERSION = '0.1.0';
@@ -83,11 +86,12 @@ export async function runCli(
         return await runOpen(env);
       case 'supervise':
         return await runSupervise(env);
+      case 'stop':
+        return await runStop(env, command.forUpdate);
       case 'availability-report':
         writeAvailabilityReport({ logDir: resolveRuntimePaths(env).logDir, month: command.month });
         return LauncherExitCode.Success;
       default:
-        // `stop` (#123) is not built yet.
         return LauncherExitCode.Failed;
     }
   } catch {
@@ -102,8 +106,7 @@ function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
   // and writes no warning about it (2.19, Nachtrag MAR-296).
   const { port } = readConfiguredPort(paths.dataDir);
   const launcherLog = createLauncherLog({ dir: paths.logDir, appVersion: APP_VERSION });
-  // `resellr-node.exe` lies in the program folder (2.19), like for the server.
-  const programDir = env[TEST_PROGRAM_DIR_ENV] || dirname(process.execPath);
+  const programDir = programDirFor(env);
   return runOpenCommand({
     healthClient: createHealthClient({ port }),
     // The only warning of CU-267 is `chrome_not_found` (2.19, Nachtrag MAR-366).
@@ -121,6 +124,29 @@ function runOpen(env: RuntimeEnv): Promise<LauncherExitCode> {
     launcherState: createLauncherStateWriter(programDir),
     log: launcherLog,
     startTimeoutMs: testStartTimeouts(env)?.timeoutMs,
+  });
+}
+
+/**
+ * Command `stop` (2.18): over the pipe of the supervisor, otherwise `POST /api/ops/shutdown` to the
+ * port of `config.json`, read anew through CU-309 without a warning (Nachtrag MAR-296).
+ */
+function runStop(env: RuntimeEnv, forUpdate: boolean): Promise<LauncherExitCode> {
+  const paths = resolveRuntimePaths(env);
+  const pipePath = pipePathFor(env);
+  const { port } = readConfiguredPort(paths.dataDir);
+  const programDir = programDirFor(env);
+  const launcherLog = createLauncherLog({ dir: paths.logDir, appVersion: APP_VERSION });
+  return runStopCommand({
+    forUpdate,
+    dataDir: paths.dataDir,
+    stopSupervisor: () => requestStop(pipePath),
+    healthClient: createHealthClient({ port }),
+    waitForFreePipe: (timeoutMs) => waitForFreePipe(pipePath, timeoutMs),
+    chromeOpener: createChromeOpener({ warn: () => launcherLog.chromeNotFound() }),
+    newRequestId: randomUUID,
+    resultPageUrl: (request) => launcherPageUrl(programDir, 'lp-03', { request }),
+    launcherState: createLauncherStateWriter(programDir),
   });
 }
 
@@ -194,6 +220,7 @@ async function supervise({
       startHealthProbe: (onProbe) =>
         startHealthProbe({ healthClient, logDir: paths.logDir, onProbe }),
       summarizeAvailability: () => summarizeMissingDays({ logDir: paths.logDir, bootTime }),
+      shutdownServer: () => healthClient.shutdown(),
     });
   } finally {
     tryToLog(() => launcherLog.supervisorEnded({ startId: lastStartId }));
@@ -206,6 +233,11 @@ function tryToLog(write: () => void): void {
   } catch {
     // ignored: the log is no reason to end the supervisor
   }
+}
+
+/** `resellr-node.exe` lies in the program folder (2.19), like for the server. */
+function programDirFor(env: RuntimeEnv): string {
+  return env[TEST_PROGRAM_DIR_ENV] || dirname(process.execPath);
 }
 
 /** The pipe of this user's supervisor, from `%LOCALAPPDATA%` (H-14). */

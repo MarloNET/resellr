@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createHealthClient, HEALTH_TIMEOUT_MS } from './health-client.ts';
 
+const REF_NO = 'R-7K3M-Q9TX';
+
 type Handler = (request: IncomingMessage, body: string, response: ServerResponse) => void;
 
 let server: Server | undefined;
@@ -118,6 +120,7 @@ describe('health client (CU-266)', () => {
     await expect(createHealthClient({ port }).shutdown()).resolves.toEqual({
       status: 200,
       body: { dataDirPath: 'C:\\Daten' },
+      refNo: null,
     });
     // Without Origin and Sec-Fetch-Site the request is no browser request (2.0.2, G-3).
     expect(requests).toEqual([
@@ -140,7 +143,27 @@ describe('health client (CU-266)', () => {
     await expect(createHealthClient({ port }).shutdown()).resolves.toEqual({
       status: 500,
       body: null,
+      refNo: null,
     });
+  });
+
+  it('returns the reference number of a failed shutdown from the error body', async () => {
+    const error = { code: 'internal_error', message: 'x', details: [], referenceNumber: REF_NO };
+    const port = await startServer((_request, _body, response) => json(response, 500, { error }));
+
+    await expect(createHealthClient({ port }).shutdown()).resolves.toEqual({
+      status: 500,
+      body: { error },
+      refNo: REF_NO,
+    });
+  });
+
+  it('ignores a reference number that does not match the pattern (H-11)', async () => {
+    const port = await startServer((_request, _body, response) =>
+      json(response, 500, { error: { referenceNumber: '<b>R-7K3M-Q9TX</b>' } }),
+    );
+
+    await expect(createHealthClient({ port }).shutdown()).resolves.toMatchObject({ refNo: null });
   });
 
   it('returns null from shutdown when no server listens on the port', async () => {

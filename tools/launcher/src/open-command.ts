@@ -24,7 +24,7 @@ export interface OpenCommandDeps {
   /** Address of LP-01 for this call (CU-310). */
   waitingPageUrl(request: string): string;
   /** Hands the result to an open LP-01 through `launcher-state.js` (CU-268). */
-  launcherState: LauncherStateWriter;
+  launcherState: Pick<LauncherStateWriter, 'prepare' | 'ready' | 'aborted' | 'timeout'>;
   /** Writes `start_timeout` into the operations and the error log (CU-296, K-07). */
   log: Pick<LauncherLog, 'startTimeout'>;
   createRefNo?: () => string;

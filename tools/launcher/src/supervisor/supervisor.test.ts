@@ -5,11 +5,13 @@ import { connect } from 'node:net';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import type { ShutdownResponse } from '../health-client.ts';
 import type { ServerEnd } from './server-process.ts';
 import { type CrashReport, runSupervisor, type SupervisorOptions } from './supervisor.ts';
 import {
   listenSupervisorPipe,
   type PhaseEvent,
+  requestStop,
   subscribeToSupervisor,
   supervisorPipePath,
 } from './supervisor-pipe.ts';
@@ -447,5 +449,74 @@ describe('supervisor (CU-261)', () => {
     server.ready();
     server.end({ kind: 'stopped' });
     await expect(ended).resolves.toBeUndefined();
+  });
+
+  describe('stop over the pipe in ready (2.18 command stop)', () => {
+    /** `POST /api/ops/shutdown` the test answers; `answer(response)` settles the open call. */
+    function fakeShutdown() {
+      const answers: ((response: ShutdownResponse | null) => void)[] = [];
+      return {
+        calls: () => answers.length,
+        answer: (response: ShutdownResponse | null) => answers.at(-1)!(response),
+        shutdownServer: () =>
+          new Promise<ShutdownResponse | null>((resolve) => answers.push(resolve)),
+      };
+    }
+
+    it('DER-104-01 sends POST /api/ops/shutdown, reports stopped to the stop client after the process end and ends without a restart', async () => {
+      const shutdown = fakeShutdown();
+      const { server, phases, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+      server.ready();
+      const subscribed = await subscriber(path);
+      expect(await subscribed.next()).toMatchObject({ phase: 'ready' });
+
+      const stopped = requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      shutdown.answer({ status: 200, body: { dataDirPath: 'C:\\Daten' }, refNo: null });
+      // The server ends with exit code 0 after its answer (2.17 step 7).
+      server.end({ kind: 'stopped' });
+
+      await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+      expect(await subscribed.next()).toEqual({ event: 'phase', phase: 'stopped' });
+      await ended;
+      expect(phases.at(-1)).toEqual({ event: 'phase', phase: 'stopped' });
+      expect(server.startIds).toEqual(['start-1']);
+      expect(await subscribeToSupervisor(path)).toBeNull();
+    });
+
+    it('sends POST /api/ops/shutdown once for two stop requests and answers both', async () => {
+      const shutdown = fakeShutdown();
+      const { server, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+      server.ready();
+
+      const first = requestStop(path);
+      const second = requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      shutdown.answer({ status: 200, body: {}, refNo: null });
+      server.end({ kind: 'stopped' });
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        { event: 'phase', phase: 'stopped' },
+        { event: 'phase', phase: 'stopped' },
+      ]);
+      expect(shutdown.calls()).toBe(1);
+      await ended;
+    });
+
+    it('sends POST /api/ops/shutdown again on a later stop when the server did not accept it', async () => {
+      const shutdown = fakeShutdown();
+      const { server, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+      server.ready();
+
+      void requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      shutdown.answer(null);
+      void requestStop(path);
+
+      await expect.poll(shutdown.calls).toBe(2);
+      shutdown.answer({ status: 200, body: {}, refNo: null });
+      server.end({ kind: 'stopped' });
+      await ended;
+    });
   });
 });
