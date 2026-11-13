@@ -5,9 +5,12 @@
 // dependencies, all under `app` of the program folder. The native modules are the ones installed
 // by `npm ci` on the build machine, so the package must be built on Windows x64 with the Node.js
 // version of `.nvmrc` (the one CU-275 ships).
-// Usage: `node tools/packaging/bundle-app.mjs <program folder>` after `vite build` of the web UI.
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { dirname, join, relative, sep } from 'node:path';
+// Usage: `node tools/packaging/bundle-app.mjs <program folder> [--metafile <path>]` after
+// `vite build` of the web UI. `--metafile` writes the merged esbuild metafile of both bundles for
+// the license notices (CU-298, Nachtrag MAR-687); the path must lie outside the program folder,
+// so the file is not shipped.
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, URL } from 'node:url';
 
@@ -48,8 +51,13 @@ const CJS_REQUIRE_BANNER = [
 ].join('\n');
 
 /**
+ * @typedef {{ inputs: Record<string, unknown>, outputs: Record<string, unknown> }} Metafile
+ */
+
+/**
  * @param {{ repoRoot: string, programDir: string, webDist?: string }} options
- * @returns {Promise<{ nativePackages: string[] }>} names of the shipped packages
+ * @returns {Promise<{ nativePackages: string[], metafile: Metafile }>} names of the shipped
+ *   packages and the merged esbuild metafile of both bundles (Nachtrag MAR-687)
  */
 export async function bundleApp({ repoRoot, programDir, webDist }) {
   const paths = programFolderPaths(programDir);
@@ -66,6 +74,8 @@ export async function bundleApp({ repoRoot, programDir, webDist }) {
 
   /** @type {Set<string>} */
   const externalImports = new Set();
+  /** @type {Metafile} */
+  const metafile = { inputs: {}, outputs: {} };
   for (const [key, entry] of Object.entries(ENTRIES)) {
     const result = await build({
       absWorkingDir: repoRoot,
@@ -88,6 +98,8 @@ export async function bundleApp({ repoRoot, programDir, webDist }) {
     if (traces.length > 0) {
       throw new Error(`Bundle of ${entry} still contains ${traces.join(', ')}`);
     }
+    Object.assign(metafile.inputs, result.metafile.inputs);
+    Object.assign(metafile.outputs, result.metafile.outputs);
     for (const output of Object.values(result.metafile.outputs)) {
       for (const imported of output.imports) {
         if (imported.external) externalImports.add(packageName(imported.path));
@@ -99,7 +111,7 @@ export async function bundleApp({ repoRoot, programDir, webDist }) {
 
   const roots = NATIVE_MODULES.filter((name) => externalImports.has(name));
   const nativePackages = shipPackages(repoRoot, roots, paths.nativeModulesDir);
-  return { nativePackages };
+  return { nativePackages, metafile };
 }
 
 /**
@@ -185,13 +197,13 @@ function keepFile(path, compiled) {
 
 /**
  * Resolves a package like Node.js does: `node_modules/<name>` in `from` or a folder above it,
- * not above the repository root.
+ * not above the repository root. The only package resolution of the build (Nachtrag MAR-687).
  * @param {string} name
  * @param {string} from
  * @param {string} repoRoot
  * @returns {string | null}
  */
-function findPackage(name, from, repoRoot) {
+export function findPackage(name, from, repoRoot) {
   for (let dir = from; ; dir = dirname(dir)) {
     const candidate = join(dir, 'node_modules', name);
     if (existsSync(join(candidate, 'package.json'))) return candidate;
@@ -199,15 +211,51 @@ function findPackage(name, from, repoRoot) {
   }
 }
 
-/** @param {string | undefined} programDir */
-async function main(programDir) {
-  if (!programDir) {
-    process.stderr.write('Usage: bundle-app.mjs <program folder>\n');
+/**
+ * Whether `path` is `dir` or lies inside it.
+ * @param {string} path
+ * @param {string} dir
+ */
+function isInside(path, dir) {
+  const rest = relative(resolve(dir), resolve(path));
+  return rest === '' || (!rest.startsWith('..') && !isAbsolute(rest));
+}
+
+/**
+ * Throws unless the metafile path lies outside the program folder, so the file is not shipped.
+ * @param {string} metafilePath
+ * @param {string} programDir
+ */
+function checkMetafilePath(metafilePath, programDir) {
+  if (isInside(metafilePath, programDir)) {
+    throw new Error(`The metafile ${metafilePath} must lie outside the program folder`);
+  }
+}
+
+/**
+ * Writes the metafile of `bundleApp` as JSON for CU-298 (Nachtrag MAR-687).
+ * @param {string} metafilePath outside the program folder
+ * @param {string} programDir
+ * @param {Metafile} metafile
+ */
+export function writeMetafile(metafilePath, programDir, metafile) {
+  checkMetafilePath(metafilePath, programDir);
+  mkdirSync(dirname(resolve(metafilePath)), { recursive: true });
+  writeFileSync(metafilePath, JSON.stringify(metafile));
+}
+
+/** @param {string[]} args */
+async function main(args) {
+  const [programDir, option, metafilePath] = args;
+  if (!programDir || (option !== undefined && (option !== '--metafile' || !metafilePath))) {
+    process.stderr.write('Usage: bundle-app.mjs <program folder> [--metafile <path>]\n');
     process.exitCode = 1;
     return;
   }
   const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
   try {
+    // Checked before bundling, so a wrong path fails fast.
+    if (metafilePath) checkMetafilePath(metafilePath, programDir);
     // The native modules of `npm ci` must fit the shipped runtime (2.19).
     const version = nodeRuntimeVersion(readFileSync(join(repoRoot, '.nvmrc'), 'utf8'));
     if (process.platform !== 'win32' || process.arch !== 'x64') {
@@ -216,7 +264,8 @@ async function main(programDir) {
     if (process.version !== `v${version}`) {
       throw new Error(`Build with Node.js ${version} from .nvmrc, not ${process.version}`);
     }
-    const { nativePackages } = await bundleApp({ repoRoot, programDir });
+    const { nativePackages, metafile } = await bundleApp({ repoRoot, programDir });
+    if (metafilePath) writeMetafile(metafilePath, programDir, metafile);
     process.stdout.write(
       `Bundled into ${programFolderPaths(programDir).appDir}; native packages: ${nativePackages.join(', ')}\n`,
     );
@@ -226,4 +275,4 @@ async function main(programDir) {
   }
 }
 
-if (import.meta.main) await main(process.argv[2]);
+if (import.meta.main) await main(process.argv.slice(2));

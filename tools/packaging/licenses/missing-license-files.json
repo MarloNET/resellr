@@ -1,0 +1,12 @@
+{
+  "abstract-logging": {
+    "license": "MIT",
+    "file": "abstract-logging.txt",
+    "source": "https://jsumners.mit-license.org/"
+  },
+  "react-remove-scroll-bar": {
+    "license": "MIT",
+    "file": "react-remove-scroll-bar.txt",
+    "source": "https://github.com/theKashey/react-remove-scroll-bar/blob/7301c160fda44cb8cf2b9fdfde61efad35736196/LICENSE"
+  }
+}

@@ -1,0 +1,153 @@
+# Release workflow (CU-279, ADR-008, Baseline 10.6, Technical Specification 2.19 "Build des
+# Pakets", Nachtrag MAR-599, MAR-687): builds the installation package on a Windows runner and
+# publishes it in GitHub Releases of MarloNET/resellr. A tag `v<version>` on a commit of `main`
+# publishes; the version comes from the root `package.json`. A manual run (`workflow_dispatch`)
+# builds the same package without tag check and without release and keeps package and license
+# notices as artifact, also when started with a tag as ref (FIND-365). Notes after AR-04 are added to the release by whoever sets the tag.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  STAGE_DIR: build/package
+  METAFILE: build/bundle-meta.json
+
+jobs:
+  build:
+    name: Build installation package (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # The full history, so the tag check sees `origin/main`.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Version from package.json
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version $version"
+
+      # Fails before the build if the tag does not name the version or its commit is not on main.
+      - name: Check tag against version and main
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version $VERSION of package.json (expected v$VERSION)"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Commit $GITHUB_SHA of tag $GITHUB_REF_NAME is not on main"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Installs the prebuilt native packages for Windows x64 and the Node.js version of .nvmrc.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web UI
+        run: npm run build --workspace @resellr/web
+
+      - name: Bundle server and launcher (CU-276)
+        run: node tools/packaging/bundle-app.mjs "$STAGE_DIR" --metafile "$METAFILE"
+
+      # Loads node-v<version>-win-x64.zip and checks it against SHASUMS256.txt (CU-275).
+      - name: Load Node.js runtime (CU-275)
+        run: node tools/packaging/fetch-node-runtime.mjs "$STAGE_DIR"
+
+      - name: Create resellr-node.exe (CU-274)
+        run: node tools/packaging/patch-pe-subsystem.mjs "$STAGE_DIR/node.exe" "$STAGE_DIR/resellr-node.exe"
+
+      - name: Build launcher pages (CU-272)
+        run: node tools/launcher-pages/build-launcher-pages.mjs "$STAGE_DIR/launcher-pages"
+
+      - name: Copy availability report file (CU-277)
+        run: cp "tools/packaging/Verfügbarkeitsbericht.cmd" "$STAGE_DIR/"
+
+      # Fails for a shipped package with missing or not allowed license (FIND-222).
+      - name: License notices (CU-298)
+        run: node tools/packaging/collect-licenses.mjs "$STAGE_DIR" --metafile "$METAFILE"
+
+      # After the program folder is filled and before iscc; iscc fails without the PDF (Nachtrag MAR-599).
+      - name: Operations manual PDF (CU-316)
+        run: node tools/packaging/build-operations-manual.mjs "$STAGE_DIR"
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+          }
+          "${env:ProgramFiles(x86)}\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      # PowerShell, because Git Bash would rewrite the switch `/DAppVersion=…` as a path.
+      - name: Build installation package (CU-273)
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          iscc "/DAppVersion=$env:VERSION" tools/packaging/installer/resellr.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path "build/installer/resellr-setup-$env:VERSION.exe")) { exit 1 }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: resellr-setup-${{ steps.version.outputs.version }}
+          path: |
+            build/installer/resellr-setup-${{ steps.version.outputs.version }}.exe
+            ${{ env.STAGE_DIR }}/THIRD-PARTY-NOTICES.txt
+          if-no-files-found: error
+
+  publish:
+    name: Publish in GitHub Releases
+    needs: build
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Only this job of this workflow may write releases (Nachtrag MAR-687).
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: resellr-setup-${{ needs.build.outputs.version }}
+          path: release
+
+      # Fails if the release exists already; `gh release create` would fail there, too.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release v$VERSION exists already"
+            exit 1
+          fi
+          gh release create "v$VERSION" \
+            "release/installer/resellr-setup-$VERSION.exe" \
+            "release/package/THIRD-PARTY-NOTICES.txt" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
