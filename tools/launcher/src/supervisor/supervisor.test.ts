@@ -226,6 +226,26 @@ describe('supervisor (CU-261)', () => {
     },
   );
 
+  it('DER-103-06 logs start_aborted with an own reference number (launcher.start_limit) before it reports aborted, then ends without a restart', async () => {
+    const { server, order, logged, phases, ended } = await start();
+    const client = await subscriber(path);
+    expect(await client.next()).toEqual({ event: 'phase', phase: 'starting', startId: 'start-1' });
+
+    server.end({ kind: 'start_limit' });
+
+    const aborted = { event: 'phase', phase: 'aborted', startId: 'start-1', refNo: REF_NO };
+    expect(await client.next()).toEqual(aborted);
+    expect(await client.next()).toBe('closed');
+    await ended;
+    expect(logged).toEqual([
+      { kind: 'start_aborted', startId: 'start-1', refNo: REF_NO, cause: 'start_limit' },
+    ]);
+    expect(order).toEqual(['phase starting', 'log start_aborted', 'phase aborted']);
+    expect(phases.at(-1)).toEqual(aborted);
+    expect(server.startIds).toHaveLength(1);
+    expect(await subscribeToSupervisor(path)).toBeNull();
+  });
+
   it('reports aborted with its reference number also when writing the log fails', async () => {
     const { server, phases, ended } = await start({
       onStartAborted: () => {
