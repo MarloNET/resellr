@@ -519,6 +519,7 @@ describe('seed migration 20261110_0002_seed_initial_settings (CU-071)', () => {
   it('AC-REQ-006-03 leaves mappings, text blocks, GPSR, merchant details, condition codes and suppliers empty', async () => {
     expect(await get('/api/suppliers?includeInactive=true')).toEqual({ items: [], total: 0 });
     expect(await get('/api/manufacturers?includeInactive=true')).toEqual({ items: [], total: 0 });
+    expect(await get('/api/condition-codes')).toEqual({ items: [], total: 0 });
     for (const table of [
       'category_mapping',
       'condition_mapping',
