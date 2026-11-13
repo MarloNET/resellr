@@ -156,6 +156,11 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.supplierName).toBe('Name: 1 bis 100 Zeichen');
   });
 
+  it('has the field texts of the merchant profile (UI-026)', () => {
+    expect(FIELD_MESSAGES.brandName).toBe('Name: 1 bis 100 Zeichen');
+    expect(FIELD_MESSAGES.contactText).toBe('Kontaktangaben: höchstens 500 Zeichen');
+  });
+
   it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {
     expect(ERROR_MESSAGES['name_taken.pick_list_value']).toBe(
       'Wert gibt es in dieser Liste bereits',

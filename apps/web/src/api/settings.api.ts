@@ -20,6 +20,10 @@ import type {
   ManufacturerUpdateResult,
 } from '@resellr/domain/schemas/manufacturer.schema';
 import type {
+  MerchantProfile,
+  MerchantProfileUpdate,
+} from '@resellr/domain/schemas/merchant-profile.schema';
+import type {
   PickList,
   PickListList,
   PickListValue,
@@ -121,6 +125,23 @@ export function useUpdateSupplierMutation() {
   return useMutation<Supplier, ApiError, SupplierUpdate & { id: number }>({
     mutationFn: ({ id, ...body }) => apiClient.patch<Supplier>(`/api/suppliers/${id}`, body),
     onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.suppliers(), saved),
+  });
+}
+
+/** Merchant profile of UI-026 (`GET /api/merchant-profile`). */
+export function useMerchantProfileQuery() {
+  return useQuery<MerchantProfile, ApiError>({
+    queryKey: queryKeys.settings.merchantProfile(),
+    queryFn: ({ signal }) => apiClient.get<MerchantProfile>('/api/merchant-profile', { signal }),
+  });
+}
+
+/** "Speichern" of UI-026 (`PUT /api/merchant-profile`); the answer is the saved profile. */
+export function useSaveMerchantProfileMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, MerchantProfileUpdate>({
+    mutationFn: (body) => apiClient.put<MerchantProfile>('/api/merchant-profile', body),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
   });
 }
 

@@ -219,12 +219,15 @@ const READ_PATHS: Record<string, string> = {
 
 /**
  * What the user sees of the seeded data: the answer of `GET` on every collection the demo data
- * created entries in. A seed area that creates entries in a collection without `GET` fails here
- * and has to name how its data is read (`READ_PATHS`).
+ * created entries in and on every single resource it saved (`PUT`, e.g. the merchant profile). A
+ * seed area that writes to a path without `GET` fails here and has to name how its data is read
+ * (`READ_PATHS`).
  */
 async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<unknown> {
   const api = createDemoApi(baseUrl);
-  const collections = [...new Set(writes.filter((w) => w.method === 'POST').map((w) => w.path))];
+  const collections = [
+    ...new Set(writes.filter((w) => w.method === 'POST' || w.method === 'PUT').map((w) => w.path)),
+  ];
   const state: Record<string, unknown> = {};
   for (const path of collections.sort()) {
     state[path] = await api.request('GET', READ_PATHS[path] ?? path);

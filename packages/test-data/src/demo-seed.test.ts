@@ -10,6 +10,7 @@ import {
   seedDemoData,
   seedManufacturers,
   type SeedArea,
+  seedMerchantProfile,
   seedSuppliers,
 } from './demo-seed.ts';
 
@@ -113,8 +114,13 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers and manufacturers', () => {
-    expect(SEED_AREAS).toEqual([seedDeviceTypes, seedSuppliers, seedManufacturers]);
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers and merchant profile', () => {
+    expect(SEED_AREAS).toEqual([
+      seedDeviceTypes,
+      seedSuppliers,
+      seedManufacturers,
+      seedMerchantProfile,
+    ]);
   });
 
   it('creates the demo device types through POST /api/device-types', async () => {
@@ -174,6 +180,32 @@ describe('seedDemoData', () => {
       ['POST', '/api/manufacturers', { name: 'Fujitsu' }],
       ['POST', '/api/manufacturers', { name: 'Toshiba' }],
       ['PATCH', '/api/manufacturers/4', { version: 1, active: false }],
+    ]);
+  });
+
+  it('saves the demo merchant profile through PUT /api/merchant-profile on the version read', async () => {
+    const requests: unknown[][] = [];
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (...args: unknown[]) => {
+        requests.push(args);
+        return { version: 1 } as never;
+      },
+    };
+
+    await seedMerchantProfile(recording);
+
+    expect(requests).toEqual([
+      ['GET', '/api/merchant-profile'],
+      [
+        'PUT',
+        '/api/merchant-profile',
+        {
+          version: 1,
+          brandName: 'Demo-Händler',
+          contactText: 'Demo-Händler GmbH\nMusterstraße 1\n12345 Musterstadt\nTel. 0000 000000',
+        },
+      ],
     ]);
   });
 
