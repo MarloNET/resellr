@@ -32,8 +32,13 @@ import {
 } from '../test/fake-programs.ts';
 import { TEST_PROGRAM_DIR_ENV } from './cli.ts';
 import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
+import { FREE_PIPE_TIMEOUT_MS, TEST_STOP_FAILS_ENV } from './stop-command.ts';
 import { TEST_SERVER_ENTRY_ENV, TEST_START_TIMEOUTS_ENV } from './supervisor/server-process.ts';
-import { subscribeToSupervisor, supervisorPipePath } from './supervisor/supervisor-pipe.ts';
+import {
+  listenSupervisorPipe,
+  subscribeToSupervisor,
+  supervisorPipePath,
+} from './supervisor/supervisor-pipe.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
 /** Preload that sends the launcher's connections to 4310 to the test server (#329). */
@@ -601,6 +606,43 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
     await expect(supervisor.exit).resolves.toBe(0);
     expect(fakes.chromeCalls()).toEqual([]);
     expect(existsSync(stateFile())).toBe(false);
+  });
+
+  it('stop --for-update waits at most 30 s for the free pipe and then ends with exit code 1', async () => {
+    // A supervisor that reports stopped but keeps holding the pipe, like a start that takes long.
+    const pipe = await listenSupervisorPipe(supervisorPipePath(root));
+    expect(pipe).not.toBeNull();
+    pipe!.onRequest((request, reply) => {
+      if (request.cmd === 'stop') reply({ event: 'phase', phase: 'stopped' });
+    });
+    writeConfig(JSON.stringify({ port: await freePort() }));
+    const started = Date.now();
+
+    try {
+      await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(1);
+
+      const elapsedMs = Date.now() - started;
+      expect(elapsedMs).toBeGreaterThanOrEqual(FREE_PIPE_TIMEOUT_MS);
+      expect(elapsedMs).toBeLessThan(FREE_PIPE_TIMEOUT_MS + 10_000);
+    } finally {
+      await pipe!.close();
+    }
+  }, 60_000);
+
+  it('DER-105-03 stop --for-update ends with exit code 1 and leaves resellr running when the test hook lets stopping fail', async () => {
+    const supervisor = await startSupervisor();
+
+    await expect(
+      runLauncher(['stop', '--for-update'], { [TEST_STOP_FAILS_ENV]: '1' }),
+    ).resolves.toBe(1);
+
+    // The supervisor still holds the pipe and the server still runs: nothing was stopped.
+    expect(await subscribeToSupervisor(supervisorPipePath(root))).toMatchObject({ phase: 'ready' });
+    expect(lines('shutdowns.jsonl')).toEqual([]);
+    expect(fakes.chromeCalls()).toEqual([]);
+
+    await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
+    await expect(supervisor.exit).resolves.toBe(0);
   });
 
   it('DER-104-03 shows not_running without a data folder when neither a server nor a supervisor runs', async () => {

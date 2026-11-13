@@ -8,6 +8,8 @@ import type { SubscribeResult } from './supervisor/supervisor-pipe.ts';
 export interface StopCommandDeps {
   /** `stop --for-update`: no page; waits for the free pipe afterwards (2.18). */
   forUpdate: boolean;
+  /** Test hook `RESELLR_TEST_STOP_FAILS`: stopping fails without stopping anything. */
+  failForTest: boolean;
   /** Data folder of the launcher's runtime paths (CU-005), shown by `LP-03.success`. */
   dataDir: string;
   /** Sends `stop` over the pipe and waits for the result; null if no supervisor listens. */
@@ -24,6 +26,12 @@ export interface StopCommandDeps {
   /** Hands the result to the open LP-03 through `launcher-state.js` (CU-268). */
   launcherState: Pick<LauncherStateWriter, 'prepare' | 'stopped' | 'error' | 'notRunning'>;
 }
+
+/**
+ * Test hook: with the value `1`, stopping fails (exit code 1) and resellr keeps running, so the
+ * Windows CI can check that the update and the uninstallation then change nothing (#131).
+ */
+export const TEST_STOP_FAILS_ENV = 'RESELLR_TEST_STOP_FAILS';
 
 /** Longest wait of `stop --for-update` for the free pipe of the supervisor (2.18, FIND-217). */
 export const FREE_PIPE_TIMEOUT_MS = 30_000;
@@ -52,7 +60,9 @@ export async function runStopCommand(deps: StopCommandDeps): Promise<LauncherExi
   const request = deps.forUpdate ? null : deps.newRequestId();
   if (request !== null) await openResultPage(deps, request);
 
-  const outcome = await stop(deps);
+  const outcome: StopOutcome = deps.failForTest
+    ? { state: 'error', refNo: null }
+    : await stop(deps);
 
   if (request !== null) showOutcome(deps, request, outcome);
   if (outcome.state === 'error') return LauncherExitCode.Failed;
