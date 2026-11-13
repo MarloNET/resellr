@@ -1348,3 +1348,436 @@ describe('merchant profile API (CU-087, Technical Specification 2.2)', () => {
     );
   });
 });
+
+describe('condition code API (CU-087, Technical Specification 2.2)', () => {
+  const BASE = '/api/condition-codes';
+
+  const listCodes = () => get(BASE);
+  const createCode = (body: Record<string, unknown>) => write('POST', BASE, body);
+  const patchCode = (id: number, body: Record<string, unknown>) =>
+    write('PATCH', `${BASE}/${id}`, body);
+  // `DELETE` needs `content-type: application/json` as every write (G-4), so the body is `{}`.
+  const deleteCode = (id: number, version: number | string) =>
+    write('DELETE', `${BASE}/${id}?version=${version}`, {});
+  const resolve = (query: string) => get(`${BASE}/resolve?${query}`);
+
+  const auditRows = () =>
+    t.database.sqlite
+      .prepare(
+        "SELECT action, object_category, object_id, object_label, old_value, new_value FROM audit_entry WHERE object_type = 'condition_code' ORDER BY id",
+      )
+      .all();
+
+  const countCodes = () =>
+    t.database.sqlite.prepare('SELECT COUNT(*) FROM condition_code').pluck().get();
+
+  const createSupplier = async (name: string) =>
+    (await write('POST', '/api/suppliers', { name, active: true })).json() as { id: number };
+
+  const createCondition = async (label: string) =>
+    (await createValue(CONDITION, { label, active: true })).json() as { id: number };
+
+  const DGS = { code: 'DGS', plainText: 'Gebrauchsspuren am Gehäuse' };
+
+  it('AC-REQ-022-01 after creating "DGS" with plain text, resolve returns this plain text', async () => {
+    const created = await createCode(DGS);
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toEqual({
+      id: expect.any(Number),
+      code: 'DGS',
+      supplierId: null,
+      plainText: 'Gebrauchsspuren am Gehäuse',
+      suggestedConditionValueId: null,
+      suggestedVisualGrade: null,
+      version: 1,
+    });
+    const response = await resolve('code=DGS');
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      found: true,
+      plainText: 'Gebrauchsspuren am Gehäuse',
+      suggestedConditionValueId: null,
+      suggestedVisualGrade: null,
+    });
+    expect((await listCodes()).json()).toEqual({ items: [created.json()], total: 1 });
+  });
+
+  it('AC-REQ-022-02 a second entry "dgs" without supplier is rejected with "Diesen Code gibt es für diesen Lieferanten bereits"', async () => {
+    await createCode(DGS);
+
+    const response = await createCode({ code: 'dgs', plainText: 'anderer Text' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual(
+      errorOf('name_taken', 'Diesen Code gibt es für diesen Lieferanten bereits'),
+    );
+    expect(countCodes()).toBe(1);
+  });
+
+  it('AC-REQ-022-02 the same code is allowed once per supplier and once without supplier', async () => {
+    const l1 = await createSupplier('L1');
+    const l2 = await createSupplier('L2');
+    await createCode(DGS);
+
+    expect((await createCode({ ...DGS, supplierId: l1.id })).statusCode).toBe(201);
+    expect((await createCode({ ...DGS, code: 'dgs', supplierId: l2.id })).statusCode).toBe(201);
+    const twice = await createCode({ ...DGS, code: ' Dgs ', supplierId: l1.id });
+    expect(twice.statusCode).toBe(422);
+    expect(twice.json().error.code).toBe('name_taken');
+    expect(countCodes()).toBe(3);
+  });
+
+  it('AC-REQ-022-02 a change to the code and supplier of another entry is rejected as well', async () => {
+    await createCode(DGS);
+    const other = (await createCode({ code: 'B1', plainText: 'Kratzer' })).json();
+
+    const response = await patchCode(other.id, { version: 1, code: 'dgs' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('name_taken');
+  });
+
+  it('AC-REQ-022-04 an entry without plain text is rejected with validation_failed "Klartext: 1 bis 500 Zeichen"', async () => {
+    const response = await createCode({ code: 'DGS', plainText: '' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual(
+      errorOf('validation_failed', '', [
+        { path: 'plainText', code: expect.any(String), message: 'Klartext: 1 bis 500 Zeichen' },
+      ]),
+    );
+    expect(countCodes()).toBe(0);
+  });
+
+  it.each([
+    ['a code of 21 characters', { code: 'x'.repeat(21) }, 'code', 'Zustandscode: 1 bis 20 Zeichen'],
+    ['an empty code', { code: '  ' }, 'code', 'Zustandscode: 1 bis 20 Zeichen'],
+    ['an empty plain text', { plainText: '   ' }, 'plainText', 'Klartext: 1 bis 500 Zeichen'],
+    [
+      'a plain text of 501 characters',
+      { plainText: 'x'.repeat(501) },
+      'plainText',
+      'Klartext: 1 bis 500 Zeichen',
+    ],
+    [
+      'a visual grade of 0',
+      { suggestedVisualGrade: 0 },
+      'suggestedVisualGrade',
+      'Optik-Note: ganze Zahl von 1 bis 5',
+    ],
+    [
+      'a visual grade of 6',
+      { suggestedVisualGrade: 6 },
+      'suggestedVisualGrade',
+      'Optik-Note: ganze Zahl von 1 bis 5',
+    ],
+    [
+      'a visual grade of 2.5',
+      { suggestedVisualGrade: 2.5 },
+      'suggestedVisualGrade',
+      'Optik-Note: ganze Zahl von 1 bis 5',
+    ],
+  ])(
+    'DER-38-05 rejects %s with validation_failed and the text of UI-033 at the field',
+    async (_case, change, path, message) => {
+      const response = await createCode({ ...DGS, ...change });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'validation_failed',
+        fields: [{ path, message }],
+      });
+      expect(countCodes()).toBe(0);
+    },
+  );
+
+  it('DER-38-05 accepts a code of 20 characters, a plain text of 500 characters and grades 1 and 5', async () => {
+    expect(
+      (await createCode({ code: 'x'.repeat(20), plainText: 'y'.repeat(500) })).statusCode,
+    ).toBe(201);
+    expect((await createCode({ ...DGS, suggestedVisualGrade: 1 })).statusCode).toBe(201);
+    expect((await createCode({ ...DGS, code: 'A5', suggestedVisualGrade: 5 })).statusCode).toBe(
+      201,
+    );
+  });
+
+  it('trims code and plain text', async () => {
+    const response = await createCode({ code: ' DGS ', plainText: '  Kratzer ' });
+
+    expect(response.json()).toMatchObject({ code: 'DGS', plainText: 'Kratzer' });
+  });
+
+  it('DER-38-10 resolve prefers the entry of the supplier to the one without supplier, without regard to case', async () => {
+    const l1 = await createSupplier('L1');
+    const l2 = await createSupplier('L2');
+    const good = await createCondition('Gebraucht');
+    await createCode({ ...DGS, plainText: 'Text für alle' });
+    await createCode({
+      code: 'DGS',
+      supplierId: l1.id,
+      plainText: 'Text von L1',
+      suggestedConditionValueId: good.id,
+      suggestedVisualGrade: 2,
+    });
+
+    expect((await resolve(`code=dgs&supplierId=${l1.id}`)).json()).toEqual({
+      found: true,
+      plainText: 'Text von L1',
+      suggestedConditionValueId: good.id,
+      suggestedVisualGrade: 2,
+    });
+    expect((await resolve('code=dgs')).json()).toMatchObject({ plainText: 'Text für alle' });
+    expect((await resolve('code=DGS&supplierId=')).json()).toMatchObject({
+      plainText: 'Text für alle',
+    });
+    expect((await resolve(`code=Dgs&supplierId=${l2.id}`)).json()).toMatchObject({
+      plainText: 'Text für alle',
+    });
+  });
+
+  it('DER-38-10 resolve finds the entry of the supplier without an entry for all suppliers, but not for another supplier', async () => {
+    const l1 = await createSupplier('L1');
+    const l2 = await createSupplier('L2');
+    await createCode({ ...DGS, supplierId: l1.id });
+
+    expect((await resolve(`code=DGS&supplierId=${l1.id}`)).json().found).toBe(true);
+    expect((await resolve(`code=DGS&supplierId=${l2.id}`)).json().found).toBe(false);
+    expect((await resolve('code=DGS')).json().found).toBe(false);
+  });
+
+  it('resolve answers found: false for an unknown or empty code', async () => {
+    await createCode(DGS);
+
+    const unknown = {
+      found: false,
+      plainText: null,
+      suggestedConditionValueId: null,
+      suggestedVisualGrade: null,
+    };
+    expect((await resolve('code=XYZ')).json()).toEqual(unknown);
+    expect((await resolve('code=')).json()).toEqual(unknown);
+  });
+
+  it('resolve rejects a supplierId that is not an id as bad_request', async () => {
+    expect((await resolve('code=DGS&supplierId=abc')).statusCode).toBe(400);
+    expect((await resolve('supplierId=1')).statusCode).toBe(400);
+  });
+
+  it('stores supplier and suggestions and lists the entries by code, the entry without supplier first', async () => {
+    const l1 = await createSupplier('L1');
+    const good = await createCondition('Gebraucht');
+    const withSupplier = (
+      await createCode({
+        code: 'dgs',
+        supplierId: l1.id,
+        plainText: 'Text von L1',
+        suggestedConditionValueId: good.id,
+        suggestedVisualGrade: 3,
+      })
+    ).json();
+    const a1 = (await createCode({ code: 'A1', plainText: 'neuwertig' })).json();
+    const all = (await createCode(DGS)).json();
+
+    expect(withSupplier).toMatchObject({
+      supplierId: l1.id,
+      suggestedConditionValueId: good.id,
+      suggestedVisualGrade: 3,
+    });
+    expect((await listCodes()).json().items.map((item: { id: number }) => item.id)).toEqual([
+      a1.id,
+      all.id,
+      withSupplier.id,
+    ]);
+  });
+
+  it('answers 404 not_found for an unknown supplier or a suggestion that is not a value of the list Zustand', async () => {
+    const keyboard = (await createValue(KEYBOARD, { label: 'DE', active: true })).json();
+
+    const unknownSupplier = await createCode({ ...DGS, supplierId: 99 });
+    const otherList = await createCode({ ...DGS, suggestedConditionValueId: keyboard.id });
+
+    for (const response of [unknownSupplier, otherList]) {
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual(
+        errorOf('not_found', 'Dieser Eintrag ist nicht mehr vorhanden.'),
+      );
+    }
+    expect(countCodes()).toBe(0);
+  });
+
+  it('changes an entry, keeps the omitted fields and removes a suggestion with null', async () => {
+    const l1 = await createSupplier('L1');
+    const good = await createCondition('Gebraucht');
+    const entry = (
+      await createCode({ ...DGS, suggestedConditionValueId: good.id, suggestedVisualGrade: 2 })
+    ).json();
+
+    const response = await patchCode(entry.id, {
+      version: 1,
+      plainText: 'Neuer Text',
+      supplierId: l1.id,
+      suggestedVisualGrade: null,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ...entry,
+      plainText: 'Neuer Text',
+      supplierId: l1.id,
+      suggestedVisualGrade: null,
+      version: 2,
+    });
+  });
+
+  it('DER-38-05 rejects an empty plain text on change with validation_failed', async () => {
+    const entry = (await createCode(DGS)).json();
+
+    const response = await patchCode(entry.id, { version: 1, plainText: '' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
+      { path: 'plainText', code: expect.any(String), message: 'Klartext: 1 bis 500 Zeichen' },
+    ]);
+  });
+
+  it('a change without a difference keeps the version and writes no audit entry', async () => {
+    const entry = (await createCode(DGS)).json();
+
+    const response = await patchCode(entry.id, {
+      version: 1,
+      code: 'DGS',
+      plainText: DGS.plainText,
+    });
+
+    expect(response.json()).toEqual(entry);
+    expect(auditRows()).toHaveLength(1);
+  });
+
+  it('DER-38-08 DELETE with the version read deletes the entry with 204', async () => {
+    const entry = (await createCode(DGS)).json();
+
+    const response = await deleteCode(entry.id, 1);
+
+    expect(response.statusCode).toBe(204);
+    expect(response.body).toBe('');
+    expect((await listCodes()).json()).toEqual({ items: [], total: 0 });
+    expect((await resolve('code=DGS')).json().found).toBe(false);
+  });
+
+  it('DER-38-06 (a) rejects a change or a deletion with an outdated version with 409 version_conflict and changes nothing', async () => {
+    const entry = (await createCode(DGS)).json();
+    await patchCode(entry.id, { version: 1, plainText: 'Neu' });
+
+    const changed = await patchCode(entry.id, { version: 1, plainText: 'Alt' });
+    const deleted = await deleteCode(entry.id, 1);
+
+    for (const response of [changed, deleted]) {
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error.code).toBe('version_conflict');
+    }
+    expect((await listCodes()).json().items).toEqual([{ ...entry, plainText: 'Neu', version: 2 }]);
+  });
+
+  it('answers 404 not_found with M-15 for an unknown entry', async () => {
+    for (const response of [
+      await patchCode(99, { version: 1, plainText: 'x' }),
+      await deleteCode(99, 1),
+    ]) {
+      expect(response.statusCode).toBe(404);
+      expect(response.json().error).toMatchObject({
+        code: 'not_found',
+        message: 'Dieser Eintrag ist nicht mehr vorhanden.',
+      });
+    }
+  });
+
+  it('rejects a DELETE without a version as bad_request', async () => {
+    const entry = (await createCode(DGS)).json();
+
+    expect((await deleteCode(entry.id, '')).statusCode).toBe(400);
+    expect(countCodes()).toBe(1);
+  });
+
+  it('writes one audit entry per change with readable values: created, updated, deleted (2.0.9, 3.6)', async () => {
+    const l1 = await createSupplier('L1');
+    const good = await createCondition('Gebraucht');
+    const entry = (await createCode({ ...DGS, suggestedVisualGrade: 2 })).json();
+    await patchCode(entry.id, {
+      version: 1,
+      supplierId: l1.id,
+      suggestedConditionValueId: good.id,
+    });
+    await deleteCode(entry.id, 2);
+
+    expect(auditRows()).toEqual([
+      {
+        action: 'created',
+        object_category: 'settings',
+        object_id: entry.id,
+        object_label: 'Code-Übersetzung DGS',
+        old_value: null,
+        new_value: JSON.stringify({
+          Zustandscode: 'DGS',
+          Lieferant: 'alle',
+          Klartext: 'Gebrauchsspuren am Gehäuse',
+          'Vorschlag Zustand': null,
+          'Vorschlag Optik-Note': 2,
+        }),
+      },
+      {
+        action: 'updated',
+        object_category: 'settings',
+        object_id: entry.id,
+        object_label: 'Code-Übersetzung DGS (L1)',
+        old_value: JSON.stringify({ Lieferant: 'alle', 'Vorschlag Zustand': null }),
+        new_value: JSON.stringify({ Lieferant: 'L1', 'Vorschlag Zustand': 'Gebraucht' }),
+      },
+      {
+        action: 'deleted',
+        object_category: 'other',
+        object_id: entry.id,
+        object_label: 'Code-Übersetzung DGS (L1)',
+        old_value: JSON.stringify({
+          Zustandscode: 'DGS',
+          Lieferant: 'L1',
+          Klartext: 'Gebrauchsspuren am Gehäuse',
+          'Vorschlag Zustand': 'Gebraucht',
+          'Vorschlag Optik-Note': 2,
+        }),
+        new_value: null,
+      },
+    ]);
+  });
+
+  it('DER-38-04 a technical error answers 500 internal_error with the reference number of the error log and stores nothing', async () => {
+    t.database.sqlite.exec(
+      "CREATE TRIGGER fail_condition_code BEFORE INSERT ON condition_code BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+    );
+
+    const response = await createCode(DGS);
+
+    expect(response.statusCode).toBe(500);
+    const { error } = response.json();
+    expect(error.code).toBe('internal_error');
+    expect(error.referenceNumber).toMatch(/^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(t.readErrorLog()).toEqual([expect.objectContaining({ refNo: error.referenceNumber })]);
+    expect(countCodes()).toBe(0);
+    expect(auditRows()).toEqual([]);
+  });
+
+  it('DER-38-06 (c) rejects a write while shutting down with 503 shutting_down and stores nothing', async () => {
+    const entry = (await createCode(DGS)).json();
+    t.lifecycle.set('stopping');
+
+    for (const response of [
+      await createCode({ ...DGS, code: 'A1' }),
+      await patchCode(entry.id, { version: 1, plainText: 'Neu' }),
+      await deleteCode(entry.id, 1),
+    ]) {
+      expect(response.statusCode).toBe(503);
+      expect(response.json().error).toMatchObject({ code: 'shutting_down', referenceNumber: null });
+    }
+    expect((await listCodes()).json().items).toEqual([entry]);
+  });
+});

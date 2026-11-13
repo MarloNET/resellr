@@ -172,6 +172,18 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.pickListValueLabel).toBe('Wert: 1 bis 100 Zeichen');
   });
 
+  it('has the text of name_taken for condition codes (2.0.6, UI-033)', () => {
+    expect(ERROR_MESSAGES['name_taken.condition_code']).toBe(
+      'Diesen Code gibt es für diesen Lieferanten bereits',
+    );
+  });
+
+  it('has the field texts of the condition codes (UI-033, design v0.6.2 O-2)', () => {
+    expect(FIELD_MESSAGES.conditionCode).toBe('Zustandscode: 1 bis 20 Zeichen');
+    expect(FIELD_MESSAGES.conditionCodePlainText).toBe('Klartext: 1 bis 500 Zeichen');
+    expect(FIELD_MESSAGES.visualGrade).toBe('Optik-Note: ganze Zahl von 1 bis 5');
+  });
+
   it('derives the usages of a code from the catalog keys', () => {
     expectTypeOf<ErrorMessageUsage<'not_found'>>().toEqualTypeOf<'default'>();
     // No text in S1, so no usage can be set (MAR-239, F-1).

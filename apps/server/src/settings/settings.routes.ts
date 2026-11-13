@@ -5,7 +5,14 @@ import {
   attributeSchema,
   attributeUpdateSchema,
 } from '@resellr/domain/schemas/attribute.schema';
-import { idSchema } from '@resellr/domain/schemas/common.schema';
+import { idSchema, versionSchema } from '@resellr/domain/schemas/common.schema';
+import {
+  conditionCodeCreateSchema,
+  conditionCodeEntrySchema,
+  conditionCodeListSchema,
+  conditionCodeResolutionSchema,
+  conditionCodeUpdateSchema,
+} from '@resellr/domain/schemas/condition-code.schema';
 import {
   deviceTypeCreateSchema,
   deviceTypeListSchema,
@@ -45,6 +52,7 @@ import { z } from 'zod';
 import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
+import { createConditionCodeService } from './condition-code-service.ts';
 import { createDeviceTypeService } from './device-type-service.ts';
 import { createManufacturerService } from './manufacturer-service.ts';
 import { createMerchantProfileService } from './merchant-profile-service.ts';
@@ -73,14 +81,30 @@ const includeInactiveQuery = pageQuery.extend({
     .transform((value) => value === 'true'),
 });
 
+/** `DELETE …?version=`: the version last read (2.0.3). */
+const versionQuery = z.strictObject({ version: z.coerce.number().pipe(versionSchema) });
+
+/**
+ * `GET /api/condition-codes/resolve?code=&supplierId=`: without `supplierId` (or empty) only the
+ * entry without supplier applies (2.2 "Auflösen eines Codes").
+ */
+const resolveQuery = z.strictObject({
+  code: z.string(),
+  supplierId: z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined || value === '' ? null : Number(value)))
+    .pipe(idSchema.nullable()),
+});
+
 /**
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
  * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, `/api/merchant-profile`, … Each
  * route calls one service.
  * There is no DELETE route for device types or attributes (REQ-004, REQ-005, DER-33-09),
  * manufacturers (2.2) or suppliers (2.2, DER-36-08). There is no route to create or delete a
- * pick list and none to delete a value (RQ-07,
- * DER-35-09).
+ * pick list and none to delete a value (RQ-07, DER-35-09). Entries of the condition code table
+ * can be deleted (2.2, REQ-022).
  */
 export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = async (
   app,
@@ -91,6 +115,7 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
   const manufacturers = createManufacturerService({ db, uow, clock });
   const suppliers = createSupplierService({ db, uow, clock });
   const merchantProfile = createMerchantProfileService({ db, uow, clock });
+  const conditionCodes = createConditionCodeService({ db, uow, clock });
 
   app.get(
     '/api/device-types',
@@ -278,5 +303,44 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
     '/api/merchant-profile',
     { schema: { body: merchantProfileUpdateSchema, response: { 200: merchantProfileSchema } } },
     async (request) => merchantProfile.update(request.body),
+  );
+
+  app.get(
+    '/api/condition-codes',
+    { schema: { querystring: pageQuery, response: { 200: conditionCodeListSchema } } },
+    async (request) => conditionCodes.list(request.query),
+  );
+
+  app.get(
+    '/api/condition-codes/resolve',
+    { schema: { querystring: resolveQuery, response: { 200: conditionCodeResolutionSchema } } },
+    async (request) => conditionCodes.resolve(request.query.code, request.query.supplierId),
+  );
+
+  app.post(
+    '/api/condition-codes',
+    { schema: { body: conditionCodeCreateSchema, response: { 201: conditionCodeEntrySchema } } },
+    async (request, reply) => reply.code(201).send(await conditionCodes.create(request.body)),
+  );
+
+  app.patch(
+    '/api/condition-codes/:id',
+    {
+      schema: {
+        params: idParams,
+        body: conditionCodeUpdateSchema,
+        response: { 200: conditionCodeEntrySchema },
+      },
+    },
+    async (request) => conditionCodes.update(request.params.id, request.body),
+  );
+
+  app.delete(
+    '/api/condition-codes/:id',
+    { schema: { params: idParams, querystring: versionQuery } },
+    async (request, reply) => {
+      await conditionCodes.delete(request.params.id, request.query.version);
+      return reply.code(204).send();
+    },
   );
 };
