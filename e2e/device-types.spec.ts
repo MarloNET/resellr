@@ -276,6 +276,42 @@ async function createAttribute(
   return (await response.json()) as { id: number; version: number };
 }
 
+/**
+ * A model template "MacBook Air" with the given default device values. There is no API for model
+ * templates before S3, so the test writes it into the database of the running server (WAL mode
+ * allows the second connection). `manufacturer` must be unique per test.
+ */
+function insertModelTemplate(
+  dataDir: string,
+  deviceTypeId: number,
+  manufacturer: string,
+  defaultDeviceValues: Record<string, unknown>,
+) {
+  const sqlite = new Database(join(dataDir, DATABASE_FILE));
+  try {
+    const now = new Date().toISOString();
+    const inserted = sqlite
+      .prepare(
+        `INSERT INTO manufacturer (name, name_key, active, gpsr_complete, version, created_at, updated_at)
+         VALUES (?, ?, 1, 0, 1, ?, ?)`,
+      )
+      .run(manufacturer, manufacturer.toLowerCase(), now, now);
+    return Number(
+      sqlite
+        .prepare(
+          `INSERT INTO model_template (device_type_id, manufacturer_id, model_name, model_name_key,
+             mpn_unknown, model_values, default_device_values, search_key, import_review_pending,
+             import_review_keys, version, created_at, updated_at)
+           VALUES (?, ?, 'MacBook Air', 'macbookair', 1, '{}', ?, 'macbook air', 0, '[]', 1, ?, ?)`,
+        )
+        .run(deviceTypeId, inserted.lastInsertRowid, JSON.stringify(defaultDeviceValues), now, now)
+        .lastInsertRowid,
+    );
+  } finally {
+    sqlite.close();
+  }
+}
+
 async function attributeList(page: Page, baseUrl: string, deviceTypeId: number) {
   const response = await page.request.get(`${baseUrl}/api/device-types/${deviceTypeId}/attributes`);
   return (
@@ -360,37 +396,9 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
       unit: 'GB',
       variantForming: true,
     });
-    // A stored value of RAM: there is no API for model templates before S3, so the test writes
-    // one into the database of the running server (WAL mode allows the second connection).
-    const sqlite = new Database(join(server.paths.dataDir, DATABASE_FILE));
-    let modelTemplateId: number;
-    try {
-      const now = new Date().toISOString();
-      const manufacturer = sqlite
-        .prepare(
-          `INSERT INTO manufacturer (name, name_key, active, gpsr_complete, version, created_at, updated_at)
-           VALUES (?, ?, 1, 0, 1, ?, ?)`,
-        )
-        .run(name, name.toLowerCase(), now, now);
-      modelTemplateId = Number(
-        sqlite
-          .prepare(
-            `INSERT INTO model_template (device_type_id, manufacturer_id, model_name, model_name_key,
-               mpn_unknown, model_values, default_device_values, search_key, import_review_pending,
-               import_review_keys, version, created_at, updated_at)
-             VALUES (?, ?, 'MacBook Air', 'macbookair', 1, '{}', ?, 'macbook air', 0, '[]', 1, ?, ?)`,
-          )
-          .run(
-            deviceType.id,
-            manufacturer.lastInsertRowid,
-            JSON.stringify({ [ram.id]: 16 }),
-            now,
-            now,
-          ).lastInsertRowid,
-      );
-    } finally {
-      sqlite.close();
-    }
+    const modelTemplateId = insertModelTemplate(server.paths.dataDir, deviceType.id, name, {
+      [ram.id]: 16,
+    });
     await openDeviceType(page, name);
 
     const response = page.waitForResponse(
@@ -416,5 +424,44 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
     } finally {
       check.close();
     }
+  });
+  test('UI-027.disabled DER-34-10 with stored values data type and level are locked with the reason inline, and the server rejects a change', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      variantForming: true,
+    });
+    insertModelTemplate(server.paths.dataDir, deviceType.id, name, { [ram.id]: 16 });
+    await openDeviceType(page, name);
+
+    await attributes(page).getByRole('button', { name: 'RAM', exact: true }).click();
+    const form = page.getByRole('form', { name: 'Merkmal bearbeiten' });
+    const dataType = form.getByRole('combobox', { name: /^Datentyp/ });
+    const level = form.getByRole('combobox', { name: /^Ebene/ });
+    await expect(dataType).toBeDisabled();
+    await expect(level).toBeDisabled();
+    await expect(dataType).toHaveAccessibleDescription(
+      'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+    await expect(level).toHaveAccessibleDescription(
+      'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+    await expect(form.getByRole('textbox', { name: /^Einheit/ })).toBeEnabled();
+
+    // AC-REQ-005-08 against the running server: level device to model is rejected.
+    const rejected = await page.request.patch(`${server.baseUrl}/api/attributes/${ram.id}`, {
+      headers: { origin: server.baseUrl },
+      data: { version: ram.version, level: 'model', variantForming: false },
+    });
+    expect(rejected.status()).toBe(422);
+    expect(((await rejected.json()) as { error: { code: string } }).error.code).toBe(
+      'attribute_has_values',
+    );
   });
 });

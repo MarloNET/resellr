@@ -245,8 +245,11 @@ export function DeviceTypesPage() {
     }
   }
 
-  /** Field errors of an attribute stand at their field in the panel (`UI-027.validation`). */
-  function onAttributeFailed(error: ApiError) {
+  /**
+   * Field errors of an attribute stand at their field in the panel (`UI-027.validation`);
+   * `attribute_has_values` at the locked field the save changed (`lockedField`).
+   */
+  function onAttributeFailed(error: ApiError, lockedField: 'dataType' | 'level' = 'level') {
     if (error.kind === 'validation') {
       const fieldMessage = (path: keyof AttributeFieldErrors) =>
         error.error?.fields.find((entry) => entry.path === path)?.message;
@@ -266,6 +269,12 @@ export function DeviceTypesPage() {
       setAttributeErrorFocus((count) => count + 1);
       return;
     }
+    // Values were stored after the list was read (2.1): the panel still offered the field.
+    if (error.kind === 'rejected' && error.error?.code === 'attribute_has_values') {
+      setAttributeErrors({ [lockedField]: error.error.message });
+      setAttributeErrorFocus((count) => count + 1);
+      return;
+    }
     onWriteFailed(error);
   }
 
@@ -278,7 +287,10 @@ export function DeviceTypesPage() {
   function saveAttribute(attributeDraft: AttributeDraft) {
     if (selectedId === null || editing === null) return;
     setNotice(null);
-    const callbacks = { onSuccess: onAttributeSaved, onError: onAttributeFailed };
+    const callbacks = {
+      onSuccess: onAttributeSaved,
+      onError: (error: ApiError) => onAttributeFailed(error),
+    };
     if (editing.id === null) {
       createAttributeMutation.mutate(
         { deviceTypeId: selectedId, ...requestOf(attributeDraft, null), active: true },
@@ -287,9 +299,11 @@ export function DeviceTypesPage() {
     } else if (editing.version !== null) {
       const attribute = attributes.find((item) => item.id === editing.id);
       const request = requestOf(attributeDraft, attribute?.systemRole ?? null);
+      // The server checks the data type before the level (2.1).
+      const lockedField = attributeDraft.dataType !== attribute?.dataType ? 'dataType' : 'level';
       updateAttributeMutation.mutate(
         { id: editing.id, version: editing.version, ...request },
-        callbacks,
+        { ...callbacks, onError: (error) => onAttributeFailed(error, lockedField) },
       );
     }
   }

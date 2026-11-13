@@ -7,6 +7,7 @@ import {
 } from '../features/settings/SettingsLayout.tsx';
 import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
 import { ManufacturersPage } from '../features/settings/manufacturers/ManufacturersPage.tsx';
+import { MerchantProfilePage } from '../features/settings/merchant/MerchantProfilePage.tsx';
 import { SuppliersPage } from '../features/settings/suppliers/SuppliersPage.tsx';
 import { PickListsPage } from '../features/settings/pick-lists/PickListsPage.tsx';
 import { TerminatedPage } from '../features/shutdown/TerminatedPage.tsx';
@@ -52,7 +53,7 @@ export const routes: RouteObject[] = [
         element: <SettingsLayout />,
         children: [
           { index: true, element: <LastSettingsSectionRedirect /> },
-          { path: 'haendlermarke', element: null },
+          { path: 'haendlermarke', element: <MerchantProfilePage /> },
           { path: 'geraetearten', element: <DeviceTypesPage /> },
           { path: 'auswahllisten', element: <PickListsPage /> },
           { path: 'titelmuster', element: null },

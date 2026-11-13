@@ -4,6 +4,7 @@
  * (hotspot rule, Technical Specification 4.5).
  */
 export const ERROR_CODES = {
+  attribute_has_values: 422,
   bad_request: 400,
   confirmation_required: 422,
   file_too_large: 413,

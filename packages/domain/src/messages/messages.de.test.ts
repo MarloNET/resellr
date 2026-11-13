@@ -139,12 +139,26 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.attributeValuePortType('Anschlüsse')).toBe('Anschlüsse: Typ fehlt');
   });
 
+  it('has the texts of attribute_has_values for data type and level (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['attribute_has_values.data_type']).toBe(
+      'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+    expect(ERROR_MESSAGES['attribute_has_values.level']).toBe(
+      'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+  });
+
   it('has the text of name_taken for suppliers (2.0.6, UI-032)', () => {
     expect(ERROR_MESSAGES['name_taken.supplier']).toBe('Name ist bereits vergeben');
   });
 
   it('has the field text of the supplier name (UI-032)', () => {
     expect(FIELD_MESSAGES.supplierName).toBe('Name: 1 bis 100 Zeichen');
+  });
+
+  it('has the field texts of the merchant profile (UI-026)', () => {
+    expect(FIELD_MESSAGES.brandName).toBe('Name: 1 bis 100 Zeichen');
+    expect(FIELD_MESSAGES.contactText).toBe('Kontaktangaben: höchstens 500 Zeichen');
   });
 
   it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {
