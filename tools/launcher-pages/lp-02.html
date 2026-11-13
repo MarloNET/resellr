@@ -9,7 +9,8 @@
     <script src="./launcher-pages.js" defer></script>
   </head>
   <body data-page="lp-02">
-    <main class="card">
+    <!-- State `default`: the start was aborted or given up. -->
+    <main class="card" id="lp-02-default">
       <h1 class="card__title card__title--error">resellr konnte nicht gestartet werden</h1>
       <p>
         Der Start von resellr wurde abgebrochen. Bitte versuchen Sie es erneut: Öffnen Sie im
@@ -17,7 +18,34 @@
         Betreiber und nennen Sie ihm diese Referenznummer:
       </p>
       <!-- Filled from the URL parameter `ref` only if it matches the pattern (2.0.5, H-11). -->
-      <p class="reference-number" id="reference-number" hidden></p>
+      <p class="reference-number" hidden></p>
+    </main>
+    <!--
+      State `zeitueberschreitung` (K-07): no result after 120 s; the start may still succeed. Shown
+      instead of `default` when the address carries the `request` of a waiting `open` call.
+    -->
+    <main class="card" id="lp-02-zeitueberschreitung" hidden>
+      <h1 class="card__title card__title--warn">resellr startet länger als erwartet</h1>
+      <p>
+        Der Start von resellr dauert länger als erwartet. Er kann noch gelingen. Lassen Sie dieses
+        Fenster geöffnet und warten Sie einen Moment: resellr öffnet sich von selbst, sobald es
+        bereit ist.
+      </p>
+      <p>
+        Öffnet sich resellr nicht, laden Sie diese Seite neu (Browser-Aktualisierung, z. B. F5).
+        Hilft das nicht, starten Sie resellr über die Verknüpfung „resellr“ im Startmenü.
+      </p>
+      <p>
+        Besteht das Problem weiter, informieren Sie den Betreiber und nennen Sie ihm diese
+        Referenznummer. Sie steht im Betriebsprotokoll von resellr:
+      </p>
+      <p class="reference-number" hidden></p>
+      <div class="progress">
+        <p id="lp-02-progress-label">resellr wird gestartet …</p>
+        <div class="progress-bar" role="progressbar" aria-labelledby="lp-02-progress-label">
+          <div class="progress-bar__indicator"></div>
+        </div>
+      </div>
     </main>
   </body>
 </html>

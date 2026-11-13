@@ -12,11 +12,13 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import {
   LAUNCHER_STATE_FILE_NAME,
   readLauncherState,
+  readStartResult,
 } from '@resellr/runtime-shared/runtime-state-files';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -30,7 +32,7 @@ import {
 } from '../test/fake-programs.ts';
 import { TEST_PROGRAM_DIR_ENV } from './cli.ts';
 import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
-import { TEST_SERVER_ENTRY_ENV } from './supervisor/server-process.ts';
+import { TEST_SERVER_ENTRY_ENV, TEST_START_TIMEOUTS_ENV } from './supervisor/server-process.ts';
 
 const CLI = fileURLToPath(new URL('./cli.ts', import.meta.url));
 /** Preload that sends the launcher's connections to 4310 to the test server (#329). */
@@ -124,15 +126,17 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
 
   const writeConfig = (text: string) => writeFileSync(join(dataDir, 'config.json'), text);
 
-  /** All entries of the operations log, oldest first. */
-  const operationsLog = (): Record<string, unknown>[] =>
+  /** All entries of the operations or the error log, oldest first. */
+  const readLog = (kind: 'operations' | 'errors'): Record<string, unknown>[] =>
     existsSync(logDir)
       ? readdirSync(logDir)
-          .filter((name) => name.startsWith('operations-'))
+          .filter((name) => name.startsWith(`${kind}-`))
           .flatMap((name) => readFileSync(join(logDir, name), 'utf8').split('\n'))
           .filter((line) => line !== '')
           .map((line) => JSON.parse(line) as Record<string, unknown>)
       : [];
+  const operationsLog = () => readLog('operations');
+  const errorsLog = () => readLog('errors');
 
   it('DER-102-01 detects the ready server and opens Chrome with http://127.0.0.1:<port>/', async () => {
     server = await startTestServer(0);
@@ -299,6 +303,161 @@ describe('launcher open against a running test server (CU-258, CU-259)', () => {
       },
       LONG_START_TEST_MS,
     );
+
+    describe('time-out and start limit with the test hook of 2 s and 6 s (K-07, 6.2 g)', () => {
+      /** Runs the own start with the shortened limits; the fake server acts like `runs`. */
+      const runWithShortLimits = (runs: string, extraEnv: Record<string, string> = {}) =>
+        runOpen({
+          [TEST_SERVER_ENTRY_ENV]: FAKE_SERVER,
+          [TEST_START_TIMEOUTS_ENV]: '2000,6000',
+          FAKE_SERVER_DIR: root,
+          FAKE_SERVER_RUNS: runs,
+          ...extraEnv,
+        });
+
+      const REF_NO = /^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
+
+      /** The entry of `event` in the operations log, once there. */
+      const logged = (event: string) =>
+        waitFor(() => operationsLog().find((entry) => entry.event === event) ?? null, 15_000);
+
+      it(
+        'DER-103-04 writes start_timeout with an own number into both logs and timeout into launcher-state.js, DER-103-05 then ready',
+        async () => {
+          const port = await freePort();
+          writeConfig(JSON.stringify({ port }));
+          fakes.registerChrome('HKCU', fakes.chromePath);
+
+          const exit = runWithShortLimits('ready', { FAKE_SERVER_DELAY_MS: '4000' });
+
+          // `open` writes the state after both log entries and after it opened LP-01.
+          await waitFor(() => (launcherState()[0]?.phase === 'timeout' ? true : null), 15_000);
+          await waitFor(() => (fakes.chromeCalls().length > 0 ? true : null));
+          const timeout = await logged('start_timeout');
+          const refNo = timeout.refNo as string;
+          expect(refNo).toMatch(REF_NO);
+          expect(timeout).toMatchObject({ level: 'warn', startId: expect.any(String) });
+          expect(errorsLog()).toEqual([
+            expect.objectContaining({
+              level: 'error',
+              refNo,
+              function: 'launcher.start_timeout',
+              startId: timeout.startId,
+            }),
+          ]);
+          const request = lp01Request(fakes.chromeCalls());
+          expect(launcherState()).toEqual([
+            {
+              request,
+              phase: 'timeout',
+              url: launcherPageUrl(programDir, 'lp-02', { request: request!, ref: refNo }),
+              refNo,
+              dataDir: null,
+            },
+          ]);
+
+          // Later the start reports ready: the page goes on to the local address by itself.
+          await waitFor(() => (launcherState()[0]?.phase === 'ready' ? true : null), 15_000);
+          expect(launcherState()).toEqual([
+            {
+              request,
+              phase: 'ready',
+              url: `http://127.0.0.1:${port}/`,
+              refNo: null,
+              dataDir: null,
+            },
+          ]);
+          expect(fakes.chromeCalls()).toHaveLength(1);
+          launcher?.kill();
+          await exit;
+        },
+        LONG_START_TEST_MS,
+      );
+
+      it(
+        'DER-103-06 ends a start without ready after the start limit, logs start_aborted (launcher.start_limit), writes aborted, does not restart, and the database stays intact although the limit hits a migration',
+        async () => {
+          writeConfig(JSON.stringify({ port: await freePort() }));
+          fakes.registerChrome('HKCU', fakes.chromePath);
+          // A database with data, like before an update with a migration.
+          const before = new DatabaseSync(join(dataDir, 'resellr.db'));
+          before.exec('PRAGMA journal_mode = WAL');
+          before.exec('CREATE TABLE listing (id INTEGER PRIMARY KEY, title TEXT NOT NULL)');
+          before.exec(
+            'CREATE TABLE app_migration (name TEXT PRIMARY KEY NOT NULL, applied_at TEXT NOT NULL)',
+          );
+          before.exec(`INSERT INTO app_migration VALUES ('20261101_0001_test', '2026-11-01')`);
+          for (let id = 1; id <= 100; id++)
+            before.prepare('INSERT INTO listing (id, title) VALUES (?, ?)').run(id, `Gerät ${id}`);
+          before.close();
+
+          const startedAt = Date.now();
+          await expect(runWithShortLimits('hang-in-migration')).resolves.toBe(0);
+
+          expect(Date.now() - startedAt).toBeGreaterThanOrEqual(6000);
+          expect(existsSync(join(root, 'in-migration'))).toBe(true);
+          // No restart: the fake server was started once, and its process is gone.
+          const starts = readFileSync(join(root, 'starts.jsonl'), 'utf8').trim().split('\n');
+          expect(starts).toHaveLength(1);
+          const { pid } = JSON.parse(starts[0]!) as { pid: number };
+          expect(() => process.kill(pid, 0)).toThrow();
+
+          const events = operationsLog().map((entry) => entry.event);
+          expect(events).toEqual([
+            'supervisor_started',
+            'start_timeout',
+            'start_aborted',
+            'supervisor_ended',
+          ]);
+          const aborted = operationsLog().find((entry) => entry.event === 'start_aborted')!;
+          const timeout = operationsLog().find((entry) => entry.event === 'start_timeout')!;
+          const refNo = aborted.refNo as string;
+          expect(refNo).toMatch(REF_NO);
+          expect(refNo).not.toBe(timeout.refNo);
+          expect(errorsLog()).toEqual([
+            expect.objectContaining({ refNo: timeout.refNo, function: 'launcher.start_timeout' }),
+            expect.objectContaining({
+              refNo,
+              function: 'launcher.start_limit',
+              startId: aborted.startId,
+            }),
+          ]);
+          expect(readStartResult(logDir)).toEqual({
+            startId: aborted.startId,
+            state: 'aborted',
+            refNo,
+            at: expect.any(String),
+          });
+          // The waiting page shows LP-02 `default` with the number of the abort.
+          const request = lp01Request(fakes.chromeCalls());
+          expect(launcherState()).toEqual([
+            { request, phase: 'aborted', url: startFailedPage(refNo), refNo, dataDir: null },
+          ]);
+
+          // The next start finds an intact database: the open migration run was rolled back.
+          const after = new DatabaseSync(join(dataDir, 'resellr.db'));
+          try {
+            expect(after.prepare('PRAGMA integrity_check').all()).toEqual([
+              { integrity_check: 'ok' },
+            ]);
+            expect(
+              after.prepare(`SELECT name FROM sqlite_master WHERE name = 'half_done'`).all(),
+            ).toEqual([]);
+            expect(after.prepare('SELECT name FROM app_migration').all()).toEqual([
+              { name: '20261101_0001_test' },
+            ]);
+            expect(after.prepare('SELECT count(*) AS rows FROM listing').get()).toEqual({
+              rows: 100,
+            });
+            after.exec('BEGIN IMMEDIATE');
+            after.exec('ROLLBACK');
+          } finally {
+            after.close();
+          }
+        },
+        LONG_START_TEST_MS,
+      );
+    });
 
     it('opens no LP-01 and writes no launcher-state.js when the own start is aborted at once', async () => {
       writeConfig(JSON.stringify({ port: await freePort() }));

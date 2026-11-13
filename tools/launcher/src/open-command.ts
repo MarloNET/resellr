@@ -1,7 +1,9 @@
 import { LauncherExitCode } from '@resellr/runtime-shared/exit-codes';
+import { createReferenceNumber } from '@resellr/runtime-shared/reference-number';
 
 import type { ChromeOpener } from './chrome-opener.ts';
 import type { HealthClient } from './health-client.ts';
+import type { LauncherLog } from './launcher-log.ts';
 import type { LauncherStateWriter } from './launcher-state-writer.ts';
 import type { PhaseEvent, SubscribeResult } from './supervisor/supervisor-pipe.ts';
 
@@ -23,10 +25,18 @@ export interface OpenCommandDeps {
   waitingPageUrl(request: string): string;
   /** Hands the result to an open LP-01 through `launcher-state.js` (CU-268). */
   launcherState: LauncherStateWriter;
+  /** Writes `start_timeout` into the operations and the error log (CU-296, K-07). */
+  log: Pick<LauncherLog, 'startTimeout'>;
+  createRefNo?: () => string;
+  /** Time-out of step 4, 120 s; the test hook `RESELLR_TEST_START_TIMEOUTS` shortens it. */
+  startTimeoutMs?: number;
 }
 
 /** Waiting time after which `open` shows LP-01 (2.18 step 4). */
 export const WAITING_PAGE_DELAY_MS = 3000;
+
+/** Waiting time after which `open` reports `start_timeout` (2.18 step 4, K-07). */
+export const START_TIMEOUT_MS = 120_000;
 
 type StartResultEvent = PhaseEvent & { phase: 'ready' | 'aborted' | 'gave_up' | 'already_running' };
 
@@ -46,9 +56,14 @@ const isStartResult = (event: SubscribeResult): event is StartResultEvent =>
  *    the result like in step 2 and run on as supervisor.
  *
  * 4. If waiting takes longer than 3 s, `open` shows LP-01; the result then reaches the page
- *    through `launcher-state.js`, and the page goes on by itself.
+ *    through `launcher-state.js`, and the page goes on by itself. After 120 s without a result
+ *    `open` writes `start_timeout` with a reference number of its own into both logs and `timeout`
+ *    with this number for the page, which shows `LP-02.zeitueberschreitung` (K-07). It waits on;
+ *    a later result reaches the page the same way.
+ * 5. The wait ends at the latest with the start limit of 10 minutes in the supervisor (CU-264).
  *
- * Steps 4 (time limit of 120 s) to 6 follow in #122.
+ * Step 6 (fallback S-7) is not built: the spike confirmed the page change (Technical
+ * Specification 9.2, S-7).
  */
 export async function runOpenCommand(deps: OpenCommandDeps): Promise<LauncherExitCode> {
   if ((await deps.healthClient.getHealth()) === 'ready') {
@@ -56,7 +71,9 @@ export async function runOpenCommand(deps: OpenCommandDeps): Promise<LauncherExi
     return LauncherExitCode.Success;
   }
 
-  const waitingPage = showWaitingPageLater(deps);
+  // The start the own supervisor watches, for the entry `start_timeout`; null while subscribed.
+  let startId: string | null = null;
+  const waitingPage = showWaitingPageLater(deps, () => startId);
   try {
     let startedAfterStop = false;
     for (;;) {
@@ -73,6 +90,7 @@ export async function runOpenCommand(deps: OpenCommandDeps): Promise<LauncherExi
 
       let shown: Promise<boolean> | undefined;
       const outcome = await deps.becomeSupervisor((event) => {
+        startId = event.startId ?? startId;
         // Showing the result must not end the supervisor, even if the browser cannot be started.
         if (shown === undefined && isStartResult(event)) {
           shown = showStartResult(deps, waitingPage, event).then(
@@ -90,36 +108,69 @@ export async function runOpenCommand(deps: OpenCommandDeps): Promise<LauncherExi
   }
 }
 
-/** LP-01 of this call, opened once waiting takes longer than 3 s (2.18 step 4). */
+/**
+ * LP-01 of this call, opened once waiting takes longer than 3 s, and the time-out after 120 s
+ * (2.18 step 4).
+ */
 interface WaitingPage {
   request: string;
   /**
-   * Stops the timer; resolves to true if LP-01 was opened, so the result has to go through
-   * `launcher-state.js`. A page that is still opening reads the state on its first load.
+   * Stops both timers and waits for a time-out being written, so the result comes after it;
+   * resolves to true if LP-01 was opened, so the result has to go through `launcher-state.js`.
+   * A page that is still opening reads the state on its first load.
    */
   settle(): Promise<boolean>;
 }
 
-function showWaitingPageLater(deps: OpenCommandDeps): WaitingPage {
+function showWaitingPageLater(
+  deps: OpenCommandDeps,
+  currentStartId: () => string | null,
+): WaitingPage {
+  const { createRefNo = createReferenceNumber, startTimeoutMs = START_TIMEOUT_MS } = deps;
   const request = deps.newRequestId();
   let opened: Promise<boolean> | undefined;
-  const timer = setTimeout(() => {
-    // Without `launcher-state.js` LP-01 would not open; the result then opens directly.
-    opened = Promise.resolve()
+  let timedOut: Promise<void> | undefined;
+
+  // Without `launcher-state.js` LP-01 would not open; the result then opens directly.
+  const openPage = () =>
+    (opened ??= Promise.resolve()
       .then(() => deps.launcherState.prepare())
       .then(() => deps.chromeOpener.open(deps.waitingPageUrl(request)))
       .then(
         () => true,
         () => false,
-      );
-  }, WAITING_PAGE_DELAY_MS);
+      ));
+
+  const reportTimeout = async () => {
+    const refNo = createRefNo();
+    // The page shows the number even if the log cannot be written, like for every other number.
+    attempt(() => deps.log.startTimeout({ startId: currentStartId(), refNo }));
+    // At the latest now LP-01 is open, also when the test hook makes the time-out shorter than 3 s.
+    if (await openPage()) attempt(() => deps.launcherState.timeout(request, refNo));
+  };
+
+  const pageTimer = setTimeout(openPage, WAITING_PAGE_DELAY_MS);
+  const timeoutTimer = setTimeout(() => {
+    clearTimeout(pageTimer);
+    timedOut = reportTimeout();
+  }, startTimeoutMs);
   return {
     request,
-    settle: () => {
-      clearTimeout(timer);
-      return opened ?? Promise.resolve(false);
+    settle: async () => {
+      clearTimeout(pageTimer);
+      clearTimeout(timeoutTimer);
+      await timedOut;
+      return opened ?? false;
     },
   };
+}
+
+function attempt(write: () => void): void {
+  try {
+    write();
+  } catch {
+    // A full disk must not end the wait for the result.
+  }
 }
 
 /** Shows what the result of a start asks for (2.18 step 2): the local address or LP-02. */
