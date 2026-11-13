@@ -52,6 +52,7 @@ import {
 } from '../../../components/ui/Table.tsx';
 import {
   AttributePanel,
+  hasErrors,
   PANEL_TEXTS,
   PANEL_WIDTH,
   requestOf,
@@ -256,7 +257,7 @@ export function DeviceTypesPage() {
         pickListId: fieldMessage('pickListId'),
       };
       // A path without a field in the panel gives the banner `.error` (addendum MAR-555).
-      if (Object.values(fieldErrors).some((message) => message !== undefined)) {
+      if (hasErrors(fieldErrors)) {
         setAttributeErrors(fieldErrors);
         setAttributeErrorFocus((count) => count + 1);
         return;

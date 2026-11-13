@@ -473,8 +473,13 @@ describe('UI-028 pick lists (CU-096)', () => {
       },
     });
     await openPage();
-
-    rename('gebraucht', 'benutzt');
+    edit('gebraucht');
+    fireEvent.change(valueInput(), { target: { value: 'benutzt' } });
+    // "Wert" has autoFocus and fireEvent.click does not move the focus: move it away
+    // first, so the assertion below proves that the field error focuses "Wert".
+    saveButton().focus();
+    expect(document.activeElement).toBe(saveButton());
+    fireEvent.click(saveButton());
 
     expect(await screen.findByText('Wert: 1 bis 100 Zeichen')).toBeTruthy();
     expect(document.activeElement).toBe(valueInput());
