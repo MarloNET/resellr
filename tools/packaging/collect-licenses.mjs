@@ -1,5 +1,5 @@
 // License notices (CU-298, FIND-222, Technical Specification 2.19 "Build des Pakets", 4.3,
-// Nachtrag MAR-687, MAR-693): writes `THIRD-PARTY-NOTICES.txt` with the license texts of
+// Nachtrag MAR-687, MAR-693, MAR-720): writes `THIRD-PARTY-NOTICES.txt` with the license texts of
 // everything the package ships and fails the build for a shipped package whose license is
 // missing or not allowed.
 // Usage: `node tools/packaging/collect-licenses.mjs <program folder> --metafile <path>` after
@@ -176,15 +176,61 @@ export function readPackageNotice(dir, options = {}) {
 }
 
 /**
+ * @typedef {{ name: string, from: string, optional: boolean } | { name: string, dir: string }}
+ *   ClosureStart a package to resolve with `findPackage` from `from`, or one in a known folder
+ */
+
+/**
+ * Package folders of the given packages and their closure over `dependencies` and installed
+ * `optionalDependencies`, resolved with `findPackage` from the folder of the dependent package.
+ * A missing dependency from `dependencies` fails, naming the package; `peerDependencies` and
+ * `devDependencies` are not followed. Workspace packages are own code, but their dependencies are
+ * followed (Nachtrag MAR-687, MAR-720).
+ * @param {ClosureStart[]} start
+ * @param {string} repoRoot
+ * @param {string} shippedIn for the message
+ * @returns {string[]}
+ */
+function dependencyClosure(start, repoRoot, shippedIn) {
+  /** @type {ClosureStart[]} */
+  const queue = [...start];
+  const visited = new Set();
+  const dirs = [];
+  for (let next = queue.shift(); next; next = queue.shift()) {
+    const { name } = next;
+    const found = 'dir' in next ? next.dir : findPackage(name, next.from, repoRoot);
+    if (found === null) {
+      if ('optional' in next && next.optional) continue;
+      throw new Error(`Package ${name} shipped in ${shippedIn} is not installed`);
+    }
+    const dir = realpathSync(found);
+    if (visited.has(dir)) continue;
+    visited.add(dir);
+    if (!OWN_PACKAGE.test(name)) dirs.push(dir);
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      queue.push({ name: dependency, from: dir, optional: false });
+    }
+    for (const dependency of Object.keys(manifest.optionalDependencies ?? {})) {
+      queue.push({ name: dependency, from: dir, optional: true });
+    }
+  }
+  return dirs;
+}
+
+/**
  * Package folders of the npm packages bundled into server and launcher: every metafile input
- * under `node_modules/`, cut after the package name (with scope) behind the last `node_modules/`.
- * Inputs from the workspaces are own code.
+ * under `node_modules/`, cut after the package name (with scope) behind the last `node_modules/`,
+ * and their closure over `dependencies`, because a pre-bundled file of a package carries the code
+ * of its dependencies without them showing up in the metafile (Nachtrag MAR-720). Inputs from
+ * the workspaces are own code.
  * @param {{ inputs: Record<string, unknown> }} metafile esbuild metafile of CU-276
  * @param {string} repoRoot folder the metafile paths are relative to
  * @returns {string[]}
  */
 export function bundledPackageDirs(metafile, repoRoot) {
-  const dirs = new Set();
+  /** @type {Map<string, ClosureStart>} */
+  const start = new Map();
   for (const input of Object.keys(metafile.inputs)) {
     const path = input.replaceAll('\\', '/');
     const index = path.lastIndexOf('node_modules/');
@@ -192,9 +238,10 @@ export function bundledPackageDirs(metafile, repoRoot) {
     const rest = path.slice(index + 'node_modules/'.length).split('/');
     const name = rest[0]?.startsWith('@') ? rest.slice(0, 2).join('/') : rest[0];
     if (!name || OWN_PACKAGE.test(name)) continue;
-    dirs.add(join(repoRoot, path.slice(0, index), 'node_modules', name));
+    const dir = join(repoRoot, path.slice(0, index), 'node_modules', name);
+    start.set(dir, { name, dir });
   }
-  return [...dirs];
+  return dependencyClosure([...start.values()], repoRoot, 'server or launcher');
 }
 
 /**
@@ -228,34 +275,12 @@ export function nativePackageDirs(nativeModulesDir) {
  */
 export function webPackageDirs(repoRoot, webDir = join(repoRoot, 'apps', 'web')) {
   const web = JSON.parse(readFileSync(join(webDir, 'package.json'), 'utf8'));
-  /** @type {Array<{ name: string, from: string, optional: boolean }>} */
-  const queue = [...Object.keys(web.dependencies ?? {}), ...WEB_CSS_PACKAGES].map((name) => ({
+  const start = [...Object.keys(web.dependencies ?? {}), ...WEB_CSS_PACKAGES].map((name) => ({
     name,
     from: webDir,
     optional: false,
   }));
-  const visited = new Set();
-  const dirs = [];
-  for (let next = queue.shift(); next; next = queue.shift()) {
-    const { name, from, optional } = next;
-    const found = findPackage(name, from, repoRoot);
-    if (found === null) {
-      if (optional) continue;
-      throw new Error(`Package ${name} shipped in web-ui is not installed`);
-    }
-    const dir = realpathSync(found);
-    if (visited.has(dir)) continue;
-    visited.add(dir);
-    if (!OWN_PACKAGE.test(name)) dirs.push(dir);
-    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-      queue.push({ name: dependency, from: dir, optional: false });
-    }
-    for (const dependency of Object.keys(manifest.optionalDependencies ?? {})) {
-      queue.push({ name: dependency, from: dir, optional: true });
-    }
-  }
-  return dirs;
+  return dependencyClosure(start, repoRoot, 'web-ui');
 }
 
 /**

@@ -274,14 +274,73 @@ describe('shipped packages (Nachtrag MAR-687)', () => {
         '(disabled):node_modules/ignored/index.js': {},
       },
     };
+    const modules = join(root, 'node_modules');
+    const fastify = fakePackage({ name: 'fastify' }, {}, modules);
+    const fastifyStatic = fakePackage({ name: '@fastify/static' }, {}, modules);
+    const glob = fakePackage({ name: 'glob' }, {}, join(fastifyStatic, 'node_modules'));
+    fakePackage({ name: '@resellr/domain' }, {}, modules);
 
-    expect(bundledPackageDirs(metafile, '/repo').sort()).toEqual(
-      [
-        join('/repo', 'node_modules', '@fastify', 'static'),
-        join('/repo', 'node_modules', '@fastify', 'static', 'node_modules', 'glob'),
-        join('/repo', 'node_modules', 'fastify'),
-      ].sort(),
+    expect(bundledPackageDirs(metafile, root).sort()).toEqual(
+      [fastifyStatic, glob, fastify].sort(),
     );
+  });
+
+  describe('closure over dependencies of bundled packages (Nachtrag MAR-720)', () => {
+    const metafile = (...names: string[]) => ({
+      inputs: Object.fromEntries(names.map((name) => [`node_modules/${name}/index.js`, {}])),
+    });
+
+    it('adds dependencies that are not in the metafile, over two levels', () => {
+      const modules = join(root, 'node_modules');
+      const glob = fakePackage(
+        { name: 'glob', dependencies: { minimatch: '1' } },
+        {},
+        join(modules, '@fastify', 'static', 'node_modules'),
+      );
+      const minimatch = fakePackage(
+        { name: 'minimatch', dependencies: { 'brace-expansion': '1' } },
+        {},
+        modules,
+      );
+      const braceExpansion = fakePackage({ name: 'brace-expansion' }, {}, modules);
+
+      expect(
+        bundledPackageDirs(
+          { inputs: { 'node_modules/@fastify/static/node_modules/glob/index.min.js': {} } },
+          root,
+        ).sort(),
+      ).toEqual([glob, minimatch, braceExpansion].sort());
+    });
+
+    it('skips a missing optional dependency and ignores peer and dev dependencies', () => {
+      const pino = fakePackage(
+        {
+          name: 'pino',
+          optionalDependencies: { absent: '1' },
+          peerDependencies: { 'peer-absent': '1' },
+          devDependencies: { 'dev-absent': '1' },
+        },
+        {},
+        join(root, 'node_modules'),
+      );
+
+      expect(bundledPackageDirs(metafile('pino'), root)).toEqual([pino]);
+    });
+
+    it('fails for a missing dependency, naming the package', () => {
+      fakePackage({ name: 'ajv', dependencies: { 'require-from-string': '1' } });
+
+      expect(() => bundledPackageDirs(metafile('ajv'), root)).toThrow(/require-from-string/);
+    });
+
+    it('lists a package in metafile and closure once', () => {
+      const fastify = fakePackage({ name: 'fastify', dependencies: { pino: '1' } });
+      const pino = fakePackage({ name: 'pino' });
+
+      expect(bundledPackageDirs(metafile('fastify', 'pino'), root).sort()).toEqual(
+        [fastify, pino].sort(),
+      );
+    });
   });
 
   it('takes native packages from each folder in app/node_modules, with scope', () => {
