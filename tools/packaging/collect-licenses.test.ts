@@ -194,6 +194,19 @@ describe('readPackageNotice', () => {
       );
     });
 
+    it('reads the text of a scoped package from scope__name.txt', () => {
+      writeFile(join(licensesDir, 'packages', 'scope__name.txt'), 'Scoped MIT License\n');
+      const dir = fakePackage({ name: '@scope/name', version: '1.0.0', license: 'MIT' });
+      const scoped = { ...entry, file: 'scope__name.txt' };
+
+      expect(
+        readPackageNotice(dir, { missingLicenseFiles: { '@scope/name': scoped }, licensesDir })
+          .text,
+      ).toBe(
+        'Lizenztext nicht im Paket enthalten, Quelle: https://example.org/license\n\nScoped MIT License',
+      );
+    });
+
     it('fails if the license of the package differs from the entry', () => {
       const dir = fakePackage({ name: 'no-file', version: '2.0.1', license: 'ISC' });
 

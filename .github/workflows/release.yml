@@ -137,12 +137,16 @@ jobs:
           name: resellr-setup-${{ needs.build.outputs.version }}
           path: release
 
-      # Fails if the release exists already.
+      # Fails if the release exists already; `gh release create` would fail there, too.
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build.outputs.version }}
         run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release v$VERSION exists already"
+            exit 1
+          fi
           gh release create "v$VERSION" \
             "release/installer/resellr-setup-$VERSION.exe" \
             "release/package/THIRD-PARTY-NOTICES.txt" \
