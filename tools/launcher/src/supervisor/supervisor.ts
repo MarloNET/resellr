@@ -37,7 +37,10 @@ export interface SupervisorOptions {
   now?: () => Date;
   /** Writes `crash` with its reference number (CU-296) and `state.json.lastCrashAt` (CU-009). */
   onCrash?(crash: CrashReport): void;
-  /** Writes `start_aborted` (CU-296), before `aborted` goes out (Nachtrag MAR-498). */
+  /**
+   * Writes `start_aborted` (CU-296), before `aborted` goes out (Nachtrag MAR-498); for the start
+   * limit also `start-result.json` with `aborted` (K-07).
+   */
   onStartAborted?(entry: ShownRefNo & { startId: string; cause: StartAbortCause }): void;
   /**
    * Writes `gave_up` (CU-296) and `start-result.json` with `state: gave_up` (CU-009), before
@@ -70,8 +73,9 @@ export interface SupervisorOptions {
  *
  * Every `aborted`, `gave_up` and `already_running` carries a reference number (Nachtrag MAR-382);
  * the supervisor writes it into the logs before it reports the event, so a number LP-02 shows is
- * already logged (FIND-210, Nachtrag MAR-498). Not built yet: the start limit of 10 min (#122)
- * and the answer to `stop` (#123, #124).
+ * already logged (FIND-210, Nachtrag MAR-498). A start without `ready` within the start limit of
+ * 10 minutes (CU-264) is reported as `aborted` with a number of its own and ends the supervisor
+ * without a restart (2.18 step 5, K-07). Not built yet: the answer to `stop` (#123, #124).
  */
 export async function runSupervisor({
   pipe,
@@ -171,6 +175,12 @@ export async function runSupervisor({
         const refNo = end.refNo ?? createRefNo();
         const cause = end.refNo === null ? 'start_result_missing' : 'start_aborted';
         attempt(() => onStartAborted({ startId, refNo, cause }));
+        return { event: 'phase', phase: 'aborted', startId, refNo };
+      }
+      case 'start_limit': {
+        // No `ready` within 10 minutes: a number of its own, like for every abort (K-07).
+        const refNo = createRefNo();
+        attempt(() => onStartAborted({ startId, refNo, cause: 'start_limit' }));
         return { event: 'phase', phase: 'aborted', startId, refNo };
       }
       case 'already_running': {

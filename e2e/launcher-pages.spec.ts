@@ -29,6 +29,20 @@ const LP_02_TEXT =
   'Betreiber und nennen Sie ihm diese Referenznummer:';
 const REF_NO = 'R-7K2M-9QX4';
 
+const LP_02_TIMEOUT_TITLE = 'resellr startet länger als erwartet';
+const LP_02_TIMEOUT_TEXT = [
+  'Der Start von resellr dauert länger als erwartet. Er kann noch gelingen. Lassen Sie dieses ' +
+    'Fenster geöffnet und warten Sie einen Moment: resellr öffnet sich von selbst, sobald es ' +
+    'bereit ist.',
+  'Öffnet sich resellr nicht, laden Sie diese Seite neu (Browser-Aktualisierung, z. B. F5). ' +
+    'Hilft das nicht, starten Sie resellr über die Verknüpfung „resellr“ im Startmenü.',
+  'Besteht das Problem weiter, informieren Sie den Betreiber und nennen Sie ihm diese ' +
+    'Referenznummer. Sie steht im Betriebsprotokoll von resellr:',
+] as const;
+/** Own number of `start_timeout`, different from the number of a later abort (K-07). */
+const TIMEOUT_REF_NO = 'R-9QX4-7K2M';
+const PROGRESS_LINE = 'resellr wird gestartet …';
+
 const LP_01_TEXT =
   'Bitte haben Sie einen Moment Geduld. Der Start dauert diesmal länger als sonst, zum Beispiel ' +
   'weil resellr Ihre Daten prüft. Lassen Sie dieses Fenster geöffnet. resellr öffnet sich von ' +
@@ -57,6 +71,14 @@ function lp01Url(request: string): string {
 function lp02Url(ref: string | null): string {
   const url = pathToFileURL(join(pagesDir, 'lp-02.html'));
   if (ref !== null) url.searchParams.set('ref', ref);
+  return url.href;
+}
+
+/** Address of `LP-02.zeitueberschreitung` as CU-268 writes it for `timeout`: `request` and `ref`. */
+function lp02TimeoutUrl(request: string, ref: string): string {
+  const url = pathToFileURL(join(pagesDir, 'lp-02.html'));
+  url.searchParams.set('request', request);
+  url.searchParams.set('ref', ref);
   return url.href;
 }
 
@@ -203,7 +225,7 @@ for (const viewport of [
       await expect(page.getByText(LP_02_TEXT)).toHaveCSS('color', 'rgb(31, 41, 55)');
 
       // Fully readable: the card fits the window, nothing scrolls sideways.
-      const card = await page.locator('main').boundingBox();
+      const card = await page.getByRole('main').boundingBox();
       expect(card!.x).toBeGreaterThanOrEqual(0);
       expect(card!.x + card!.width).toBeLessThanOrEqual(viewport.width);
       expect(card!.width).toBeLessThanOrEqual(560);
@@ -214,6 +236,166 @@ for (const viewport of [
     });
   });
 }
+
+for (const viewport of [
+  { width: 480, height: 600 },
+  { width: 1366, height: 600 },
+]) {
+  test.describe(`LP-02.zeitueberschreitung at ${viewport.width} px`, () => {
+    test.use({ viewport });
+
+    test('LP-02.zeitueberschreitung DER-103-04 shows the title, the three paragraphs, the reference number and the progress line, nothing else', async ({
+      page,
+    }) => {
+      const errors = collectErrors(page);
+      const request = `timeout-1-${viewport.width}`;
+      writeState({ request, phase: 'timeout', url: lp02TimeoutUrl(request, TIMEOUT_REF_NO) });
+
+      await page.goto(lp02TimeoutUrl(request, TIMEOUT_REF_NO));
+
+      await expect(page).toHaveTitle(LP_02_TIMEOUT_TITLE);
+      await expect(page.locator('body')).toMatchAriaSnapshot(`
+        - main:
+          - heading "${LP_02_TIMEOUT_TITLE}" [level=1]
+          - paragraph: "${LP_02_TIMEOUT_TEXT[0]}"
+          - paragraph: "${LP_02_TIMEOUT_TEXT[1]}"
+          - paragraph: "${LP_02_TIMEOUT_TEXT[2]}"
+          - paragraph: ${TIMEOUT_REF_NO}
+          - paragraph: ${PROGRESS_LINE}
+          - progressbar "${PROGRESS_LINE}"
+      `);
+      await expect(page.getByRole('main')).toHaveCount(1);
+      await expect(page.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
+      // Not "abgebrochen" and no technical detail: the page holds only these texts (REQ-073).
+      expect(await visibleLines(page)).toEqual([
+        LP_02_TIMEOUT_TITLE,
+        ...LP_02_TIMEOUT_TEXT,
+        TIMEOUT_REF_NO,
+        PROGRESS_LINE,
+      ]);
+
+      const refNo = page.getByText(TIMEOUT_REF_NO, { exact: true });
+      await refNo.selectText();
+      expect(await page.evaluate(() => window.getSelection()?.toString().trim())).toBe(
+        TIMEOUT_REF_NO,
+      );
+
+      // Warn style for the title strip, not the error style (DESIGN.md: #92400E on #FEF3C7).
+      const title = page.getByRole('heading', { level: 1 });
+      await expect(title).toHaveCSS('color', 'rgb(146, 64, 14)');
+      await expect(title).toHaveCSS('background-color', 'rgb(254, 243, 199)');
+
+      const card = await page.getByRole('main').boundingBox();
+      expect(card!.x).toBeGreaterThanOrEqual(0);
+      expect(card!.x + card!.width).toBeLessThanOrEqual(viewport.width);
+      expect(card!.width).toBeLessThanOrEqual(560);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+test('DER-103-04 LP-01 goes on to LP-02.zeitueberschreitung with the number of start_timeout when open writes timeout', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const request = 'timeout-2';
+
+  await page.goto(lp01Url(request));
+  await expect(page).toHaveTitle('resellr startet');
+  const historyLength = await page.evaluate(() => history.length);
+
+  writeState({ request, phase: 'timeout', url: lp02TimeoutUrl(request, TIMEOUT_REF_NO) });
+
+  await page.waitForURL((url) => url.pathname.endsWith('/lp-02.html'), { timeout: 5000 });
+  await expect(page).toHaveTitle(LP_02_TIMEOUT_TITLE);
+  expect(await visibleLines(page)).toEqual([
+    LP_02_TIMEOUT_TITLE,
+    ...LP_02_TIMEOUT_TEXT,
+    TIMEOUT_REF_NO,
+    PROGRESS_LINE,
+  ]);
+  expect(await page.evaluate(() => history.length)).toBe(historyLength);
+  expect(errors).toEqual([]);
+});
+
+test.describe('DER-103-05 LP-02.zeitueberschreitung after the time-out', () => {
+  test('keeps waiting while the state is timeout, also after a reload, and goes on to the local address by itself on ready', async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    const request = 'timeout-3';
+    const stateLoads = countStateLoads(page);
+    await page.route(`${APP_URL}**`, (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<title>resellr</title>' }),
+    );
+    writeState({ request, phase: 'timeout', url: lp02TimeoutUrl(request, TIMEOUT_REF_NO) });
+
+    await page.goto(lp02TimeoutUrl(request, TIMEOUT_REF_NO));
+    const loadsBefore = stateLoads();
+    await expect.poll(stateLoads).toBeGreaterThanOrEqual(loadsBefore + 2);
+    await page.reload();
+    await expect(page).toHaveTitle(LP_02_TIMEOUT_TITLE);
+    const historyLength = await page.evaluate(() => history.length);
+
+    writeState({ request, phase: 'ready', url: APP_URL });
+
+    await page.waitForURL(APP_URL, { timeout: 5000 });
+    expect(await page.evaluate(() => history.length)).toBe(historyLength);
+    expect(errors).toEqual([]);
+  });
+
+  test('shows LP-02.default with the number of the abort when open writes aborted', async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    const request = 'timeout-4';
+    writeState({ request, phase: 'timeout', url: lp02TimeoutUrl(request, TIMEOUT_REF_NO) });
+    await page.goto(lp02TimeoutUrl(request, TIMEOUT_REF_NO));
+    await expect(page).toHaveTitle(LP_02_TIMEOUT_TITLE);
+
+    writeState({ request, phase: 'aborted', url: lp02Url(REF_NO), refNo: REF_NO });
+
+    await expect(page).toHaveTitle(LP_02_TITLE, { timeout: 5000 });
+    expect(await visibleLines(page)).toEqual([LP_02_TITLE, LP_02_TEXT, REF_NO]);
+    expect(errors).toEqual([]);
+  });
+
+  test('a reload shows the current state: the local address after ready, LP-02.default after an abort', async ({
+    page,
+  }) => {
+    await page.route(`${APP_URL}**`, (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<title>resellr</title>' }),
+    );
+    // The result came while the page was not reading, e.g. while it reloads.
+    writeState({ request: 'timeout-5', phase: 'ready', url: APP_URL });
+    await page.goto(lp02TimeoutUrl('timeout-5', TIMEOUT_REF_NO));
+    await page.waitForURL(APP_URL, { timeout: 5000 });
+
+    writeState({ request: 'timeout-6', phase: 'aborted', url: lp02Url(REF_NO), refNo: REF_NO });
+    await page.goto(lp02TimeoutUrl('timeout-6', TIMEOUT_REF_NO));
+    await expect(page).toHaveTitle(LP_02_TITLE, { timeout: 5000 });
+    expect(await visibleLines(page)).toEqual([LP_02_TITLE, LP_02_TEXT, REF_NO]);
+  });
+
+  test('shows no number in the time-out state that does not match the pattern (H-11)', async ({
+    page,
+  }) => {
+    const request = 'timeout-7';
+    writeState({ request, phase: 'timeout', url: lp02TimeoutUrl(request, '<b>R-7K2M-9QX4</b>') });
+
+    await page.goto(lp02TimeoutUrl(request, '<b>R-7K2M-9QX4</b>'));
+
+    expect(await visibleLines(page)).toEqual([
+      LP_02_TIMEOUT_TITLE,
+      ...LP_02_TIMEOUT_TEXT,
+      PROGRESS_LINE,
+    ]);
+    expect(await page.locator('b').count()).toBe(0);
+  });
+});
 
 test.describe('LP-02.default reference number', () => {
   for (const [name, ref] of [

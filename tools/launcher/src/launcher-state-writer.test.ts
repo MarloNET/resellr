@@ -55,6 +55,29 @@ describe('launcher state writer (CU-268)', () => {
     ]);
   });
 
+  it('DER-103-04 writes timeout with the number of start_timeout and the address of LP-02 for this request', () => {
+    createLauncherStateWriter(programDir).timeout(REQUEST, REF_NO);
+
+    expect(written()).toEqual([
+      {
+        request: REQUEST,
+        phase: 'timeout',
+        // With `request` LP-02 shows `zeitueberschreitung` and keeps reading the state (K-07).
+        url: launcherPageUrl(programDir, 'lp-02', { request: REQUEST, ref: REF_NO }),
+        refNo: REF_NO,
+        dataDir: null,
+      },
+    ]);
+  });
+
+  it('DER-103-05 replaces timeout of the request by the later result', () => {
+    const writer = createLauncherStateWriter(programDir);
+    writer.timeout(REQUEST, REF_NO);
+    writer.aborted(REQUEST, 'R-ABCD-EFGH');
+
+    expect(written()).toMatchObject([{ request: REQUEST, phase: 'aborted', refNo: 'R-ABCD-EFGH' }]);
+  });
+
   it('leaves out a reference number that does not match the pattern of 2.0.5 (H-11)', () => {
     createLauncherStateWriter(programDir).aborted(REQUEST, '<img src=x>');
 

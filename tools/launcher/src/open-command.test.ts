@@ -2,13 +2,20 @@ import { LauncherExitCode } from '@resellr/runtime-shared/exit-codes';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { HealthState } from './health-client.ts';
-import { type OpenCommandDeps, runOpenCommand, WAITING_PAGE_DELAY_MS } from './open-command.ts';
+import {
+  type OpenCommandDeps,
+  runOpenCommand,
+  START_TIMEOUT_MS,
+  WAITING_PAGE_DELAY_MS,
+} from './open-command.ts';
 import type { PhaseEvent, SubscribeResult } from './supervisor/supervisor-pipe.ts';
 
 const APP_URL = 'http://127.0.0.1:4311/';
 const REF_NO = 'R-7K3M-Q9TX';
 const REQUEST = 'request-1';
 const LP_01_URL = `file:///pages/lp-01.html?request=${REQUEST}`;
+/** Own reference number of `start_timeout` (K-07). */
+const TIMEOUT_REF_NO = 'R-T1ME-0UT0';
 
 const phase = (name: PhaseEvent['phase'], fields: Partial<PhaseEvent> = {}): PhaseEvent => ({
   event: 'phase',
@@ -62,7 +69,10 @@ function setup({ health = [null], subscribe = [null], supervisor = [], waitMs = 
       prepare: vi.fn<() => void>(),
       ready: vi.fn<(request: string, url: string) => void>(),
       aborted: vi.fn<(request: string, refNo: string | null) => void>(),
+      timeout: vi.fn<(request: string, refNo: string) => void>(),
     },
+    log: { startTimeout: vi.fn<(entry: { startId: string | null; refNo: string }) => void>() },
+    createRefNo: () => TIMEOUT_REF_NO,
   } satisfies OpenCommandDeps;
   return deps;
 }
@@ -423,6 +433,115 @@ describe('open command (CU-259)', () => {
 
       await expect(run).resolves.toBe(LauncherExitCode.Failed);
       expect(deps.becomeSupervisor).toHaveBeenCalledOnce();
+    });
+
+    describe('time-out after 120 s without a result (2.18 step 4, K-07)', () => {
+      it('DER-103-04 writes start_timeout with an own reference number and timeout for LP-01 after 120 s, not before', async () => {
+        const deps = setup({ subscribe: [phase('ready', { startId: 's-1' })], waitMs: 200_000 });
+
+        const run = runOpenCommand(deps);
+        await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS - 1);
+        expect(deps.log.startTimeout).not.toHaveBeenCalled();
+        expect(deps.launcherState.timeout).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(deps.log.startTimeout).toHaveBeenCalledExactlyOnceWith({
+          startId: null,
+          refNo: TIMEOUT_REF_NO,
+        });
+        expect(deps.launcherState.timeout).toHaveBeenCalledExactlyOnceWith(REQUEST, TIMEOUT_REF_NO);
+        expect(deps.log.startTimeout.mock.invocationCallOrder[0]).toBeLessThan(
+          deps.launcherState.timeout.mock.invocationCallOrder[0]!,
+        );
+        expect(START_TIMEOUT_MS).toBe(120_000);
+
+        // `open` waits on and hands the later result to the page (DER-103-05).
+        await vi.advanceTimersByTimeAsync(200_000);
+        await expect(run).resolves.toBe(LauncherExitCode.Success);
+        expect(deps.launcherState.ready).toHaveBeenCalledExactlyOnceWith(REQUEST, APP_URL);
+        expect(deps.launcherState.timeout.mock.invocationCallOrder[0]).toBeLessThan(
+          deps.launcherState.ready.mock.invocationCallOrder[0]!,
+        );
+        expect(deps.chromeOpener.open).toHaveBeenCalledExactlyOnceWith(LP_01_URL);
+        expect(deps.log.startTimeout).toHaveBeenCalledOnce();
+      });
+
+      it('DER-103-05 writes aborted with the number of the abort after the time-out', async () => {
+        const deps = setup();
+        // The own supervisor reports the abort by the start limit after 10 minutes.
+        deps.becomeSupervisor.mockImplementationOnce(async (onPhase) => {
+          onPhase(phase('starting', { startId: 's-1' }));
+          await sleep(600_000);
+          onPhase(phase('aborted', { startId: 's-1', refNo: REF_NO }));
+          return 'ended';
+        });
+
+        const run = runOpenCommand(deps);
+        await vi.advanceTimersByTimeAsync(600_000);
+
+        await expect(run).resolves.toBe(LauncherExitCode.Success);
+        // The own supervisor watches the start, so the entry names it.
+        expect(deps.log.startTimeout).toHaveBeenCalledExactlyOnceWith({
+          startId: 's-1',
+          refNo: TIMEOUT_REF_NO,
+        });
+        expect(deps.launcherState.timeout).toHaveBeenCalledExactlyOnceWith(REQUEST, TIMEOUT_REF_NO);
+        expect(deps.launcherState.aborted).toHaveBeenCalledExactlyOnceWith(REQUEST, REF_NO);
+        expect(deps.launcherState.timeout.mock.invocationCallOrder[0]).toBeLessThan(
+          deps.launcherState.aborted.mock.invocationCallOrder[0]!,
+        );
+      });
+
+      it('writes no time-out when the result comes within 120 s', async () => {
+        const deps = setup({ subscribe: [phase('ready')], waitMs: START_TIMEOUT_MS - 1 });
+
+        const run = runOpenCommand(deps);
+        await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS * 2);
+
+        await expect(run).resolves.toBe(LauncherExitCode.Success);
+        expect(deps.log.startTimeout).not.toHaveBeenCalled();
+        expect(deps.launcherState.timeout).not.toHaveBeenCalled();
+      });
+
+      it('opens LP-01 at the latest with a time-out shorter than 3 s (test hook)', async () => {
+        const deps = setup({ subscribe: [phase('ready')], waitMs: 5000 });
+
+        const run = runOpenCommand({ ...deps, startTimeoutMs: 2000 });
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(deps.chromeOpener.open).toHaveBeenCalledExactlyOnceWith(LP_01_URL);
+        expect(deps.launcherState.timeout).toHaveBeenCalledExactlyOnceWith(REQUEST, TIMEOUT_REF_NO);
+
+        await vi.advanceTimersByTimeAsync(5000);
+        await expect(run).resolves.toBe(LauncherExitCode.Success);
+        expect(deps.chromeOpener.open).toHaveBeenCalledOnce();
+      });
+
+      it('writes timeout for the page also when the log cannot be written', async () => {
+        const deps = setup({ subscribe: [phase('ready')], waitMs: 130_000 });
+        deps.log.startTimeout.mockImplementation(() => {
+          throw new Error('disk full');
+        });
+
+        const run = runOpenCommand(deps);
+        await vi.advanceTimersByTimeAsync(130_000);
+
+        await expect(run).resolves.toBe(LauncherExitCode.Success);
+        expect(deps.launcherState.timeout).toHaveBeenCalledOnce();
+        expect(deps.launcherState.ready).toHaveBeenCalledOnce();
+      });
+
+      it('logs the time-out but writes no state when LP-01 could not be opened', async () => {
+        const deps = setup({ subscribe: [phase('ready')], waitMs: 130_000 });
+        deps.chromeOpener.open.mockRejectedValueOnce(new Error('spawn explorer.exe ENOENT'));
+
+        const run = runOpenCommand(deps);
+        await vi.advanceTimersByTimeAsync(130_000);
+
+        await expect(run).resolves.toBe(LauncherExitCode.Success);
+        expect(deps.log.startTimeout).toHaveBeenCalledOnce();
+        expect(deps.launcherState.timeout).not.toHaveBeenCalled();
+        expect(deps.chromeOpener.open.mock.calls).toEqual([[LP_01_URL], [APP_URL]]);
+      });
     });
 
     it('opens no LP-01 later while the own supervisor runs on after the result', async () => {

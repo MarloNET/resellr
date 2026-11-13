@@ -15,23 +15,60 @@ let done = false;
 
 /** @typedef {{ request?: unknown, phase?: unknown, url?: unknown }} LauncherState */
 
-/** Reaction of each page to a state of its own call. */
+/** Title of `LP-02.zeitueberschreitung` (K-07). */
+const TIMEOUT_TITLE = 'resellr startet länger als erwartet';
+
+/**
+ * Reaction of each page to a state of its own call. Every target address was written by `open`
+ * through CU-268 and CU-310 (2.18 "Seitenwechsel").
+ */
 const reactions = {
   /** @param {LauncherState} state */
   'lp-01': (state) => {
-    // `aborted` (also for `gave_up` and `already_running` without a server) leads to LP-02, whose
-    // address with the reference number `open` wrote through CU-310 (2.18 "Seitenwechsel").
+    // `aborted` (also for `gave_up` and `already_running` without a server) leads to LP-02 with
+    // the reference number, `timeout` after 120 s to `LP-02.zeitueberschreitung` (K-07).
+    if (
+      (state.phase === 'ready' || state.phase === 'aborted' || state.phase === 'timeout') &&
+      typeof state.url === 'string'
+    ) {
+      goTo(state.url);
+    }
+  },
+  /** @param {LauncherState} state */
+  'lp-02': (state) => {
+    // `LP-02.zeitueberschreitung` reads on: `ready` goes on to the local address like LP-01,
+    // `aborted` to `LP-02.default` with the number of the abort (K-07).
     if ((state.phase === 'ready' || state.phase === 'aborted') && typeof state.url === 'string') {
       goTo(state.url);
     }
   },
 };
 
-/** LP-02 shows the reference number of its address, but only one that matches the pattern. */
-function showReferenceNumber() {
+/**
+ * LP-02 shows `zeitueberschreitung` instead of `default` when its address carries the `request` of
+ * a waiting call; only then it reads `launcher-state.js` (K-07). Returns the shown card.
+ * @returns {HTMLElement | null}
+ */
+function showLp02State() {
+  if (request === null) return document.getElementById('lp-02-default');
+  const card = document.getElementById('lp-02-zeitueberschreitung');
+  if (card === null) return null;
+  document.getElementById('lp-02-default')?.setAttribute('hidden', '');
+  card.hidden = false;
+  document.title = TIMEOUT_TITLE;
+  return card;
+}
+
+/**
+ * LP-02 shows the reference number of its address, but only one that matches the pattern.
+ * @param {HTMLElement | null} card
+ */
+function showReferenceNumber(card) {
   const refNo = params.get('ref');
-  const element = document.getElementById('reference-number');
-  if (element === null || refNo === null || !REFERENCE_NUMBER.test(refNo)) return;
+  const element = /** @type {HTMLElement | null | undefined} */ (
+    card?.querySelector('.reference-number')
+  );
+  if (!element || refNo === null || !REFERENCE_NUMBER.test(refNo)) return;
   element.textContent = refNo;
   element.hidden = false;
 }
@@ -65,5 +102,5 @@ function loadState() {
 }
 
 Object.assign(window, { __resellrLauncherState: onLauncherState });
-if (page === 'lp-02') showReferenceNumber();
+if (page === 'lp-02') showReferenceNumber(showLp02State());
 if (request !== null) loadState();
