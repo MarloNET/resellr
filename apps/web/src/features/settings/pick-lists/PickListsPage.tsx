@@ -199,11 +199,15 @@ export function PickListsPage() {
     if (error.kind === 'validation') {
       const fieldMessage = (path: string) =>
         error.error?.fields.find((entry) => entry.path === path)?.message;
-      showFieldErrors({
+      const fieldErrors: FieldErrors = {
         label: fieldMessage('label'),
         batteryPresent: fieldMessage('batteryPresent'),
-      });
-      return;
+      };
+      // A path without a field on the screen gives the banner `.error` (addendum MAR-555).
+      if (hasErrors(fieldErrors)) {
+        showFieldErrors(fieldErrors);
+        return;
+      }
     }
     // `name_taken.pick_list_value` "Wert gibt es in dieser Liste bereits" stands at the field.
     if (error.kind === 'rejected' && error.error?.code === 'name_taken') {

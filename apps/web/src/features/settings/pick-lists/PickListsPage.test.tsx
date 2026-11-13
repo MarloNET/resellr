@@ -460,6 +460,58 @@ describe('UI-028 pick lists (CU-096)', () => {
     expectAccessible();
   });
 
+  it('UI-028.validation DER-35-15 shows the field error of a 422 validation_failed at "Wert" with the focus on it, without banner', async () => {
+    mockApi({
+      writes: {
+        [PATCH_GEBRAUCHT]: () =>
+          Response.json(
+            errorBody('validation_failed', {
+              fields: [{ path: 'label', code: 'too_big', message: 'Wert: 1 bis 100 Zeichen' }],
+            }),
+            { status: 422 },
+          ),
+      },
+    });
+    await openPage();
+
+    rename('gebraucht', 'benutzt');
+
+    expect(await screen.findByText('Wert: 1 bis 100 Zeichen')).toBeTruthy();
+    expect(document.activeElement).toBe(valueInput());
+    expect(screen.queryByText(/Einstellungen konnten nicht gespeichert werden/)).toBeNull();
+    expect(valueInput().value).toBe('benutzt');
+    expectAccessible();
+  });
+
+  it('UI-028.error DER-35-14 a 422 validation_failed without a field of the screen shows the error banner, no field error and keeps the focus and the input', async () => {
+    mockApi({
+      writes: {
+        [PATCH_GEBRAUCHT]: () =>
+          Response.json(
+            errorBody('validation_failed', {
+              fields: [{ path: 'active', code: 'invalid_type', message: 'Status ungültig' }],
+            }),
+            { status: 422 },
+          ),
+      },
+    });
+    await openPage();
+
+    edit('gebraucht');
+    act(() => valueInput().focus());
+    fireEvent.change(valueInput(), { target: { value: 'benutzt' } });
+    fireEvent.click(saveButton());
+
+    expect(
+      await screen.findByText('Einstellungen konnten nicht gespeichert werden. Referenz: –'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Status ungültig')).toBeNull();
+    expect(valueInput().getAttribute('aria-invalid')).toBeNull();
+    expect(document.activeElement).toBe(valueInput());
+    expect(valueInput().value).toBe('benutzt');
+    expectAccessible();
+  });
+
   it('UI-028.validation checks an empty value when leaving the field', async () => {
     mockApi();
     await openPage();

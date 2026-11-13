@@ -248,15 +248,19 @@ export function DeviceTypesPage() {
     if (error.kind === 'validation') {
       const fieldMessage = (path: keyof AttributeFieldErrors) =>
         error.error?.fields.find((entry) => entry.path === path)?.message;
-      setAttributeErrors({
+      const fieldErrors: AttributeFieldErrors = {
         label: fieldMessage('label'),
         unit: fieldMessage('unit'),
         minValue: fieldMessage('minValue'),
         maxValue: fieldMessage('maxValue'),
         pickListId: fieldMessage('pickListId'),
-      });
-      setAttributeErrorFocus((count) => count + 1);
-      return;
+      };
+      // A path without a field in the panel gives the banner `.error` (addendum MAR-555).
+      if (Object.values(fieldErrors).some((message) => message !== undefined)) {
+        setAttributeErrors(fieldErrors);
+        setAttributeErrorFocus((count) => count + 1);
+        return;
+      }
     }
     // `name_taken.attribute` "Bezeichnung ist bei dieser Geräteart bereits vergeben" (DER-34-05).
     if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
@@ -363,9 +367,12 @@ export function DeviceTypesPage() {
   }
 
   function onFailed(error: ApiError) {
-    if (error.kind === 'validation') {
-      const field = error.error?.fields.find((entry) => entry.path === 'name');
-      if (field) showFieldError(field.message);
+    const field =
+      error.kind === 'validation'
+        ? error.error?.fields.find((entry) => entry.path === 'name')
+        : undefined;
+    if (field) {
+      showFieldError(field.message);
       return;
     }
     // `name_taken.device_type` "Name ist bereits vergeben" stands at the field.
