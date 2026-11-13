@@ -1,5 +1,6 @@
 import { attributeValuesSchema } from '@resellr/domain/schemas/attribute-values.schema';
 import { attributeListSchema } from '@resellr/domain/schemas/attribute.schema';
+import { pickListValueListSchema } from '@resellr/domain/schemas/pick-list.schema';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { insertAttributeValueRecords } from '../../test/attribute-values.ts';
@@ -165,6 +166,48 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     expect(modelTemplateValues.parse({ [String(diagonal?.id)]: '27' })).toEqual({
       [String(diagonal?.id)]: '27',
     });
+  });
+
+  it('AC-REQ-007-04 after renaming "mit Akku (defekt)" to "Akku defekt", a device with "Akku defekt" without battery capacity is rejected with the rule of the battery capacity', async () => {
+    const notebook = await createDeviceType('Notebook');
+    const batteryId = insertSystemRoleAttribute(notebook.id, 'battery', 'Akku');
+    const capacityId = insertSystemRoleAttribute(notebook.id, 'battery_capacity', 'Akkukapazität');
+    const batteryList = pickListId('battery');
+    const created = await write('POST', `/api/pick-lists/${batteryList}/values`, {
+      label: 'mit Akku (defekt)',
+      active: true,
+      batteryPresent: true,
+    });
+
+    const renamed = await write('PATCH', `/api/pick-list-values/${created.json().id}`, {
+      version: 1,
+      label: 'Akku defekt',
+    });
+
+    expect(renamed.json()).toMatchObject({ label: 'Akku defekt', batteryPresent: true });
+    const { items: attributes } = attributeListSchema.parse(
+      (await get(`/api/device-types/${notebook.id}/attributes`)).json(),
+    );
+    const { items: batteryValues } = pickListValueListSchema.parse(
+      (await get(`/api/pick-lists/${batteryList}/values`)).json(),
+    );
+    const deviceValues = attributeValuesSchema(attributes, 'device', { batteryValues });
+    const akkuDefekt = batteryValues.find((value) => value.label === 'Akku defekt');
+    expect(
+      deviceValues.safeParse({ [batteryId]: akkuDefekt?.id }).error?.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    ).toEqual([
+      {
+        path: String(capacityId),
+        message: 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“',
+      },
+    ]);
+    expect(
+      deviceValues.safeParse({ [batteryId]: akkuDefekt?.id, [capacityId]: { percent: 85 } })
+        .success,
+    ).toBe(true);
   });
 
   it('AC-REQ-005-06 an attribute of level device can be variant forming, at level model the flag is rejected', async () => {
