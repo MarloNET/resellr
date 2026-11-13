@@ -13,7 +13,7 @@
     "fastify": "5.12.8",
     "fastify-type-provider-zod": "7.0.0",
     "kysely": "0.28.19",
-    "sharp": "0.34.5",
+    "sharp": "0.35.5",
     "zod": "4.6.7"
   },
   "devDependencies": {
