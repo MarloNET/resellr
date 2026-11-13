@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,6 +8,7 @@ import {
   buildNotices,
   bundledPackageDirs,
   checkLicense,
+  collectLicenses,
   nativePackageDirs,
   readPackageNotice,
   webPackageDirs,
@@ -450,5 +451,59 @@ describe('buildNotices', () => {
     expect(() => buildNotices({ packageDirs: [fork], nodeLicense, interLicense })).toThrow(
       /sharp-win32-x64@0\.34\.5/,
     );
+  });
+});
+
+describe('collectLicenses', () => {
+  it('writes the packages of all three sources, Node.js and Inter into the program folder', () => {
+    const modules = join(root, 'node_modules');
+    const license = (name: string) => ({ LICENSE: `${name} license text` });
+    fakePackage(
+      { name: 'fastify', version: '5.0.0', license: 'MIT', dependencies: { pino: '1' } },
+      license('fastify'),
+    );
+    fakePackage({ name: 'pino', version: '9.0.0', license: 'MIT' }, license('pino'));
+    const programDir = join(root, 'resellr');
+    fakePackage(
+      { name: 'better-sqlite3', version: '12.0.0', license: 'MIT' },
+      license('better-sqlite3'),
+      join(programDir, 'app', 'node_modules'),
+    );
+    writeFile(
+      join(root, 'apps', 'web', 'package.json'),
+      JSON.stringify({ name: '@resellr/web', dependencies: { react: '1' } }),
+    );
+    writeFile(
+      join(root, 'apps', 'web', 'src', 'assets', 'fonts', 'LICENSE-Inter.txt'),
+      'Inter OFL',
+    );
+    fakePackage({ name: 'react', version: '19.0.0', license: 'MIT' }, license('react'), modules);
+    fakePackage(
+      { name: 'tailwindcss', version: '4.0.0', license: 'MIT' },
+      license('tailwindcss'),
+      modules,
+    );
+    const nodeLicense = writeFile(join(root, 'node', 'LICENSE'), 'Node.js license text');
+
+    const target = collectLicenses({
+      repoRoot: root,
+      programDir,
+      metafile: { inputs: { 'node_modules/fastify/fastify.js': {} } },
+      nodeLicense,
+    });
+
+    expect(target).toBe(join(programDir, 'THIRD-PARTY-NOTICES.txt'));
+    const text = readFileSync(target, 'utf8');
+    for (const pkg of [
+      'fastify@5.0.0',
+      'pino@9.0.0',
+      'better-sqlite3@12.0.0',
+      'react@19.0.0',
+      'tailwindcss@4.0.0',
+    ]) {
+      expect(text).toMatch(new RegExp(`^${pkg}$`, 'm'));
+    }
+    expect(text).toContain('Node.js license text');
+    expect(text).toContain('Inter OFL');
   });
 });
