@@ -1,5 +1,5 @@
 // License notices (CU-298, FIND-222, Technical Specification 2.19 "Build des Pakets", 4.3,
-// Nachtrag MAR-687, MAR-693, MAR-720): writes `THIRD-PARTY-NOTICES.txt` with the license texts of
+// Nachtrag MAR-687, MAR-693, MAR-720, MAR-758): writes `THIRD-PARTY-NOTICES.txt` with the license texts of
 // everything the package ships and fails the build for a shipped package whose license is
 // missing or not allowed.
 // Usage: `node tools/packaging/collect-licenses.mjs <program folder> --metafile <path>` after
@@ -129,7 +129,8 @@ function hasLgpl(expression) {
 
 /**
  * Name, version, checked license and license text of an installed package. A package without
- * license file needs an entry in `missingLicenseFiles` (Nachtrag MAR-693).
+ * license file needs an entry in `missingLicenseFiles` (Nachtrag MAR-693), unless it is a libvips
+ * package under LGPL-3.0 alone (Nachtrag MAR-758).
  * @param {string} dir package folder
  * @param {{ missingLicenseFiles?: MissingLicenseFiles, licensesDir?: string,
  *   log?: (line: string) => void }} [options]
@@ -169,6 +170,10 @@ export function readPackageNotice(dir, options = {}) {
       );
     }
     text = `Lizenztext nicht im Paket enthalten, Quelle: ${entry.source}\n\n${readFileSync(file, 'utf8').trim()}`;
+  } else if (LIBVIPS_PACKAGE.test(pkg) && LGPL_LICENSES.has(license?.trim() ?? '')) {
+    // A libvips package under LGPL-3.0 alone gets the texts of LGPL-3.0 and GPL-3.0 and its libvips
+    // section appended by `buildNotices` (Nachtrag MAR-758).
+    text = `Lizenztext nicht im Paket enthalten. Es gelten LGPL-3.0 und GPL-3.0, Texte am Ende dieser Datei; Bibliotheken und Quellcode im Abschnitt „libvips aus ${pkg}“.`;
   } else {
     throw new Error(`${pkg} ships no license text`);
   }

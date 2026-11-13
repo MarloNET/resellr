@@ -259,6 +259,55 @@ describe('readPackageNotice', () => {
       expect(log).toEqual([expect.stringMatching(/no-file@3\.0\.0.*unused/)]);
     });
   });
+
+  describe('libvips packages without license file (Nachtrag MAR-758)', () => {
+    it('accepts a libvips package under LGPL-3.0 alone without entry and refers to the appended texts', () => {
+      const dir = fakePackage(
+        { name: '@img/sharp-libvips-linux-x64', version: '1.3.4', license: 'LGPL-3.0-or-later' },
+        { 'versions.json': '{}', 'README.md': 'readme' },
+      );
+
+      expect(readPackageNotice(dir, { missingLicenseFiles: {} }).text).toBe(
+        'Lizenztext nicht im Paket enthalten. Es gelten LGPL-3.0 und GPL-3.0, Texte am Ende dieser Datei; Bibliotheken und Quellcode im Abschnitt „libvips aus @img/sharp-libvips-linux-x64@1.3.4“.',
+      );
+    });
+
+    it('fails for the same package under MIT', () => {
+      const dir = fakePackage({
+        name: '@img/sharp-libvips-linux-x64',
+        version: '1.3.4',
+        license: 'MIT',
+      });
+
+      expect(() => readPackageNotice(dir, { missingLicenseFiles: {} })).toThrow(
+        /sharp-libvips-linux-x64@1\.3\.4 ships no license text/,
+      );
+    });
+
+    it('fails for a libvips package with another license part', () => {
+      const dir = fakePackage({
+        name: '@img/sharp-win32-x64',
+        version: '0.35.5',
+        license: 'Apache-2.0 AND LGPL-3.0-or-later',
+      });
+
+      expect(() => readPackageNotice(dir, { missingLicenseFiles: {} })).toThrow(
+        /sharp-win32-x64@0\.35\.5 ships no license text/,
+      );
+    });
+
+    it('fails for an LGPL-3.0 package outside the libvips packages', () => {
+      const dir = fakePackage({
+        name: '@other/sharp-libvips-linux-x64',
+        version: '1.3.4',
+        license: 'LGPL-3.0-or-later',
+      });
+
+      expect(() => readPackageNotice(dir, { missingLicenseFiles: {} })).toThrow(
+        /@other\/sharp-libvips-linux-x64@1\.3\.4.*not allowed/,
+      );
+    });
+  });
 });
 
 describe('shipped packages (Nachtrag MAR-687)', () => {
