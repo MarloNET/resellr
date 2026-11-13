@@ -2878,7 +2878,7 @@ Exakte Versionen legt das Lockfile im Walking Skeleton fest (neueste stabile Min
 | HTTP | Fastify, `@fastify/multipart`, `@fastify/static`, `fastify-type-provider-zod` | 5.x | MIT |
 | Validierung | Zod | 4.x | MIT |
 | Datenbank | `better-sqlite3`, Kysely (nur Abfragen, nicht der `Migrator`, Kap. 2.19) | 12.x, 0.28.x | MIT |
-| Bilder | `sharp` (libvips) | 0.34.x | Apache-2.0; `@img/sharp-win32-x64` Apache-2.0 AND LGPL-3.0-or-later (libvips) |
+| Bilder | `sharp` (libvips) | 0.35.x, mindestens 0.35.5 (Nachtrag MAR-719, vorher 0.34.x) | Apache-2.0; `@img/sharp-win32-x64` Apache-2.0 AND LGPL-3.0-or-later (libvips) |
 | PDF | `pdfmake` | 0.2.x | MIT |
 | ZIP | `yazl` | 3.x | MIT |
 | Oberfläche | React, React DOM, React Router, TanStack Query, React Hook Form, `@hookform/resolvers` | 19.x, 7.x, 5.x, 7.x | MIT |
@@ -2895,7 +2895,7 @@ Exakte Versionen legt das Lockfile im Walking Skeleton fest (neueste stabile Min
 
 **Zugehörige Pakete (Nachtrag MAR-245).** Ohne eigene Zeile zulässig sind (1) die Typdefinitionen `@types/<name>` einer Bibliothek der Tabelle in deren Hauptversion (z. B. `@types/react`, `@types/react-dom` 19.x; für Node.js die Typen der gewählten Laufzeit) und (2) offizielle Teilpakete einer Zeile, die das Projekt der Bibliothek selbst herausgibt: `@tailwindcss/vite` in der Hauptversion von Tailwind CSS, die Radix-Primitives `@radix-ui/react-*`, auf denen ein shadcn/ui-Baustein in `components/ui/` aufbaut. Für alles andere gilt die Hotspot-Regel von CU-001 (Kap. 4.5).
 
-**Sicherheitshinweise der Abhängigkeiten (TH-07, Nachtrag MAR-213).** Die CI prüft in zwei Schritten: (1) `npm audit --omit=dev --audit-level=high` für alles, was ausgeliefert wird, ohne Ausnahme; (2) `npm audit --audit-level=high` für alle Abhängigkeiten einschließlich Test-, Lint- und Build-Werkzeugen, weil diese auf dem Entwicklerrechner und in der CI Code ausführen. Meldet Schritt (2) einen Befund ohne Fix innerhalb der hier genannten Hauptversion, entscheidet der Software Architect: Hauptversion in dieser Tabelle anheben (Nachtrag nach Kap. 4.7) oder befristete, im Änderungsprotokoll (Kap. 10.2) begründete Ausnahme. Befunde unterhalb `high` in Werkzeugen werden über die Dependabot-Vorschläge behoben, sobald ein Fix vorliegt.
+**Sicherheitshinweise der Abhängigkeiten (TH-07, Nachtrag MAR-213).** Die CI prüft in zwei Schritten: (1) `npm audit --omit=dev --audit-level=high` für alles, was ausgeliefert wird, ohne Ausnahme; (2) `npm audit --audit-level=high` für alle Abhängigkeiten einschließlich Test-, Lint- und Build-Werkzeugen, weil diese auf dem Entwicklerrechner und in der CI Code ausführen. Meldet Schritt (2) einen Befund ohne Fix innerhalb der hier genannten Hauptversion, entscheidet der Software Architect: Hauptversion in dieser Tabelle anheben (Nachtrag nach Kap. 4.7) oder befristete, im Änderungsprotokoll (Kap. 10.2) begründete Ausnahme. Meldet Schritt (1) einen solchen Befund, hebt der Software Architect die Hauptversion an (Nachtrag nach Kap. 4.7); eine Ausnahme gibt es dort nicht. Ändert die neue Hauptversion Lizenz, Komponenten oder freigegebenes Verhalten, ist das eine Architekturänderung (Nachtrag MAR-719). Befunde unterhalb `high` in Werkzeugen werden über die Dependabot-Vorschläge behoben, sobald ein Fix vorliegt.
 
 ### 4.4 Karte der Code-Einheiten
 
@@ -4425,7 +4425,7 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
   1. **Die Auslieferung von `sharp` 0.34.5 mit diesen Bibliotheken ist zulässig.** Alle 28 Bibliotheken stehen unter freien Lizenzen im Sinne von Baseline Kap. 3 („Kosten“), ohne Gebühr und ohne Nutzungsbeschränkung. Ihre Bedingungen sind Lizenztext und Copyright-Hinweis beilegen, bei LGPL und MPL zusätzlich den Quellcode nennen. Beides erfüllt `THIRD-PARTY-NOTICES.txt` nach Festlegung 3. Keine dieser Bedingungen reicht in den Code von resellr hinein, denn die Bibliotheken liegen nur in den unveränderten, austauschbaren DLLs von libvips. resellr lädt sie zur Laufzeit über `sharp` und bindet sie nie in ein Bündel ein. Die Abmessungsprüfung (Kap. 2.11) bleibt daher bei `sharp`; eine Alternative entfällt. Kostenpflichtige Patentlizenzen fallen nicht an: Ein HEVC-Codec (`libde265`, `x265`) steht nicht in `versions.json`; libheif liest dort nur AVIF über aom. Die AOM-Patentlizenz 1.0 gewährt Patentrechte gebührenfrei und erlischt nur bei einer Patentklage des Lizenznehmers zu AV1.
   2. **Zwei Listen erlaubter Lizenzen.**
      - **npm-Pakete:** Die Liste aus Nachtrag MAR-687, Festlegung 3, mit `BlueOak-1.0.0` aus Nachtrag MAR-693 gilt unverändert. Ausnahme bleibt LGPL-3.0 nur für Pakete, die libvips als dynamische Bibliothek tragen. `@img/sharp-win32-x64` besteht diese Prüfung mit `Apache-2.0 AND LGPL-3.0-or-later`.
-     - **Bibliotheken in den libvips-DLLs:** erlaubt ist die Liste der npm-Pakete und zusätzlich LGPL-2.0, LGPL-2.1 und LGPL-3.0 (jeweils `-only` oder `-or-later`), MPL-1.1, MPL-2.0, `Zlib`, `IJG`, `libpng-2.0`, `libtiff`, `FTL`, die fontconfig-Lizenz (MIT-artig) sowie BSD-2-Clause mit der AOM-Patentlizenz 1.0.
+     - **Bibliotheken in den libvips-DLLs:** erlaubt ist die Liste der npm-Pakete und zusätzlich LGPL-2.0, LGPL-2.1 und LGPL-3.0 (jeweils `-only` oder `-or-later`), MPL-1.1, MPL-2.0, `Zlib`, `IJG`, `libpng-2.0`, `libtiff`, `FTL`, die fontconfig-Lizenz (MIT-artig), BSD-2-Clause mit der AOM-Patentlizenz 1.0 sowie `CC0-1.0` (ergänzt mit Nachtrag MAR-719).
      - **Nirgends erlaubt:** GPL ohne Bibliotheksausnahme, AGPL und jede Lizenz mit Gebühr, Nutzungsbeschränkung oder kostenpflichtiger Patentlizenz.
      - CU-298 liest die Lizenz dieser Bibliotheken nicht aus einem Feld, denn es gibt keins in maschinenlesbarer Form. Die Prüfung ist der Eintrag in der Liste nach Festlegung 3. Neue Bibliotheken und geänderte Lizenzen legt der Software Architect auf Rückfrage fest, nicht der Developer.
   3. **Liste der Bibliotheken in CU-298:** `tools/packaging/licenses/libvips-libraries.json`. Sie ist ein Objekt mit dem Schlüssel aus `versions.json` (z. B. `cairo`, `vips`). Jeder Eintrag hat diese Felder:
@@ -4445,7 +4445,7 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
      Der libvips-Abschnitt aus Nachtrag MAR-687 nennt dann je Bibliothek Name, Version, Lizenz und `source` und gibt den Text aus `file` wieder. Ein Eintrag ohne Schlüssel in `versions.json` bleibt ungenutzt; dazu gibt CU-298 eine Zeile im Build-Protokoll aus.
 
      **Update von `sharp`:** Ändert ein Update nur Versionen und bleibt die Lizenzangabe jeder Bibliothek im README des neuen Pakets gleich, aktualisiert der Developer `version`, `source` und Text selbst. Bei einer neuen Bibliothek oder einer geänderten Lizenzangabe stellt er eine Rückfrage an den Software Architect. Die Versionsprüfung sorgt dafür, dass kein Release mit veralteten Texten oder ungeprüften Bibliotheken entsteht.
-  4. **Einträge für `@img/sharp-win32-x64` 0.34.5** (geprüft, alle erlaubt nach Festlegung 2):
+  4. **Einträge für `@img/sharp-win32-x64` 0.34.5** (geprüft, alle erlaubt nach Festlegung 2; für 0.35.5 ersetzt durch Festlegung 4 von Nachtrag MAR-719):
 
      | Schlüssel | Version | `license` |
      |---|---|---|
@@ -4478,6 +4478,60 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
 - **Hinweis zur Quellangabe:** Für LGPL und MPL nennt die Datei die Quellen nach Nachtrag MAR-687 und je Bibliothek `source` am Tag der Version. Das genügt, solange resellr nur an den Owner selbst geht (privates Repository, GitHub Releases von `MarloNET/resellr`). Geht resellr einmal an Dritte, prüft der Software Architect, ob die Quellarchive der LGPL- und MPL-Bibliotheken dem Release beigelegt werden müssen.
 - Kap. 2.19 (Build des Pakets), Kap. 4.3 (Einleitung) und Kap. 4.4 (CU-298) entsprechend ergänzt.
 - **Keine Owner-Freigabe nötig (Kap. 4.7):** Es entsteht keine neue Einheit. Der Owner hat `sharp` mit libvips freigegeben (Kap. 4.3, Zeile „Bilder“; Baseline Kap. 3). Die Bibliotheken sind seit jeher Teil der vorkompilierten DLLs, ihre Prüfung war mit FIND-222 vorgesehen. Die Festlegungen benennen sie und machen die freigegebene Lizenzprüfung für sie baubar. Inhalt des Pakets und Verhalten von resellr bleiben gleich. Neu in `THIRD-PARTY-NOTICES.txt` sind nur die Lizenztexte dieser Bibliotheken.
+
+**Code-Struktur-Nachtrag 13.11.2026 (MAR-719, Rückfrage aus der Umsetzung von GitHub-Issue #167, MAR-684; Sicherheitshinweise TH-07):** keine neue Einheit, Hauptversion von `sharp` in Kap. 4.3 von 0.34.x auf 0.35.x angehoben, Einträge der libvips-Bibliotheken aus Nachtrag MAR-711 für `@img/sharp-win32-x64` 0.35.5 ersetzt, keine Komponentengrenze berührt, keine Migration, kein Diagramm.
+
+- **Ausgangslage:** Mit `sharp` 0.34.5 (PR #364) scheitert die CI in Schritt (1) der Abhängigkeitsprüfung (Kap. 4.3, TH-07; Lauf 43441180467). `npm audit --omit=dev --audit-level=high` meldet für `sharp` drei Hinweise der Stufe `high` zu Bibliotheken in den libvips-DLLs: GHSA-f88m-g3jw-g9cj (libvips, CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591; behoben ab 0.35.0), GHSA-rgj7-g3m4-5g8c (libheif; ab 0.35.4) und GHSA-wq5f-xc86-pv6w (librsvg, CVE-2026-96889; ab 0.35.5). 0.34.5 ist die letzte Version von 0.34; einen Fix innerhalb von 0.34.x gibt es nicht. Für ausgelieferte Pakete erlaubt Schritt (1) keine Ausnahme, und Kap. 4.3 regelte bisher nur Befunde aus Schritt (2). Von mir nachgeprüft: `npm audit` für `sharp@0.34.5`; `npm pack` von `@img/sharp-win32-x64` 0.34.5 und 0.35.5 (`package.json`, `versions.json`, README, `lib/`) und von `sharp` 0.35.5; Changelog von `sharp` 0.35.0 bis 0.35.5; Upstream-Lizenzdateien von libultrahdr v2.0.2, Highway 1.4.0, cairo 1.18.6, zlib-ng 2.3.3, aom v3.15.1 und `libvips/foreign/libnsgif/COPYING` in libvips 8.18.7.
+- **Festlegung:**
+  1. **Hauptversion 0.35.x, mindestens 0.35.5.** Kap. 4.3, Zeile „Bilder“: `sharp` 0.35.x. Das Lockfile hält 0.35.5 oder neuer, denn erst 0.35.5 behebt alle drei Hinweise. `sharp` bleibt Apache-2.0, `@img/sharp-win32-x64` bleibt `Apache-2.0 AND LGPL-3.0-or-later`. Die Laufzeit-Abhängigkeiten von `sharp` sind dieselben (`@img/colour`, `detect-libc`, `semver`). Node.js 26 erfüllt `engines` `>=20.9.0`. Kap. 4.3 regelt jetzt auch Befunde aus Schritt (1) ohne Fix in der Hauptversion: anheben, keine Ausnahme.
+  2. **Breaking Changes von 0.35.0 und ihre Folgen für resellr:** Keine betrifft die freigegebene Nutzung: CU-089 liest `metadata()` mit `limitInputPixels`, CU-205 erzeugt das Vorschaubild mit `rotate()`, `resize()` und `jpeg()`. Kap. 2.11 bleibt unverändert.
+     - Node.js 18 entfällt. resellr nutzt Node.js 26.
+     - Das `install`-Skript entfällt. Ohne vorkompiliertes Paket baut `sharp` nicht mehr aus dem Quellcode. Für Windows x64 (Paket) und Linux x64 (CI) gibt es vorkompilierte Pakete. Der Rückfall auf WebAssembly (`@img/sharp-wasm32`) ist für resellr nicht vorgesehen und wird nicht ausgeliefert; die Pakete dafür setzen `cpu` `wasm32` oder `os` `freebsd` voraus und werden auf dem Windows-Runner nicht installiert.
+     - Neu ist `limitInputChannels` mit dem Standardwert 5. JPEG (bis 4 Kanäle bei CMYK) und PNG (bis 4) liegen darunter.
+     - Entfernt wurden `failOnError`, `paletteBitDepth` in `metadata()`, alte Parameter von `sharpen` und `format.jp2k`. resellr nutzt nichts davon. Die geänderte AVIF-Ausgabe betrifft resellr ebenfalls nicht.
+     - `sharp` lädt seine Binärdatei jetzt über statische Pfade. In CU-276 bleibt `sharp` extern; das Bündel ändert sich dadurch nicht.
+     - Neu liest libvips JPEG mit eingebetteter Gain Map (Ultra HDR) über libultrahdr. `sharp` meldet dafür weiter `format` `jpeg` (Quellcode `src/common.cc` von 0.35.5). Ohne `keepGainMap()` entfernt `sharp` die Gain Map aus der Ausgabe, das Vorschaubild bleibt also ein normales JPEG.
+  3. **Lizenzen der Bibliotheken in den DLLs von 0.35.5** (`lib/libvips-42.dll`, `lib/libvips-cpp-8.18.7.dll`; 28 Bibliotheken): Alle sind nach Festlegung 2 von Nachtrag MAR-711 erlaubt, wenn `CC0-1.0` dort in die Liste für Bibliotheken in den libvips-DLLs aufgenommen wird. Das legt dieser Nachtrag fest. Änderungen gegenüber 0.34.5:
+     - **Entfallen:** `spng`. Eintrag und Datei in `tools/packaging/licenses/libvips/` entfallen.
+     - **Neu: `uhdr` 2.0.2 (libultrahdr, Google).** `LICENSE` von v2.0.2 sagt „distributed under the terms of both the MIT license and the Apache License (Version 2.0)“, also `MIT AND Apache-2.0`. Beide stehen schon in der Liste der npm-Pakete. Das README des Pakets nennt nur MIT. Das Repository enthält außerdem `adobe-hdr-gain-map-license/NOTICE` mit dem Satz „This product includes Gain Map technology under license by Adobe.“ Das ist ein Hinweis, den der Weitergebende beilegt. Eine Gebühr oder Nutzungsbeschränkung nennt das Repository nicht. `file` enthält `LICENSE` und diesen `NOTICE` unverändert.
+     - **Geänderte Lizenzangabe im README: `highway`.** Das README nennt nur noch „BSD 3-Clause“ statt „Apache-2.0 License, BSD 3-Clause“. Upstream `LICENSE` von 1.4.0 nennt weiter die Wahl zwischen Apache-2.0 und BSD-3-Clause und zusätzlich `CC0-1.0` für die Datei `hwy/contrib/random/random-inl.h`. Die Texte stehen jetzt alle in `LICENSE`; `LICENSE-BSD3` gibt es nicht mehr. `CC0-1.0` ist ein Verzicht auf Rechte ohne Bedingungen und deshalb erlaubt.
+     - **`cairo`:** Das README nennt jetzt MPL-1.1 statt MPL-2.0. Upstream `COPYING` von 1.18.6 nennt unverändert „LGPL-2.1 oder MPL-1.1“. Der Eintrag bleibt `LGPL-2.1-only OR MPL-1.1`.
+     - **Alle übrigen:** nur neue Versionen. Ihre Lizenzangabe im README ist bis auf die Schreibweise („Licence“ → „License“) gleich. Der Developer aktualisiert `version`, `source` und Text nach Festlegung 3 von Nachtrag MAR-711 selbst.
+  4. **Einträge für `@img/sharp-win32-x64` 0.35.5** (ersetzen Festlegung 4 von Nachtrag MAR-711; geprüft, alle erlaubt nach Festlegung 2 von Nachtrag MAR-711 mit `CC0-1.0`):
+
+     | Schlüssel | Version | `license` |
+     |---|---|---|
+     | `aom` | 3.15.1 | BSD-2-Clause mit AOM-Patentlizenz 1.0 |
+     | `archive` | 3.8.9 | BSD-2-Clause |
+     | `cairo` | 1.18.6 | `LGPL-2.1-only OR MPL-1.1` (Upstream `COPYING`; README nennt MPL-1.1) |
+     | `cgif`, `expat`, `ffi`, `harfbuzz`, `lcms`, `pixman`, `xml2` | laut `versions.json` | MIT |
+     | `exif`, `fribidi`, `glib`, `heif`, `pango`, `proxy-libintl`, `rsvg` | laut `versions.json` | `LGPL-3.0-or-later` (über „any later version“, laut README), `file` `null` |
+     | `fontconfig` | 2.18.3 | fontconfig-Lizenz (MIT-artig) |
+     | `freetype` | 2.14.3 | `FTL` (gewählt aus `FTL OR GPL-2.0-or-later`; Text `LICENSE.TXT` und `docs/FTL.TXT`) |
+     | `highway` | 1.4.0 | `(Apache-2.0 OR BSD-3-Clause) AND CC0-1.0` (`CC0-1.0` nur `hwy/contrib/random/random-inl.h`; Text `LICENSE`) |
+     | `imagequant` | 2.4.1 | BSD-2-Clause (Fork `lovell/libimagequant`) |
+     | `mozjpeg` | 0826579 | `IJG AND BSD-3-Clause AND Zlib` |
+     | `png` | 1.6.58 | `libpng-2.0` |
+     | `tiff` | 4.7.2 | `libtiff` |
+     | `uhdr` | 2.0.2 | `MIT AND Apache-2.0`; `file` mit `LICENSE` und `adobe-hdr-gain-map-license/NOTICE` |
+     | `vips` | 8.18.7 | `LGPL-3.0-or-later`; `file` mit dem MIT-Text von libnsgif |
+     | `webp` | 1.6.0 | BSD-3-Clause mit Patentgewährung (`PATENTS`) |
+     | `zlib-ng` | 2.3.3 | `Zlib` |
+
+- **Umfang:** alles in #167 (PR #364).
+  - `apps/server/package.json`: `sharp` exakt `0.35.5` und das Lockfile aktualisieren. Den Code von CU-089 und den Testbildern (`apps/server/test/images.ts`) gegen Festlegung 2 prüfen.
+  - Die Tabelle „Lizenzprüfung sharp (a)“ im PR zeigt 0.35.5 nach Festlegung 4 mit dem Ergebnis „zulässig (Nachtrag MAR-711, MAR-719)“.
+  - Teil (b) der Auflage (Liste, Texte, CU-298 mit Test) nimmt die Einträge aus Festlegung 4, wo der CEOrchestrator Teil (b) hinlegt. `CC0-1.0` gehört in die Liste der erlaubten Lizenzen für Bibliotheken in den libvips-DLLs.
+  - Belegt durch die grüne CI einschließlich beider Schritte von `npm audit`. Der nächste Probelauf von `release.yml` (`workflow_dispatch`) zeigt, dass unter `@img/` nur `sharp-win32-x64` und `colour` ausgeliefert werden.
+  - #125 ändert sich nicht.
+- **Verworfen:**
+  - (a) Befristete Ausnahme für 0.34.5: Kap. 4.3 lässt Ausnahmen nur für Werkzeuge zu (Schritt 2). Die Hinweise betreffen genau die Bibliotheken, die hochgeladene Dateien lesen (TH-04).
+  - (b) `@img/sharp-win32-x64` per `overrides` auf 0.35.5 unter `sharp` 0.34.5: Das Binding `sharp-win32-x64.node` und der JavaScript-Teil von `sharp` gehören zur selben Version. Eine gemischte Kombination unterstützt `sharp` nicht.
+  - (c) 0.35.4: Der Hinweis zu librsvg (GHSA-wq5f-xc86-pv6w) bliebe offen.
+  - (d) `sharp` ersetzen: wie Nachtrag MAR-711, Verworfen (e).
+- **Hinweis zur Quellangabe:** Der Hinweis aus Nachtrag MAR-711 gilt weiter. Geht resellr einmal an Dritte, prüft der Software Architect dabei auch den Hinweis von Adobe zur Gain-Map-Technik in libultrahdr.
+- Kap. 4.3 (Zeile „Bilder“, Regel zu Schritt (1) der Abhängigkeitsprüfung) sowie Festlegung 2 (`CC0-1.0`) und Festlegung 4 (Verweis auf diesen Nachtrag) von Nachtrag MAR-711 entsprechend ergänzt.
+- **Keine Owner-Freigabe nötig (Kap. 4.7):** Es entsteht keine neue Einheit. Kap. 4.3 (TH-07) sieht das Anheben der Hauptversion durch den Software Architect als Nachtrag nach Kap. 4.7 vor. Bibliothek, Lizenz der Pakete, Komponenten und Verhalten von resellr bleiben gleich. Die neue Bibliothek in der DLL steht unter MIT und Apache-2.0, `CC0-1.0` ist freier als jede Lizenz der Liste. Neu in `THIRD-PARTY-NOTICES.txt` sind nur die Texte von libultrahdr, der Hinweis von Adobe und der `CC0-1.0`-Teil von Highway.
 
 **Code-Struktur-Nachtrag 13.11.2026 (MAR-720, dritte Rückfrage aus der Umsetzung von GitHub-Issue #125, MAR-683):** keine neue Einheit, Quelle „Server und Launcher“ von CU-298 aus Nachtrag MAR-687, Festlegung 2, ergänzt, keine Komponentengrenze berührt, keine Migration, kein Diagramm.
 
