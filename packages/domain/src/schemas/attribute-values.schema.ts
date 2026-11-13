@@ -5,6 +5,7 @@ import { compareDecimal, parseDecimal } from '../format/parse-decimal.ts';
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
 import type { Attribute, AttributeLevel } from './attribute.schema.ts';
 import { idSchema } from './common.schema.ts';
+import type { BatteryValueFlag } from './pick-list.schema.ts';
 
 // Values of the attributes of a device type (CU-067, REQ-005, REQ-076; Technical Specification
 // 2.5 "Regeln und Texte je Datentyp", 3.4). The schema is built at run time from the attribute
@@ -113,7 +114,8 @@ function valueSchema(attribute: AttributeValueDefinition): z.ZodType<AttributeVa
       ])
       .nullable()
       .transform((input, context): BatteryCapacityValue | undefined => {
-        if (input === null) return missing(context);
+        // Whether a value is required depends on the battery value (`batteryCapacityRule`).
+        if (input === null) return undefined;
         if ('notDeterminable' in input) return input;
         const percent = wholeNumber(input.percent);
         if (percent === null || percent < 0 || percent > 100) {
@@ -200,16 +202,49 @@ function valueSchema(attribute: AttributeValueDefinition): z.ZodType<AttributeVa
 }
 
 /**
+ * Rule of the role `battery_capacity` (2.5, FIND-353): a value is required exactly when the
+ * attribute is active and the chosen value of the active attribute with the role `battery`
+ * carries the flag "Akku vorhanden", whatever its label (DER-35-12). `undefined` without both
+ * attributes at the level.
+ */
+function batteryCapacityRule(
+  attributes: readonly AttributeValueDefinition[],
+  batteryValues: readonly BatteryValueFlag[],
+) {
+  const battery = attributes.find(({ systemRole }) => systemRole === 'battery');
+  const capacity = attributes.find(({ systemRole }) => systemRole === 'battery_capacity');
+  if (battery === undefined || capacity === undefined) return undefined;
+  const present = new Set(
+    batteryValues.filter((value) => value.batteryPresent).map(({ id }) => id),
+  );
+  return (values: Record<string, unknown>, context: Context) => {
+    if (!battery.active || !capacity.active) return;
+    const chosen = values[String(battery.id)];
+    if (typeof chosen !== 'number' || !present.has(chosen)) return;
+    if (values[String(capacity.id)] !== undefined) return;
+    context.addIssue({
+      code: 'custom',
+      message: FIELD_MESSAGES.attributeValueMissing(capacity.label),
+      params: { code: 'value_missing' },
+      path: [String(capacity.id)],
+    });
+  };
+}
+
+/**
  * Schema of the values of one level ("Modell" for model templates, "Gerät" for devices) built
  * from the attributes of the device type (2.5): one optional key per attribute of the level, the
  * attribute id as string (3.4). An active required attribute without a value is rejected with
  * "<Merkmal> fehlt"; a deactivated attribute is no longer asked for, but a stored value of it
- * stays valid (REQ-005). Each attribute has at most one field error, at its id. The output holds
- * only the attributes with a value, in their stored form.
+ * stays valid (REQ-005). The battery capacity is required by the flag "Akku vorhanden" of the
+ * chosen value among `batteryValues`, the values of the list battery; without them it is never
+ * required. Each attribute has at most one field error, at its id. The output holds only the
+ * attributes with a value, in their stored form.
  */
 export function attributeValuesSchema(
   attributes: readonly AttributeValueDefinition[],
   level: AttributeLevel,
+  { batteryValues = [] }: { batteryValues?: readonly BatteryValueFlag[] } = {},
 ) {
   const ofLevel = attributes.filter((attribute) => attribute.level === level);
   const shape = Object.fromEntries(
@@ -221,7 +256,16 @@ export function attributeValuesSchema(
     typeof input === 'object' && input !== null && !Array.isArray(input)
       ? { ...Object.fromEntries(ofLevel.map(({ id }) => [String(id), null])), ...input }
       : input;
-  return z.preprocess(withAllKeys, z.strictObject(shape)).transform((values) => {
+  const batteryCapacity = batteryCapacityRule(ofLevel, batteryValues);
+  // The cross-field rule runs beside the field errors of the other attributes, but not after a
+  // structural error (2.0.5 rule (4)).
+  const object =
+    batteryCapacity === undefined
+      ? z.strictObject(shape)
+      : z.strictObject(shape).superRefine(batteryCapacity, {
+          when: ({ issues }) => issues.every((issue) => issue.code === 'custom'),
+        });
+  return z.preprocess(withAllKeys, object).transform((values) => {
     const stored: AttributeValues = {};
     for (const [key, value] of Object.entries(values)) {
       if (value !== undefined) stored[key] = value as AttributeValue;

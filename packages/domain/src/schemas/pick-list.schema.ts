@@ -95,6 +95,12 @@ export const pickListValueSchema = z.object({
 });
 export type PickListValue = z.infer<typeof pickListValueSchema>;
 
+/**
+ * A value of the list battery as the rule of the battery capacity needs it: the flag "Akku
+ * vorhanden", never the label, decides whether a battery is present (2.1, 2.5; DER-35-12).
+ */
+export type BatteryValueFlag = Pick<PickListValue, 'id' | 'batteryPresent'>;
+
 /** `GET /api/pick-lists/{id}/values`. */
 export const pickListValueListSchema = listResponseSchema(pickListValueSchema);
 export type PickListValueList = z.infer<typeof pickListValueListSchema>;

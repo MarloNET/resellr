@@ -275,4 +275,101 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
       ]);
     });
   });
+
+  describe('row "Rolle battery_capacity": required by the flag "Akku vorhanden" (2.5)', () => {
+    const BATTERY = attribute({
+      id: 17,
+      label: 'Akku',
+      dataType: 'pick',
+      systemRole: 'battery',
+      level: 'device',
+      required: true,
+    });
+    const CAPACITY = attribute({
+      id: 18,
+      label: 'Akkukapazität',
+      dataType: 'integer',
+      systemRole: 'battery_capacity',
+      level: 'device',
+    });
+    const RAM = attribute({ id: 12, label: 'RAM', dataType: 'integer', level: 'device' });
+    const WITH_BATTERY = { id: 4, label: 'mit Akku', batteryPresent: true };
+    const DEFECTIVE = { id: 5, label: 'mit Akku (defekt)', batteryPresent: true };
+    const WITHOUT_BATTERY = { id: 6, label: 'ohne Akku', batteryPresent: false };
+    const BATTERY_VALUES = [WITH_BATTERY, DEFECTIVE, WITHOUT_BATTERY];
+    const CAPACITY_MISSING = [{ path: '18', message: 'Akkukapazität fehlt' }];
+
+    const deviceValues = (
+      attributes: AttributeValueDefinition[],
+      values: Record<string, unknown>,
+      batteryValues: { id: number; batteryPresent: boolean | null }[] = BATTERY_VALUES,
+    ) => attributeValuesSchema(attributes, 'device', { batteryValues }).safeParse(values);
+
+    it('DER-35-12 the requirement follows the flag batteryPresent and not the name of the value', () => {
+      const renamed = { ...DEFECTIVE, label: 'Akku defekt' };
+      expect(issuesOf(deviceValues([BATTERY, CAPACITY], { 17: 5 }, [renamed]))).toEqual(
+        CAPACITY_MISSING,
+      );
+      // A value named like one with a battery, but without the flag, needs no capacity.
+      const namedLikeBattery = { ...WITHOUT_BATTERY, label: 'mit Akku (defekt)' };
+      expect(deviceValues([BATTERY, CAPACITY], { 17: 6 }, [namedLikeBattery]).data).toEqual({
+        17: 6,
+      });
+    });
+
+    it('rejects a battery value with the flag without capacity, beside the other field errors', () => {
+      expect(issuesOf(deviceValues([BATTERY, CAPACITY], { 17: 4 }))).toEqual(CAPACITY_MISSING);
+      expect(issuesOf(deviceValues([BATTERY, CAPACITY], { 17: 5, 18: null }))).toEqual(
+        CAPACITY_MISSING,
+      );
+      expect(issuesOf(deviceValues([BATTERY, CAPACITY, RAM], { 12: 'viel', 17: 4 }))).toEqual([
+        { path: '12', message: 'RAM: ganze Zahl' },
+        { path: '18', message: 'Akkukapazität fehlt' },
+      ]);
+    });
+
+    it('accepts a battery value with the flag and a capacity or "nicht ermittelbar"', () => {
+      expect(deviceValues([BATTERY, CAPACITY], { 17: 4, 18: { percent: '85' } }).data).toEqual({
+        17: 4,
+        18: { percent: 85 },
+      });
+      expect(
+        deviceValues([BATTERY, CAPACITY], { 17: 5, 18: { notDeterminable: true } }).data,
+      ).toEqual({ 17: 5, 18: { notDeterminable: true } });
+    });
+
+    it('needs no capacity for a value without the flag or without a battery value', () => {
+      expect(deviceValues([BATTERY, CAPACITY], { 17: 6 }).data).toEqual({ 17: 6 });
+      expect(deviceValues([{ ...BATTERY, required: false }, CAPACITY], {}).data).toEqual({});
+      // Whether capacity is required depends only on the flag, not on its own "Pflicht".
+      expect(deviceValues([BATTERY, { ...CAPACITY, required: true }], { 17: 6 }).data).toEqual({
+        17: 6,
+      });
+      expect(issuesOf(deviceValues([BATTERY, { ...CAPACITY, required: true }], { 17: 4 }))).toEqual(
+        CAPACITY_MISSING,
+      );
+    });
+
+    it('battery active with "mit Akku" and capacity deactivated, no value: no error', () => {
+      expect(deviceValues([BATTERY, { ...CAPACITY, active: false }], { 17: 4 }).data).toEqual({
+        17: 4,
+      });
+    });
+
+    it('capacity active, no value: "Akkukapazität fehlt"', () => {
+      expect(issuesOf(deviceValues([BATTERY, CAPACITY], { 17: 4 }))).toEqual(CAPACITY_MISSING);
+    });
+
+    it('battery deactivated with the stored value "mit Akku", capacity active without value: no error', () => {
+      expect(deviceValues([{ ...BATTERY, active: false }, CAPACITY], { 17: 4 }).data).toEqual({
+        17: 4,
+      });
+    });
+
+    it('needs no capacity without the values of the list battery', () => {
+      expect(
+        attributeValuesSchema([BATTERY, CAPACITY], 'device').safeParse({ 17: 4 }).data,
+      ).toEqual({ 17: 4 });
+    });
+  });
 });
