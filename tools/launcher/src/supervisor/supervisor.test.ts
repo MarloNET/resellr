@@ -7,7 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { ShutdownResponse } from '../health-client.ts';
 import type { ServerEnd } from './server-process.ts';
-import { type CrashReport, runSupervisor, type SupervisorOptions } from './supervisor.ts';
+import {
+  type CrashReport,
+  runSupervisor,
+  STOP_TIMEOUT_MS,
+  type SupervisorOptions,
+} from './supervisor.ts';
 import {
   listenSupervisorPipe,
   type PhaseEvent,
@@ -24,13 +29,16 @@ const CRASH_AT = SUPERVISOR_START;
 /** The wait after a crash, released by the test. */
 function controlledWaits() {
   const durations: number[] = [];
+  const signals: (AbortSignal | undefined)[] = [];
   const releases: (() => void)[] = [];
   return {
     durations,
+    signals,
     pending: () => releases.length,
     release: () => releases.shift()?.(),
-    sleep: (ms: number) => {
+    sleep: (ms: number, signal?: AbortSignal) => {
       durations.push(ms);
+      signals.push(signal);
       return new Promise<void>((resolve) => releases.push(resolve));
     },
   };
@@ -133,6 +141,8 @@ describe('supervisor (CU-261)', () => {
       onStartAborted: log('start_aborted'),
       onGaveUp: log('gave_up'),
       onAlreadyRunning: log('already_running'),
+      onStopCrash: log('stop_crash'),
+      onShutdownTimeout: log('shutdown_timeout'),
       startHealthProbe: probes.start,
       summarizeAvailability: () => summaries.count++,
       ...options,
@@ -503,20 +513,286 @@ describe('supervisor (CU-261)', () => {
       await ended;
     });
 
-    it('sends POST /api/ops/shutdown again on a later stop when the server did not accept it', async () => {
+    it('keeps waiting without a second POST /api/ops/shutdown when the connection breaks without an answer', async () => {
+      const shutdown = fakeShutdown();
+      const { server, phases, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+      server.ready();
+
+      const stopped = requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      shutdown.answer(null);
+      void requestStop(path);
+      server.end({ kind: 'stopped' });
+
+      await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+      await ended;
+      expect(shutdown.calls()).toBe(1);
+      expect(phases.map(({ phase }) => phase)).not.toContain('error');
+    });
+
+    it.each<[string, ShutdownResponse]>([
+      ['403', { status: 403, body: {}, refNo: null }],
+      ['500 without a valid reference number', { status: 500, body: {}, refNo: null }],
+    ])(
+      'DER-104-02 reports no error and sends no second POST /api/ops/shutdown on %s, but waits for the process end',
+      async (_, response) => {
+        const shutdown = fakeShutdown();
+        const { server, phases, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+        server.ready();
+
+        const stopped = requestStop(path);
+        await expect.poll(shutdown.calls).toBe(1);
+        shutdown.answer(response);
+        void requestStop(path);
+        server.end({ kind: 'stopped' });
+
+        await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+        await ended;
+        expect(shutdown.calls()).toBe(1);
+        expect(phases.map(({ phase }) => phase)).not.toContain('error');
+      },
+    );
+
+    it('DER-104-02 reports error with the reference number of 500 internal_error and stays in ready', async () => {
       const shutdown = fakeShutdown();
       const { server, ended } = await start({ shutdownServer: shutdown.shutdownServer });
       server.ready();
 
-      void requestStop(path);
+      const stopped = requestStop(path);
       await expect.poll(shutdown.calls).toBe(1);
-      shutdown.answer(null);
-      void requestStop(path);
+      shutdown.answer({ status: 500, body: {}, refNo: 'R-SRVR-0500' });
 
+      await expect(stopped).resolves.toEqual({
+        event: 'phase',
+        phase: 'error',
+        refNo: 'R-SRVR-0500',
+      });
+      // The server runs on: a new client sees ready, and a later stop asks the server again.
+      await expect(subscribeToSupervisor(path)).resolves.toEqual({
+        event: 'phase',
+        phase: 'ready',
+        startId: 'start-1',
+      });
+      const second = requestStop(path);
       await expect.poll(shutdown.calls).toBe(2);
       shutdown.answer({ status: 200, body: {}, refNo: null });
       server.end({ kind: 'stopped' });
+      await expect(second).resolves.toEqual({ event: 'phase', phase: 'stopped' });
       await ended;
+    });
+
+    it('DER-104-02 logs and reports error with an own reference number when the server process still runs 30 s after the change to stopping', async () => {
+      const shutdown = fakeShutdown();
+      const { server, order, logged, waits, ended } = await start({
+        shutdownServer: shutdown.shutdownServer,
+      });
+      server.ready();
+
+      const stopped = requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      shutdown.answer({ status: 200, body: {}, refNo: null });
+      await expect.poll(() => waits.durations).toEqual([STOP_TIMEOUT_MS]);
+      expect(STOP_TIMEOUT_MS).toBe(30_000);
+      waits.release();
+
+      await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'error', refNo: REF_NO });
+      expect(logged).toEqual([{ kind: 'shutdown_timeout', startId: 'start-1', refNo: REF_NO }]);
+      expect(order.slice(-2)).toEqual(['log shutdown_timeout', 'phase error']);
+      await expect(subscribeToSupervisor(path)).resolves.toMatchObject({ phase: 'ready' });
+      // A late end of the server after the error is an ordinary end in ready.
+      server.end({ kind: 'stopped' });
+      await ended;
+    });
+
+    it('DER-104-02 applies the normal restart rule after error', async () => {
+      const shutdown = fakeShutdown();
+      const { server, waits, crashes, ended } = await start({
+        shutdownServer: shutdown.shutdownServer,
+      });
+      server.ready();
+      void requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      shutdown.answer({ status: 500, body: {}, refNo: 'R-SRVR-0500' });
+      await expect.poll(() => waits.pending()).toBe(1);
+
+      server.end({ kind: 'crashed', exitCode: 1, signal: null });
+      await expect.poll(() => waits.durations).toEqual([STOP_TIMEOUT_MS, 5000]);
+      waits.release();
+      waits.release();
+
+      await expect.poll(() => server.startIds).toEqual(['start-1', 'start-2']);
+      expect(crashes).toHaveLength(1);
+      server.end({ kind: 'stopped' });
+      await ended;
+    });
+
+    it('DER-104-04 keeps waiting on 503 shutting_down, reports no error and stopped after the process end', async () => {
+      const shutdown = fakeShutdown();
+      const { server, phases, logged, waits, ended } = await start({
+        shutdownServer: shutdown.shutdownServer,
+      });
+      server.ready();
+
+      const stopped = requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      shutdown.answer({ status: 503, body: {}, refNo: null });
+      server.end({ kind: 'stopped' });
+
+      await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+      await ended;
+      expect(phases.map(({ phase }) => phase)).toEqual(['starting', 'ready', 'stopped']);
+      expect(logged).toEqual([]);
+      expect(server.startIds).toEqual(['start-1']);
+      // The wait of 30 s ends with the process.
+      expect(waits.signals[0]?.aborted).toBe(true);
+    });
+
+    it.each<[string, ServerEnd, { exitCode: number | null; signal: string | null }]>([
+      [
+        'exit code 1',
+        { kind: 'crashed', exitCode: 1, signal: null },
+        { exitCode: 1, signal: null },
+      ],
+      [
+        'a signal',
+        { kind: 'crashed', exitCode: null, signal: 'SIGKILL' },
+        { exitCode: null, signal: 'SIGKILL' },
+      ],
+      ['exit code 10', { kind: 'aborted', refNo: null }, { exitCode: 10, signal: null }],
+    ])(
+      'DER-104-04 logs stop_crash with a reference number and reports stopped without a restart when the process ends in stopping by %s',
+      async (_, end, exit) => {
+        const shutdown = fakeShutdown();
+        const { server, order, logged, crashes, waits, ended } = await start({
+          shutdownServer: shutdown.shutdownServer,
+        });
+        server.ready();
+
+        const stopped = requestStop(path);
+        await expect.poll(shutdown.calls).toBe(1);
+        shutdown.answer({ status: 503, body: {}, refNo: null });
+        server.end(end);
+
+        await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+        await ended;
+        expect(logged).toEqual([
+          { kind: 'stop_crash', startId: 'start-1', refNo: REF_NO, ...exit },
+        ]);
+        expect(order.slice(-2)).toEqual(['log stop_crash', 'phase stopped']);
+        expect(crashes).toEqual([]);
+        expect(waits.durations).toEqual([STOP_TIMEOUT_MS]);
+        expect(server.startIds).toEqual(['start-1']);
+        expect(await subscribeToSupervisor(path)).toBeNull();
+      },
+    );
+  });
+
+  describe('stop over the pipe in the wait after a crash (crash_grace)', () => {
+    it('DER-104-05 ends the wait, restarts nothing, writes no crash, reports stopped and ends', async () => {
+      const { server, crashes, phases, waits, ended } = await start();
+      server.ready();
+      server.end({ kind: 'crashed', exitCode: 1, signal: null });
+      await expect.poll(() => waits.pending()).toBe(1);
+
+      await expect(requestStop(path)).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+
+      await ended;
+      expect(waits.signals[0]?.aborted).toBe(true);
+      expect(server.startIds).toEqual(['start-1']);
+      expect(crashes).toEqual([]);
+      expect(phases.at(-1)).toEqual({ event: 'phase', phase: 'stopped' });
+      expect(await subscribeToSupervisor(path)).toBeNull();
+    });
+  });
+
+  describe('stop over the pipe in starting (stop_pending)', () => {
+    it('DER-104-06 waits for the running start and on ready sends POST /api/ops/shutdown, then reports stopped', async () => {
+      const shutdown = {
+        calls: 0,
+        shutdownServer: async (): Promise<ShutdownResponse> => {
+          shutdown.calls++;
+          return { status: 200, body: {}, refNo: null };
+        },
+      };
+      const { server, phases, probes, ended } = await start({
+        shutdownServer: shutdown.shutdownServer,
+      });
+
+      const stopped = requestStop(path);
+      await expect.poll(() => phases.length).toBe(1);
+      // Wait until the supervisor has the request before the server reports ready.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(shutdown.calls).toBe(0);
+      server.ready();
+      await expect.poll(() => shutdown.calls).toBe(1);
+      server.end({ kind: 'stopped' });
+
+      await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+      await ended;
+      // The server is stopped at once: no ready goes out and no availability check starts.
+      expect(phases.map(({ phase }) => phase)).toEqual(['starting', 'stopped']);
+      expect(probes.started).toBe(0);
+      expect(server.startIds).toEqual(['start-1']);
+    });
+
+    it.each<[string, ServerEnd, Record<string, unknown>[]]>([
+      [
+        'a crash, with stop_crash',
+        { kind: 'crashed', exitCode: 1, signal: null },
+        [{ kind: 'stop_crash', startId: 'start-1', refNo: REF_NO, exitCode: 1, signal: null }],
+      ],
+      // The cause of the abort stands in the entry of the server; no start_aborted (MAR-764).
+      ['an abort (exit code 10), without an entry', { kind: 'aborted', refNo: 'R-ABCD-EFGH' }, []],
+      [
+        'the start limit, with stop_crash and its cause',
+        { kind: 'start_limit' },
+        [
+          {
+            kind: 'stop_crash',
+            startId: 'start-1',
+            refNo: REF_NO,
+            exitCode: null,
+            signal: null,
+            cause: 'start_limit',
+          },
+        ],
+      ],
+    ])(
+      'DER-104-06 reports stopped without a restart when the process ends by %s',
+      async (_, end, entries) => {
+        const { server, phases, crashes, logged, waits, ended } = await start();
+
+        const stopped = requestStop(path);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        server.end(end);
+
+        await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+        await ended;
+        expect(phases.map(({ phase }) => phase)).toEqual(['starting', 'stopped']);
+        expect(server.startIds).toEqual(['start-1']);
+        expect(waits.durations).toEqual([]);
+        expect(crashes).toEqual([]);
+        expect(logged).toEqual(entries);
+        expect(await subscribeToSupervisor(path)).toBeNull();
+      },
+    );
+
+    it('DER-104-07 logs and reports already_running with its reference number and ends when the process ends with exit code 11', async () => {
+      const { server, order, logged, ended } = await start();
+
+      const stopped = requestStop(path);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      server.end({ kind: 'already_running' });
+
+      await expect(stopped).resolves.toEqual({
+        event: 'phase',
+        phase: 'already_running',
+        refNo: REF_NO,
+      });
+      await ended;
+      expect(logged).toEqual([{ kind: 'already_running', startId: 'start-1', refNo: REF_NO }]);
+      expect(order).toEqual(['phase starting', 'log already_running', 'phase already_running']);
+      expect(server.startIds).toEqual(['start-1']);
     });
   });
 });

@@ -218,6 +218,8 @@ async function supervise({
         writeStartResult(paths.logDir, { startId, state: 'gave_up', refNo, at: at.toISOString() });
       },
       onAlreadyRunning: (entry) => launcherLog.alreadyRunning(entry),
+      onStopCrash: (entry) => launcherLog.stopCrash(entry),
+      onShutdownTimeout: (entry) => launcherLog.shutdownTimeout(entry),
       startHealthProbe: (onProbe) =>
         startHealthProbe({ healthClient, logDir: paths.logDir, onProbe }),
       summarizeAvailability: () => summarizeMissingDays({ logDir: paths.logDir, bootTime }),

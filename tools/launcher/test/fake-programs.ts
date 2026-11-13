@@ -17,6 +17,9 @@ export const FAKE_SERVER = fileURLToPath(new URL('./fake-server.ts', import.meta
 /** Reference number the fake server writes into `start-result.json`. */
 export const FAKE_REF_NO = 'R-ABCD-EFGH';
 
+/** Reference number of the fake server's `500 internal_error` on `POST /api/ops/shutdown`. */
+export const FAKE_SHUTDOWN_REF_NO = 'R-5T0P-FA1X';
+
 /**
  * Stand-ins for `reg`, Chrome and `explorer.exe` under Linux: shell scripts in a temporary
  * folder that is put in front of `PATH`. Chrome and `explorer.exe` record their arguments.

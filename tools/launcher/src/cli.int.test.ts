@@ -23,17 +23,22 @@ import {
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { REFERENCE_NUMBER_PATTERN } from '@resellr/runtime-shared/reference-number';
+
 import {
   createFakePrograms,
   FAKE_REF_NO,
   FAKE_SERVER,
+  FAKE_SHUTDOWN_REF_NO,
   type FakePrograms,
   waitFor,
 } from '../test/fake-programs.ts';
 import { TEST_PROGRAM_DIR_ENV } from './cli.ts';
 import { launcherPagesDir, launcherPageUrl } from './launcher-pages-location.ts';
 import { FREE_PIPE_TIMEOUT_MS, TEST_STOP_FAILS_ENV } from './stop-command.ts';
+import { CRASH_GRACE_MS } from './supervisor/restart-policy.ts';
 import { TEST_SERVER_ENTRY_ENV, TEST_START_TIMEOUTS_ENV } from './supervisor/server-process.ts';
+import { STOP_TIMEOUT_MS } from './supervisor/supervisor.ts';
 import {
   listenSupervisorPipe,
   subscribeToSupervisor,
@@ -561,9 +566,11 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
    * Starts `supervise` with the fake server and waits until it reports ready over the pipe.
    * Returns the exit of the supervisor wrapped, so awaiting this call does not wait for it.
    */
-  async function startSupervisor(): Promise<{ exit: Promise<number> }> {
+  async function startSupervisor(
+    extraEnv: Record<string, string> = {},
+  ): Promise<{ exit: Promise<number> }> {
     writeConfig(JSON.stringify({ port: await freePort() }));
-    const exit = runLauncher(['supervise']);
+    const exit = runLauncher(['supervise'], extraEnv);
     const pipePath = supervisorPipePath(root);
     // `subscribe` resolves with null until the supervisor holds the pipe, then with `ready`.
     const deadline = Date.now() + 10_000;
@@ -643,6 +650,209 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
 
     await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
     await expect(supervisor.exit).resolves.toBe(0);
+  });
+
+  /** Tests that run several launcher processes take longer than 5 s on a loaded host. */
+  const MULTI_PROCESS_TIMEOUT_MS = 30_000;
+
+  /** Errors log entries in `logDir`, oldest first. */
+  const errorsLog = () =>
+    existsSync(logDir)
+      ? readdirSync(logDir)
+          .filter((name) => name.startsWith('errors-'))
+          .flatMap((name) => readFileSync(join(logDir, name), 'utf8').split('\n'))
+          .filter((line) => line !== '')
+          .map((line) => JSON.parse(line) as Record<string, unknown>)
+      : [];
+
+  /**
+   * Starts `supervise` and waits until it has started the server `count` times, so it holds the
+   * pipe; with `FAKE_SERVER_DELAY_MS` it is then still in `starting`.
+   */
+  async function startSupervisorUntilStarts(
+    extraEnv: Record<string, string>,
+    port?: number,
+  ): Promise<{ exit: Promise<number> }> {
+    writeConfig(JSON.stringify({ port: port ?? (await freePort()) }));
+    const exit = runLauncher(['supervise'], extraEnv);
+    await waitFor(() => (lines('starts.jsonl').length > 0 ? true : null), 10_000);
+    return { exit };
+  }
+
+  const shownRefNo = () => launcherState()[0]?.refNo;
+
+  describe('stop when stopping fails (DER-104-02)', () => {
+    it(
+      'DER-104-02 shows error with the reference number of 500 internal_error, and the supervisor stays in ready',
+      async () => {
+        const supervisor = await startSupervisor({ FAKE_SERVER_RUNS: 'ready-shutdown-500' });
+
+        await expect(runLauncher(['stop'])).resolves.toBe(1);
+
+        const request = lp03Request();
+        expect(launcherState()).toEqual([
+          { request, phase: 'error', url: null, refNo: FAKE_SHUTDOWN_REF_NO, dataDir: null },
+        ]);
+        expect(await subscribeToSupervisor(supervisorPipePath(root))).toMatchObject({
+          phase: 'ready',
+        });
+        expect(lines('starts.jsonl')).toHaveLength(1);
+        expect(await Promise.race([supervisor.exit, Promise.resolve('running')])).toBe('running');
+      },
+      MULTI_PROCESS_TIMEOUT_MS,
+    );
+
+    it(
+      'DER-104-02 shows error with a reference number from both logs when the server still runs 30 s after the change to stopping, and the supervisor stays in ready',
+      async () => {
+        await startSupervisor({ FAKE_SERVER_RUNS: 'ready-shutdown-hang' });
+        const started = Date.now();
+
+        await expect(runLauncher(['stop'])).resolves.toBe(1);
+
+        expect(Date.now() - started).toBeGreaterThanOrEqual(STOP_TIMEOUT_MS);
+        const refNo = shownRefNo();
+        expect(refNo).toMatch(REFERENCE_NUMBER_PATTERN);
+        expect(operationsLog(logDir)).toContainEqual(
+          expect.objectContaining({ event: 'shutdown_failed', refNo }),
+        );
+        expect(errorsLog()).toContainEqual(
+          expect.objectContaining({ function: 'launcher.shutdown_timeout', refNo }),
+        );
+        expect(await subscribeToSupervisor(supervisorPipePath(root))).toMatchObject({
+          phase: 'ready',
+        });
+      },
+      STOP_TIMEOUT_MS + 30_000,
+    );
+  });
+
+  describe('stop while the server already stops (DER-104-04)', () => {
+    it(
+      'DER-104-04 reports no error on 503 shutting_down and stopped after the process end',
+      async () => {
+        const supervisor = await startSupervisor({ FAKE_SERVER_RUNS: 'ready-shutdown-503-exit-0' });
+
+        await expect(runLauncher(['stop'])).resolves.toBe(0);
+
+        const request = lp03Request();
+        expect(launcherState()).toEqual([
+          { request, phase: 'stopped', url: null, refNo: null, dataDir },
+        ]);
+        await expect(supervisor.exit).resolves.toBe(0);
+        expect(lines('starts.jsonl')).toHaveLength(1);
+        expect(operationsLog(logDir).map(({ event }) => event)).not.toContain('stop_crash');
+      },
+      MULTI_PROCESS_TIMEOUT_MS,
+    );
+
+    it(
+      'DER-104-04 writes stop_crash with a reference number when the process ends with exit code 1, and stop --for-update ends with exit code 0',
+      async () => {
+        const supervisor = await startSupervisor({ FAKE_SERVER_RUNS: 'ready-shutdown-503-exit-1' });
+
+        await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
+
+        await expect(supervisor.exit).resolves.toBe(0);
+        expect(lines('starts.jsonl')).toHaveLength(1);
+        const stopCrash = operationsLog(logDir).find(({ event }) => event === 'stop_crash');
+        expect(stopCrash).toMatchObject({ exitCode: 1, signal: null });
+        expect(stopCrash?.refNo).toMatch(REFERENCE_NUMBER_PATTERN);
+        expect(operationsLog(logDir).map(({ event }) => event)).not.toContain('crash');
+      },
+      MULTI_PROCESS_TIMEOUT_MS,
+    );
+  });
+
+  it(
+    'DER-104-05 stop --for-update in the wait after a crash ends the wait without a restart and with exit code 0',
+    async () => {
+      const supervisor = await startSupervisorUntilStarts({ FAKE_SERVER_RUNS: 'exit-1,ready' });
+
+      await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
+
+      await expect(supervisor.exit).resolves.toBe(0);
+      // Longer than the wait of 5 s: no restart followed.
+      await new Promise((resolve) => setTimeout(resolve, CRASH_GRACE_MS + 1000));
+      expect(lines('starts.jsonl')).toHaveLength(1);
+      expect(operationsLog(logDir).map(({ event }) => event)).toEqual([
+        'supervisor_started',
+        'supervisor_ended',
+      ]);
+    },
+    CRASH_GRACE_MS + 30_000,
+  );
+
+  describe('stop while a start runs (DER-104-06, DER-104-07)', () => {
+    /** Long enough that `stop` arrives while the server is still starting. */
+    const SLOW_START = { FAKE_SERVER_DELAY_MS: '4000' };
+
+    it(
+      'DER-104-06 waits for ready, then stops the server in order and shows stopped',
+      async () => {
+        const supervisor = await startSupervisorUntilStarts({
+          ...SLOW_START,
+          FAKE_SERVER_RUNS: 'ready',
+        });
+
+        await expect(runLauncher(['stop'])).resolves.toBe(0);
+
+        const request = lp03Request();
+        expect(launcherState()).toEqual([
+          { request, phase: 'stopped', url: null, refNo: null, dataDir },
+        ]);
+        expect(lines('shutdowns.jsonl')).toEqual([{ origin: null }]);
+        await expect(supervisor.exit).resolves.toBe(0);
+        expect(lines('starts.jsonl')).toHaveLength(1);
+      },
+      MULTI_PROCESS_TIMEOUT_MS,
+    );
+
+    it.each([
+      ['a crash', 'exit-1'],
+      ['an abort', 'aborted'],
+    ])(
+      'DER-104-06 reports stopped without a restart when the start ends by %s',
+      async (_, run) => {
+        const supervisor = await startSupervisorUntilStarts({
+          ...SLOW_START,
+          FAKE_SERVER_RUNS: `${run},ready`,
+        });
+
+        await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
+
+        await expect(supervisor.exit).resolves.toBe(0);
+        await new Promise((resolve) => setTimeout(resolve, CRASH_GRACE_MS + 1000));
+        expect(lines('starts.jsonl')).toHaveLength(1);
+        expect(lines('shutdowns.jsonl')).toEqual([]);
+      },
+      CRASH_GRACE_MS + 30_000,
+    );
+
+    it(
+      'DER-104-07 reports already_running when the start ends with exit code 11, and stop sends POST /api/ops/shutdown directly to the running server',
+      async () => {
+        // The server that already runs, on the port of config.json.
+        server = await startTestServer(0);
+        const supervisor = await startSupervisorUntilStarts(
+          { ...SLOW_START, FAKE_SERVER_RUNS: 'exit-11' },
+          server.port,
+        );
+
+        await expect(runLauncher(['stop'])).resolves.toBe(0);
+
+        expect(server.requests).toEqual([`POST http://127.0.0.1:${server.port}/api/ops/shutdown`]);
+        const request = lp03Request();
+        expect(launcherState()).toEqual([
+          { request, phase: 'stopped', url: null, refNo: null, dataDir },
+        ]);
+        await expect(supervisor.exit).resolves.toBe(0);
+        const warning = operationsLog(logDir).find(({ event }) => event === 'already_running');
+        expect(warning?.refNo).toMatch(REFERENCE_NUMBER_PATTERN);
+        expect(lines('starts.jsonl')).toHaveLength(1);
+      },
+      MULTI_PROCESS_TIMEOUT_MS,
+    );
   });
 
   it('DER-104-03 shows not_running without a data folder when neither a server nor a supervisor runs', async () => {
