@@ -1,6 +1,6 @@
-# Meldungskatalog – Ergänzungen (Design v0.6.2, MAR-167, Spec DG-08; v0.6.2 MAR-212)
+# Meldungskatalog – Ergänzungen (Design v0.6.2, MAR-167, Spec DG-08; v0.6.2 MAR-212; v0.6.4 MAR-607)
 
-Der Katalog enthält 30 Meldungen (M-01 bis M-22 und M-24 bis M-31; M-23 entfallen, siehe Abschnitt 3; M-25 bis M-31 neu in v0.6.2). Wortlaut für Fälle, die im Design bisher keinen Text hatten. Muster wie im Design: Feldfehler „<Feld>: 1 bis n Zeichen“ bzw. „<Feld>: höchstens n Zeichen“, Anrede „Sie“, keine Codes oder technischen Begriffe (REQ-073), Zahlen de-DE (20.000). Gezählt werden Zeichen (nicht Bytes). Grenzen aus der Technical Specification (MAR-153, Kap. 2 und 3, DG-08), vom Design auf Plausibilität geprüft (siehe unten). Der Katalog ergänzt das Design; die Regeln selbst (REQ) sind unverändert.
+Der Katalog enthält 31 Meldungen (M-01 bis M-22 und M-24 bis M-32; M-23 entfallen, siehe Abschnitt 3; M-25 bis M-31 neu in v0.6.2, M-32 neu in v0.6.4). Wortlaut für Fälle, die im Design bisher keinen Text hatten. Muster wie im Design: Feldfehler „<Feld>: 1 bis n Zeichen“ bzw. „<Feld>: höchstens n Zeichen“, Anrede „Sie“, keine Codes oder technischen Begriffe (REQ-073), Zahlen de-DE (20.000). Gezählt werden Zeichen (nicht Bytes). Grenzen aus der Technical Specification (MAR-153, Kap. 2 und 3, DG-08), vom Design auf Plausibilität geprüft (siehe unten). Der Katalog ergänzt das Design; die Regeln selbst (REQ) sind unverändert.
 
 ## 1. Texte
 
@@ -37,6 +37,7 @@ Der Katalog enthält 30 Meldungen (M-01 bis M-22 und M-24 bis M-31; M-23 entfall
 | M-29 | Löschen einer Modellvorlage mit Modell-Inserat (O-8, REQ-095) | UI-041 | „Löschen nicht möglich: Modellvorlage wird von ein oder mehreren Inseraten genutzt“ | Banner im Dialog (Wortlaut des Owners, ohne Schlusspunkt); Grund-Teil von `delete_not_allowed`; ersetzt den früheren Vorschlag „Modell-Inserate verweisen auf die Modellvorlage.“ |
 | M-30 | Textbaustein: Name leer oder zu lang (O-3, REQ-026) | UI-030 | „Name: 1 bis 100 Zeichen“ | Feldfehler am Feld „Name“; **Wortlaut vom Designer, Owner bestätigt mit der Freigabe**; Muster wie M-05; die Specification v0.5.1 nennt nur die Grenze (Kap. 2.2), keinen Wortlaut |
 | M-31 | Textbaustein: Prüfende Stelle zu lang (O-3, REQ-054) | UI-030 | „Prüfende Stelle: höchstens 100 Zeichen“ | Feldfehler am Feld „Prüfende Stelle“; **Wortlaut vom Designer, Owner bestätigt mit der Freigabe**; Muster wie M-05; „Prüfende Stelle fehlt“ bleibt der Text M-24 |
+| M-32 | Pflichtmerkmal ohne Wert beim Speichern (REQ-005 „Wieder aktivieren“, AC-REQ-005-12 a, b; REQ-008, REQ-010, REQ-014, REQ-088) | UI-007, UI-010, UI-003, UI-014 (nur „Inseratswerte bearbeiten“) | „<Merkmal> fehlt“ (z. B. „RAM fehlt“, „Prozessor fehlt“) | Feldfehler am Feld des Merkmals, Muster wie „Zustand fehlt“ und „Hersteller fehlt“; <Merkmal> ist die Bezeichnung des Merkmals; erscheint auch dann, wenn die Änderung ein anderes Feld betrifft; je fehlendem Pflichtmerkmal eine Meldung; nichts wird gespeichert. **Wortlaut vom Designer, Owner bestätigt mit der Freigabe.** Nicht bei Preis erfassen, Fotos zuordnen, Zuordnen, Umbuchen, Verkauf, WI-Nr-Korrektur, Storno, Freigabe (A-39) |
 
 ## 2. `not_found` (M-15)
 
@@ -46,7 +47,7 @@ Der Katalog enthält 30 Meldungen (M-01 bis M-22 und M-24 bis M-31; M-23 entfall
 
 ## 3. M-23: entfallen
 
-Der Sammeltext „Bitte die markierten Felder prüfen.“ entfällt (v0.6.1, Owner-Entscheidung MAR-176 / MAR-179). Es gibt keinen eigenen Sammeltext; Feldfehler stehen am Feld, der erste markierte Fehler erhält den Fokus (Kap. 5 „Validierung“). Eine Fehlerzusammenfassung, wo das freigegebene Design sie bereits beschreibt (UI-003 „Speichern“, DESIGN.md Formulare, UI-016 „Freigabe nicht möglich:“ mit Liste), bleibt unverändert und ist nicht Teil von M-23. Die Nummer M-23 bleibt unbesetzt. Der Katalog enthält 30 Meldungen: M-01 bis M-22 und M-24 bis M-31.
+Der Sammeltext „Bitte die markierten Felder prüfen.“ entfällt (v0.6.1, Owner-Entscheidung MAR-176 / MAR-179). Es gibt keinen eigenen Sammeltext; Feldfehler stehen am Feld, der erste markierte Fehler erhält den Fokus (Kap. 5 „Validierung“). Eine Fehlerzusammenfassung, wo das freigegebene Design sie bereits beschreibt (UI-003 „Speichern“, DESIGN.md Formulare, UI-016 „Freigabe nicht möglich:“ mit Liste), bleibt unverändert und ist nicht Teil von M-23. Die Nummer M-23 bleibt unbesetzt. Der Katalog enthält 31 Meldungen: M-01 bis M-22 und M-24 bis M-32.
 
 ## 4. Plausibilitätsprüfung der Grenzen
 

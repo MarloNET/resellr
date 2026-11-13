@@ -41,3 +41,6 @@ keine (kein Mockup).
 
 ## Annahmen und offene Fragen
 - Das System bearbeitet Fotos nicht (kein Zuschneiden).
+
+## Hinweis v0.6.4 (REQ-005, AC-REQ-005-12 c)
+Fotos zuordnen, ändern und entfernen verlangen den Wert eines (wieder aktivierten) Pflichtmerkmals nicht und zeigen die Meldung M-32 („<Merkmal> fehlt“) nicht (A-39). Beispiel: Modell-Inserat „MI-B“ ohne RAM-Wert: Fotos können wie bisher zugeordnet werden.
