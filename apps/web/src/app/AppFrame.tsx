@@ -1,5 +1,6 @@
-import { Outlet } from 'react-router';
+import { Navigate, Outlet } from 'react-router';
 
+import { isAppTerminated, TERMINATED_PATH } from '../api/app-termination.ts';
 import { useOpsStatusQuery } from '../api/ops.api.ts';
 import { UnreachableBanner } from '../components/patterns/UnreachableBanner.tsx';
 import { BackupNotice } from '../features/backup-notice/BackupNotice.tsx';
@@ -16,12 +17,16 @@ import { Navigation } from './Navigation.tsx';
  * stands as the first element of the content area, the page below it stays (DG-06, Nachtrag
  * MAR-395); not while the status loads and not on `500` (then `UI-044.error` in the notice).
  * After it follows the banner of "resellr beenden" (CU-312: `UI-045.error` or P-07, Nachtrag
- * MAR-421), both before the page.
+ * MAR-421), both before the page. Once this window has shut resellr down (CU-257), no route
+ * under `/` shows the frame any more: it leads with `replace` to `/beendet`, so "Zurück" and "Vor"
+ * show UI-046 again instead of a frame whose queries are stopped (Nachtrag MAR-510).
  */
 export function AppFrame() {
   const status = useOpsStatusQuery();
   const unreachable = status.error?.kind === 'unreachable';
   const shutdownOutcome = useShutdownOutcome();
+
+  if (isAppTerminated()) return <Navigate to={TERMINATED_PATH} replace />;
 
   return (
     <div className="flex h-dvh w-full overflow-hidden">
