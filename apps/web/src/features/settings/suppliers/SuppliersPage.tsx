@@ -1,5 +1,5 @@
 import { supplierNameSchema, type Supplier } from '@resellr/domain/schemas/supplier.schema';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { ApiError } from '../../../api/api-client.ts';
 import {
@@ -8,16 +8,23 @@ import {
   useUpdateSupplierMutation,
 } from '../../../api/settings.api.ts';
 import { useWritesLocked } from '../../../api/write-outcome-store.ts';
-import { FormField, useFocusFirstError } from '../../../components/forms/FormField.tsx';
-import { ConflictBanner } from '../../../components/patterns/ConflictBanner.tsx';
+import {
+  FormField,
+  useDeferredBlurCheck,
+  useFocusFirstError,
+} from '../../../components/forms/FormField.tsx';
+import { StatusSwitch } from '../../../components/forms/StatusSwitch.tsx';
 import { MaintenanceTable } from '../../../components/patterns/MaintenanceTable.tsx';
 import { OutcomeUnknownBanner } from '../../../components/patterns/OutcomeUnknownBanner.tsx';
-import { bannerClassName, PageBanner } from '../../../components/patterns/PageBanner.tsx';
-import { ShuttingDownBanner } from '../../../components/patterns/ShuttingDownBanner.tsx';
+import { PageBanner } from '../../../components/patterns/PageBanner.tsx';
+import {
+  noticeOf,
+  SaveNoticeBanners,
+  type SaveNotice,
+} from '../../../components/patterns/SaveNoticeBanners.tsx';
 import { UnreachableBanner } from '../../../components/patterns/UnreachableBanner.tsx';
 import { Badge } from '../../../components/ui/Badge.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
-import { cn } from '../../../components/ui/cn.ts';
 import { Input } from '../../../components/ui/Input.tsx';
 
 // Texts of UI-032 `screen.md` and of pattern P-01 (UI/UX design v0.6.1).
@@ -37,14 +44,6 @@ const TEXTS = {
   error: (referenceNumber: string | null) =>
     `Einstellungen konnten nicht gespeichert werden. Referenz: ${referenceNumber ?? '–'}`,
 } as const;
-
-/** Banner at the top of the page after a save (2.0.7). */
-type Notice =
-  | { kind: 'success' }
-  | { kind: 'error'; error: ApiError }
-  | { kind: 'conflict' }
-  | { kind: 'shutting-down' }
-  | { kind: 'not-found'; message: string };
 
 interface Values {
   name: string;
@@ -95,15 +94,13 @@ export function SuppliersPage() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [draft, setDraft] = useState<Draft>(draftOf(undefined));
   const [nameError, setNameError] = useState<string | undefined>();
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<SaveNotice | null>(null);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
   const [takeReloaded, setTakeReloaded] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
   const focusFirstError = useFocusFirstError(formRef);
-  // A pointer is pressed in the form: the focus leaves "Name" in the middle of a click there.
-  const pointerPressed = useRef(false);
-  const cancelDeferredCheck = useRef(() => {});
+  const blurCheck = useDeferredBlurCheck();
 
   const saving = createMutation.isPending || updateMutation.isPending;
   const selectedId = selection?.id ?? null;
@@ -126,7 +123,7 @@ export function SuppliersPage() {
   }, [takeReloaded, query.isFetching, selected]);
 
   function open(next: Selection | null, supplier?: Supplier) {
-    cancelDeferredCheck.current();
+    blurCheck.cancel();
     setSelection(next);
     setDraft(draftOf(supplier));
     setNameError(undefined);
@@ -152,76 +149,25 @@ export function SuppliersPage() {
   }
 
   function onFailed(error: ApiError) {
-    switch (error.kind) {
-      case 'validation': {
-        const field = error.error?.fields.find((entry) => entry.path === 'name');
-        if (field) showFieldError(field.message);
-        else setNotice({ kind: 'error', error });
-        return;
-      }
-      case 'rejected':
-        // `name_taken.supplier` "Name ist bereits vergeben" stands at the field.
-        if (error.error?.code === 'name_taken') showFieldError(error.error.message);
-        else setNotice({ kind: 'error', error });
-        return;
-      case 'conflict':
-        setNotice({ kind: 'conflict' });
-        return;
-      case 'shutting-down':
-        setNotice({ kind: 'shutting-down' });
-        return;
-      case 'not-found':
-        setNotice({ kind: 'not-found', message: error.error?.message ?? '' });
-        return;
-      case 'outcome-unknown':
-        // The banner P-08 shows itself once the page is locked (CU-049).
-        setNotice(null);
-        return;
-      default:
-        setNotice({ kind: 'error', error });
-    }
-  }
-
-  function pressPointer() {
-    pointerPressed.current = true;
-    const release = () => {
-      pointerPressed.current = false;
-      window.removeEventListener('pointerup', release);
-      window.removeEventListener('pointercancel', release);
-    };
-    window.addEventListener('pointerup', release);
-    window.addEventListener('pointercancel', release);
-  }
-
-  /**
-   * Check on leaving "Name" (2.0.7). During a click in the form the check waits until after the
-   * click: a new or vanished error line would move the button or the switch between `mousedown`
-   * and `mouseup`, and the browser would drop the click.
-   */
-  function checkNameOnBlur() {
-    const name = draft.name;
-    if (!pointerPressed.current) {
-      setNameError(checkName(name));
+    const field =
+      error.kind === 'validation'
+        ? error.error?.fields.find((entry) => entry.path === 'name')
+        : undefined;
+    if (field) {
+      showFieldError(field.message);
       return;
     }
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const run = () => {
-      cancelDeferredCheck.current();
-      // `click` follows `pointerup` in the same task, so the timeout runs after it.
-      timer = setTimeout(() => setNameError(checkName(name)));
-    };
-    window.addEventListener('pointerup', run);
-    window.addEventListener('pointercancel', run);
-    cancelDeferredCheck.current = () => {
-      window.removeEventListener('pointerup', run);
-      window.removeEventListener('pointercancel', run);
-      clearTimeout(timer);
-    };
+    // `name_taken.supplier` "Name ist bereits vergeben" stands at the field.
+    if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
+      showFieldError(error.error.message);
+      return;
+    }
+    setNotice(noticeOf(error));
   }
 
   function save() {
     // The save checks the name itself; a later check on leaving must not hide its result.
-    cancelDeferredCheck.current();
+    blurCheck.cancel();
     if (!changed(draft)) return;
     const message = checkName(draft.name);
     if (message) {
@@ -256,30 +202,16 @@ export function SuppliersPage() {
           {TEXTS.error}
         </PageBanner>
       )}
-      {notice?.kind === 'success' && (
-        <PageBanner variant="success" onClose={() => setNotice(null)}>
-          {TEXTS.saved}
-        </PageBanner>
-      )}
-      {notice?.kind === 'error' && (
-        <PageBanner variant="error" error={notice.error} onClose={() => setNotice(null)}>
-          {TEXTS.error}
-        </PageBanner>
-      )}
-      {notice?.kind === 'conflict' && (
-        <ConflictBanner
-          onReloaded={() => {
-            setNotice(null);
-            setTakeReloaded(true);
-          }}
-        />
-      )}
-      {notice?.kind === 'shutting-down' && <ShuttingDownBanner />}
-      {notice?.kind === 'not-found' && (
-        <div role="alert" className={bannerClassName('warn')}>
-          {notice.message}
-        </div>
-      )}
+      <SaveNoticeBanners
+        notice={notice}
+        onClose={() => setNotice(null)}
+        onReloaded={() => {
+          setNotice(null);
+          setTakeReloaded(true);
+        }}
+        successText={TEXTS.saved}
+        errorText={TEXTS.error}
+      />
 
       <MaintenanceTable
         title={TEXTS.title}
@@ -312,7 +244,7 @@ export function SuppliersPage() {
           aria-label={TEXTS.title}
           noValidate
           className="flex flex-col gap-4 rounded-control border border-border bg-surface p-4 full:flex-row full:flex-wrap full:items-start"
-          onPointerDown={pressPointer}
+          onPointerDown={blurCheck.pressPointer}
           onSubmit={(event) => {
             event.preventDefault();
             save();
@@ -326,7 +258,10 @@ export function SuppliersPage() {
                   value={draft.name}
                   disabled={formLocked}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                  onBlur={checkNameOnBlur}
+                  onBlur={() => {
+                    const name = draft.name;
+                    blurCheck.checkOnBlur(() => setNameError(checkName(name)));
+                  }}
                 />
               )}
             </FormField>
@@ -335,6 +270,9 @@ export function SuppliersPage() {
             checked={draft.active}
             disabled={formLocked}
             onChange={(active) => setDraft({ ...draft, active })}
+            label={TEXTS.status}
+            activeText={TEXTS.active}
+            inactiveText={TEXTS.inactive}
           />
           <div className="flex flex-wrap gap-2 full:ml-auto full:mt-6">
             <Button
@@ -355,50 +293,6 @@ export function SuppliersPage() {
           </div>
         </form>
       </MaintenanceTable>
-    </div>
-  );
-}
-
-/** Switch "Status" aktiv/deaktiviert of UI-032. */
-function StatusSwitch({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  const labelId = useId();
-  return (
-    <div className="flex flex-col gap-1">
-      <span id={labelId} className="text-label font-semibold text-text">
-        {TEXTS.status}
-      </span>
-      <div className="flex h-control items-center gap-2">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          aria-labelledby={labelId}
-          disabled={disabled}
-          onClick={() => onChange(!checked)}
-          className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border',
-            'disabled:cursor-not-allowed disabled:opacity-60',
-            checked ? 'border-primary bg-primary' : 'border-border-input bg-bg',
-          )}
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              'inline-block size-5 rounded-full bg-surface shadow transition-transform',
-              checked ? 'translate-x-5' : 'translate-x-0.5',
-            )}
-          />
-        </button>
-        <span className="text-body">{checked ? TEXTS.active : TEXTS.inactive}</span>
-      </div>
     </div>
   );
 }

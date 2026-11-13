@@ -4,7 +4,7 @@ import {
   type PickList,
   type PickListValue,
 } from '@resellr/domain/schemas/pick-list.schema';
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { ApiError } from '../../../api/api-client.ts';
 import {
@@ -16,7 +16,7 @@ import {
 } from '../../../api/settings.api.ts';
 import { useWritesLocked } from '../../../api/write-outcome-store.ts';
 import { FormField, useFocusFirstError } from '../../../components/forms/FormField.tsx';
-import { ConflictBanner } from '../../../components/patterns/ConflictBanner.tsx';
+import { StatusSwitch } from '../../../components/forms/StatusSwitch.tsx';
 import {
   MaintenanceTable,
   moveEntry,
@@ -24,13 +24,18 @@ import {
   useDragOrder,
 } from '../../../components/patterns/MaintenanceTable.tsx';
 import { OutcomeUnknownBanner } from '../../../components/patterns/OutcomeUnknownBanner.tsx';
-import { bannerClassName, PageBanner } from '../../../components/patterns/PageBanner.tsx';
-import { ShuttingDownBanner } from '../../../components/patterns/ShuttingDownBanner.tsx';
+import { PageBanner } from '../../../components/patterns/PageBanner.tsx';
+import {
+  noticeOf,
+  SaveNoticeBanners,
+  type SaveNotice,
+} from '../../../components/patterns/SaveNoticeBanners.tsx';
 import { UnreachableBanner } from '../../../components/patterns/UnreachableBanner.tsx';
 import { Badge } from '../../../components/ui/Badge.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
 import { cn } from '../../../components/ui/cn.ts';
 import { Input } from '../../../components/ui/Input.tsx';
+import { Select } from '../../../components/ui/Select.tsx';
 import {
   Table,
   TableBody,
@@ -65,14 +70,6 @@ const TEXTS = {
   error: (referenceNumber: string | null) =>
     `Einstellungen konnten nicht gespeichert werden. Referenz: ${referenceNumber ?? '–'}`,
 } as const;
-
-/** Banner at the top of the page after a write (2.0.7). */
-type Notice =
-  | { kind: 'success' }
-  | { kind: 'error'; error: ApiError }
-  | { kind: 'conflict' }
-  | { kind: 'shutting-down' }
-  | { kind: 'not-found'; message: string };
 
 interface Draft {
   label: string;
@@ -145,7 +142,7 @@ export function PickListsPage() {
 
   const [editing, setEditing] = useState<Editing | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<SaveNotice | null>(null);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
   const [takeReloaded, setTakeReloaded] = useState(false);
 
@@ -199,37 +196,21 @@ export function PickListsPage() {
   }
 
   function onFailed(error: ApiError) {
-    switch (error.kind) {
-      case 'validation': {
-        const fieldMessage = (path: string) =>
-          error.error?.fields.find((entry) => entry.path === path)?.message;
-        showFieldErrors({
-          label: fieldMessage('label'),
-          batteryPresent: fieldMessage('batteryPresent'),
-        });
-        return;
-      }
-      case 'rejected':
-        // `name_taken.pick_list_value` "Wert gibt es in dieser Liste bereits" stands at the field.
-        if (error.error?.code === 'name_taken') showFieldErrors({ label: error.error.message });
-        else setNotice({ kind: 'error', error });
-        return;
-      case 'conflict':
-        setNotice({ kind: 'conflict' });
-        return;
-      case 'shutting-down':
-        setNotice({ kind: 'shutting-down' });
-        return;
-      case 'not-found':
-        setNotice({ kind: 'not-found', message: error.error?.message ?? '' });
-        return;
-      case 'outcome-unknown':
-        // The banner P-08 shows itself once the page is locked (CU-049).
-        setNotice(null);
-        return;
-      default:
-        setNotice({ kind: 'error', error });
+    if (error.kind === 'validation') {
+      const fieldMessage = (path: string) =>
+        error.error?.fields.find((entry) => entry.path === path)?.message;
+      showFieldErrors({
+        label: fieldMessage('label'),
+        batteryPresent: fieldMessage('batteryPresent'),
+      });
+      return;
     }
+    // `name_taken.pick_list_value` "Wert gibt es in dieser Liste bereits" stands at the field.
+    if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
+      showFieldErrors({ label: error.error.message });
+      return;
+    }
+    setNotice(noticeOf(error));
   }
 
   const onSaved = () => {
@@ -312,30 +293,16 @@ export function PickListsPage() {
           {TEXTS.error}
         </PageBanner>
       )}
-      {notice?.kind === 'success' && (
-        <PageBanner variant="success" onClose={() => setNotice(null)}>
-          {TEXTS.saved}
-        </PageBanner>
-      )}
-      {notice?.kind === 'error' && (
-        <PageBanner variant="error" error={notice.error} onClose={() => setNotice(null)}>
-          {TEXTS.error}
-        </PageBanner>
-      )}
-      {notice?.kind === 'conflict' && (
-        <ConflictBanner
-          onReloaded={() => {
-            setNotice(null);
-            setTakeReloaded(true);
-          }}
-        />
-      )}
-      {notice?.kind === 'shutting-down' && <ShuttingDownBanner />}
-      {notice?.kind === 'not-found' && (
-        <div role="alert" className={bannerClassName('warn')}>
-          {notice.message}
-        </div>
-      )}
+      <SaveNoticeBanners
+        notice={notice}
+        onClose={() => setNotice(null)}
+        onReloaded={() => {
+          setNotice(null);
+          setTakeReloaded(true);
+        }}
+        successText={TEXTS.saved}
+        errorText={TEXTS.error}
+      />
 
       <MaintenanceTable
         title={TEXTS.title}
@@ -579,13 +546,16 @@ function EditRow({
           checked={draft.active}
           disabled={saving}
           onChange={(active) => onChange({ ...draft, active })}
+          label={TEXTS.status}
+          activeText={TEXTS.active}
+          inactiveText={TEXTS.inactive}
         />
       </TableCell>
       {isBatteryList && (
         <TableCell>
           <FormField label={TEXTS.batteryPresent} required error={errors.batteryPresent}>
             {(control) => (
-              <select
+              <Select
                 {...control}
                 value={draft.batteryPresent === null ? '' : String(draft.batteryPresent)}
                 disabled={saving}
@@ -597,15 +567,12 @@ function EditRow({
                   })
                 }
                 onKeyDown={onEnter}
-                className={cn(
-                  'h-control min-w-24 rounded-control border border-border-input bg-surface px-2',
-                  'text-body text-text aria-invalid:border-error disabled:bg-bg',
-                )}
+                className="min-w-24"
               >
                 <option value="" />
                 <option value="true">{TEXTS.yes}</option>
                 <option value="false">{TEXTS.no}</option>
-              </select>
+              </Select>
             )}
           </FormField>
         </TableCell>
@@ -625,49 +592,5 @@ function EditRow({
         </span>
       </TableCell>
     </TableRow>
-  );
-}
-
-/** Switch "Status" aktiv/deaktiviert of UI-028. */
-function StatusSwitch({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  const labelId = useId();
-  return (
-    <div className="flex flex-col gap-1">
-      <span id={labelId} className="text-label font-semibold text-text">
-        {TEXTS.status}
-      </span>
-      <div className="flex h-control items-center gap-2">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          aria-labelledby={labelId}
-          disabled={disabled}
-          onClick={() => onChange(!checked)}
-          className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border',
-            'disabled:cursor-not-allowed disabled:opacity-60',
-            checked ? 'border-primary bg-primary' : 'border-border-input bg-bg',
-          )}
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              'inline-block size-5 rounded-full bg-surface shadow transition-transform',
-              checked ? 'translate-x-5' : 'translate-x-0.5',
-            )}
-          />
-        </button>
-        <span className="text-body">{checked ? TEXTS.active : TEXTS.inactive}</span>
-      </div>
-    </div>
   );
 }

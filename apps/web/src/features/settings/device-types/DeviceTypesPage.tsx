@@ -4,7 +4,7 @@ import {
   type AttributeWithUsage,
 } from '@resellr/domain/schemas/attribute.schema';
 import { deviceTypeNameSchema, type DeviceType } from '@resellr/domain/schemas/device-type.schema';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { ApiError } from '../../../api/api-client.ts';
 import {
@@ -18,8 +18,12 @@ import {
   useUpdateDeviceTypeMutation,
 } from '../../../api/settings.api.ts';
 import { useWritesLocked } from '../../../api/write-outcome-store.ts';
-import { FormField, useFocusFirstError } from '../../../components/forms/FormField.tsx';
-import { ConflictBanner } from '../../../components/patterns/ConflictBanner.tsx';
+import {
+  FormField,
+  useDeferredBlurCheck,
+  useFocusFirstError,
+} from '../../../components/forms/FormField.tsx';
+import { StatusSwitch } from '../../../components/forms/StatusSwitch.tsx';
 import {
   MaintenanceTable,
   moveEntry,
@@ -27,8 +31,12 @@ import {
   useDragOrder,
 } from '../../../components/patterns/MaintenanceTable.tsx';
 import { OutcomeUnknownBanner } from '../../../components/patterns/OutcomeUnknownBanner.tsx';
-import { bannerClassName, PageBanner } from '../../../components/patterns/PageBanner.tsx';
-import { ShuttingDownBanner } from '../../../components/patterns/ShuttingDownBanner.tsx';
+import { PageBanner } from '../../../components/patterns/PageBanner.tsx';
+import {
+  noticeOf,
+  SaveNoticeBanners,
+  type SaveNotice,
+} from '../../../components/patterns/SaveNoticeBanners.tsx';
 import { UnreachableBanner } from '../../../components/patterns/UnreachableBanner.tsx';
 import { Badge } from '../../../components/ui/Badge.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
@@ -85,14 +93,6 @@ const TEXTS = {
     `Einstellungen konnten nicht gespeichert werden. Referenz: ${referenceNumber ?? '–'}`,
 } as const;
 
-/** Banner at the top of the page after a save or a failed load (2.0.7). */
-type Notice =
-  | { kind: 'success'; text: string }
-  | { kind: 'error'; error: ApiError }
-  | { kind: 'conflict' }
-  | { kind: 'shutting-down' }
-  | { kind: 'not-found'; message: string };
-
 interface Draft {
   name: string;
   active: boolean;
@@ -146,15 +146,15 @@ export function DeviceTypesPage() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [draft, setDraft] = useState<Draft>(draftOf(undefined));
   const [nameError, setNameError] = useState<string | undefined>();
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<SaveNotice | null>(null);
+  // Text of `.success`: the device type or an attribute was saved.
+  const [successText, setSuccessText] = useState<string>(TEXTS.saved);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
   const [takeReloaded, setTakeReloaded] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
   const focusFirstError = useFocusFirstError(formRef);
-  // A pointer is pressed in the form: the focus leaves "Name" in the middle of a click there.
-  const pointerPressed = useRef(false);
-  const cancelDeferredCheck = useRef(() => {});
+  const blurCheck = useDeferredBlurCheck();
 
   const attributeSaving =
     createAttributeMutation.isPending ||
@@ -198,6 +198,7 @@ export function DeviceTypesPage() {
   }, [takeReloaded, query.isFetching, attributesQuery.isFetching, selected, attributes]);
 
   function open(next: Selection, deviceType?: DeviceType) {
+    blurCheck.cancel();
     setSelection(next);
     setDraft(draftOf(deviceType));
     setNameError(undefined);
@@ -217,32 +218,16 @@ export function DeviceTypesPage() {
     focusFirstError();
   }
 
+  function showSaved(text: string) {
+    setSuccessText(text);
+    setNotice({ kind: 'success' });
+  }
+
   function onSaved(saved: DeviceType) {
     setSelection({ id: saved.id });
     setDraft(draftOf(saved));
     setNameError(undefined);
-    setNotice({ kind: 'success', text: TEXTS.saved });
-  }
-
-  /** Rejections that every write of the page shows the same way (2.0.7). */
-  function onWriteFailed(error: ApiError) {
-    switch (error.kind) {
-      case 'conflict':
-        setNotice({ kind: 'conflict' });
-        return;
-      case 'shutting-down':
-        setNotice({ kind: 'shutting-down' });
-        return;
-      case 'not-found':
-        setNotice({ kind: 'not-found', message: error.error?.message ?? '' });
-        return;
-      case 'outcome-unknown':
-        // The banner P-08 shows itself once the page is locked (CU-049).
-        setNotice(null);
-        return;
-      default:
-        setNotice({ kind: 'error', error });
-    }
+    showSaved(TEXTS.saved);
   }
 
   /**
@@ -275,13 +260,13 @@ export function DeviceTypesPage() {
       setAttributeErrorFocus((count) => count + 1);
       return;
     }
-    onWriteFailed(error);
+    setNotice(noticeOf(error));
   }
 
   const onAttributeSaved = () => {
     setEditing(null);
     setAttributeErrors({});
-    setNotice({ kind: 'success', text: TEXTS.attributeSaved });
+    showSaved(TEXTS.attributeSaved);
   };
 
   function saveAttribute(attributeDraft: AttributeDraft) {
@@ -313,8 +298,8 @@ export function DeviceTypesPage() {
     updateAttributeMutation.mutate(
       { id: attribute.id, version: attribute.version, active: false },
       {
-        onSuccess: () => setNotice({ kind: 'success', text: TEXTS.attributeSaved }),
-        onError: onWriteFailed,
+        onSuccess: () => showSaved(TEXTS.attributeSaved),
+        onError: (error: ApiError) => setNotice(noticeOf(error)),
       },
     );
   }
@@ -334,70 +319,30 @@ export function DeviceTypesPage() {
         // device type continues from it.
         onSuccess: (saved) => {
           setDraft((current) => ({ ...current, version: saved.version }));
-          setNotice({ kind: 'success', text: TEXTS.attributeSaved });
+          showSaved(TEXTS.attributeSaved);
         },
-        onError: onWriteFailed,
+        onError: (error: ApiError) => setNotice(noticeOf(error)),
       },
     );
   }
 
   function onFailed(error: ApiError) {
-    switch (error.kind) {
-      case 'validation': {
-        const field = error.error?.fields.find((entry) => entry.path === 'name');
-        if (field) showFieldError(field.message);
-        return;
-      }
-      case 'rejected':
-        // `name_taken.device_type` "Name ist bereits vergeben" stands at the field.
-        if (error.error?.code === 'name_taken') showFieldError(error.error.message);
-        else setNotice({ kind: 'error', error });
-        return;
-      default:
-        onWriteFailed(error);
-    }
-  }
-
-  function pressPointer() {
-    pointerPressed.current = true;
-    const release = () => {
-      pointerPressed.current = false;
-      window.removeEventListener('pointerup', release);
-      window.removeEventListener('pointercancel', release);
-    };
-    window.addEventListener('pointerup', release);
-    window.addEventListener('pointercancel', release);
-  }
-
-  /**
-   * Check on leaving "Name" (2.0.7). During a click in the form the check waits until after the
-   * click: a new or vanished error line would move the button or the switch between `mousedown`
-   * and `mouseup`, and the browser would drop the click (QA-D1).
-   */
-  function checkNameOnBlur() {
-    const name = draft.name;
-    if (!pointerPressed.current) {
-      setNameError(checkName(name));
+    if (error.kind === 'validation') {
+      const field = error.error?.fields.find((entry) => entry.path === 'name');
+      if (field) showFieldError(field.message);
       return;
     }
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const run = () => {
-      cancelDeferredCheck.current();
-      // `click` follows `pointerup` in the same task, so the timeout runs after it.
-      timer = setTimeout(() => setNameError(checkName(name)));
-    };
-    window.addEventListener('pointerup', run);
-    window.addEventListener('pointercancel', run);
-    cancelDeferredCheck.current = () => {
-      window.removeEventListener('pointerup', run);
-      window.removeEventListener('pointercancel', run);
-      clearTimeout(timer);
-    };
+    // `name_taken.device_type` "Name ist bereits vergeben" stands at the field.
+    if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
+      showFieldError(error.error.message);
+      return;
+    }
+    setNotice(noticeOf(error));
   }
 
   function save() {
     // The save checks the name itself; a later check on leaving must not hide its result.
-    cancelDeferredCheck.current();
+    blurCheck.cancel();
     const message = checkName(draft.name);
     if (message) {
       showFieldError(message);
@@ -436,30 +381,16 @@ export function DeviceTypesPage() {
           {TEXTS.error}
         </PageBanner>
       )}
-      {notice?.kind === 'success' && (
-        <PageBanner variant="success" onClose={() => setNotice(null)}>
-          {notice.text}
-        </PageBanner>
-      )}
-      {notice?.kind === 'error' && (
-        <PageBanner variant="error" error={notice.error} onClose={() => setNotice(null)}>
-          {TEXTS.error}
-        </PageBanner>
-      )}
-      {notice?.kind === 'conflict' && (
-        <ConflictBanner
-          onReloaded={() => {
-            setNotice(null);
-            setTakeReloaded(true);
-          }}
-        />
-      )}
-      {notice?.kind === 'shutting-down' && <ShuttingDownBanner />}
-      {notice?.kind === 'not-found' && (
-        <div role="alert" className={bannerClassName('warn')}>
-          {notice.message}
-        </div>
-      )}
+      <SaveNoticeBanners
+        notice={notice}
+        onClose={() => setNotice(null)}
+        onReloaded={() => {
+          setNotice(null);
+          setTakeReloaded(true);
+        }}
+        successText={successText}
+        errorText={TEXTS.error}
+      />
 
       <MaintenanceTable
         title={TEXTS.list}
@@ -521,7 +452,7 @@ export function DeviceTypesPage() {
           aria-label={TEXTS.list}
           noValidate
           className="flex flex-col gap-4 rounded-control border border-border bg-surface p-4 full:flex-row full:flex-wrap full:items-start"
-          onPointerDown={pressPointer}
+          onPointerDown={blurCheck.pressPointer}
           onSubmit={(event) => {
             event.preventDefault();
             save();
@@ -535,7 +466,10 @@ export function DeviceTypesPage() {
                   value={draft.name}
                   disabled={formLocked}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                  onBlur={checkNameOnBlur}
+                  onBlur={() => {
+                    const name = draft.name;
+                    blurCheck.checkOnBlur(() => setNameError(checkName(name)));
+                  }}
                 />
               )}
             </FormField>
@@ -544,6 +478,9 @@ export function DeviceTypesPage() {
             checked={draft.active}
             disabled={formLocked}
             onChange={(active) => setDraft({ ...draft, active })}
+            label={TEXTS.status}
+            activeText={TEXTS.active}
+            inactiveText={TEXTS.inactive}
           />
           <Button
             type="submit"
@@ -712,49 +649,5 @@ function AttributeTable({
         </Table>
       )}
     </section>
-  );
-}
-
-/** Switch "Status" aktiv/deaktiviert of UI-027. */
-function StatusSwitch({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  const labelId = useId();
-  return (
-    <div className="flex flex-col gap-1">
-      <span id={labelId} className="text-label font-semibold text-text">
-        {TEXTS.status}
-      </span>
-      <div className="flex h-control items-center gap-2">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          aria-labelledby={labelId}
-          disabled={disabled}
-          onClick={() => onChange(!checked)}
-          className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border',
-            'disabled:cursor-not-allowed disabled:opacity-60',
-            checked ? 'border-primary bg-primary' : 'border-border-input bg-bg',
-          )}
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              'inline-block size-5 rounded-full bg-surface shadow transition-transform',
-              checked ? 'translate-x-5' : 'translate-x-0.5',
-            )}
-          />
-        </button>
-        <span className="text-body">{checked ? TEXTS.active : TEXTS.inactive}</span>
-      </div>
-    </div>
   );
 }
