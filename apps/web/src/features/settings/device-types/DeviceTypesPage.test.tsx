@@ -289,6 +289,9 @@ const BATTERY: AttributeItem = {
   version: 1,
 };
 
+const DEACTIVATED_RAM: AttributeItem = { ...RAM, active: false, version: 3 };
+const ACTIVATED_RAM: AttributeItem = { ...DEACTIVATED_RAM, active: true, version: 4 };
+
 const attributeRegion = () => screen.getByRole('region', { name: 'Merkmale' });
 const panel = () => screen.getByRole('form', { name: 'Merkmal bearbeiten' });
 const panelField = (name: RegExp | string) =>
@@ -303,13 +306,21 @@ const attributeRow = (label: string) =>
     .find((row) => within(row).queryByRole('button', { name: label })) as HTMLElement;
 
 async function openAttributes(attributes: AttributeItem[], writes: Record<string, Route> = {}) {
-  const api = mockApi({ attributes: { 1: [...attributes] }, writes });
+  // The list the server answers for "Notebook"; a test may change it like another window.
+  const listed = [...attributes];
+  const api = mockApi({ attributes: { 1: listed }, writes });
   await openPage();
   if (attributes.length > 0) {
     await within(attributeRegion()).findByRole('button', { name: attributes[0]?.label });
   }
-  return api;
+  return { ...api, listed };
 }
+
+/** The row action of an attribute: "Deaktivieren", "Wieder aktivieren" or "Speichern …". */
+const rowAction = (label: string) =>
+  within(attributeRow(label)).getByRole<HTMLButtonElement>('button', {
+    name: /^(Deaktivieren|Wieder aktivieren|Speichern …)$/,
+  });
 
 async function openPanelOf(label: string) {
   fireEvent.click(within(attributeRegion()).getByRole('button', { name: label }));
@@ -868,7 +879,7 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     expect(panelField(/^Einheit/).disabled).toBe(true);
     expect(
       within(attributeRow('Displaygröße')).getByRole<HTMLButtonElement>('button', {
-        name: 'Merkmal deaktivieren',
+        name: 'Deaktivieren',
       }).disabled,
     ).toBe(true);
     expect(
@@ -887,24 +898,226 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     expectAccessiblePanel();
   });
 
-  it('DER-34-07 "Merkmal deaktivieren" sends active false and the row shows "deaktiviert"', async () => {
+  it('DER-34-07 "Deaktivieren" sends active false and the row shows "deaktiviert" with "Wieder aktivieren"', async () => {
     const { sent } = await openAttributes([RAM, DISPLAY], {
       'PATCH /api/attributes/12': () => Response.json({ ...RAM, active: false, version: 3 }),
     });
 
-    fireEvent.click(
-      within(attributeRow('RAM')).getByRole('button', { name: 'Merkmal deaktivieren' }),
-    );
+    fireEvent.click(within(attributeRow('RAM')).getByRole('button', { name: 'Deaktivieren' }));
 
     await screen.findByText('Merkmal gespeichert');
     expect(sent).toEqual([
       { method: 'PATCH', path: '/api/attributes/12', body: { version: 2, active: false } },
     ]);
     expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
+    expect(within(attributeRow('RAM')).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
     expect(
-      within(attributeRow('RAM')).queryByRole('button', { name: 'Merkmal deaktivieren' }),
-    ).toBeNull();
+      within(attributeRow('RAM')).getByRole('button', { name: 'Wieder aktivieren' }),
+    ).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('UI-027.default DER-34-13 a deactivated row keeps its place with "deaktiviert", a muted label and "Wieder aktivieren" where an active row has "Deaktivieren"', async () => {
+    await openAttributes([DEACTIVATED_RAM, DISPLAY]);
+
+    const rows = within(attributeRegion()).getAllByRole('row').slice(1);
+    expect(rows.map((row) => within(row).getAllByRole('cell')[1]?.textContent)).toEqual([
+      'RAM',
+      'Displaygröße',
+    ]);
+    expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
+    expect(within(attributeRow('RAM')).getByRole('button', { name: 'RAM' }).className).toContain(
+      'text-text-secondary',
+    );
+    // "variantenbildend" and the other columns do not depend on the status (A-38).
+    expect(within(attributeRow('RAM')).getAllByText('Ja')).toHaveLength(2);
+    expect(rowAction('RAM').textContent).toBe('Wieder aktivieren');
+    expect(within(attributeRow('RAM')).queryByRole('button', { name: 'Deaktivieren' })).toBeNull();
+    expect(rowAction('Displaygröße').textContent).toBe('Deaktivieren');
+    expect(within(attributeRow('Displaygröße')).getByText('aktiv')).toBeTruthy();
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.textContent?.trim() || button.getAttribute('aria-label')).toBeTruthy();
+    }
+  });
+
+  it('UI-027.aktiviert-speichert DER-34-13 "Wieder aktivieren" sends exactly version and active true without dialog, shows "Speichern …" in the row and locks everything without time limit', async () => {
+    const { sent } = await openAttributes([DEACTIVATED_RAM, DISPLAY], {
+      'PATCH /api/attributes/12': pending,
+    });
+    await openPanelOf('RAM');
+    fireEvent.click(panelField(/^Pflichtmerkmal/));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    fireEvent.click(rowAction('RAM'));
+
+    await vi.waitFor(() => expect(rowAction('RAM').textContent).toBe('Speichern …'));
+    expect(sent).toEqual([
+      { method: 'PATCH', path: '/api/attributes/12', body: { version: 3, active: true } },
+    ]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(rowAction('RAM').disabled).toBe(true);
+    expect(rowAction('Displaygröße').disabled).toBe(true);
+    expect(
+      within(attributeRow('Displaygröße')).getByRole<HTMLButtonElement>('button', { name: 'Hoch' })
+        .disabled,
+    ).toBe(true);
+    // The row changes only with the answer.
+    expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
+    // The panel stays open with its inputs, locked; its save button keeps its label.
+    expect(panelField(/^Bezeichnung/).disabled).toBe(true);
+    expect(panelField(/^Pflichtmerkmal/).disabled).toBe(true);
+    expect(panelField(/^Pflichtmerkmal/).checked).toBe(false);
+    expect(panelSave().textContent).toBe('Merkmal speichern');
+    expect(panelSave().disabled).toBe(true);
+    expect(
+      within(panel()).getByRole<HTMLButtonElement>('button', { name: 'Abbrechen' }).disabled,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Geräteart speichern' }).disabled,
+    ).toBe(true);
+    expect(screen.getAllByRole('button', { name: 'Speichern …' })).toHaveLength(1);
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(rowAction('RAM').textContent).toBe('Speichern …');
+    expectAccessiblePanel();
+  });
+
+  it('UI-027.success DER-34-14 after 200 the row shows "aktiv" and "Deaktivieren" with the focus, and the status banner "Merkmal aktiviert"', async () => {
+    let answer: (response: Response) => void = () => {};
+    await openAttributes([DEACTIVATED_RAM, DISPLAY], {
+      'PATCH /api/attributes/12': () => new Promise<Response>((resolve) => (answer = resolve)),
+    });
+    act(() => rowAction('RAM').focus());
+
+    fireEvent.click(rowAction('RAM'));
+    await vi.waitFor(() => expect(rowAction('RAM').disabled).toBe(true));
+    // Like the browser, the disabled action loses the focus during the request.
+    act(() => rowAction('RAM').blur());
+    await act(async () => answer(Response.json(ACTIVATED_RAM)));
+
+    const text = await screen.findByText('Merkmal aktiviert');
+    expect(text.closest('[role="status"]')).toBeTruthy();
+    expect(within(attributeRow('RAM')).getByText('aktiv')).toBeTruthy();
+    expect(within(attributeRow('RAM')).queryByText('deaktiviert')).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(rowAction('RAM')));
+    expect(rowAction('RAM').textContent).toBe('Deaktivieren');
+    expect(within(attributeRow('RAM')).getByRole('button', { name: 'RAM' }).className).toContain(
+      'text-primary',
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('UI-027.error DER-34-15 after 500 shows the error banner with the reference number without "Erneut versuchen"; the row stays "deaktiviert"', async () => {
+    await openAttributes([DEACTIVATED_RAM], {
+      'PATCH /api/attributes/12': () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-3HX8-5TQ2' }), {
+          status: 500,
+        }),
+    });
+
+    fireEvent.click(rowAction('RAM'));
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain(
+      'Einstellungen konnten nicht gespeichert werden. Referenz: R-3HX8-5TQ2',
+    );
+    expect(within(banner).queryByRole('button', { name: /Erneut versuchen/ })).toBeNull();
+    expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
+    expect(rowAction('RAM').textContent).toBe('Wieder aktivieren');
+    expect(rowAction('RAM').disabled).toBe(false);
+  });
+
+  it('UI-027.conflict DER-34-15 after 409 shows P-05; the row stays "deaktiviert"', async () => {
+    await openAttributes([DEACTIVATED_RAM], {
+      'PATCH /api/attributes/12': () =>
+        Response.json(errorBody('version_conflict'), { status: 409 }),
+    });
+
+    fireEvent.click(rowAction('RAM'));
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert.',
+    );
+    expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
+    expect(rowAction('RAM').textContent).toBe('Wieder aktivieren');
+  });
+
+  it('UI-027.success DER-34-16 an open panel based on the activated version stays open with its input, and its save sends the new version', async () => {
+    const { sent } = await openAttributes([DEACTIVATED_RAM, DISPLAY], {
+      'PATCH /api/attributes/12': (init) => {
+        const body = JSON.parse(String(init?.body)) as { version: number; active?: boolean };
+        if (body.active === true) return Response.json(ACTIVATED_RAM);
+        return body.version === ACTIVATED_RAM.version
+          ? Response.json({ ...ACTIVATED_RAM, required: false, version: 5 })
+          : Response.json(errorBody('version_conflict'), { status: 409 });
+      },
+    });
+    await openPanelOf('RAM');
+    fireEvent.click(panelField(/^Pflichtmerkmal/));
+
+    fireEvent.click(rowAction('RAM'));
+    await screen.findByText('Merkmal aktiviert');
+
+    expect(panelField(/^Pflichtmerkmal/).checked).toBe(false);
+    expect(within(panel()).queryByRole('switch')).toBeNull();
+    fireEvent.click(panelSave());
+
+    await screen.findByText('Merkmal gespeichert');
+    expect(sent.map((request) => request.body)).toEqual([
+      { version: 3, active: true },
+      expect.objectContaining({ version: 4, required: false }),
+    ]);
+    expect(sent[1]?.body).not.toHaveProperty('active');
+    expect(within(attributeRow('RAM')).getByText('aktiv')).toBeTruthy();
+  });
+
+  it('UI-027.conflict DER-34-16 an open panel based on an older version keeps it, and its save after the activation gives P-05', async () => {
+    const { sent, listed } = await openAttributes([DEACTIVATED_RAM, DISPLAY], {
+      'PATCH /api/attributes/12': (init) => {
+        const body = JSON.parse(String(init?.body)) as { version: number; active?: boolean };
+        if (body.active === true && body.version === 4) {
+          return Response.json({ ...ACTIVATED_RAM, unit: 'GiB', version: 5 });
+        }
+        return Response.json(errorBody('version_conflict'), { status: 409 });
+      },
+    });
+    await openPanelOf('RAM');
+    fireEvent.click(panelField(/^Pflichtmerkmal/));
+    // Another window changed RAM to version 4; the list is loaded again in the background.
+    listed[0] = { ...DEACTIVATED_RAM, unit: 'GiB', version: 4 };
+    fireEvent(window, new Event('visibilitychange'));
+    await within(attributeRow('RAM')).findByText('GiB');
+
+    fireEvent.click(rowAction('RAM'));
+    await screen.findByText('Merkmal aktiviert');
+    fireEvent.click(panelSave());
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Dieser Eintrag wurde inzwischen in einem anderen Fenster geändert.',
+    );
+    expect(sent.map((request) => request.body)).toEqual([
+      { version: 4, active: true },
+      expect.objectContaining({ version: 3, required: false }),
+    ]);
+    expect(panelField(/^Pflichtmerkmal/).checked).toBe(false);
+  });
+
+  it('UI-027.success DER-34-16 the panel of a deactivated attribute is editable without status switch: "Pflichtmerkmal" saves with required true', async () => {
+    const { sent } = await openAttributes([{ ...DEACTIVATED_RAM, required: false }], {
+      'PATCH /api/attributes/12': () =>
+        Response.json({ ...DEACTIVATED_RAM, required: true, version: 4 }),
+    });
+    await openPanelOf('RAM');
+
+    expect(within(panel()).queryByRole('switch')).toBeNull();
+    expect(panelField(/^Pflichtmerkmal/).disabled).toBe(false);
+    expectAccessiblePanel();
+    fireEvent.click(panelField(/^Pflichtmerkmal/));
+    fireEvent.click(panelSave());
+
+    await screen.findByText('Merkmal gespeichert');
+    expect(sent[0]?.body).toMatchObject({ version: 3, required: true });
+    expect(sent[0]?.body).not.toHaveProperty('active');
+    expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
   });
 
   it('DER-34-06 "Runter" sends the complete order of the attributes with the version of the device type', async () => {
@@ -1397,5 +1610,54 @@ describe('UI-027 device types (CU-095)', () => {
     fireEvent.click(saveButton());
     expect(sent).toHaveLength(1);
     expectAccessibleForm();
+  });
+});
+
+describe('UI-027 "Wieder aktivieren" without answer (CU-095, REQ-005)', () => {
+  beforeEach(() => stubViewport({ full: true }));
+
+  // Fresh modules: the lock "gesperrt bis Neuladen" (CU-049) of the tests above lasts until the
+  // page is loaded again.
+  async function renderFreshDeviceTypes() {
+    vi.resetModules();
+    const { QueryClientProvider: FreshProvider } = await import('@tanstack/react-query');
+    const { createMemoryRouter: freshRouter, RouterProvider: FreshRouterProvider } =
+      await import('react-router');
+    const { createQueryClient: freshQueryClient } = await import('../../../app/query-client.ts');
+    const { routes: freshRoutes } = await import('../../../app/router.tsx');
+    render(
+      <FreshProvider client={freshQueryClient()}>
+        <FreshRouterProvider
+          router={freshRouter(freshRoutes, { initialEntries: ['/einstellungen/geraetearten'] })}
+        />
+      </FreshProvider>,
+    );
+  }
+
+  it('UI-027.ausgang-unbekannt DER-34-15 an activation without HTTP answer shows "Ausgang unbekannt, bitte neu laden." without button; the row stays "deaktiviert" and every write is locked', async () => {
+    const { sent } = mockApi({
+      attributes: { 1: [DEACTIVATED_RAM, DISPLAY] },
+      writes: {
+        'PATCH /api/attributes/12': () => {
+          throw new TypeError('Failed to fetch');
+        },
+      },
+    });
+    await renderFreshDeviceTypes();
+    await within(await screen.findByRole('region', { name: 'Merkmale' })).findByRole('button', {
+      name: 'RAM',
+    });
+
+    fireEvent.click(rowAction('RAM'));
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('Ausgang unbekannt, bitte neu laden.');
+    expect(within(banner).queryByRole('button')).toBeNull();
+    expect(within(attributeRow('RAM')).getByText('deaktiviert')).toBeTruthy();
+    expect(rowAction('RAM').textContent).toBe('Wieder aktivieren');
+    expect(rowAction('RAM').disabled).toBe(true);
+    expect(rowAction('Displaygröße').disabled).toBe(true);
+    fireEvent.click(rowAction('RAM'));
+    expect(sent).toHaveLength(1);
   });
 });

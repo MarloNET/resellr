@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,6 +80,34 @@ describe('SaveNoticeBanners (CU-314)', () => {
     expect(screen.getByRole('status').textContent).toContain('Gespeichert');
     fireEvent.click(screen.getByRole('button', { name: 'Meldung schließen' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('DER-34-14 announces a changed success text such as "Merkmal aktiviert" as status and gives it its own 5 s', () => {
+    vi.useFakeTimers();
+    try {
+      const onClose = vi.fn();
+      const banners = (successText: string) => (
+        <SaveNoticeBanners
+          notice={{ kind: 'success' }}
+          onClose={onClose}
+          onReloaded={() => {}}
+          successText={successText}
+          errorText={errorText}
+        />
+      );
+      const { rerender } = render(banners('Merkmal gespeichert'));
+      act(() => vi.advanceTimersByTime(3000));
+
+      rerender(banners('Merkmal aktiviert'));
+
+      expect(screen.getByRole('status').textContent).toContain('Merkmal aktiviert');
+      act(() => vi.advanceTimersByTime(4999));
+      expect(onClose).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows no success banner for a screen without a success text', () => {

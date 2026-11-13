@@ -405,6 +405,90 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     });
   });
 
+  it('AC-REQ-005-11 activating a deactivated variant attribute with stored values answers 200 and changes nothing but the status', async () => {
+    const notebook = await createDeviceType('Notebook');
+    const cpu = (
+      await createAttribute(notebook.id, { label: 'Prozessor', dataType: 'text' })
+    ).json() as { id: number };
+    const ram = (await createAttribute(notebook.id, { minValue: '1', maxValue: '256' })).json() as {
+      id: number;
+    };
+    const ssd = (await createAttribute(notebook.id, { label: 'SSD' })).json() as { id: number };
+    insertAttributeValueRecords(
+      t.database.sqlite,
+      {
+        modelValues: { [String(cpu.id)]: 'i5' },
+        defaultDeviceValues: { [String(ram.id)]: 16 },
+        deviceValues: { [String(ram.id)]: 16, [String(ssd.id)]: 512 },
+        variantValues: { [String(ram.id)]: 16 },
+      },
+      notebook.id,
+    );
+    const storedValues = () =>
+      t.database.sqlite
+        .prepare(
+          `SELECT mt.model_values, mt.default_device_values, l.variant_values,
+             l.other_device_values, d.device_values
+           FROM model_template mt JOIN listing l ON l.model_template_id = mt.id
+           JOIN device d ON d.listing_id = l.id`,
+        )
+        .all();
+    const deactivated = (await patchAttribute(ram.id, { version: 1, active: false })).json() as {
+      version: number;
+    };
+    const before = { values: storedValues(), list: (await listAttributes(notebook.id)).items };
+
+    const response = await patchAttribute(ram.id, { version: deactivated.version, active: true });
+
+    expect(response.statusCode).toBe(200);
+    // The answer is the attribute without `hasValues` (2.1); everything else is unchanged.
+    const beforeRam = before.list.find((item) => item.id === ram.id) as Record<string, unknown>;
+    expect({ ...response.json(), hasValues: beforeRam.hasValues }).toEqual({
+      ...beforeRam,
+      active: true,
+      variantForming: true,
+      version: deactivated.version + 1,
+    });
+    const after = (await listAttributes(notebook.id)).items;
+    expect(after.map((item) => item.id)).toEqual([cpu.id, ram.id, ssd.id]);
+    expect(after).toEqual(
+      before.list.map((item) =>
+        item.id === ram.id ? { ...item, active: true, version: deactivated.version + 1 } : item,
+      ),
+    );
+    expect(storedValues()).toEqual(before.values);
+    const audit = t.database.sqlite
+      .prepare(
+        "SELECT action, old_value, new_value FROM audit_entry WHERE object_type = 'attribute' AND object_id = ? ORDER BY id",
+      )
+      .all(ram.id) as { action: string; old_value: string; new_value: string }[];
+    expect(audit.map((row) => row.action)).toEqual(['created', 'deactivated', 'activated']);
+    expect(JSON.parse(audit[2]?.old_value ?? '')).toEqual({ Status: 'deaktiviert' });
+    expect(JSON.parse(audit[2]?.new_value ?? '')).toEqual({ Status: 'aktiv' });
+    expect(JSON.stringify(response.json())).not.toContain('variant_flag_would_merge_listings');
+  });
+
+  it('DER-34-17 active true at an active attribute with the current version answers 200 without new version or audit entry, with an outdated version 409', async () => {
+    const notebook = await createDeviceType('Notebook');
+    const ram = (await createAttribute(notebook.id)).json() as { id: number; version: number };
+    await patchAttribute(ram.id, { version: 1, unit: 'GiB' });
+    const auditCount = () =>
+      t.database.sqlite.prepare('SELECT COUNT(*) FROM audit_entry').pluck().get();
+    const entries = auditCount();
+
+    const repeated = await patchAttribute(ram.id, { version: 2, active: true });
+
+    expect(repeated.statusCode).toBe(200);
+    expect(repeated.json()).toMatchObject({ active: true, unit: 'GiB', version: 2 });
+    expect(auditCount()).toBe(entries);
+
+    const outdated = await patchAttribute(ram.id, { version: 1, active: true });
+
+    expect(outdated.statusCode).toBe(409);
+    expect(outdated.json()).toMatchObject({ error: { code: 'version_conflict' } });
+    expect(auditCount()).toBe(entries);
+  });
+
   it('DER-34-06 PUT attribute-order stores the order and answers with the device type in its new version', async () => {
     const notebook = await createDeviceType('Notebook');
     const a = (await createAttribute(notebook.id, { label: 'Prozessor' })).json();
