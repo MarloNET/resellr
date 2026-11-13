@@ -208,3 +208,88 @@ describe('AppFrame banner after "resellr beenden" (CU-044, Nachtrag MAR-421)', (
     expect(second!.compareDocumentPosition(page) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('AppFrame after "resellr beenden" in this window (CU-044, Nachtrag MAR-510)', () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  // Fresh modules per test: the flag `terminated` lives until the page is reloaded.
+  async function renderApp() {
+    vi.resetModules();
+    const { QueryClientProvider } = await import('@tanstack/react-query');
+    const { createMemoryRouter, RouterProvider } = await import('react-router');
+    const { createQueryClient } = await import('./query-client.ts');
+    const { routes } = await import('./router.tsx');
+    const router = createMemoryRouter(routes, { initialEntries: ['/inserate'] });
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    return router;
+  }
+
+  /** Second page, "resellr beenden" in the notice and in UI-045, then the end state UI-046. */
+  async function shutDownFromSecondPage(router: Awaited<ReturnType<typeof renderApp>>) {
+    await screen.findByText(DATA_DIR_PATH);
+    await router.navigate('/einstellungen/hersteller');
+    fireEvent.click(within(notice()).getByRole('button', { name: 'resellr beenden' }));
+    const dialog = screen.getByRole('dialog', { name: 'resellr beenden' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'resellr beenden' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/beendet'));
+  }
+
+  async function expectEndStateOnly(router: Awaited<ReturnType<typeof renderApp>>) {
+    await waitFor(() => expect(router.state.location.pathname).toBe('/beendet'));
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.queryByTestId('navigation-column')).toBeNull();
+    expect(screen.queryByRole('region', { name: FIXED_TEXTS.backupNoticeTitle })).toBeNull();
+  }
+
+  it('UI-046.success: DER-96-09 "Zurück" and "Vor" after the shutdown lead to /beendet with the same path, without frame and without request', async () => {
+    const answerPath = 'D:\\Kopie\\resellr-Daten';
+    serve({
+      '/api/ops/status': status,
+      '/api/ops/shutdown': () => Response.json({ dataDirPath: answerPath }),
+    });
+    const router = await renderApp();
+    await shutDownFromSecondPage(router);
+    const requests = fetchMock.mock.calls.length;
+
+    await router.navigate(-1);
+
+    await expectEndStateOnly(router);
+    expect(screen.getByRole('heading', { level: 1, name: FIXED_TEXTS.shutdownDone })).toBeTruthy();
+    expect(screen.getByTestId('terminated-path').textContent).toBe(answerPath);
+
+    await router.navigate('/einstellungen/lieferanten');
+    await router.navigate('/gibt-es-nicht');
+    await expectEndStateOnly(router);
+    expect(screen.getByRole('heading', { level: 1, name: FIXED_TEXTS.shutdownDone })).toBeTruthy();
+    expect(screen.getByTestId('terminated-path').textContent).toBe(answerPath);
+    expect(fetchMock.mock.calls.length).toBe(requests);
+  });
+
+  it('UI-046.unknown: DER-96-09 "Zurück" after the shutdown leads to /beendet without path, without frame and without request', async () => {
+    serve({ '/api/ops/status': status });
+    const router = await renderApp();
+    await shutDownFromSecondPage(router);
+    const requests = fetchMock.mock.calls.length;
+
+    await router.navigate(-1);
+
+    await expectEndStateOnly(router);
+    expect(
+      screen.getByRole('heading', { level: 1, name: FIXED_TEXTS.shutdownUnknownTitle }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('terminated-path')).toBeNull();
+    expect(fetchMock.mock.calls.length).toBe(requests);
+  });
+});

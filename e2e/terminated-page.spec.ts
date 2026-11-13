@@ -144,6 +144,32 @@ test.describe('End state UI-046 after "resellr beenden" (#143)', () => {
     await expect(page.getByRole('navigation')).toBeVisible();
   });
 
+  test('DER-96-09 "Zurück" after the shutdown shows UI-046 again with the same path, without frame and without request', async ({
+    page,
+    server,
+  }) => {
+    await page.goto('/inserate');
+    await expect(page.getByTestId('backup-notice-path')).toHaveText(server.paths.dataDir);
+    await page.getByRole('navigation').getByRole('link', { name: 'Einstellungen' }).click();
+    await expect(page).toHaveURL(/\/einstellungen\/[a-z-]+$/);
+
+    await confirmShutdown(page);
+    await expect(page.getByRole('heading', { level: 1, name: DONE })).toBeVisible();
+    await expect.poll(() => answers(server), { timeout: 10_000 }).toBe(false);
+
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await page.goBack();
+
+    await expect(page).toHaveURL(/\/beendet$/);
+    await expect(page.getByRole('heading', { level: 1, name: DONE })).toBeVisible();
+    await expect(page.getByTestId('terminated-path')).toHaveText(server.paths.dataDir);
+    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Sicherung einrichten' })).toHaveCount(0);
+    await expect(page.getByText('wird geladen', { exact: false })).toHaveCount(0);
+    expect(requests).toEqual([]);
+  });
+
   test('DER-96-06 on a connection loss UI-046.unknown appears without path and without "Erneut versuchen"', async ({
     page,
     server,
