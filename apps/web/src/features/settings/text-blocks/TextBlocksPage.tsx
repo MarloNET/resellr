@@ -1,12 +1,21 @@
+import { formatDate } from '@resellr/domain/format/format-value';
 import { fixedPlaceholdersFor } from '@resellr/domain/placeholders/placeholder-catalog';
 import {
+  hasLegalStatus,
+  legalCheckIssues,
   TEXT_BLOCK_BODY_MAX,
   TEXT_BLOCK_KIND_LABELS,
   TEXT_BLOCK_KINDS,
+  TEXT_BLOCK_LEGAL_STATUS_LABELS,
+  TEXT_BLOCK_LEGAL_STATUSES,
   textBlockBodySchema,
+  textBlockLegalCheckedBySchema,
   textBlockNameSchema,
   type TextBlock,
   type TextBlockKind,
+  type TextBlockLegalStatus,
+  type TextBlockSaveResult,
+  type TextBlockUpdateResult,
 } from '@resellr/domain/schemas/text-block.schema';
 import { useEffect, useId, useRef, useState } from 'react';
 
@@ -19,6 +28,7 @@ import {
 import { useWritesLocked } from '../../../api/write-outcome-store.ts';
 import {
   FormField,
+  type FormFieldControlProps,
   useDeferredBlurCheck,
   useFocusFirstError,
 } from '../../../components/forms/FormField.tsx';
@@ -54,6 +64,15 @@ const TEXTS = {
   placeholders: 'Platzhalter',
   active: 'aktiv',
   inactive: 'deaktiviert',
+  legalStatus: 'Prüfstatus',
+  legalCheckedOn: 'Prüfdatum',
+  legalCheckedBy: 'Prüfende Stelle',
+  legalStatusReset: 'Prüfstatus wurde auf ‚rechtlich ungeprüft‘ zurückgesetzt',
+  /** Column "Prüfstatus" of the list (DER-40-04). */
+  legalChip: ({ legalStatus, legalCheckedOn, legalCheckedBy }: TextBlock) =>
+    legalStatus === 'checked' && legalCheckedOn !== null
+      ? `${TEXT_BLOCK_LEGAL_STATUS_LABELS.checked} am ${formatDate(legalCheckedOn)} durch ${legalCheckedBy ?? ''}`
+      : TEXT_BLOCK_LEGAL_STATUS_LABELS.unchecked,
   /** Counter below "Text" (mockup `default.png`). */
   bodyLength: (length: number) =>
     `${length.toLocaleString('de-DE')} / ${TEXT_BLOCK_BODY_MAX.toLocaleString('de-DE')} Zeichen`,
@@ -67,13 +86,21 @@ const PLACEHOLDERS = fixedPlaceholdersFor('text_block');
 /** Kind of a new text block until the user chooses another. */
 const NEW_KIND: TextBlockKind = 'other';
 
-type Field = 'name' | 'body';
-type FieldErrors = Partial<Record<Field, string>>;
+type Field = 'name' | 'body' | 'legalCheckedBy';
+/**
+ * Errors of the form: `legalCheck` is M-24, shown once below "Prüfdatum" and "Prüfende Stelle"
+ * and marking both (K-05, DER-40-01).
+ */
+type FieldErrors = Partial<Record<Field | 'legalCheckedOn' | 'legalCheck', string>>;
 
 interface Values {
   name: string;
   kind: TextBlockKind;
   body: string;
+  legalStatus: TextBlockLegalStatus;
+  /** `YYYY-MM-DD` of the date input, `""` while empty. */
+  legalCheckedOn: string;
+  legalCheckedBy: string;
 }
 
 interface Draft extends Values {
@@ -94,20 +121,63 @@ function draftOf(textBlock: TextBlock | undefined): Draft {
     name: textBlock?.name ?? '',
     kind: textBlock?.kind ?? NEW_KIND,
     body: textBlock?.body ?? '',
+    // A text block that becomes "Rechtliches" or "Akku-Hinweis" is "rechtlich ungeprüft" (2.2).
+    legalStatus: textBlock?.legalStatus ?? 'unchecked',
+    legalCheckedOn: textBlock?.legalCheckedOn ?? '',
+    legalCheckedBy: textBlock?.legalCheckedBy ?? '',
   };
   return { ...base, base, version: textBlock?.version ?? null };
 }
 
+/** Changed check fields; only the kinds "Rechtliches" and "Akku-Hinweis" have them (DER-40-05). */
+const legalChanged = (draft: Draft) =>
+  hasLegalStatus(draft.kind) &&
+  (draft.legalStatus !== draft.base.legalStatus ||
+    draft.legalCheckedOn !== draft.base.legalCheckedOn ||
+    draft.legalCheckedBy !== draft.base.legalCheckedBy);
+
 const changed = (draft: Draft) =>
   draft.name !== draft.base.name ||
   draft.kind !== draft.base.kind ||
-  draft.body !== draft.base.body;
+  draft.body !== draft.base.body ||
+  legalChanged(draft);
+
+const FIELD_SCHEMAS = {
+  name: textBlockNameSchema,
+  body: textBlockBodySchema,
+  legalCheckedBy: textBlockLegalCheckedBySchema,
+};
 
 /** First message of the Zod check in the browser, the same schemas as on the server (2.0.7). */
 function check(field: Field, value: string): string | undefined {
-  const schema = field === 'name' ? textBlockNameSchema : textBlockBodySchema;
-  const result = schema.safeParse(value);
+  const result = FIELD_SCHEMAS[field].safeParse(value);
   return result.success ? undefined : result.error.issues[0]?.message;
+}
+
+const berlinDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Berlin',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/**
+ * Check fields in the browser with the rules of the service (2.2): M-31 at "Prüfende Stelle",
+ * a date in the future at "Prüfdatum", M-24 once for both. "Today" is the calendar day in
+ * Europe/Berlin, as on the server (2.0.1).
+ */
+function checkLegal(draft: Draft): FieldErrors {
+  const errors: FieldErrors = { legalCheckedBy: check('legalCheckedBy', draft.legalCheckedBy) };
+  const legalCheck = {
+    legalStatus: draft.legalStatus,
+    legalCheckedOn: draft.legalCheckedOn,
+    legalCheckedBy: draft.legalCheckedBy.trim(),
+  };
+  for (const issue of legalCheckIssues(legalCheck, berlinDate.format(new Date()))) {
+    if (issue.code === 'legal_check_required') errors.legalCheck = issue.message;
+    else errors[issue.path] ??= issue.message;
+  }
+  return errors;
 }
 
 /** Field of a rejection: `fields[]` of `validation_failed` or a code with a field (2.0.6). */
@@ -115,7 +185,15 @@ function fieldErrorsOf(error: ApiError): FieldErrors | null {
   if (error.kind === 'validation') {
     const errors: FieldErrors = {};
     for (const entry of error.error?.fields ?? []) {
-      if (entry.path === 'name' || entry.path === 'body') errors[entry.path] = entry.message;
+      if (entry.code === 'legal_check_required') errors.legalCheck = entry.message;
+      else if (
+        entry.path === 'name' ||
+        entry.path === 'body' ||
+        entry.path === 'legalCheckedOn' ||
+        entry.path === 'legalCheckedBy'
+      ) {
+        errors[entry.path] = entry.message;
+      }
     }
     return Object.keys(errors).length > 0 ? errors : null;
   }
@@ -134,10 +212,11 @@ function fieldErrorsOf(error: ApiError): FieldErrors | null {
 }
 
 /**
- * Text blocks of UI-030 (CU-101, REQ-026; Technical Specification 2.2): maintenance list P-01
- * with name, kind and status, the detail area with name, kind, text and the list of
+ * Text blocks of UI-030 (CU-101, REQ-026, REQ-054; Technical Specification 2.2): maintenance
+ * list P-01 with name, kind, status and the legal check status, the detail area with name, kind,
+ * text, the check fields of the kinds "Rechtliches" and "Akku-Hinweis" and the list of
  * placeholders, "Textbaustein anlegen" and the row action "Deaktivieren". There is no deletion
- * (DER-39-13). The scope and dialog UI-043 follow with #163, the legal check status with #164.
+ * (DER-39-13). The scope and dialog UI-043 follow with #163.
  * States after 2.0.7: loading, empty, validation, success, error, disabled, speichert (P-08),
  * conflict (P-05), unreachable (P-06), wird-beendet (P-07), ausgang-unbekannt (P-08).
  */
@@ -153,6 +232,8 @@ export function TextBlocksPage() {
   const [draft, setDraft] = useState<Draft>(draftOf(undefined));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
+  // Hint of UI-030 "Speichern" after a change of the text set the status back (DER-40-03).
+  const [legalReset, setLegalReset] = useState(false);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
   const [takeReloaded, setTakeReloaded] = useState(false);
 
@@ -160,6 +241,7 @@ export function TextBlocksPage() {
   const focusFirstError = useFocusFirstError(formRef);
   const blurCheck = useDeferredBlurCheck();
   const placeholdersId = useId();
+  const legalCheckErrorId = useId();
 
   const saving = createMutation.isPending || updateMutation.isPending;
   const busy = saving || deactivateMutation.isPending;
@@ -187,6 +269,7 @@ export function TextBlocksPage() {
     setSelection(next);
     setDraft(draftOf(textBlock));
     setErrors({});
+    setLegalReset(false);
     if (notice?.kind !== 'success') setNotice(null);
   }
 
@@ -201,10 +284,14 @@ export function TextBlocksPage() {
     focusFirstError();
   }
 
-  function onSaved({ textBlock }: { textBlock: TextBlock }) {
+  function onSaved({
+    textBlock,
+    legalStatusReset = false,
+  }: TextBlockSaveResult & Partial<TextBlockUpdateResult>) {
     setSelection({ id: textBlock.id });
     setDraft(draftOf(textBlock));
     setErrors({});
+    setLegalReset(legalStatusReset);
     setNotice({ kind: 'success' });
   }
 
@@ -228,13 +315,15 @@ export function TextBlocksPage() {
     const fieldErrors: FieldErrors = {
       name: check('name', draft.name),
       body: check('body', draft.body),
+      ...(legalChanged(draft) && checkLegal(draft)),
     };
-    if (fieldErrors.name || fieldErrors.body) {
+    if (Object.values(fieldErrors).some(Boolean)) {
       showFieldErrors(fieldErrors);
       return;
     }
     setErrors({});
     setNotice(null);
+    setLegalReset(false);
     const callbacks = { onSuccess: onSaved, onError: onSaveFailed };
     if (selectedId === null) {
       createMutation.mutate({ name: draft.name, kind: draft.kind, body: draft.body }, callbacks);
@@ -247,6 +336,12 @@ export function TextBlocksPage() {
           ...(draft.name !== draft.base.name && { name: draft.name }),
           ...(draft.kind !== draft.base.kind && { kind: draft.kind }),
           ...(draft.body !== draft.base.body && { body: draft.body }),
+          // The three check fields together; "rechtlich ungeprüft" stores neither date nor body.
+          ...(legalChanged(draft) && {
+            legalStatus: draft.legalStatus,
+            legalCheckedOn: draft.legalStatus === 'checked' ? draft.legalCheckedOn : '',
+            legalCheckedBy: draft.legalStatus === 'checked' ? draft.legalCheckedBy : '',
+          }),
         },
         callbacks,
       );
@@ -272,6 +367,19 @@ export function TextBlocksPage() {
   }
 
   const formLocked = busy || selection === null;
+  const showLegal = hasLegalStatus(draft.kind);
+  const checked = showLegal && draft.legalStatus === 'checked';
+  /** M-24 marks "Prüfdatum" and "Prüfende Stelle" and stands once below both (K-05). */
+  const withLegalCheck = (control: FormFieldControlProps): FormFieldControlProps =>
+    errors.legalCheck
+      ? {
+          ...control,
+          'aria-invalid': true,
+          'aria-describedby': [control['aria-describedby'], legalCheckErrorId]
+            .filter(Boolean)
+            .join(' '),
+        }
+      : control;
   const unchanged = !changed(draft);
   const loadFailed = query.isError ? query.error : null;
 
@@ -310,6 +418,14 @@ export function TextBlocksPage() {
               <span className="text-label text-text-secondary">
                 {TEXT_BLOCK_KIND_LABELS[item.kind]}
               </span>
+              {item.legalStatus !== null && (
+                <Badge
+                  variant={item.legalStatus === 'checked' ? 'approved' : 'warn'}
+                  className="mt-1 self-start [overflow-wrap:anywhere]"
+                >
+                  {TEXTS.legalChip(item)}
+                </Badge>
+              )}
             </span>
             <Badge variant={item.active ? 'published' : 'draft'} className="shrink-0">
               {item.active ? TEXTS.active : TEXTS.inactive}
@@ -421,6 +537,80 @@ export function TextBlocksPage() {
               ))}
             </ul>
           </section>
+
+          {showLegal && (
+            <div className="flex flex-col gap-1">
+              <FormField label={TEXTS.legalStatus} required>
+                {(control) => (
+                  <Select
+                    {...control}
+                    value={draft.legalStatus}
+                    // A new text block is "rechtlich ungeprüft" (AC-REQ-054-04).
+                    disabled={formLocked || selectedId === null}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        legalStatus: event.target.value as TextBlockLegalStatus,
+                      })
+                    }
+                  >
+                    {TEXT_BLOCK_LEGAL_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {TEXT_BLOCK_LEGAL_STATUS_LABELS[status]}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
+              {legalReset && (
+                <p role="status" className="m-0 text-label text-text-secondary">
+                  {TEXTS.legalStatusReset}
+                </p>
+              )}
+            </div>
+          )}
+
+          {checked && (
+            <div className="flex flex-col gap-1">
+              <FormField label={TEXTS.legalCheckedOn} required error={errors.legalCheckedOn}>
+                {(control) => (
+                  <Input
+                    {...withLegalCheck(control)}
+                    type="date"
+                    value={draft.legalCheckedOn}
+                    disabled={formLocked}
+                    onChange={(event) => setDraft({ ...draft, legalCheckedOn: event.target.value })}
+                  />
+                )}
+              </FormField>
+              <FormField label={TEXTS.legalCheckedBy} required error={errors.legalCheckedBy}>
+                {(control) => (
+                  <Input
+                    {...withLegalCheck(control)}
+                    value={draft.legalCheckedBy}
+                    disabled={formLocked}
+                    onChange={(event) => setDraft({ ...draft, legalCheckedBy: event.target.value })}
+                    onBlur={() => checkOnBlur('legalCheckedBy')}
+                  />
+                )}
+              </FormField>
+              {errors.legalCheck && (
+                <p className="flex items-start gap-1 text-label text-error">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 16 16"
+                    className="mt-0.5 size-3 shrink-0"
+                    fill="currentColor"
+                  >
+                    <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 3.5h1.5v5h-1.5v-5Zm0 6.25h1.5v1.5h-1.5v-1.5Z" />
+                  </svg>
+                  <span id={legalCheckErrorId} className="min-w-0 [overflow-wrap:anywhere]">
+                    {errors.legalCheck}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <Button

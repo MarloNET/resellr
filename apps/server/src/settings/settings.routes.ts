@@ -49,6 +49,7 @@ import {
   textBlockCreateSchema,
   textBlockListSchema,
   textBlockSaveResultSchema,
+  textBlockUpdateResultSchema,
   textBlockUpdateSchema,
 } from '@resellr/domain/schemas/text-block.schema';
 import type { Kysely } from 'kysely';
@@ -319,7 +320,7 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       schema: {
         params: idParams,
         body: textBlockUpdateSchema,
-        response: { 200: textBlockSaveResultSchema },
+        response: { 200: textBlockUpdateResultSchema },
       },
     },
     async (request) => textBlocks.update(request.params.id, request.body),
