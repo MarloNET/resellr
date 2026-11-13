@@ -150,6 +150,17 @@ export function createDeviceTypeRepository(db: Kysely<DB>) {
       return db.selectFrom('attribute').selectAll().where('id', '=', id).executeTakeFirst();
     },
 
+    /**
+     * Label keys of the attributes of all device types, active or not, without duplicates: the
+     * names `{Merkmalsbezeichnung}` may take in texts for several device types (Requirements
+     * chapter 9.7, RQ-06). A deactivated attribute can be activated again (REQ-005), so its
+     * label stays a known placeholder.
+     */
+    async listAttributeLabelKeys(): Promise<string[]> {
+      const rows = await db.selectFrom('attribute').select('label_key').distinct().execute();
+      return rows.map((row) => row.label_key);
+    },
+
     /** The attribute of the device type that already has this label key, if any (2.1). */
     async findAttributeIdByLabelKey(
       deviceTypeId: number,

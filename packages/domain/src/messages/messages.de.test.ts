@@ -33,11 +33,13 @@ const MESSAGE_TABLE: [string, string][] = [
   ['M-21', 'Zeile: höchstens 1.000 Zeichen'],
   ['M-22', 'Excel-Datei: höchstens 10 MB'],
   ['M-24', 'Prüfdatum und prüfende Stelle erforderlich'],
+  ['M-30', 'Name: 1 bis 100 Zeichen'],
 ];
 
 const EXPECTED_KEYS = [
   ...Array.from({ length: 22 }, (_, i) => `M-${String(i + 1).padStart(2, '0')}`),
   'M-24',
+  'M-30',
 ];
 
 describe('message catalog (E1)', () => {
@@ -51,7 +53,7 @@ describe('message catalog (E1)', () => {
     );
   });
 
-  it('has exactly the keys M-01 to M-22 and M-24', () => {
+  it('has exactly the keys M-01 to M-22, M-24 and M-30', () => {
     expect(Object.keys(MESSAGES)).toEqual(EXPECTED_KEYS);
   });
 
@@ -182,6 +184,17 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.conditionCode).toBe('Zustandscode: 1 bis 20 Zeichen');
     expect(FIELD_MESSAGES.conditionCodePlainText).toBe('Klartext: 1 bis 500 Zeichen');
     expect(FIELD_MESSAGES.visualGrade).toBe('Optik-Note: ganze Zahl von 1 bis 5');
+  });
+
+  it('has the texts of the text block (2.0.6, UI-030, M-30, MAR-493)', () => {
+    expect(ERROR_MESSAGES['name_taken.text_block']).toBe('Name ist bereits vergeben');
+    expect(ERROR_MESSAGES['placeholder_not_allowed.unknown']('{Garantiezeit}')).toBe(
+      'Unbekannter Platzhalter {Garantiezeit}',
+    );
+    expect(ERROR_MESSAGES['placeholder_not_allowed.text_block']).toBe(
+      '{Baustein:Name} ist im Textbaustein nicht zulässig',
+    );
+    expect(FIELD_MESSAGES.textBlockBody).toBe('Text: 1 bis 5.000 Zeichen');
   });
 
   it('derives the usages of a code from the catalog keys', () => {

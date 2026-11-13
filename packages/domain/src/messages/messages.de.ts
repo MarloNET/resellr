@@ -28,6 +28,8 @@ export const MESSAGES = {
   'M-21': 'Zeile: höchstens 1.000 Zeichen',
   'M-22': 'Excel-Datei: höchstens 10 MB',
   'M-24': 'Prüfdatum und prüfende Stelle erforderlich',
+  /** UI-030 "Name" of a text block, empty or longer than 100 characters after trimming. */
+  'M-30': 'Name: 1 bis 100 Zeichen',
 } as const;
 
 /**
@@ -98,6 +100,11 @@ export const FIELD_MESSAGES = {
   pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
   /** UI-032 "Name", empty or longer than 100 characters after trimming. */
   supplierName: 'Name: 1 bis 100 Zeichen',
+  /**
+   * UI-030 "Text", empty or longer than 5,000 characters. Text defined by Technical
+   * Specification 8.2, table "Meldungstexte" (addendum MAR-493).
+   */
+  textBlockBody: 'Text: 1 bis 5.000 Zeichen',
   /** UI-033 "Vorschlag Optik-Note", not a whole number from 1 to 5 (REQ-022). */
   visualGrade: 'Optik-Note: ganze Zahl von 1 bis 5',
 } as const;
@@ -121,7 +128,11 @@ export const ERROR_MESSAGES = {
   'name_taken.manufacturer': 'Name ist bereits vergeben',
   'name_taken.pick_list_value': 'Wert gibt es in dieser Liste bereits',
   'name_taken.supplier': 'Name ist bereits vergeben',
+  'name_taken.text_block': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
+  'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
+  'placeholder_not_allowed.unknown': (placeholder: string) =>
+    `Unbekannter Platzhalter ${placeholder}`,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
 /**

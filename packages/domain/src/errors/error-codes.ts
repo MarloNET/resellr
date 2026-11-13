@@ -15,6 +15,7 @@ export const ERROR_CODES = {
   method_not_allowed: 405,
   name_taken: 422,
   not_found: 404,
+  placeholder_not_allowed: 422,
   shutting_down: 503,
   stale_content: 409,
   stale_stock: 409,

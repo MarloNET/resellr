@@ -14,6 +14,7 @@ export const queryKeys = {
     attributes: (deviceTypeId: number) => ['settings', 'attributes', deviceTypeId] as const,
     manufacturers: () => ['settings', 'manufacturers'] as const,
     suppliers: () => ['settings', 'suppliers'] as const,
+    textBlocks: () => ['settings', 'text-blocks'] as const,
     merchantProfile: () => ['settings', 'merchant-profile'] as const,
     conditionCodes: () => ['settings', 'condition-codes'] as const,
     pickLists: () => ['settings', 'pick-lists'] as const,

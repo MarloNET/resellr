@@ -7,6 +7,7 @@ import {
   DEMO_MANUFACTURERS,
   DEMO_MERCHANT_PROFILE,
   DEMO_SUPPLIERS,
+  DEMO_TEXT_BLOCKS,
   type SeedArea,
 } from '@resellr/test-data/demo-seed';
 import Database from 'better-sqlite3';
@@ -93,14 +94,15 @@ describe('startDemo (CU-004)', () => {
         (table) => db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get() !== 0,
       );
       // Only the demo data written through the API (CU-061): the device types, suppliers,
-      // manufacturers and the merchant profile of S2 with their audit entries; the initial
-      // settings follow with the seed migration CU-071.
+      // manufacturers, the merchant profile and the text blocks of S2 with their audit entries;
+      // the initial settings follow with the seed migration CU-071.
       expect(filled.sort()).toEqual([
         'audit_entry',
         'device_type',
         'manufacturer',
         'merchant_profile',
         'supplier',
+        'text_block',
       ]);
       expect(db.prepare('SELECT name, active FROM device_type ORDER BY id').all()).toEqual(
         DEMO_DEVICE_TYPES.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
@@ -117,6 +119,16 @@ describe('startDemo (CU-004)', () => {
           contact_text: DEMO_MERCHANT_PROFILE.contactText,
         },
       ]);
+      expect(
+        db.prepare('SELECT name, kind, body, active FROM text_block ORDER BY id').all(),
+      ).toEqual(
+        DEMO_TEXT_BLOCKS.map(({ name, kind, body, active }) => ({
+          name,
+          kind,
+          body,
+          active: active ? 1 : 0,
+        })),
+      );
     } finally {
       db.close();
     }
