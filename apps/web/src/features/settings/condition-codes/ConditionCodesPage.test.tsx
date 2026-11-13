@@ -608,6 +608,36 @@ describe('UI-033 condition codes (CU-100)', () => {
     expect(rows()).toHaveLength(2);
   });
 
+  it('UI-033.conflict DER-38-06 (a) DER-38-08 a deletion sends the version of the opened entry, not the one refetched in the background', async () => {
+    let listCalls = 0;
+    const { sent } = mockApi({
+      list: () => {
+        listCalls += 1;
+        const dgs =
+          listCalls === 1 ? DGS : { ...DGS, plainText: 'Aus anderem Fenster', version: 4 };
+        return Response.json({ items: [dgs, DGS_L1], total: 2 });
+      },
+      writes: {
+        [DELETE_DGS]: () => Response.json(errorBody('version_conflict'), { status: 409 }),
+        'DELETE /api/condition-codes/1?version=4': () => new Response(null, { status: 204 }),
+      },
+    });
+    await openPage();
+    // The browser window gets the focus again; TanStack Query loads the list in the background.
+    fireEvent(window, new Event('visibilitychange'));
+    await within(listRegion()).findByText(/Aus anderem Fenster/);
+    expect(plainTextInput().value).toBe(DGS.plainText);
+
+    fireEvent.click(deleteButton());
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Löschen' }),
+    );
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('Bitte neu laden und erneut prüfen.');
+    expect(sent.map((request) => request.path)).toEqual(['/api/condition-codes/1?version=3']);
+  });
+
   it('UI-033.unreachable DER-38-06 (b) shows P-06 with "Erneut versuchen" when the list gets no answer, without replacing the page', async () => {
     mockApi({
       list: () => {

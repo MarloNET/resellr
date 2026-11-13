@@ -279,10 +279,12 @@ export function ConditionCodesPage() {
 
   /** "Löschen" in the dialog P-04: only the confirmation sends the DELETE (DER-38-08). */
   function remove() {
-    if (selected === undefined) return;
+    if (selected === undefined || draft.version === null) return;
     setNotice(null);
+    // The version read when the entry was opened, so that a change in another window answers
+    // `version_conflict` (P-05) even after a refetch in the background.
     deleteMutation.mutate(
-      { id: selected.id, version: selected.version },
+      { id: selected.id, version: draft.version },
       {
         onSuccess: () => {
           setConfirmDelete(false);
