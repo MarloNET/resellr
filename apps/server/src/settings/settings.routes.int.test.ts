@@ -1207,3 +1207,144 @@ describe('manufacturer API (CU-087, Technical Specification 2.2)', () => {
     expect(manufacturerCount()).toBe(0);
   });
 });
+
+describe('merchant profile API (CU-087, Technical Specification 2.2)', () => {
+  const get = () =>
+    t.app.inject({ method: 'GET', url: '/api/merchant-profile', headers: { host: HOST } });
+
+  const put = (body: Record<string, unknown>) =>
+    t.app.inject({
+      method: 'PUT',
+      url: '/api/merchant-profile',
+      headers: SAME_ORIGIN_WRITE,
+      payload: body,
+    });
+
+  const auditRows = () =>
+    t.database.sqlite
+      .prepare(
+        "SELECT action, object_id, object_label, old_value, new_value FROM audit_entry WHERE object_type = 'merchant_profile' ORDER BY id",
+      )
+      .all();
+
+  it('answers the empty profile without logo before anything was saved', async () => {
+    const response = await get();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ brandName: '', contactText: '', logo: null, version: 1 });
+  });
+
+  it('DER-42-11 saves name and contact details; the answer is the profile without counts', async () => {
+    const response = await put({
+      version: 1,
+      brandName: ' Muster-Händler ',
+      contactText: 'Tel. 0761 1234\ninfo@example.org',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const profile = {
+      brandName: 'Muster-Händler',
+      contactText: 'Tel. 0761 1234\ninfo@example.org',
+      logo: null,
+      version: 2,
+    };
+    expect(response.json()).toEqual(profile);
+    expect(response.json()).not.toHaveProperty('impact');
+    expect((await get()).json()).toEqual(profile);
+    expect(auditRows()).toEqual([
+      {
+        action: 'updated',
+        object_id: 1,
+        object_label: 'Händlermarke',
+        old_value: JSON.stringify({ Name: '', Kontaktangaben: '' }),
+        new_value: JSON.stringify({
+          Name: 'Muster-Händler',
+          Kontaktangaben: 'Tel. 0761 1234\ninfo@example.org',
+        }),
+      },
+    ]);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['only spaces', '   '],
+    ['101 characters', 'x'.repeat(101)],
+  ])(
+    'DER-42-05 rejects a name that is %s with validation_failed "Name: 1 bis 100 Zeichen" at the field',
+    async (_case, brandName) => {
+      const response = await put({ version: 1, brandName, contactText: '' });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'validation_failed',
+        message: '',
+        fields: [
+          { path: 'brandName', code: expect.any(String), message: 'Name: 1 bis 100 Zeichen' },
+        ],
+        details: {},
+        referenceNumber: null,
+      });
+      expect(auditRows()).toEqual([]);
+    },
+  );
+
+  it('DER-42-05 rejects contact details over 500 characters with validation_failed at the field', async () => {
+    const response = await put({ version: 1, brandName: 'B', contactText: 'x'.repeat(501) });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
+      {
+        path: 'contactText',
+        code: expect.any(String),
+        message: 'Kontaktangaben: höchstens 500 Zeichen',
+      },
+    ]);
+    expect((await get()).json().version).toBe(1);
+  });
+
+  it('accepts a name of 100 and contact details of 500 characters', async () => {
+    const response = await put({
+      version: 1,
+      brandName: 'x'.repeat(100),
+      contactText: 'y'.repeat(500),
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('DER-42-07 (a) rejects an outdated version with 409 version_conflict', async () => {
+    await put({ version: 1, brandName: 'B1', contactText: '' });
+
+    const response = await put({ version: 1, brandName: 'B2', contactText: '' });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error).toMatchObject({ code: 'version_conflict' });
+    expect((await get()).json()).toMatchObject({ brandName: 'B1', version: 2 });
+  });
+
+  it('DER-42-04 a technical error answers 500 internal_error with the reference number and stores nothing', async () => {
+    t.database.sqlite.exec(
+      "CREATE TRIGGER fail_profile BEFORE INSERT ON merchant_profile BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+    );
+
+    const response = await put({ version: 1, brandName: 'B', contactText: '' });
+
+    expect(response.statusCode).toBe(500);
+    const { error } = response.json();
+    expect(error.code).toBe('internal_error');
+    expect(error.referenceNumber).toMatch(/^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(auditRows()).toEqual([]);
+  });
+
+  it('DER-42-07 (c) rejects a save while shutting down with 503 shutting_down and stores nothing', async () => {
+    t.lifecycle.set('stopping');
+
+    const response = await put({ version: 1, brandName: 'B', contactText: '' });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error).toMatchObject({ code: 'shutting_down', referenceNumber: null });
+    expect(t.database.sqlite.prepare('SELECT COUNT(*) FROM merchant_profile').pluck().get()).toBe(
+      0,
+    );
+  });
+});

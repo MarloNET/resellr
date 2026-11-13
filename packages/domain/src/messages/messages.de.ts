@@ -74,6 +74,10 @@ export const FIELD_MESSAGES = {
   attributeUnit: 'Einheit: höchstens 20 Zeichen',
   /** UI-028 "Akku vorhanden", missing in the list battery (REQ-007, DER-35-10). */
   batteryPresentMissing: 'Kennzeichen ‚Akku vorhanden‘ fehlt',
+  /** UI-026 "Name der Händlermarke", empty or longer than 100 characters after trimming. */
+  brandName: 'Name: 1 bis 100 Zeichen',
+  /** UI-026 "Kontaktangaben", longer than 500 characters. */
+  contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
   /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
@@ -95,6 +99,10 @@ type MessageText = string | ((...args: string[]) => string);
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  'attribute_has_values.data_type':
+    'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  'attribute_has_values.level':
+    'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.device_type': 'Name ist bereits vergeben',

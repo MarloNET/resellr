@@ -22,6 +22,7 @@ const GENERAL_CODES: [string, number][] = [
 
 // Domain codes of 2.0.6, added by the feature tasks that raise them.
 const DOMAIN_CODES: [string, number][] = [
+  ['attribute_has_values', 422],
   ['name_taken', 422],
   ['manufacturer_deactivated', 422],
 ];

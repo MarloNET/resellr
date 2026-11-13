@@ -2,6 +2,7 @@ import { attributeValuesSchema } from '@resellr/domain/schemas/attribute-values.
 import { attributeListSchema } from '@resellr/domain/schemas/attribute.schema';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { insertAttributeValueRecords } from '../../test/attribute-values.ts';
 import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { runMigrations } from '../db/migrator.ts';
@@ -536,6 +537,105 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
     for (const change of [{ level: 'model' }, { label: '' }, { label: 'ssd' }]) {
       expect((await patchAttribute(ram.id, { version: 1, ...change })).statusCode).toBe(409);
     }
+  });
+
+  describe('data type and level locked by stored values (2.1, CU-074)', () => {
+    const hasValuesError = (message: string) => ({
+      error: {
+        code: 'attribute_has_values',
+        message,
+        fields: [],
+        details: {},
+        referenceNumber: null,
+      },
+    });
+
+    /** "RAM" of "Notebook" (level device, variant forming) with the value 16 of one device. */
+    async function ramWithValues() {
+      const notebook = await createDeviceType('Notebook');
+      const ram = (await createAttribute(notebook.id)).json();
+      const ssd = (await createAttribute(notebook.id, { label: 'SSD' })).json();
+      insertAttributeValueRecords(
+        t.database.sqlite,
+        { deviceValues: { [String(ram.id)]: 16 } },
+        notebook.id,
+      );
+      return { notebook, ram, ssd };
+    }
+
+    it('lists hasValues per attribute from the stored values', async () => {
+      const { notebook, ram, ssd } = await ramWithValues();
+
+      const list = await listAttributes(notebook.id);
+      expect(list.items).toEqual([
+        expect.objectContaining({ id: ram.id, hasValues: true }),
+        expect.objectContaining({ id: ssd.id, hasValues: false }),
+      ]);
+    });
+
+    it('AC-REQ-005-04 rejects changing the data type of an attribute with stored values with attribute_has_values', async () => {
+      const { notebook, ram } = await ramWithValues();
+
+      const response = await patchAttribute(ram.id, { version: 1, dataType: 'text' });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toEqual(
+        hasValuesError('Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.'),
+      );
+      expect((await listAttributes(notebook.id)).items[0]).toMatchObject({
+        dataType: 'integer',
+        version: 1,
+      });
+    });
+
+    it('AC-REQ-005-08 rejects changing the level of RAM with stored values from device to model', async () => {
+      const { notebook, ram } = await ramWithValues();
+
+      const response = await patchAttribute(ram.id, {
+        version: 1,
+        level: 'model',
+        variantForming: false,
+      });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toEqual(
+        hasValuesError('Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.'),
+      );
+      expect((await listAttributes(notebook.id)).items[0]).toMatchObject({
+        level: 'device',
+        variantForming: true,
+        version: 1,
+      });
+    });
+
+    it('keeps the other fields changeable and accepts the stored data type and level', async () => {
+      const { ram } = await ramWithValues();
+
+      const response = await patchAttribute(ram.id, {
+        version: 1,
+        dataType: 'integer',
+        level: 'device',
+        unit: 'GiB',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ unit: 'GiB', version: 2 });
+    });
+
+    it('allows changing data type and level of an attribute without stored values', async () => {
+      const { ssd } = await ramWithValues();
+
+      const response = await patchAttribute(ssd.id, {
+        version: 1,
+        dataType: 'text',
+        unit: null,
+        level: 'model',
+        variantForming: false,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ dataType: 'text', level: 'model' });
+    });
   });
 
   it('writes created, updated, deactivated and reordered to the audit log with readable values', async () => {

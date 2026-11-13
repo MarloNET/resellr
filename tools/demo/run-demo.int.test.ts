@@ -6,6 +6,7 @@ import { INITIAL_DEVICE_TYPES } from '@resellr/seed-data/initial-settings';
 import {
   DEMO_DEVICE_TYPES,
   DEMO_MANUFACTURERS,
+  DEMO_MERCHANT_PROFILE,
   DEMO_SUPPLIERS,
   type SeedArea,
 } from '@resellr/test-data/demo-seed';
@@ -98,7 +99,7 @@ describe('startDemo (CU-004)', () => {
       // The initial settings of the seed migration CU-071 and the demo data written through the
       // API on top of them (CU-061): the device types, suppliers and manufacturers of S2 with
       // their audit entries.
-      expect(filled).toEqual([
+      expect(filled.sort()).toEqual([
         'attribute',
         'attribute_mapping',
         'audit_entry',
@@ -123,6 +124,12 @@ describe('startDemo (CU-004)', () => {
       expect(db.prepare('SELECT name, active FROM manufacturer ORDER BY id').all()).toEqual(
         DEMO_MANUFACTURERS.map(({ name, active }) => ({ name, active: active ? 1 : 0 })),
       );
+      expect(db.prepare('SELECT brand_name, contact_text FROM merchant_profile').all()).toEqual([
+        {
+          brand_name: DEMO_MERCHANT_PROFILE.brandName,
+          contact_text: DEMO_MERCHANT_PROFILE.contactText,
+        },
+      ]);
     } finally {
       db.close();
     }
