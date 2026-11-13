@@ -11,6 +11,13 @@ export interface MerchantProfileChange {
   at: string;
 }
 
+export interface MerchantLogoChange {
+  /** Hash of the new logo in `media_file`, `null` to remove it. */
+  logoHash: string | null;
+  version: number;
+  at: string;
+}
+
 /** The single row of `merchant_profile` (3.1: `id` is always 1). */
 const MERCHANT_PROFILE_ID = 1;
 
@@ -51,6 +58,27 @@ export function createProfileRepository(db: Kysely<DB>) {
             version,
             updated_at: at,
           }),
+        )
+        .execute();
+    },
+
+    /**
+     * Sets or removes the logo with the new version; name and contact details stay. Without the
+     * row it is inserted with an empty name and contact, as the seed migration would (#150).
+     */
+    async saveMerchantLogo({ logoHash, version, at }: MerchantLogoChange) {
+      await db
+        .insertInto('merchant_profile')
+        .values({
+          id: MERCHANT_PROFILE_ID,
+          brand_name: '',
+          contact_text: '',
+          logo_hash: logoHash,
+          version,
+          updated_at: at,
+        })
+        .onConflict((conflict) =>
+          conflict.column('id').doUpdateSet({ logo_hash: logoHash, version, updated_at: at }),
         )
         .execute();
     },

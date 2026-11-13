@@ -80,6 +80,11 @@ describe('message catalog (E1)', () => {
     expect(ERROR_MESSAGES['not_found.default']).toBe('Dieser Eintrag ist nicht mehr vorhanden.');
   });
 
+  it('has one text of the logo for a too large file and a wrong type (2.2, UI-026)', () => {
+    expect(ERROR_MESSAGES['file_too_large.logo']).toBe('Logo: nur PNG oder JPEG bis 5 MB');
+    expect(ERROR_MESSAGES['unsupported_media_type.logo']).toBe('Logo: nur PNG oder JPEG bis 5 MB');
+  });
+
   it('has the text of name_taken for device types (2.0.6, UI-027)', () => {
     expect(ERROR_MESSAGES['name_taken.device_type']).toBe('Name ist bereits vergeben');
   });

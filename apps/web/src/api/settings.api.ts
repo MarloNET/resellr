@@ -189,6 +189,33 @@ export function useSaveMerchantProfileMutation() {
   });
 }
 
+/**
+ * "Logo ersetzen" of UI-026 (`PUT /api/merchant-profile/logo`, multipart with the field
+ * `version` before the file, 2.2); the answer is the saved profile.
+ */
+export function useReplaceLogoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, { version: number; file: File }>({
+    mutationFn: ({ version, file }) => {
+      const form = new FormData();
+      form.append('version', String(version));
+      form.append('file', file);
+      return apiClient.put<MerchantProfile>('/api/merchant-profile/logo', form);
+    },
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
+  });
+}
+
+/** "Logo entfernen" of UI-026 (`DELETE /api/merchant-profile/logo?version=`). */
+export function useRemoveLogoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, { version: number }>({
+    mutationFn: ({ version }) =>
+      apiClient.delete<MerchantProfile>(`/api/merchant-profile/logo?version=${version}`, {}),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
+  });
+}
+
 /** Manufacturers of UI-031, active and deactivated (`GET /api/manufacturers?includeInactive=true`). */
 export function useManufacturersQuery() {
   return useQuery<ManufacturerList, ApiError>({

@@ -8,6 +8,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ApiError } from '../../../api/api-client.ts';
 import {
   useMerchantProfileQuery,
+  useRemoveLogoMutation,
+  useReplaceLogoMutation,
   useSaveMerchantProfileMutation,
 } from '../../../api/settings.api.ts';
 import { useWritesLocked } from '../../../api/write-outcome-store.ts';
@@ -35,6 +37,9 @@ const TEXTS = {
   brandName: 'Name der Händlermarke',
   logo: 'Logo',
   logoNotice: 'Das Logo erscheint auf dem Datenblatt. Die Druckqualität stellt der Händler sicher.',
+  noLogo: 'Kein Logo. Ohne Logo kann kein Datenblatt erzeugt werden.',
+  replaceLogo: 'Logo ersetzen',
+  removeLogo: 'Logo entfernen',
   contactText: 'Kontaktangaben',
   save: 'Speichern',
   saving: 'Speichern …',
@@ -75,21 +80,28 @@ const checkAll = (draft: Draft): FieldErrors => ({
 
 const hasErrors = (errors: FieldErrors) => Object.values(errors).some(Boolean);
 
+/** Types the file dialog offers; the server checks the content (2.11). */
+const LOGO_TYPES = 'image/png,image/jpeg';
+
 /**
  * Merchant profile of UI-026 (CU-097, REQ-028; Technical Specification 2.2): name of the brand
- * and contact details, the logo area with the notice on the datasheet. The logo itself (preview,
- * replace, remove) follows with #167. States after 2.0.7: default, loading, validation, success,
- * error, speichert (P-08), conflict (P-05), unreachable (P-06), wird-beendet (P-07),
+ * and contact details, the logo with preview, "Logo ersetzen" and "Logo entfernen" and the
+ * notice on the datasheet. States after 2.0.7: default, empty (no logo), loading, validation,
+ * success, error, speichert (P-08), conflict (P-05), unreachable (P-06), wird-beendet (P-07),
  * ausgang-unbekannt (P-08). The save reports `SettingsChanged`, but UI-026 shows no counts and
- * no dialog UI-043 (2.2).
+ * no dialog UI-043 (2.2). A logo change is saved at once and keeps unsaved name and contact
+ * details; only the version of the form follows it.
  */
 export function MerchantProfilePage() {
   const query = useMerchantProfileQuery();
   const saveMutation = useSaveMerchantProfileMutation();
+  const replaceLogoMutation = useReplaceLogoMutation();
+  const removeLogoMutation = useRemoveLogoMutation();
   const writesLocked = useWritesLocked();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
   const [takeReloaded, setTakeReloaded] = useState(false);
@@ -98,9 +110,13 @@ export function MerchantProfilePage() {
   const focusFirstError = useFocusFirstError(formRef);
   const blurCheck = useDeferredBlurCheck();
   const logoHeadingId = useId();
+  const logoErrorId = useId();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const replaceLogoId = useId();
 
   const profile = query.data;
-  const saving = saveMutation.isPending;
+  const saving =
+    saveMutation.isPending || replaceLogoMutation.isPending || removeLogoMutation.isPending;
 
   // The form opens with the loaded profile.
   useEffect(() => {
@@ -112,7 +128,13 @@ export function MerchantProfilePage() {
     setTakeReloaded(false);
     setDraft(draftOf(profile));
     setErrors({});
+    setLogoError(null);
   }, [takeReloaded, query.isFetching, profile]);
+
+  // The focus goes to "Logo ersetzen", which the error text describes (2.0.7 `.validation`).
+  useEffect(() => {
+    if (logoError !== null) document.getElementById(replaceLogoId)?.focus();
+  }, [logoError, replaceLogoId]);
 
   function change(field: Field, value: string) {
     if (draft !== null) setDraft({ ...draft, [field]: value });
@@ -151,6 +173,41 @@ export function MerchantProfilePage() {
     setNotice(noticeOf(error));
   }
 
+  function onLogoSaved(saved: MerchantProfile) {
+    setDraft((current) => (current === null ? current : { ...current, version: saved.version }));
+  }
+
+  function onLogoFailed(error: ApiError) {
+    // `413 file_too_large` and `415 unsupported_media_type` are file errors at the logo (2.2).
+    if (error.kind === 'validation' && error.error !== null && error.status !== 422) {
+      setLogoError(error.error.message);
+      return;
+    }
+    setNotice(noticeOf(error));
+  }
+
+  function changeLogo(write: (version: number) => void) {
+    if (draft === null) return;
+    setLogoError(null);
+    setNotice(null);
+    write(draft.version);
+  }
+
+  function replaceLogo(file: File) {
+    changeLogo((version) =>
+      replaceLogoMutation.mutate(
+        { version, file },
+        { onSuccess: onLogoSaved, onError: onLogoFailed },
+      ),
+    );
+  }
+
+  function removeLogo() {
+    changeLogo((version) =>
+      removeLogoMutation.mutate({ version }, { onSuccess: onLogoSaved, onError: onLogoFailed }),
+    );
+  }
+
   function save() {
     // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
@@ -169,6 +226,7 @@ export function MerchantProfilePage() {
   }
 
   const formLocked = saving || draft === null;
+  const logo = profile?.logo ?? null;
   const loadFailed = query.isError ? query.error : null;
 
   return (
@@ -223,10 +281,63 @@ export function MerchantProfilePage() {
             )}
           </FormField>
 
-          <section aria-labelledby={logoHeadingId} className="flex flex-col gap-1">
+          <section aria-labelledby={logoHeadingId} className="flex flex-col gap-2">
             <h2 id={logoHeadingId} className="m-0 text-label font-semibold text-text">
               {TEXTS.logo}
             </h2>
+            {logo === null ? (
+              <p className="m-0 text-body text-text">{TEXTS.noLogo}</p>
+            ) : (
+              <img
+                src={logo.url}
+                alt={TEXTS.logo}
+                className="max-h-24 max-w-xs self-start rounded-control border border-border object-contain"
+              />
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                id={replaceLogoId}
+                disabled={formLocked || writesLocked}
+                aria-describedby={logoError === null ? undefined : logoErrorId}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                {TEXTS.replaceLogo}
+              </Button>
+              {logo !== null && (
+                <Button
+                  variant="destructive"
+                  disabled={formLocked || writesLocked}
+                  onClick={removeLogo}
+                >
+                  {TEXTS.removeLogo}
+                </Button>
+              )}
+            </div>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept={LOGO_TYPES}
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                // Empty again, so choosing the same file once more is a new change.
+                event.target.value = '';
+                if (file !== undefined) replaceLogo(file);
+              }}
+            />
+            {logoError !== null && (
+              <p className="m-0 flex items-start gap-1 text-label text-error">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  className="mt-0.5 size-3 shrink-0"
+                  fill="currentColor"
+                >
+                  <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 3.5h1.5v5h-1.5v-5Zm0 6.25h1.5v1.5h-1.5v-1.5Z" />
+                </svg>
+                <span id={logoErrorId}>{logoError}</span>
+              </p>
+            )}
             <p className="m-0 text-body text-text-secondary">{TEXTS.logoNotice}</p>
           </section>
 

@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { logoUpload, multipart, sha256, testImages } from '../../test/images.ts';
 import { insertPickLists, PICK_LISTS, pickListId } from '../../test/pick-lists.ts';
-import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
+import { createTestApp, HOST, ORIGIN, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { runMigrations } from '../db/migrator.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 
@@ -1346,6 +1350,300 @@ describe('merchant profile API (CU-087, Technical Specification 2.2)', () => {
     expect(t.database.sqlite.prepare('SELECT COUNT(*) FROM merchant_profile').pluck().get()).toBe(
       0,
     );
+  });
+});
+
+describe('merchant logo API (CU-087, CU-091, Technical Specification 2.2)', () => {
+  const LOGO_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
+
+  const get = () =>
+    t.app.inject({ method: 'GET', url: '/api/merchant-profile', headers: { host: HOST } });
+
+  const putProfile = (body: Record<string, unknown>) =>
+    t.app.inject({
+      method: 'PUT',
+      url: '/api/merchant-profile',
+      headers: SAME_ORIGIN_WRITE,
+      payload: body,
+    });
+
+  const putLogo = ({ payload, contentType }: { payload: Buffer; contentType: string }) =>
+    t.app.inject({
+      method: 'PUT',
+      url: '/api/merchant-profile/logo',
+      headers: {
+        host: HOST,
+        origin: ORIGIN,
+        'sec-fetch-site': 'same-origin',
+        'content-type': contentType,
+      },
+      payload,
+    });
+
+  // `DELETE` needs `content-type: application/json` as every write (G-4), so the body is `{}`.
+  const deleteLogo = (version: number | string) =>
+    t.app.inject({
+      method: 'DELETE',
+      url: `/api/merchant-profile/logo?version=${version}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload: {},
+    });
+
+  const getMedia = (url: string) => t.app.inject({ method: 'GET', url, headers: { host: HOST } });
+
+  const mediaRows = () =>
+    t.database.sqlite
+      .prepare(
+        'SELECT hash, kind, ext, mime, byte_size, width, height, unreferenced_since FROM media_file',
+      )
+      .all();
+
+  const storedFiles = () => {
+    const folder = join(t.dataDir, 'media', 'logo');
+    return existsSync(folder) ? readdirSync(folder) : [];
+  };
+
+  const incomingFiles = () => {
+    const folder = join(t.dataDir, 'media', '.incoming');
+    return existsSync(folder) ? readdirSync(folder) : [];
+  };
+
+  const auditRows = () =>
+    t.database.sqlite
+      .prepare(
+        "SELECT action, old_value, new_value FROM audit_entry WHERE object_type = 'merchant_profile' ORDER BY id",
+      )
+      .all();
+
+  it('AC-REQ-028-01 after saving brand "notebookers.de" and a logo, the profile has name and logo hash and the file is served under /media/logo/{hash}', async () => {
+    await putProfile({ version: 1, brandName: 'notebookers.de', contactText: '' });
+    const png = await testImages.png();
+    const hash = sha256(png);
+
+    const upload = await putLogo(logoUpload(2, png));
+
+    expect(upload.statusCode).toBe(200);
+    const profile = {
+      brandName: 'notebookers.de',
+      contactText: '',
+      logo: { hash, url: `/media/logo/${hash}` },
+      version: 3,
+    };
+    expect(upload.json()).toEqual(profile);
+    expect((await get()).json()).toEqual(profile);
+
+    const media = await getMedia(profile.logo.url);
+    expect(media.statusCode).toBe(200);
+    expect(media.headers['content-type']).toBe('image/png');
+    expect(media.rawPayload.equals(png)).toBe(true);
+  });
+
+  it('stores the file once under its hash with its row in media_file and logs the change', async () => {
+    const jpeg = await testImages.jpeg();
+    const hash = sha256(jpeg);
+
+    const response = await putLogo(logoUpload(1, jpeg, 'logo.jpg'));
+
+    expect(response.statusCode).toBe(200);
+    expect(storedFiles()).toEqual([`${hash}.jpg`]);
+    expect(incomingFiles()).toEqual([]);
+    expect(mediaRows()).toEqual([
+      {
+        hash,
+        kind: 'logo',
+        ext: 'jpg',
+        mime: 'image/jpeg',
+        byte_size: jpeg.length,
+        width: 120,
+        height: 40,
+        unreferenced_since: null,
+      },
+    ]);
+    expect(auditRows()).toEqual([
+      {
+        action: 'updated',
+        old_value: JSON.stringify({ Logo: null }),
+        new_value: JSON.stringify({ Logo: hash }),
+      },
+    ]);
+  });
+
+  it('DER-42-09 replacing the logo shows the new one; removing it leaves the profile without logo', async () => {
+    const first = await testImages.png('#000000');
+    const second = await testImages.png('#ffffff');
+    await putLogo(logoUpload(1, first));
+
+    const replaced = await putLogo(logoUpload(2, second));
+
+    expect(replaced.statusCode).toBe(200);
+    expect(replaced.json().logo).toEqual({
+      hash: sha256(second),
+      url: `/media/logo/${sha256(second)}`,
+    });
+
+    const removed = await deleteLogo(3);
+
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json()).toEqual({ brandName: '', contactText: '', logo: null, version: 4 });
+    expect((await get()).json().logo).toBeNull();
+    // The files stay for the housekeeping (2.19).
+    expect(storedFiles()).toHaveLength(2);
+    expect(auditRows()).toEqual([
+      {
+        action: 'updated',
+        old_value: JSON.stringify({ Logo: null }),
+        new_value: JSON.stringify({ Logo: sha256(first) }),
+      },
+      {
+        action: 'updated',
+        old_value: JSON.stringify({ Logo: sha256(first) }),
+        new_value: JSON.stringify({ Logo: sha256(second) }),
+      },
+      {
+        action: 'updated',
+        old_value: JSON.stringify({ Logo: sha256(second) }),
+        new_value: JSON.stringify({ Logo: null }),
+      },
+    ]);
+  });
+
+  it('keeps name and contact details when the logo changes', async () => {
+    await putProfile({ version: 1, brandName: 'notebookers.de', contactText: 'Tel. 0761 1234' });
+
+    await putLogo(logoUpload(2, await testImages.png()));
+    const removed = await deleteLogo(3);
+
+    expect(removed.json()).toMatchObject({
+      brandName: 'notebookers.de',
+      contactText: 'Tel. 0761 1234',
+    });
+  });
+
+  it.each([
+    ['a GIF file', 415, 'unsupported_media_type', () => testImages.gif()],
+    ['a PNG file of 6 MB', 413, 'file_too_large', () => testImages.pngOfSize(6)],
+  ])(
+    'AC-REQ-028-02 rejects %s with "Logo: nur PNG oder JPEG bis 5 MB" and stores no file',
+    async (_case, status, code, file) => {
+      const response = await putLogo(logoUpload(1, await file()));
+
+      expect(response.statusCode).toBe(status);
+      expect(response.json().error).toEqual({
+        code,
+        message: LOGO_RULE,
+        fields: [],
+        details: {},
+        referenceNumber: null,
+      });
+      expect(storedFiles()).toEqual([]);
+      expect(incomingFiles()).toEqual([]);
+      expect(mediaRows()).toEqual([]);
+      expect((await get()).json()).toMatchObject({ logo: null, version: 1 });
+      expect(auditRows()).toEqual([]);
+    },
+  );
+
+  it('accepts a PNG of exactly 5 MB', async () => {
+    const response = await putLogo(logoUpload(1, await testImages.pngOfSize(5)));
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it.each([
+    ['a text file named logo.png', Buffer.from('not an image')],
+    [
+      'a file with the PNG signature that is no image',
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]),
+    ],
+  ])('rejects %s with 415 unsupported_media_type', async (_case, file) => {
+    const response = await putLogo(logoUpload(1, file));
+
+    expect(response.statusCode).toBe(415);
+    expect(response.json().error.message).toBe(LOGO_RULE);
+    expect(storedFiles()).toEqual([]);
+  });
+
+  it('rejects an outdated version with 409 version_conflict and keeps the logo', async () => {
+    const first = await testImages.png('#000000');
+    await putLogo(logoUpload(1, first));
+
+    const upload = await putLogo(logoUpload(1, await testImages.png('#ffffff')));
+    const removal = await deleteLogo(1);
+
+    expect(upload.statusCode).toBe(409);
+    expect(upload.json().error.code).toBe('version_conflict');
+    expect(removal.statusCode).toBe(409);
+    expect((await get()).json()).toMatchObject({ logo: { hash: sha256(first) }, version: 2 });
+  });
+
+  it('stores and logs nothing when the same logo is uploaded again or no logo is removed', async () => {
+    const png = await testImages.png();
+    await putLogo(logoUpload(1, png));
+
+    const again = await putLogo(logoUpload(2, png));
+    await deleteLogo(2);
+    const removedTwice = await deleteLogo(3);
+
+    expect(again.json().version).toBe(2);
+    expect(removedTwice.json()).toMatchObject({ logo: null, version: 3 });
+    expect(auditRows()).toHaveLength(2);
+  });
+
+  it.each([
+    [
+      'without the field version',
+      () => [{ name: 'file', value: Buffer.from('x'), filename: 'logo.png' }],
+    ],
+    [
+      'with the file under another name',
+      () => [
+        { name: 'version', value: '1' },
+        { name: 'logo', value: Buffer.from('x'), filename: 'logo.png' },
+      ],
+    ],
+    ['without a file', () => [{ name: 'version', value: '1' }]],
+  ])('rejects an upload %s as 400 bad_request', async (_case, parts) => {
+    const response = await putLogo(multipart(parts()));
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+  });
+
+  it('takes exactly one file per upload and skips a second one (2.0.1)', async () => {
+    const [first, second] = [await testImages.png(), await testImages.png('#000000')];
+
+    const response = await putLogo(
+      multipart([
+        { name: 'version', value: '1' },
+        { name: 'file', value: first, filename: 'logo.png', contentType: 'image/png' },
+        { name: 'file', value: second, filename: 'other.png', contentType: 'image/png' },
+      ]),
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().logo.hash).toBe(sha256(first));
+    expect(storedFiles()).toEqual([`${sha256(first)}.png`]);
+    expect(mediaRows()).toHaveLength(1);
+  });
+
+  it('rejects an upload as JSON with 415 unsupported_media_type (G-4)', async () => {
+    const response = await t.app.inject({
+      method: 'PUT',
+      url: '/api/merchant-profile/logo',
+      headers: SAME_ORIGIN_WRITE,
+      payload: { version: 1 },
+    });
+
+    expect(response.statusCode).toBe(415);
+  });
+
+  it('rejects an upload while shutting down with 503 shutting_down and stores nothing', async () => {
+    t.lifecycle.set('stopping');
+
+    const response = await putLogo(logoUpload(1, await testImages.png()));
+
+    expect(response.statusCode).toBe(503);
+    expect(storedFiles()).toEqual([]);
   });
 });
 

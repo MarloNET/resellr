@@ -10,6 +10,12 @@ const PAGE = '/einstellungen/haendlermarke';
 const LOGO_NOTICE =
   'Das Logo erscheint auf dem Datenblatt. Die Druckqualität stellt der Händler sicher.';
 
+/** A synthetic PNG of 1 × 1 pixel, no real logo. */
+const LOGO_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+
 const nameField = (page: Page) => page.getByRole('textbox', { name: /^Name der Händlermarke/ });
 const contactField = (page: Page) => page.getByRole('textbox', { name: /^Kontaktangaben/ });
 const saveButton = (page: Page) => page.getByRole('button', { name: /^Speichern/ });
@@ -73,6 +79,32 @@ test.describe('UI-026 merchant profile (CU-097)', () => {
     await expect(nameField(page)).toHaveValue(name);
     await expect(contactField(page)).toHaveValue('Musterstraße 1\n12345 Musterstadt');
     await expectReachable(page);
+  });
+
+  test('UI-026.success UI-026.empty DER-42-09 an uploaded logo is shown as preview from /media/logo, removing it shows "Kein Logo"', async ({
+    page,
+  }) => {
+    await openPage(page);
+    const logo = page.getByRole('region', { name: 'Logo' });
+
+    const chooser = page.waitForEvent('filechooser');
+    await logo.getByRole('button', { name: 'Logo ersetzen' }).click();
+    await (await chooser).setFiles({ name: 'logo.png', mimeType: 'image/png', buffer: LOGO_PNG });
+
+    const preview = logo.getByRole('img', { name: 'Logo' });
+    await expect(preview).toHaveAttribute('src', /^\/media\/logo\/[0-9a-f]{64}$/);
+    // The browser has loaded the image the server delivers.
+    await expect
+      .poll(() => preview.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBe(1);
+    await expectReachable(page);
+
+    await logo.getByRole('button', { name: 'Logo entfernen' }).click();
+
+    await expect(
+      logo.getByText('Kein Logo. Ohne Logo kann kein Datenblatt erzeugt werden.'),
+    ).toBeVisible();
+    await expect(preview).toHaveCount(0);
   });
 
   test('UI-026.validation DER-42-05 an empty name and too long contact details are rejected at the fields', async ({

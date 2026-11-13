@@ -7,11 +7,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@fastify/multipart": "10.1.8",
     "@fastify/static": "10.1.10",
     "better-sqlite3": "12.11.1",
     "fastify": "5.12.8",
     "fastify-type-provider-zod": "7.0.0",
     "kysely": "0.28.19",
+    "sharp": "0.34.5",
     "zod": "4.6.7"
   },
   "devDependencies": {
