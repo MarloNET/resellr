@@ -115,6 +115,17 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
       expect(one({ required: true, active: false }, 'alt').data).toEqual({ 1: 'alt' });
     });
 
+    it('AC-REQ-005-11 a schema built after "Wieder aktivieren" asks for the required attribute again', () => {
+      const ram = { label: 'RAM', dataType: 'integer', level: 'device', required: true } as const;
+      const deactivated = attributeValuesSchema([attribute({ ...ram, active: false })], 'device');
+      expect(deactivated.safeParse({}).success).toBe(true);
+
+      const activated = attributeValuesSchema([attribute({ ...ram, active: true })], 'device');
+
+      expect(issuesOf(activated.safeParse({}))).toEqual([{ path: '1', message: 'RAM fehlt' }]);
+      expect(activated.parse({ 1: 16 })).toEqual({ 1: 16 });
+    });
+
     it('reports a missing required value beside the field errors of other attributes', () => {
       const schema = attributeValuesSchema(
         [

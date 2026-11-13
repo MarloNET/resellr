@@ -300,6 +300,41 @@ describe('attributes in the device type service (CU-072)', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it('AC-REQ-005-11 activating a deactivated variant attribute reports SettingsChanged and no VariantSetChanging in the same transaction', async () => {
+    const variantSet = vi.fn(async () => {});
+    const settings: { event: SettingsChanged; active: number | undefined }[] = [];
+    const { service, notebook, attribute } = await notebookWithRam({
+      check: { VariantSetChanging: variantSet },
+      change: {
+        SettingsChanged: async (event, tx) => {
+          const row = await tx.db
+            .selectFrom('attribute')
+            .select('active')
+            .where('id', '=', 1)
+            .executeTakeFirst();
+          settings.push({ event, active: row?.active });
+          return emptyChangeReport();
+        },
+      },
+    });
+    await service.updateAttribute(attribute.id, { version: 1, active: false });
+    settings.length = 0;
+
+    const saved = await service.updateAttribute(attribute.id, { version: 2, active: true });
+
+    expect(saved).toEqual({ ...attribute, active: true, version: 3 });
+    expect(variantSet).not.toHaveBeenCalled();
+    expect(settings).toEqual([
+      {
+        event: {
+          type: 'SettingsChanged',
+          scope: { kind: 'device_types', deviceTypeIds: [notebook.id] },
+        },
+        active: 1,
+      },
+    ]);
+  });
+
   it('keeps the version and writes nothing when nothing changes', async () => {
     const { service, attribute } = await notebookWithRam();
 

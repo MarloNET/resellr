@@ -199,6 +199,11 @@ export interface AttributePanelProps {
   errorFocusRequest: number;
   /** `UI-027.speichert`: inputs and buttons locked, the save button shows "Speichern …" (P-08). */
   saving: boolean;
+  /**
+   * Another write of the page runs (`UI-027.aktiviert-speichert`): inputs and buttons are locked,
+   * the inputs stay and the save button keeps its label.
+   */
+  locked?: boolean;
   /** Writes are locked after an unknown outcome (P-08). */
   writesLocked: boolean;
   onErrors: (errors: AttributeFieldErrors) => void;
@@ -213,8 +218,9 @@ export interface AttributePanelProps {
  * battery_capacity (AC-REQ-005-06, AC-REQ-005-07). Once values are stored (`hasValues`), data type
  * and level are locked with the reason inline at the field (DER-34-10); minimum and maximum exist
  * only for numbers
- * (DER-34-03), the pick list only for data type pick (DER-34-04). The status changes with the
- * row action "Merkmal deaktivieren".
+ * (DER-34-03), the pick list only for data type pick (DER-34-04). The panel has no status: it
+ * changes only with the row actions "Deaktivieren" and "Wieder aktivieren", and the panel of a
+ * deactivated attribute is editable like that of an active one (DER-34-16, design v0.6.4).
  */
 export function AttributePanel({
   attribute,
@@ -222,6 +228,7 @@ export function AttributePanel({
   errors,
   errorFocusRequest,
   saving,
+  locked: otherWriteRunning = false,
   writesLocked,
   onErrors,
   onSave,
@@ -235,7 +242,7 @@ export function AttributePanel({
   const valuesLocked = attribute?.hasValues ?? false;
   const lockReasonId = useId();
   const lockReason = (field: keyof typeof VALUES_LOCK_REASONS) => `${lockReasonId}-${field}`;
-  const locked = saving || writesLocked;
+  const locked = saving || otherWriteRunning || writesLocked;
   const change = (next: Partial<AttributeDraft>) => setDraft({ ...draft, ...next });
   const pointerPressed = useRef(false);
   const cancelDeferredCheck = useRef(() => {});
@@ -477,7 +484,7 @@ export function AttributePanel({
       </FormField>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-        <Button disabled={saving} onClick={onCancel}>
+        <Button disabled={saving || otherWriteRunning} onClick={onCancel}>
           {PANEL_TEXTS.cancel}
         </Button>
         <Button type="submit" variant="primary" disabled={locked}>

@@ -405,7 +405,7 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
       (answer) =>
         answer.request().method() === 'PATCH' && answer.url().endsWith(`/api/attributes/${ram.id}`),
     );
-    await attributeRow(page, 'RAM').getByRole('button', { name: 'Merkmal deaktivieren' }).click();
+    await attributeRow(page, 'RAM').getByRole('button', { name: 'Deaktivieren' }).click();
 
     const answer = await response;
     expect(answer.status()).toBe(200);
@@ -424,6 +424,50 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
     } finally {
       check.close();
     }
+  });
+
+  test('AC-REQ-005-11 UI-027.success RAM is deactivated and activated again, the row shows "aktiv" with "Deaktivieren", "Merkmal aktiviert" and stays active after reloading', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      variantForming: true,
+      required: true,
+    });
+    await openDeviceType(page, name);
+    const ramRow = attributeRow(page, 'RAM');
+
+    await ramRow.getByRole('button', { name: 'Deaktivieren' }).click();
+    await expect(ramRow.getByText('deaktiviert')).toBeVisible();
+
+    const response = page.waitForResponse(
+      (answer) =>
+        answer.request().method() === 'PATCH' && answer.url().endsWith(`/api/attributes/${ram.id}`),
+    );
+    // Keyboard like every row action (Enter, Space).
+    await ramRow.getByRole('button', { name: 'Wieder aktivieren' }).press('Enter');
+
+    const answer = await response;
+    expect(answer.request().postDataJSON()).toEqual({ version: ram.version + 1, active: true });
+    expect(answer.status()).toBe(200);
+    await expect(ramRow.getByText('aktiv', { exact: true })).toBeVisible();
+    await expect(ramRow.getByRole('button', { name: 'Deaktivieren' })).toBeFocused();
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal aktiviert' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await page.reload();
+    await deviceTypes(page)
+      .getByRole('button', { name: new RegExp(name) })
+      .click();
+    await expect(ramRow.getByText('aktiv', { exact: true })).toBeVisible();
+    await expect(ramRow.getByRole('button', { name: 'Deaktivieren' })).toBeVisible();
+    const [stored] = await attributeList(page, server.baseUrl, deviceType.id);
+    expect(stored).toMatchObject({ id: ram.id, active: true, variantForming: true });
   });
 
   test('AC-REQ-006-02 UI-027.default an attribute of the initial device type Notebook is renamed and keeps its new name after reloading', async ({

@@ -39,7 +39,11 @@ export interface SaveNoticeBannersProps {
   onClose: () => void;
   /** After "Neu laden" of P-05 has loaded the data again (T-1). */
   onReloaded: () => void;
-  /** Text of `.success`, e.g. "Gespeichert"; a screen without it shows no success banner. */
+  /**
+   * Text of `.success`, e.g. "Gespeichert", or per action like "Merkmal aktiviert" in UI-027; a
+   * changed text is announced again and gets its own 5 s. A screen without it shows no success
+   * banner.
+   */
   successText?: ReactNode;
   /** Text of `.error` of the screen with the reference number (REQ-073). */
   errorText: (referenceNumber: string | null) => ReactNode;

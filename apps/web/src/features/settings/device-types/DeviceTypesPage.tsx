@@ -59,7 +59,7 @@ import {
   type AttributeFieldErrors,
 } from './AttributePanel.tsx';
 
-// Texts of UI-027 `screen.md` (UI/UX design v0.6.1).
+// Texts of UI-027 `screen.md` (UI/UX design v0.6.4).
 const TEXTS = {
   title: 'Gerätearten und Merkmale',
   list: 'Gerätearten',
@@ -77,7 +77,9 @@ const TEXTS = {
   attributeEmpty: 'Noch keine Merkmale. Legen Sie das erste Merkmal an.',
   attributeCreate: 'Merkmal anlegen',
   attributeSaved: 'Merkmal gespeichert',
-  attributeDeactivate: 'Merkmal deaktivieren',
+  attributeDeactivate: 'Deaktivieren',
+  attributeReactivate: 'Wieder aktivieren',
+  attributeActivated: 'Merkmal aktiviert',
   order: 'Reihenfolge',
   label: 'Bezeichnung',
   dataType: 'Datentyp',
@@ -141,6 +143,8 @@ export function DeviceTypesPage() {
   const createAttributeMutation = useCreateAttributeMutation();
   const updateAttributeMutation = useUpdateAttributeMutation();
   const reorderAttributesMutation = useReorderAttributesMutation();
+  // Own instance: only "Wieder aktivieren" shows "Speichern …" in its row (UI-027.aktiviert-speichert).
+  const activateAttributeMutation = useUpdateAttributeMutation();
 
   const items = query.data?.items ?? [];
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -159,7 +163,11 @@ export function DeviceTypesPage() {
   const attributeSaving =
     createAttributeMutation.isPending ||
     updateAttributeMutation.isPending ||
-    reorderAttributesMutation.isPending;
+    reorderAttributesMutation.isPending ||
+    activateAttributeMutation.isPending;
+  const activatingId = activateAttributeMutation.isPending
+    ? (activateAttributeMutation.variables?.id ?? null)
+    : null;
   const deviceTypeSaving = createMutation.isPending || updateMutation.isPending;
   // Every write locks the whole page; only the triggering save button shows "Speichern …" (P-08).
   const saving = deviceTypeSaving || attributeSaving;
@@ -172,6 +180,8 @@ export function DeviceTypesPage() {
   const [editing, setEditing] = useState<AttributeEditing | null>(null);
   const [attributeErrors, setAttributeErrors] = useState<AttributeFieldErrors>({});
   const [attributeErrorFocus, setAttributeErrorFocus] = useState(0);
+  // Row whose action gets the focus once the table is unlocked again (after "Wieder aktivieren").
+  const [actionFocusId, setActionFocusId] = useState<number | null>(null);
 
   // The first device type is open once the list has arrived.
   const firstItem = items[0];
@@ -304,6 +314,32 @@ export function DeviceTypesPage() {
     );
   }
 
+  /**
+   * "Wieder aktivieren" (REQ-005, AC-REQ-005-11; Technical Specification 2.1): exactly
+   * `{ version, active: true }` without dialog, never rejected; only the general states P-05 to
+   * P-08 and `.error`, in which the row keeps "deaktiviert". An open panel of the attribute stays
+   * open with its inputs; if it is based on the version the activation started from, it continues
+   * from the new one, because the activation changes only `active` and the panel has no status.
+   */
+  function activateAttribute(attribute: Attribute) {
+    setNotice(null);
+    activateAttributeMutation.mutate(
+      { id: attribute.id, version: attribute.version, active: true },
+      {
+        onSuccess: (saved) => {
+          setEditing((current) =>
+            current?.id === saved.id && current.version === attribute.version
+              ? { ...current, version: saved.version }
+              : current,
+          );
+          setActionFocusId(saved.id);
+          showSaved(TEXTS.attributeActivated);
+        },
+        onError: (error: ApiError) => setNotice(noticeOf(error)),
+      },
+    );
+  }
+
   function reorderAttributes(from: number, to: number) {
     if (selected === undefined || from === to) return;
     setNotice(null);
@@ -430,7 +466,8 @@ export function DeviceTypesPage() {
                     pickLists={pickListsQuery.data?.items ?? []}
                     errors={attributeErrors}
                     errorFocusRequest={attributeErrorFocus}
-                    saving={attributeSaving}
+                    saving={attributeSaving && activatingId === null}
+                    locked={activatingId !== null}
                     writesLocked={writesLocked}
                     onErrors={setAttributeErrors}
                     onSave={saveAttribute}
@@ -500,9 +537,13 @@ export function DeviceTypesPage() {
             locked={saving || writesLocked}
             orderLocked={orderLocked}
             editingId={editing?.id ?? null}
+            activatingId={activatingId}
+            actionFocusId={actionFocusId}
+            onActionFocused={() => setActionFocusId(null)}
             dragProps={dragProps}
             onOpen={openAttribute}
             onDeactivate={deactivateAttribute}
+            onActivate={activateAttribute}
             onMove={reorderAttributes}
           />
         )}
@@ -514,8 +555,10 @@ export function DeviceTypesPage() {
 const yesNo = (value: boolean) => (value ? TEXTS.yes : TEXTS.no);
 
 /**
- * Attribute table of UI-027 (DER-34-01, DER-34-06, DER-34-07): order by dragging or with
- * "Hoch"/"Runter" (P-01), a click on the label opens the panel, the row action deactivates.
+ * Attribute table of UI-027 (DER-34-01, DER-34-06, DER-34-07, DER-34-13): order by dragging or
+ * with "Hoch"/"Runter" (P-01), a click on the label opens the panel. The row action at the same
+ * place is "Deaktivieren" for an active attribute and "Wieder aktivieren" for a deactivated one,
+ * whose row keeps its place with a muted label (design v0.6.4).
  */
 function AttributeTable({
   attributes,
@@ -523,9 +566,13 @@ function AttributeTable({
   locked,
   orderLocked,
   editingId,
+  activatingId,
+  actionFocusId,
+  onActionFocused,
   dragProps,
   onOpen,
   onDeactivate,
+  onActivate,
   onMove,
 }: {
   attributes: readonly AttributeWithUsage[];
@@ -533,14 +580,32 @@ function AttributeTable({
   locked: boolean;
   orderLocked: boolean;
   editingId: number | null;
+  /** `UI-027.aktiviert-speichert`: this row shows "Speichern …" at its action. */
+  activatingId: number | null;
+  /** The action of this row gets the focus as soon as the table is unlocked. */
+  actionFocusId: number | null;
+  onActionFocused: () => void;
   dragProps: ReturnType<typeof useDragOrder>;
   onOpen: (attribute: AttributeWithUsage | null) => void;
   onDeactivate: (attribute: Attribute) => void;
+  onActivate: (attribute: Attribute) => void;
   onMove: (from: number, to: number) => void;
 }) {
   const empty = !loading && attributes.length === 0;
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // The action was disabled during the request and lost the focus; it gets it back once enabled.
+  useEffect(() => {
+    if (actionFocusId === null || locked) return;
+    sectionRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-row-action="${actionFocusId}"]`)
+      ?.focus();
+    onActionFocused();
+  }, [actionFocusId, locked, onActionFocused]);
+
   return (
     <section
+      ref={sectionRef}
       aria-label={TEXTS.attributeSection}
       className="mt-4 flex flex-col gap-2 rounded-control border border-border bg-surface p-4"
     >
@@ -612,7 +677,11 @@ function AttributeTable({
                     type="button"
                     disabled={locked}
                     onClick={() => onOpen(attribute)}
-                    className="scroll-ml-44 cursor-pointer text-left font-semibold text-primary disabled:cursor-not-allowed"
+                    className={cn(
+                      'scroll-ml-44 cursor-pointer text-left font-semibold disabled:cursor-not-allowed',
+                      // Muted in addition to the status text, never by colour alone.
+                      attribute.active ? 'text-primary' : 'text-text-secondary',
+                    )}
                   >
                     {attribute.label}
                   </button>
@@ -636,12 +705,20 @@ function AttributeTable({
                     {attribute.active ? TEXTS.active : TEXTS.inactive}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  {attribute.active && (
-                    <Button disabled={locked} onClick={() => onDeactivate(attribute)}>
-                      {TEXTS.attributeDeactivate}
-                    </Button>
-                  )}
+                <TableCell className="whitespace-nowrap">
+                  <Button
+                    data-row-action={attribute.id}
+                    disabled={locked}
+                    onClick={() =>
+                      attribute.active ? onDeactivate(attribute) : onActivate(attribute)
+                    }
+                  >
+                    {attribute.id === activatingId
+                      ? TEXTS.saving
+                      : attribute.active
+                        ? TEXTS.attributeDeactivate
+                        : TEXTS.attributeReactivate}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
