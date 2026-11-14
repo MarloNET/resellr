@@ -259,6 +259,55 @@ describe('readPackageNotice', () => {
       expect(log).toEqual([expect.stringMatching(/no-file@3\.0\.0.*unused/)]);
     });
   });
+
+  describe('libvips packages without license file (Nachtrag MAR-758)', () => {
+    it('accepts a libvips package under LGPL-3.0 alone without entry and refers to the appended texts', () => {
+      const dir = fakePackage(
+        { name: '@img/sharp-libvips-linux-x64', version: '1.3.4', license: 'LGPL-3.0-or-later' },
+        { 'versions.json': '{}', 'README.md': 'readme' },
+      );
+
+      expect(readPackageNotice(dir, { missingLicenseFiles: {} }).text).toBe(
+        'Lizenztext nicht im Paket enthalten. Es gelten LGPL-3.0 und GPL-3.0, Texte am Ende dieser Datei; Bibliotheken und Quellcode im Abschnitt „libvips aus @img/sharp-libvips-linux-x64@1.3.4“.',
+      );
+    });
+
+    it('fails for the same package under MIT', () => {
+      const dir = fakePackage({
+        name: '@img/sharp-libvips-linux-x64',
+        version: '1.3.4',
+        license: 'MIT',
+      });
+
+      expect(() => readPackageNotice(dir, { missingLicenseFiles: {} })).toThrow(
+        /sharp-libvips-linux-x64@1\.3\.4 ships no license text/,
+      );
+    });
+
+    it('fails for a libvips package with another license part', () => {
+      const dir = fakePackage({
+        name: '@img/sharp-win32-x64',
+        version: '0.35.5',
+        license: 'Apache-2.0 AND LGPL-3.0-or-later',
+      });
+
+      expect(() => readPackageNotice(dir, { missingLicenseFiles: {} })).toThrow(
+        /sharp-win32-x64@0\.35\.5 ships no license text/,
+      );
+    });
+
+    it('fails for an LGPL-3.0 package outside the libvips packages', () => {
+      const dir = fakePackage({
+        name: '@other/sharp-libvips-linux-x64',
+        version: '1.3.4',
+        license: 'LGPL-3.0-or-later',
+      });
+
+      expect(() => readPackageNotice(dir, { missingLicenseFiles: {} })).toThrow(
+        /@other\/sharp-libvips-linux-x64@1\.3\.4.*not allowed/,
+      );
+    });
+  });
 });
 
 describe('shipped packages (Nachtrag MAR-687)', () => {
@@ -431,8 +480,16 @@ describe('buildNotices', () => {
       },
       { LICENSE: 'Apache License 2.0', 'versions.json': '{"vips":"8.17.3"}' },
     );
+    const libvipsLibraries = {
+      vips: { version: '8.17.3', license: 'LGPL-3.0-or-later', file: null, source: 'vips-src' },
+    };
 
-    const text = buildNotices({ packageDirs: [sharp], nodeLicense, interLicense });
+    const text = buildNotices({
+      packageDirs: [sharp],
+      nodeLicense,
+      interLicense,
+      libvipsLibraries,
+    });
 
     expect(text).toContain('libvips aus @img/sharp-win32-x64@0.34.5');
     expect(text).toContain('{"vips":"8.17.3"}');
@@ -440,6 +497,108 @@ describe('buildNotices', () => {
     expect(text).toContain('https://github.com/lovell/sharp-libvips');
     expect(text).toContain('GNU LESSER GENERAL PUBLIC LICENSE');
     expect(text).toContain('GNU GENERAL PUBLIC LICENSE');
+  });
+
+  describe('libraries built into the libvips DLLs (Nachtrag MAR-711, Festlegung 5)', () => {
+    let licensesDir: string;
+    let log: string[];
+    const libraries = {
+      cairo: {
+        version: '1.18.6',
+        license: 'LGPL-2.1-only OR MPL-1.1',
+        file: 'cairo.txt',
+        source: 'https://gitlab.freedesktop.org/cairo/cairo/-/tree/1.18.6',
+      },
+      glib: {
+        version: '2.90.0',
+        license: 'LGPL-3.0-or-later',
+        file: null,
+        source: 'https://gitlab.gnome.org/GNOME/glib/-/tree/2.90.0',
+      },
+    };
+
+    beforeEach(() => {
+      licensesDir = join(root, 'licenses');
+      writeFile(join(licensesDir, 'LGPL-3.0.txt'), 'GNU LESSER GENERAL PUBLIC LICENSE');
+      writeFile(join(licensesDir, 'GPL-3.0.txt'), 'GNU GENERAL PUBLIC LICENSE');
+      writeFile(join(licensesDir, 'libvips', 'cairo.txt'), 'cairo license text');
+      log = [];
+    });
+
+    function sharpWith(versions: Record<string, string>) {
+      return fakePackage(
+        {
+          name: '@img/sharp-win32-x64',
+          version: '0.35.5',
+          license: 'Apache-2.0 AND LGPL-3.0-or-later',
+        },
+        { LICENSE: 'Apache License 2.0', 'versions.json': JSON.stringify(versions) },
+      );
+    }
+
+    function build(dir: string) {
+      return buildNotices({
+        packageDirs: [dir],
+        nodeLicense,
+        interLicense,
+        licensesDir,
+        libvipsLibraries: libraries,
+        log: (line: string) => log.push(line),
+      });
+    }
+
+    it('accepts known keys with matching versions and adds name, version, license, source and text', () => {
+      const text = build(sharpWith({ cairo: '1.18.6', glib: '2.90.0' }));
+
+      expect(text).toContain('cairo 1.18.6');
+      expect(text).toContain('Lizenz: LGPL-2.1-only OR MPL-1.1');
+      expect(text).toContain('Quelle: https://gitlab.freedesktop.org/cairo/cairo/-/tree/1.18.6');
+      expect(text).toContain('cairo license text');
+      expect(log).toEqual([]);
+    });
+
+    it('accepts a pure LGPL entry with file null and refers to the appended texts', () => {
+      const text = build(sharpWith({ glib: '2.90.0' }));
+
+      expect(text).toContain('glib 2.90.0');
+      expect(text).toContain('Quelle: https://gitlab.gnome.org/GNOME/glib/-/tree/2.90.0');
+      expect(text).toMatch(/glib 2\.90\.0[\s\S]*LGPL-3\.0 und GPL-3\.0/);
+    });
+
+    it('fails for an unknown key, naming library and package', () => {
+      expect(() => build(sharpWith({ cairo: '1.18.6', uhdr: '2.0.2' }))).toThrow(
+        /uhdr.*@img\/sharp-win32-x64@0\.35\.5|@img\/sharp-win32-x64@0\.35\.5.*uhdr/,
+      );
+    });
+
+    it('fails for a differing version, naming library and package', () => {
+      expect(() => build(sharpWith({ cairo: '1.18.4' }))).toThrow(
+        /@img\/sharp-win32-x64@0\.35\.5.*cairo.*1\.18\.4/,
+      );
+    });
+
+    it('fails for a missing file from file, naming library and package', () => {
+      rmSync(join(licensesDir, 'libvips', 'cairo.txt'));
+
+      expect(() => build(sharpWith({ cairo: '1.18.6' }))).toThrow(
+        /@img\/sharp-win32-x64@0\.35\.5.*cairo.*cairo\.txt/,
+      );
+    });
+
+    it('fails without versions.json, naming the package', () => {
+      const dir = sharpWith({});
+      rmSync(join(dir, 'versions.json'));
+
+      expect(() => build(dir)).toThrow(/versions\.json.*@img\/sharp-win32-x64@0\.35\.5/);
+    });
+
+    it('accepts an entry without key in versions.json and logs one line', () => {
+      const text = build(sharpWith({ cairo: '1.18.6' }));
+
+      expect(text).not.toContain('glib 2.90.0');
+      expect(log).toHaveLength(1);
+      expect(log[0]).toMatch(/glib.*@img\/sharp-win32-x64@0\.35\.5/);
+    });
   });
 
   it('fails for the same libvips package under another name', () => {

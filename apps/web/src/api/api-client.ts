@@ -90,14 +90,18 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       ? AbortSignal.any([options.signal, timeout.signal])
       : timeout.signal;
 
+    // An upload goes as `multipart/form-data`; the browser sets its content type with the
+    // boundary (2.0.1, G-4).
+    const json = body !== undefined && !(body instanceof FormData);
+
     let response: Response;
     let text: string;
     try {
       response = await doFetch(path, {
         method,
         signal,
-        headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: json ? { 'Content-Type': 'application/json' } : undefined,
+        body: json ? JSON.stringify(body) : (body as FormData | undefined),
       });
       // The body is read within the time limit: an answer cut off while reading counts as none.
       text = await response.text();

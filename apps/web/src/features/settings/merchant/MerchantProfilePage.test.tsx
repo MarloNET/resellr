@@ -11,6 +11,15 @@ import { routes } from '../../../app/router.tsx';
 const PROFILE = { brandName: 'Muster-Händler', contactText: 'Tel. 1', logo: null, version: 3 };
 const SAVED = { ...PROFILE, brandName: 'Demo-Händler', version: 4 };
 const PUT = 'PUT /api/merchant-profile';
+const PUT_LOGO = 'PUT /api/merchant-profile/logo';
+
+const HASH_A = 'a'.repeat(64);
+const HASH_B = 'b'.repeat(64);
+const logoOf = (hash: string) => ({ hash, url: `/media/logo/${hash}` });
+const WITH_LOGO = { ...PROFILE, logo: logoOf(HASH_A), version: 4 };
+
+const NO_LOGO = 'Kein Logo. Ohne Logo kann kein Datenblatt erzeugt werden.';
+const LOGO_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
 
 const OPS_STATUS = {
   dataDirPath: 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten',
@@ -40,7 +49,13 @@ function mockApi({ read, writes = {} }: { read?: Route; writes?: Record<string, 
       return read ? read(init) : Response.json(PROFILE);
     }
     const key = `${method} ${path}`;
-    sent.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    const body = init?.body;
+    // An upload is recorded as its form, every other write as its JSON body.
+    sent.push({
+      method,
+      path,
+      body: body instanceof FormData ? body : body ? JSON.parse(String(body)) : undefined,
+    });
     const handler = writes[key];
     if (!handler) throw new Error(`unexpected request ${key}`);
     return handler(init);
@@ -64,6 +79,18 @@ const contactInput = () =>
   screen.getByRole<HTMLTextAreaElement>('textbox', { name: /^Kontaktangaben/ });
 const saveButton = () =>
   screen.getByRole<HTMLButtonElement>('button', { name: /^(Speichern|Speichern …)$/ });
+
+const logoRegion = () => screen.getByRole('region', { name: 'Logo' });
+const logoButton = (name: 'Logo ersetzen' | 'Logo entfernen') =>
+  within(logoRegion()).getByRole<HTMLButtonElement>('button', { name });
+const logoPreview = () =>
+  within(logoRegion()).queryByRole<HTMLImageElement>('img', { name: 'Logo' });
+
+/** Chooses a file in the dialog that "Logo ersetzen" opens. */
+function chooseLogo(name = 'logo.png', type = 'image/png') {
+  const input = logoRegion().querySelector<HTMLInputElement>('input[type="file"]')!;
+  fireEvent.change(input, { target: { files: [new File(['image'], name, { type })] } });
+}
 
 /** A response that never arrives, e.g. a write without time limit (P-08). */
 const pending = () => new Promise<Response>(() => {});
@@ -329,6 +356,121 @@ describe('UI-026 merchant profile (CU-097)', () => {
     await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(screen.getByRole('button', { name: 'Speichern …' })).toBeTruthy();
     expectAccessiblePage();
+  });
+
+  it('UI-026.empty DER-42-02 shows "Kein Logo. Ohne Logo kann kein Datenblatt erzeugt werden." without preview and without "Logo entfernen"', async () => {
+    mockApi();
+    await openPage();
+
+    expect(within(logoRegion()).getByText(NO_LOGO)).toBeTruthy();
+    expect(logoPreview()).toBeNull();
+    expect(logoButton('Logo ersetzen').disabled).toBe(false);
+    expect(within(logoRegion()).queryByRole('button', { name: 'Logo entfernen' })).toBeNull();
+    expectAccessiblePage();
+  });
+
+  it('UI-026.default shows the stored logo as preview with "Logo ersetzen" and "Logo entfernen"', async () => {
+    mockApi({ read: () => Response.json(WITH_LOGO) });
+    await openPage();
+
+    expect(logoPreview()?.getAttribute('src')).toBe(`/media/logo/${HASH_A}`);
+    expect(within(logoRegion()).queryByText(NO_LOGO)).toBeNull();
+    expect(logoButton('Logo entfernen').disabled).toBe(false);
+    expectAccessiblePage();
+  });
+
+  it('UI-026.success DER-42-09 the preview follows replacing and removing the logo; later writes use the new version', async () => {
+    const replaced = { ...WITH_LOGO, logo: logoOf(HASH_B), version: 5 };
+    const removed = { ...replaced, logo: null, version: 6 };
+    const { sent } = mockApi({
+      read: () => Response.json(WITH_LOGO),
+      writes: {
+        [PUT_LOGO]: () => Response.json(replaced),
+        'DELETE /api/merchant-profile/logo?version=5': () => Response.json(removed),
+        [PUT]: () => Response.json({ ...removed, brandName: 'Demo-Händler', version: 7 }),
+      },
+    });
+    await openPage();
+    fireEvent.change(nameInput(), { target: { value: 'Demo-Händler' } });
+
+    chooseLogo('neu.jpg', 'image/jpeg');
+
+    await vi.waitFor(() =>
+      expect(logoPreview()?.getAttribute('src')).toBe(`/media/logo/${HASH_B}`),
+    );
+    const form = sent[0]?.body as FormData;
+    expect(sent[0]?.path).toBe('/api/merchant-profile/logo');
+    expect(form.get('version')).toBe('4');
+    expect((form.get('file') as File).name).toBe('neu.jpg');
+    // A not yet saved name stays in the form.
+    expect(nameInput().value).toBe('Demo-Händler');
+    expectAccessiblePage();
+
+    fireEvent.click(logoButton('Logo entfernen'));
+
+    expect(await within(logoRegion()).findByText(NO_LOGO)).toBeTruthy();
+    expect(logoPreview()).toBeNull();
+
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(sent).toHaveLength(3));
+    expect(sent[2]?.body).toEqual({ version: 6, brandName: 'Demo-Händler', contactText: 'Tel. 1' });
+  });
+
+  it.each([
+    ['a GIF file', 415, 'unsupported_media_type'],
+    ['a file over 5 MB', 413, 'file_too_large'],
+  ])(
+    'UI-026.validation %s shows "Logo: nur PNG oder JPEG bis 5 MB" at the logo and keeps the preview',
+    async (_case, status, code) => {
+      mockApi({
+        read: () => Response.json(WITH_LOGO),
+        writes: {
+          [PUT_LOGO]: () => Response.json(errorBody(code, { message: LOGO_RULE }), { status }),
+        },
+      });
+      await openPage();
+
+      chooseLogo('logo.gif', 'image/gif');
+
+      const message = await within(logoRegion()).findByText(LOGO_RULE);
+      expect(logoButton('Logo ersetzen').getAttribute('aria-describedby')).toBe(message.id);
+      expect(document.activeElement).toBe(logoButton('Logo ersetzen'));
+      expect(logoPreview()?.getAttribute('src')).toBe(`/media/logo/${HASH_A}`);
+      expect(screen.queryByRole('alert')).toBeNull();
+      expectAccessiblePage();
+    },
+  );
+
+  it('UI-026.speichert shows "Speichern …" and locks all inputs while the logo is uploaded', async () => {
+    mockApi({ read: () => Response.json(WITH_LOGO), writes: { [PUT_LOGO]: pending } });
+    await openPage();
+
+    chooseLogo();
+
+    expect(
+      (await screen.findByRole('button', { name: 'Speichern …' })).hasAttribute('disabled'),
+    ).toBe(true);
+    expect(nameInput().disabled).toBe(true);
+    expect(contactInput().disabled).toBe(true);
+    expect(logoButton('Logo ersetzen').disabled).toBe(true);
+    expect(logoButton('Logo entfernen').disabled).toBe(true);
+    expectAccessiblePage();
+  });
+
+  it('UI-026.conflict DER-42-07 (a) removing the logo with an outdated version shows P-05 and keeps the preview', async () => {
+    mockApi({
+      read: () => Response.json(WITH_LOGO),
+      writes: {
+        'DELETE /api/merchant-profile/logo?version=4': () =>
+          Response.json(errorBody('version_conflict'), { status: 409 }),
+      },
+    });
+    await openPage();
+
+    fireEvent.click(logoButton('Logo entfernen'));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Bitte neu laden');
+    expect(logoPreview()?.getAttribute('src')).toBe(`/media/logo/${HASH_A}`);
   });
 
   it('UI-026.conflict DER-42-07 (a) shows P-05 with "Neu laden" and keeps the inputs; "Neu laden" takes the reloaded data', async () => {

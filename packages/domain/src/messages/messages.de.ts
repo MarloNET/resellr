@@ -111,6 +111,9 @@ export const FIELD_MESSAGES = {
 
 type MessageText = string | ((...args: string[]) => string);
 
+/** UI-026 "Logo": one text for a too large file and a wrong type (AC-REQ-028-02). */
+const LOGO_FILE_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
+
 /**
  * Rejection texts by `<code>.<usage>` (Technical Specification 2.0.5, FIND-209): the service
  * sets the usage, `error-mapper` picks the text. `default` is the usage of a code with one
@@ -121,6 +124,7 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  'file_too_large.logo': LOGO_FILE_RULE,
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.condition_code': 'Diesen Code gibt es für diesen Lieferanten bereits',
@@ -133,6 +137,7 @@ export const ERROR_MESSAGES = {
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
+  'unsupported_media_type.logo': LOGO_FILE_RULE,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
 /**
