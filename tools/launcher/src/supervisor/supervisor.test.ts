@@ -44,6 +44,24 @@ function controlledWaits() {
   };
 }
 
+/**
+ * `POST /api/ops/shutdown` the test answers; `answer(response)` settles the open call. `signals`
+ * holds the abort signal of each call.
+ */
+function fakeShutdown() {
+  const answers: ((response: ShutdownResponse | null) => void)[] = [];
+  const signals: AbortSignal[] = [];
+  return {
+    signals,
+    calls: () => answers.length,
+    answer: (response: ShutdownResponse | null) => answers.at(-1)!(response),
+    shutdownServer: (signal: AbortSignal) => {
+      signals.push(signal);
+      return new Promise<ShutdownResponse | null>((resolve) => answers.push(resolve));
+    },
+  };
+}
+
 /** Availability check the test drives: `check(at)` reports a check at that instant. */
 function fakeProbes() {
   let onProbe: (at: Date) => void = () => {};
@@ -109,6 +127,14 @@ describe('supervisor (CU-261)', () => {
   async function start(options: Partial<SupervisorOptions> = {}) {
     path = supervisorPipePath(`/tmp/resellr-test-${randomUUID()}`);
     const pipe = (await listenSupervisorPipe(path))!;
+    /** Pipe requests the supervisor has handled, so a test knows when it has a `stop`. */
+    const handled: string[] = [];
+    const onRequest = pipe.onRequest.bind(pipe);
+    pipe.onRequest = (handle) =>
+      onRequest((request, reply) => {
+        handle(request, reply);
+        handled.push(request.cmd);
+      });
     const server = fakeServer();
     const phases: PhaseEvent[] = [];
     const crashes: CrashReport[] = [];
@@ -147,7 +173,10 @@ describe('supervisor (CU-261)', () => {
       summarizeAvailability: () => summaries.count++,
       ...options,
     });
-    return { server, phases, crashes, order, logged, waits, probes, summaries, ended };
+    /** Resolves once the supervisor has handled `count` stop requests. */
+    const stopHandled = (count = 1) =>
+      expect.poll(() => handled.filter((cmd) => cmd === 'stop').length).toBe(count);
+    return { server, phases, crashes, order, logged, waits, probes, summaries, stopHandled, ended };
   }
 
   it('starts one server in starting and reports ready with the startId of this attempt', async () => {
@@ -462,17 +491,6 @@ describe('supervisor (CU-261)', () => {
   });
 
   describe('stop over the pipe in ready (2.18 command stop)', () => {
-    /** `POST /api/ops/shutdown` the test answers; `answer(response)` settles the open call. */
-    function fakeShutdown() {
-      const answers: ((response: ShutdownResponse | null) => void)[] = [];
-      return {
-        calls: () => answers.length,
-        answer: (response: ShutdownResponse | null) => answers.at(-1)!(response),
-        shutdownServer: () =>
-          new Promise<ShutdownResponse | null>((resolve) => answers.push(resolve)),
-      };
-    }
-
     it('DER-104-01 sends POST /api/ops/shutdown, reports stopped to the stop client after the process end and ends without a restart', async () => {
       const shutdown = fakeShutdown();
       const { server, phases, ended } = await start({ shutdownServer: shutdown.shutdownServer });
@@ -553,9 +571,11 @@ describe('supervisor (CU-261)', () => {
       },
     );
 
-    it('DER-104-02 reports error with the reference number of 500 internal_error and stays in ready', async () => {
+    it('DER-104-02 reports error with the reference number of 500 internal_error, logs nothing itself and stays in ready', async () => {
       const shutdown = fakeShutdown();
-      const { server, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+      const { server, phases, logged, probes, ended } = await start({
+        shutdownServer: shutdown.shutdownServer,
+      });
       server.ready();
 
       const stopped = requestStop(path);
@@ -567,6 +587,11 @@ describe('supervisor (CU-261)', () => {
         phase: 'error',
         refNo: 'R-SRVR-0500',
       });
+      // The server has written shutdown_failed with its number (2.17 step 8); no own entry.
+      expect(logged).toEqual([]);
+      // ready went out before the stop; it is not reported again, the check keeps running.
+      expect(phases.map(({ phase }) => phase)).toEqual(['starting', 'ready', 'error']);
+      expect(probes).toMatchObject({ started: 1, stopped: 0 });
       // The server runs on: a new client sees ready, and a later stop asks the server again.
       await expect(subscribeToSupervisor(path)).resolves.toEqual({
         event: 'phase',
@@ -596,12 +621,44 @@ describe('supervisor (CU-261)', () => {
       waits.release();
 
       await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'error', refNo: REF_NO });
+      expect(shutdown.signals[0]?.aborted).toBe(true);
       expect(logged).toEqual([{ kind: 'shutdown_timeout', startId: 'start-1', refNo: REF_NO }]);
       expect(order.slice(-2)).toEqual(['log shutdown_timeout', 'phase error']);
       await expect(subscribeToSupervisor(path)).resolves.toMatchObject({ phase: 'ready' });
       // A late end of the server after the error is an ordinary end in ready.
       server.end({ kind: 'stopped' });
       await ended;
+    });
+
+    it('DER-104-02 aborts a POST /api/ops/shutdown without an answer after 30 s and reports error', async () => {
+      const shutdown = fakeShutdown();
+      const { server, waits, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+      server.ready();
+
+      const stopped = requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      expect(shutdown.signals[0]?.aborted).toBe(false);
+      await expect.poll(() => waits.pending()).toBe(1);
+      waits.release();
+
+      await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'error', refNo: REF_NO });
+      expect(shutdown.signals[0]?.aborted).toBe(true);
+      server.end({ kind: 'stopped' });
+      await ended;
+    });
+
+    it('DER-104-04 aborts a POST /api/ops/shutdown without an answer when the process ends in stopping', async () => {
+      const shutdown = fakeShutdown();
+      const { server, ended } = await start({ shutdownServer: shutdown.shutdownServer });
+      server.ready();
+
+      const stopped = requestStop(path);
+      await expect.poll(shutdown.calls).toBe(1);
+      server.end({ kind: 'stopped' });
+
+      await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
+      await ended;
+      expect(shutdown.signals[0]?.aborted).toBe(true);
     });
 
     it('DER-104-02 applies the normal restart rule after error', async () => {
@@ -714,14 +771,13 @@ describe('supervisor (CU-261)', () => {
           return { status: 200, body: {}, refNo: null };
         },
       };
-      const { server, phases, probes, ended } = await start({
+      const { server, phases, probes, stopHandled, ended } = await start({
         shutdownServer: shutdown.shutdownServer,
       });
 
       const stopped = requestStop(path);
-      await expect.poll(() => phases.length).toBe(1);
-      // Wait until the supervisor has the request before the server reports ready.
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // The supervisor has the request before the server reports ready.
+      await stopHandled();
       expect(shutdown.calls).toBe(0);
       server.ready();
       await expect.poll(() => shutdown.calls).toBe(1);
@@ -734,6 +790,49 @@ describe('supervisor (CU-261)', () => {
       expect(probes.started).toBe(0);
       expect(server.startIds).toEqual(['start-1']);
     });
+
+    it.each<[string, (shutdown: ReturnType<typeof fakeShutdown>, release: () => void) => void]>([
+      [
+        '500 internal_error',
+        (shutdown) => shutdown.answer({ status: 500, body: {}, refNo: REF_NO }),
+      ],
+      ['30 s without the process end', (_, release) => release()],
+    ])(
+      'DER-104-06 after ready reports error on %s, then ready to waiting clients and starts the availability check',
+      async (_, fail) => {
+        const shutdown = fakeShutdown();
+        const { server, phases, probes, waits, stopHandled, ended } = await start({
+          shutdownServer: shutdown.shutdownServer,
+        });
+        const subscribed = await subscriber(path);
+        expect(await subscribed.next()).toMatchObject({ phase: 'starting' });
+
+        const stopped = requestStop(path);
+        await stopHandled();
+        server.ready();
+        await expect.poll(shutdown.calls).toBe(1);
+        await expect.poll(() => waits.pending()).toBe(1);
+        fail(shutdown, waits.release);
+
+        await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'error', refNo: REF_NO });
+        expect(await subscribed.next()).toEqual({ event: 'phase', phase: 'error', refNo: REF_NO });
+        expect(await subscribed.next()).toEqual({
+          event: 'phase',
+          phase: 'ready',
+          startId: 'start-1',
+        });
+        expect(phases.map(({ phase }) => phase)).toEqual(['starting', 'error', 'ready']);
+        expect(probes.started).toBe(1);
+        await expect(subscribeToSupervisor(path)).resolves.toEqual({
+          event: 'phase',
+          phase: 'ready',
+          startId: 'start-1',
+        });
+        server.end({ kind: 'stopped' });
+        await ended;
+        expect(probes.stopped).toBe(1);
+      },
+    );
 
     it.each<[string, ServerEnd, Record<string, unknown>[]]>([
       [
@@ -760,10 +859,10 @@ describe('supervisor (CU-261)', () => {
     ])(
       'DER-104-06 reports stopped without a restart when the process ends by %s',
       async (_, end, entries) => {
-        const { server, phases, crashes, logged, waits, ended } = await start();
+        const { server, phases, crashes, logged, waits, stopHandled, ended } = await start();
 
         const stopped = requestStop(path);
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await stopHandled();
         server.end(end);
 
         await expect(stopped).resolves.toEqual({ event: 'phase', phase: 'stopped' });
@@ -778,10 +877,10 @@ describe('supervisor (CU-261)', () => {
     );
 
     it('DER-104-07 logs and reports already_running with its reference number and ends when the process ends with exit code 11', async () => {
-      const { server, order, logged, ended } = await start();
+      const { server, order, logged, stopHandled, ended } = await start();
 
       const stopped = requestStop(path);
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await stopHandled();
       server.end({ kind: 'already_running' });
 
       await expect(stopped).resolves.toEqual({

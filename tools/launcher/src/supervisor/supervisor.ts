@@ -74,8 +74,11 @@ export interface SupervisorOptions {
   startHealthProbe?(onProbe: (at: Date) => void): HealthProbe;
   /** Summarises the missing days of the availability (CU-269). */
   summarizeAvailability?(): void;
-  /** `POST /api/ops/shutdown` to the own server (CU-266), the answer to `stop` in `ready`. */
-  shutdownServer?(): Promise<ShutdownResponse | null>;
+  /**
+   * `POST /api/ops/shutdown` to the own server (CU-266), the answer to `stop` in `ready`; `signal`
+   * aborts the request when `stopping` ends, at the latest after 30 s (Nachtrag MAR-764).
+   */
+  shutdownServer?(signal: AbortSignal): Promise<ShutdownResponse | null>;
 }
 
 /**
@@ -108,9 +111,11 @@ export interface SupervisorOptions {
  *   e.g. from UI-045), every other answer and none at all change nothing. `500` with a valid
  *   reference number reports `error` with it; a server process that still runs 30 s after the
  *   change writes `shutdown_failed` with an own number and reports `error` with that. After
- *   `error` the supervisor is back in `ready` with the normal restart rule.
+ *   `error` the supervisor is back in `ready` with the normal restart rule. The request ends with
+ *   `stopping`, at the latest after 30 s.
  * - `starting`: `stop_pending`, no restart any more. On `ready` it goes on as in `ready` without
- *   reporting `ready`; every end of the process reports `stopped`, exit code 11 `already_running`.
+ *   reporting `ready`; only after `error` it reports `ready` and starts the availability check.
+ *   Every end of the process reports `stopped`, exit code 11 `already_running`.
  *   A crash and the start limit write `stop_crash`; exit code 10 writes nothing (no
  *   `start_aborted`), the server has logged its cause.
  * - `crash_grace` (no server runs): the wait ends, no restart, no `crash`, `stopped`.
@@ -156,6 +161,10 @@ export async function runSupervisor({
   };
 
   let state: SupervisorState = 'starting';
+  /** The availability check of the current server run, while it is `ready`. */
+  let probe: HealthProbe | undefined;
+  /** The server run whose `ready` has gone out; a stop that failed does not report it again. */
+  let readyStartId: string | undefined;
   /** Ends the wait of the current `crash_grace` or `stopping`. */
   let waitAbort = new AbortController();
   /** Resolves with false after `ms`, with true as soon as the wait is aborted. */
@@ -176,11 +185,10 @@ export async function runSupervisor({
     const fail = (refNo: string) => {
       if (state !== 'stopping' || waitAbort !== abort) return;
       abort.abort();
-      state = 'ready';
       report({ event: 'phase', phase: 'error', refNo });
-      // Those clients have their answer; a client that subscribes now sees the running server.
+      // Those clients have their answer; from now on the server runs on in `ready`.
       stopClients.length = 0;
-      current = { event: 'phase', phase: 'ready', startId };
+      enterReady(startId);
     };
     void waitUnlessAborted(STOP_TIMEOUT_MS, abort.signal).then((aborted) => {
       if (aborted) return;
@@ -190,7 +198,7 @@ export async function runSupervisor({
     });
     // Only a 500 with a valid reference number fails at once; 200, 503, every other answer and
     // none at all wait for the end of the process or the 30 s (Nachtrag MAR-764).
-    void shutdownServer?.().then(
+    void shutdownServer?.(abort.signal).then(
       (response) => {
         if (response?.status === 500 && response.refNo !== null) fail(response.refNo);
       },
@@ -228,11 +236,25 @@ export async function runSupervisor({
     summarize();
   };
 
+  /**
+   * `ready`: reports it and starts the availability check, once per server run. After a failed
+   * stop from `stop_pending` this is the first `ready` of the run, so waiting clients get it.
+   */
+  function enterReady(startId: string) {
+    state = 'ready';
+    if (readyStartId === startId) {
+      current = { event: 'phase', phase: 'ready', startId };
+      return;
+    }
+    readyStartId = startId;
+    report({ event: 'phase', phase: 'ready', startId });
+    probe = startHealthProbe?.(onProbe);
+  }
+
   for (;;) {
     const startId = createStartId();
     state = 'starting';
     report({ event: 'phase', phase: 'starting', startId });
-    let probe: HealthProbe | undefined;
     const server = startServer({
       startId,
       onReady: () => {
@@ -240,14 +262,13 @@ export async function runSupervisor({
           enterStopping(startId);
           return;
         }
-        state = 'ready';
-        report({ event: 'phase', phase: 'ready', startId });
-        probe = startHealthProbe?.(onProbe);
+        enterReady(startId);
       },
     });
 
     const end = await server.ended;
     probe?.stop();
+    probe = undefined;
     // `stop` and `onReady` have changed the state while the server ran.
     const endState = state as SupervisorState;
     if (endState === 'stopping' || endState === 'stop_pending') {

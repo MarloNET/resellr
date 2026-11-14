@@ -223,7 +223,7 @@ async function supervise({
       startHealthProbe: (onProbe) =>
         startHealthProbe({ healthClient, logDir: paths.logDir, onProbe }),
       summarizeAvailability: () => summarizeMissingDays({ logDir: paths.logDir, bootTime }),
-      shutdownServer: () => healthClient.shutdown(),
+      shutdownServer: (signal) => healthClient.shutdown(signal),
     });
   } finally {
     tryToLog(() => launcherLog.supervisorEnded({ startId: lastStartId }));

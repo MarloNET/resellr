@@ -1,4 +1,5 @@
 import { type ChildProcess, execFile } from 'node:child_process';
+import { once } from 'node:events';
 import {
   existsSync,
   mkdirSync,
@@ -9,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { type AddressInfo, connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -698,6 +699,11 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
         });
         expect(lines('starts.jsonl')).toHaveLength(1);
         expect(await Promise.race([supervisor.exit, Promise.resolve('running')])).toBe('running');
+        // The number is the server's (2.17 step 8): the supervisor writes no entry of its own.
+        expect(operationsLog(logDir).map(({ event }) => event)).not.toContain('shutdown_failed');
+        expect(errorsLog().map((entry) => entry.function)).not.toContain(
+          'launcher.shutdown_timeout',
+        );
       },
       MULTI_PROCESS_TIMEOUT_MS,
     );
@@ -768,6 +774,10 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
     'DER-104-05 stop --for-update in the wait after a crash ends the wait without a restart and with exit code 0',
     async () => {
       const supervisor = await startSupervisorUntilStarts({ FAKE_SERVER_RUNS: 'exit-1,ready' });
+      // In the wait after the crash the supervisor reports starting without a startId.
+      await expect
+        .poll(() => currentPhase(supervisorPipePath(root)), { timeout: 10_000 })
+        .toEqual({ event: 'phase', phase: 'starting' });
 
       await expect(runLauncher(['stop', '--for-update'])).resolves.toBe(0);
 
@@ -808,12 +818,13 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
       MULTI_PROCESS_TIMEOUT_MS,
     );
 
-    it.each([
-      ['a crash', 'exit-1'],
-      ['an abort', 'aborted'],
+    it.each<[string, string, Record<string, unknown>[]]>([
+      ['a crash', 'exit-1', [{ event: 'stop_crash', exitCode: 1, signal: null }]],
+      // The cause of the abort stands in the entry of the server (Nachtrag MAR-764).
+      ['an abort', 'aborted', []],
     ])(
       'DER-104-06 reports stopped without a restart when the start ends by %s',
-      async (_, run) => {
+      async (_, run, stopCrashes) => {
         const supervisor = await startSupervisorUntilStarts({
           ...SLOW_START,
           FAKE_SERVER_RUNS: `${run},ready`,
@@ -825,6 +836,12 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
         await new Promise((resolve) => setTimeout(resolve, CRASH_GRACE_MS + 1000));
         expect(lines('starts.jsonl')).toHaveLength(1);
         expect(lines('shutdowns.jsonl')).toEqual([]);
+        const log = operationsLog(logDir);
+        expect(log.map(({ event }) => event)).not.toContain('start_aborted');
+        expect(log.map(({ event }) => event)).not.toContain('crash');
+        const written = log.filter(({ event }) => event === 'stop_crash');
+        expect(written).toEqual(stopCrashes.map((entry) => expect.objectContaining(entry)));
+        for (const { refNo } of written) expect(refNo).toMatch(REFERENCE_NUMBER_PATTERN);
       },
       CRASH_GRACE_MS + 30_000,
     );
@@ -896,6 +913,24 @@ describe('launcher stop (CU-260, Technical Specification 2.18 command stop)', ()
 });
 
 /** All entries of the operations log in `logDir`, oldest first. */
+/** The phase a supervisor reports at once after `subscribe`, without waiting for a final one. */
+async function currentPhase(path: string): Promise<unknown> {
+  const socket = connect(path);
+  try {
+    await once(socket, 'connect');
+    socket.setEncoding('utf8');
+    socket.write('{"cmd":"subscribe"}\n');
+    let buffer = '';
+    while (!buffer.includes('\n')) {
+      const [chunk] = (await once(socket, 'data')) as [string];
+      buffer += chunk;
+    }
+    return JSON.parse(buffer.slice(0, buffer.indexOf('\n'))) as unknown;
+  } finally {
+    socket.destroy();
+  }
+}
+
 function operationsLog(logDir: string): Record<string, unknown>[] {
   return existsSync(logDir)
     ? readdirSync(logDir)
