@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { INITIAL_DEVICE_TYPES } from '@resellr/seed-data/initial-settings';
 import {
+  DEMO_DATASHEET_BLOCK_ORDER,
   DEMO_DEVICE_TYPES,
   DEMO_MANUFACTURERS,
   DEMO_MERCHANT_PROFILE,
@@ -99,7 +100,7 @@ describe('startDemo (CU-004)', () => {
       );
       // The initial settings of the seed migration CU-071 and the demo data written through the
       // API on top of them (CU-061): the device types, suppliers, manufacturers, the merchant
-      // profile and the text blocks of S2 with their audit entries.
+      // profile, the text blocks and the datasheet layout of S2 with their audit entries.
       expect(filled.sort()).toEqual([
         'attribute',
         'attribute_mapping',
@@ -142,6 +143,9 @@ describe('startDemo (CU-004)', () => {
           active: active ? 1 : 0,
         })),
       );
+      expect(db.prepare('SELECT block_order FROM datasheet_layout').pluck().all()).toEqual([
+        JSON.stringify(DEMO_DATASHEET_BLOCK_ORDER),
+      ]);
     } finally {
       db.close();
     }

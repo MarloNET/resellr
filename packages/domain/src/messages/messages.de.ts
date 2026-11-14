@@ -91,6 +91,8 @@ export const FIELD_MESSAGES = {
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
+  /** UI-039 "Kopfzeilentext", longer than 50 characters (2.2). */
+  headerLabel: 'Kopfzeilentext: höchstens 50 Zeichen',
   /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
   manufacturerName: 'Name: 1 bis 50 Zeichen',
   /**

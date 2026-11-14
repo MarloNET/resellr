@@ -171,6 +171,34 @@ export const seedTextBlocks: SeedArea = async (api) => {
 };
 
 /**
+ * Datasheet layout (S2, UI-039): the demo moves the block "Anschlüsse" before "Technik"
+ * (example of AC-REQ-051-01) and keeps the header labels and attribute orders of the initial
+ * settings. The layout is a single row, saved on top of the state read.
+ */
+export const DEMO_DATASHEET_BLOCK_ORDER = [
+  'identification',
+  'condition',
+  'delivery_scope',
+  'ports',
+  'technical',
+  'software',
+] as const;
+
+export const seedDatasheetLayout: SeedArea = async (api) => {
+  const { version, headerLabels, attributeOrder } = await api.request<{
+    version: number;
+    headerLabels: string[];
+    attributeOrder: Record<string, number[]>;
+  }>('GET', '/api/datasheet-layout');
+  await api.request('PUT', '/api/datasheet-layout', {
+    version,
+    headerLabels,
+    blockOrder: DEMO_DATASHEET_BLOCK_ORDER,
+    attributeOrder,
+  });
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
@@ -181,6 +209,7 @@ export const SEED_AREAS: readonly SeedArea[] = [
   seedManufacturers,
   seedMerchantProfile,
   seedTextBlocks,
+  seedDatasheetLayout,
 ];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */
