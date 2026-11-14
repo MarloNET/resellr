@@ -6,14 +6,17 @@ import { cn } from './cn.ts';
  * Table (CU-058, Technical Specification 2.0.10, R-1 (2)): scrolls horizontally in its own
  * container so the page never does; the first column stays fixed. Rows 36 px, column heads
  * in text-secondary, row hover bg, tabular figures (DESIGN.md "Tabellen", "Typografie").
+ * The first column stays fixed only while the container is at least 24rem wide: in a narrower
+ * one, e.g. beside an open side panel at 1366 px (UI-027, #372), it would cover every other
+ * column at each scroll position, so there it scrolls with them.
  */
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
-    <div data-table-scroll="" className="w-full min-w-0 overflow-x-auto">
+    <div data-table-scroll="" className="@container w-full min-w-0 overflow-x-auto">
       <table
         className={cn(
           'w-full border-collapse bg-surface text-body tabular-nums',
-          '[&_tr>*:first-child]:sticky [&_tr>*:first-child]:left-0 [&_tr>*:first-child]:bg-inherit',
+          '@sm:[&_tr>*:first-child]:sticky @sm:[&_tr>*:first-child]:left-0 [&_tr>*:first-child]:bg-inherit',
           className,
         )}
         {...props}

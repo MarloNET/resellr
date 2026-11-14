@@ -680,13 +680,14 @@ function AttributeTable({
                   />
                 </TableCell>
                 <TableCell className="min-w-32 [overflow-wrap:break-word]">
-                  {/* Scrolled into view, the label stays beside the fixed first column (2.0.10). */}
+                  {/* Scrolled into view, the label stays beside the fixed first column (2.0.10),
+                      which is fixed only in a wide enough table (`Table`). */}
                   <button
                     type="button"
                     disabled={locked}
                     onClick={() => onOpen(attribute)}
                     className={cn(
-                      'scroll-ml-44 cursor-pointer text-left font-semibold disabled:cursor-not-allowed',
+                      'cursor-pointer @sm:scroll-ml-44 text-left font-semibold disabled:cursor-not-allowed',
                       // Muted in addition to the status text, never by colour alone.
                       attribute.active ? 'text-primary' : 'text-text-secondary',
                     )}

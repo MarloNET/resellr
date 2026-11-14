@@ -258,7 +258,7 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('Table scrolls horizontally in its own container with a fixed first column', () => {
+  it('Table scrolls horizontally in its own container with a first column fixed only in a wide enough container', () => {
     render(
       <Table>
         <TableHeader>
@@ -279,8 +279,11 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     const table = screen.getByRole('table');
     expect(table.parentElement?.className).toContain('overflow-x-auto');
     expect(table.parentElement?.className).toContain('min-w-0');
-    expect(table.className).toContain('[&_tr>*:first-child]:sticky');
-    expect(table.className).toContain('[&_tr>*:first-child]:left-0');
+    // Bug #372: a fixed column wider than a narrow container would cover all other columns.
+    expect(table.parentElement?.className).toContain('@container');
+    expect(table.className).toContain('@sm:[&_tr>*:first-child]:sticky');
+    expect(table.className).toContain('@sm:[&_tr>*:first-child]:left-0');
+    expect(table.className).not.toMatch(/(^|\s)\[&_tr>\*:first-child\]:sticky/);
     expect(table.className).toContain('tabular-nums');
   });
 

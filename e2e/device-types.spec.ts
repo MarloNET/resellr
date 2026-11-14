@@ -470,6 +470,81 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
     expect(stored).toMatchObject({ id: ram.id, active: true, variantForming: true });
   });
 
+  // Bug #372: at 1366 px the open panel left the table a scroll area narrower than its fixed
+  // first column, which covered the row actions and labels at every scroll position.
+  for (const { width, height, panel } of [
+    { width: 1366, height: 768, panel: true },
+    { width: 1920, height: 1080, panel: true },
+    { width: 1366, height: 768, panel: false },
+  ]) {
+    test(`UI-027.default row actions and labels are operable by mouse with a visible focus at ${width} x ${height} ${panel ? 'with' : 'without'} the open panel`, async ({
+      page,
+      server,
+    }, testInfo) => {
+      // The test sets its own viewports, so one row of the matrix suffices.
+      test.skip(testInfo.project.name !== 'FM-1', 'own viewports');
+      await page.setViewportSize({ width, height });
+      const name = uniqueName('Notebook', `${testInfo.title}`, testInfo.project.name);
+      const deviceType = await createDeviceType(page, server.baseUrl, name);
+      const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+        label: 'RAM',
+        dataType: 'integer',
+        unit: 'GB',
+        required: true,
+      });
+      await createAttribute(page, server.baseUrl, deviceType.id, { label: 'SSD' });
+      await openDeviceType(page, name);
+      const ramRow = attributeRow(page, 'RAM');
+      const panelLabel = page.getByRole('textbox', { name: /^Bezeichnung/ });
+      if (panel) {
+        await ramRow.getByRole('button', { name: 'RAM', exact: true }).click();
+        await expect(panelLabel).toHaveValue('RAM');
+      }
+      // Scrolled into view, the center of every button of the table receives the mouse.
+      const hitAtCenter = (button: Element) => {
+        const rect = button.getBoundingClientRect();
+        return button.contains(
+          document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
+        );
+      };
+      for (const button of await attributes(page).locator('table button:enabled').all()) {
+        await button.scrollIntoViewIfNeeded();
+        expect(await button.evaluate(hitAtCenter), await button.innerText()).toBe(true);
+      }
+      await attributes(page)
+        .locator('[data-table-scroll]')
+        .evaluate((area) => {
+          area.scrollLeft = 0;
+        });
+
+      // Focus on the action without scrolling by hand: the focused button is not covered.
+      const deactivate = ramRow.getByRole('button', { name: 'Deaktivieren' });
+      await deactivate.focus();
+      expect(await deactivate.evaluate(hitAtCenter)).toBe(true);
+
+      // Mouse clicks (Playwright waits until the point receives the click).
+      const deactivated = page.waitForResponse(
+        (answer) =>
+          answer.request().method() === 'PATCH' &&
+          answer.url().endsWith(`/api/attributes/${ram.id}`),
+      );
+      await deactivate.click();
+      expect((await deactivated).status()).toBe(200);
+      await expect(ramRow.getByText('deaktiviert')).toBeVisible();
+      const activated = page.waitForResponse(
+        (answer) =>
+          answer.request().method() === 'PATCH' &&
+          answer.url().endsWith(`/api/attributes/${ram.id}`),
+      );
+      await ramRow.getByRole('button', { name: 'Wieder aktivieren' }).click();
+      expect((await activated).status()).toBe(200);
+      await expect(ramRow.getByText('aktiv', { exact: true })).toBeVisible();
+
+      await attributeRow(page, 'SSD').getByRole('button', { name: 'SSD', exact: true }).click();
+      await expect(panelLabel).toHaveValue('SSD');
+    });
+  }
+
   test('AC-REQ-006-02 UI-027.default an attribute of the initial device type Notebook is renamed and keeps its new name after reloading', async ({
     page,
     server,
