@@ -11,7 +11,7 @@ import { runMigrations } from '../db/migrator.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import type { DB } from '../db/schema.ts';
 import { createUnitOfWork, emptyChangeReport, type EventHandlers } from '../db/unit-of-work.ts';
-import { createFileStore, createMediaFileIntake } from '../media/index.ts';
+import { createMediaFileIntake } from '../media/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import type { SettingsChanged } from '../shared/events.ts';
 import { createMerchantProfileService } from './merchant-profile-service.ts';
@@ -37,8 +37,7 @@ afterEach(async () => {
 
 function serviceWith(handlers: EventHandlers<DB> = {}) {
   const uow = createUnitOfWork(database.db, handlers);
-  const fileStore = createFileStore({ mediaDir: join(dir, 'media') });
-  const mediaFiles = createMediaFileIntake({ fileStore, clock });
+  const mediaFiles = createMediaFileIntake({ mediaDir: join(dir, 'media'), clock });
   return createMerchantProfileService({ db: database.db, uow, clock, mediaFiles });
 }
 

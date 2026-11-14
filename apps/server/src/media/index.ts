@@ -1,6 +1,5 @@
 // Public interface of `media` (Technical Specification 4.1, exception (1)): its route
-// registration, the media store and the file intake (CU-090) for the logo of `settings`.
-export { createFileStore, type FileStore } from './file-store.ts';
+// registration and the file intake (CU-090) for the logo of `settings`.
 export {
   createMediaFileIntake,
   type MediaFileIntake,

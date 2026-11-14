@@ -6,12 +6,13 @@ import { z } from 'zod';
 
 import type { DB } from '../db/schema.ts';
 import { NotFoundError } from '../shared/domain-error.ts';
-import type { FileStore } from './file-store.ts';
+import { createFileStore } from './file-store.ts';
 import { createMediaReader } from './media-reader.ts';
 
 export interface MediaRoutesOptions {
   db: Kysely<DB>;
-  fileStore: FileStore;
+  /** `<Datenordner>/media` (2.19); the media store (CU-088) stays inside `media` (4.1). */
+  mediaDir: string;
 }
 
 /** A content hash: SHA-256 as 64 lower-case hex characters (2.0.1). */
@@ -31,9 +32,9 @@ const hashParams = z.strictObject({ hash: z.string() });
  */
 export const mediaRoutes: FastifyPluginAsyncZod<MediaRoutesOptions> = async (
   app,
-  { db, fileStore },
+  { db, mediaDir },
 ) => {
-  const reader = createMediaReader({ db, fileStore });
+  const reader = createMediaReader({ db, fileStore: createFileStore({ mediaDir }) });
 
   app.get('/media/logo/:hash', { schema: { params: hashParams } }, async (request, reply) => {
     const { hash } = request.params;

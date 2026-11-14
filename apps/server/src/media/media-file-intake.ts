@@ -8,7 +8,7 @@ import type { Kysely } from 'kysely';
 import type { DB } from '../db/schema.ts';
 import type { Clock } from '../shared/clock.ts';
 import { RuleViolation } from '../shared/domain-error.ts';
-import { type FileStore, type MediaKind, withHashLock } from './file-store.ts';
+import { createFileStore, type MediaKind, withHashLock } from './file-store.ts';
 import { type ImageInfo, inspectImage } from './image-inspector.ts';
 import { createMediaFileRepository } from './media-file-repository.ts';
 
@@ -65,15 +65,12 @@ function hashingLimit(maxBytes: number) {
  * uploaded file to `media/.incoming` with its size limit, hashes it, checks it (CU-089), places it
  * under the lock of its hash (CU-088) and lets the caller register it in its own transaction.
  * The lock is held until that transaction has ended, so the housekeeping never deletes a file
- * that an upload is just referencing. A rejected file leaves nothing behind.
+ * that an upload is just referencing. A rejected file leaves nothing behind. The media store
+ * (CU-088) stays inside `media` (4.1); callers pass only the media folder.
  */
-export function createMediaFileIntake({
-  fileStore,
-  clock,
-}: {
-  fileStore: FileStore;
-  clock: Clock;
-}) {
+export function createMediaFileIntake({ mediaDir, clock }: { mediaDir: string; clock: Clock }) {
+  const fileStore = createFileStore({ mediaDir });
+
   async function receive(source: Readable, { maxBytes, usage }: IntakeOptions) {
     const path = await fileStore.createIncomingPath();
     const limit = hashingLimit(maxBytes);
