@@ -1,3 +1,4 @@
+import type { TextBlock } from '@resellr/domain/schemas/text-block.schema';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -8,28 +9,37 @@ import { routes } from '../../../app/router.tsx';
 
 // Component tests of UI-030 with a mocked `fetch` (Technical Specification 6.1, 6.2).
 
-const ABHOLUNG = {
+const NO_LEGAL_STATUS = { legalStatus: null, legalCheckedOn: null, legalCheckedBy: null };
+
+const ABHOLUNG: TextBlock = {
   id: 1,
   name: 'Abholung Hannover',
   kind: 'pickup_contact',
   body: 'Abholung nach Absprache.',
   active: true,
+  ...NO_LEGAL_STATUS,
   version: 3,
 };
-const AKKU = {
+const AKKU: TextBlock = {
   id: 2,
   name: 'Akku-Hinweis Notebook',
   kind: 'battery_notice',
   body: 'Die Akkukapazität beträgt {Akkukapazität}.',
   active: true,
+  legalStatus: 'unchecked',
+  legalCheckedOn: null,
+  legalCheckedBy: null,
   version: 1,
 };
-const ALT = {
+const ALT: TextBlock = {
   id: 3,
   name: 'Widerruf alt',
   kind: 'legal',
   body: 'Alter Rechtsblock.',
   active: false,
+  legalStatus: 'checked',
+  legalCheckedOn: '2026-11-05',
+  legalCheckedBy: 'Kanzlei Muster',
   version: 2,
 };
 
@@ -46,7 +56,7 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
-type TextBlockItem = typeof ABHOLUNG;
+type TextBlockItem = TextBlock;
 
 /**
  * `fetch` of the page: `GET /api/ops/status` for the frame (UI-044), the text blocks and one
@@ -154,6 +164,307 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('UI-030 legal check status (CU-101, REQ-054)', () => {
+  const LEGAL_REQUIRED = 'Prüfdatum und prüfende Stelle erforderlich';
+  const CHECKED_BY_TOO_LONG = 'Prüfende Stelle: höchstens 100 Zeichen';
+  const PATCH_AKKU = 'PATCH /api/text-blocks/2';
+
+  const legalStatusSelect = () =>
+    within(detailForm()).queryByRole<HTMLSelectElement>('combobox', { name: /^Prüfstatus/ });
+  const checkedOnInput = () => within(detailForm()).getByLabelText<HTMLInputElement>(/^Prüfdatum/);
+  const checkedByInput = () =>
+    within(detailForm()).getByRole<HTMLInputElement>('textbox', { name: /^Prüfende Stelle/ });
+
+  /** Every error a marked control names through `aria-describedby` exists and has a text. */
+  function expectLinkedErrors(input: HTMLElement) {
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    const ids = input.getAttribute('aria-describedby')?.split(' ') ?? [];
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) expect(document.getElementById(id)?.textContent).toBeTruthy();
+  }
+
+  /** Opens "Akku-Hinweis Notebook" and sets "rechtlich geprüft" with the given fields. */
+  async function checkAkku(legalCheckedOn: string, legalCheckedBy: string) {
+    await openPage();
+    fireEvent.click(row('Akku-Hinweis Notebook'));
+    fireEvent.change(legalStatusSelect() as HTMLSelectElement, { target: { value: 'checked' } });
+    fireEvent.change(checkedOnInput(), { target: { value: legalCheckedOn } });
+    fireEvent.change(checkedByInput(), { target: { value: legalCheckedBy } });
+    fireEvent.click(saveButton());
+  }
+
+  it('UI-030.default DER-40-04 shows the check status chip of the kinds Rechtliches and Akku-Hinweis in the list', async () => {
+    mockApi();
+    await openPage();
+
+    expect(within(row('Akku-Hinweis Notebook')).getByText('rechtlich ungeprüft')).toBeTruthy();
+    expect(
+      within(row('Widerruf alt')).getByText('rechtlich geprüft am 05.11.2026 durch Kanzlei Muster'),
+    ).toBeTruthy();
+    expect(row('Abholung Hannover').textContent).not.toContain('rechtlich');
+    expectAccessiblePage();
+  });
+
+  it('UI-030.default DER-40-05 offers no check fields for the kinds Lieferumfang, Abholung/Kontakt and Sonstiges', async () => {
+    mockApi();
+    await openPage();
+
+    for (const kind of ['pickup_contact', 'delivery_scope', 'other']) {
+      fireEvent.change(kindSelect(), { target: { value: kind } });
+      expect(legalStatusSelect()).toBeNull();
+      expect(within(detailForm()).queryByLabelText(/^Prüfdatum/)).toBeNull();
+      expect(within(detailForm()).queryByLabelText(/^Prüfende Stelle/)).toBeNull();
+    }
+    fireEvent.change(kindSelect(), { target: { value: 'legal' } });
+    expect(legalStatusSelect()?.value).toBe('unchecked');
+  });
+
+  it('UI-030.default shows the check status of a text block of the kind Akku-Hinweis and the check fields only at "rechtlich geprüft"', async () => {
+    mockApi();
+    await openPage();
+
+    fireEvent.click(row('Akku-Hinweis Notebook'));
+    expect(legalStatusSelect()?.value).toBe('unchecked');
+    expect(within(detailForm()).queryByLabelText(/^Prüfdatum/)).toBeNull();
+
+    fireEvent.click(row('Widerruf alt'));
+    expect(legalStatusSelect()?.value).toBe('checked');
+    expect(checkedOnInput().value).toBe('2026-11-05');
+    expect(checkedOnInput().type).toBe('date');
+    expect(checkedByInput().value).toBe('Kanzlei Muster');
+    expectAccessiblePage();
+  });
+
+  it('UI-030.default a new text block of the kind Akku-Hinweis is "rechtlich ungeprüft" and its status is not chosen', async () => {
+    mockApi();
+    await openPage();
+
+    fireEvent.click(createButton());
+    fireEvent.change(kindSelect(), { target: { value: 'battery_notice' } });
+
+    expect(legalStatusSelect()?.value).toBe('unchecked');
+    expect(legalStatusSelect()?.disabled).toBe(true);
+  });
+
+  it('UI-030.success sends the three check fields together and shows "Gespeichert"', async () => {
+    const saved = {
+      ...AKKU,
+      legalStatus: 'checked',
+      legalCheckedOn: '2020-01-15',
+      legalCheckedBy: 'Kanzlei Muster',
+      version: 2,
+    } as const;
+    const { sent } = mockApi({
+      writes: {
+        [PATCH_AKKU]: () =>
+          Response.json({ textBlock: saved, impact: NO_IMPACT, legalStatusReset: false }),
+      },
+    });
+
+    await checkAkku('2020-01-15', 'Kanzlei Muster');
+
+    expect((await screen.findByText('Gespeichert')).closest('[role="status"]')).toBeTruthy();
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/text-blocks/2',
+        body: {
+          version: 1,
+          legalStatus: 'checked',
+          legalCheckedOn: '2020-01-15',
+          legalCheckedBy: 'Kanzlei Muster',
+        },
+      },
+    ]);
+    await vi.waitFor(() =>
+      expect(row('Akku-Hinweis Notebook').textContent).toContain(
+        'rechtlich geprüft am 15.01.2020 durch Kanzlei Muster',
+      ),
+    );
+  });
+
+  it.each([
+    ['the check date', '', 'Kanzlei Muster'],
+    ['the checking body', '2020-01-15', ''],
+    ['both', '', ''],
+  ])(
+    'UI-030.validation DER-40-01 without %s shows "Prüfdatum und prüfende Stelle erforderlich" exactly once and marks both fields',
+    async (_case, legalCheckedOn, legalCheckedBy) => {
+      const { sent } = mockApi();
+
+      await checkAkku(legalCheckedOn, legalCheckedBy);
+
+      expect(await screen.findAllByText(LEGAL_REQUIRED)).toHaveLength(1);
+      expectLinkedErrors(checkedOnInput());
+      expectLinkedErrors(checkedByInput());
+      expect(screen.queryByText('Prüfende Stelle fehlt')).toBeNull();
+      expect(document.activeElement).toBe(checkedOnInput());
+      expect(sent).toEqual([]);
+      expectAccessiblePage();
+    },
+  );
+
+  it('UI-030.validation DER-40-01 shows the entries of a 422 validation_failed once below both fields', async () => {
+    const required = (path: string) => ({
+      path,
+      code: 'legal_check_required',
+      message: LEGAL_REQUIRED,
+    });
+    mockApi({
+      writes: {
+        [PATCH_AKKU]: () =>
+          Response.json(
+            errorBody('validation_failed', {
+              fields: [required('legalCheckedOn'), required('legalCheckedBy')],
+            }),
+            { status: 422 },
+          ),
+      },
+    });
+
+    await checkAkku('2020-01-15', 'Kanzlei Muster');
+
+    expect(await screen.findAllByText(LEGAL_REQUIRED)).toHaveLength(1);
+    expectLinkedErrors(checkedOnInput());
+    expectLinkedErrors(checkedByInput());
+    expect(screen.queryByText('Gespeichert')).toBeNull();
+  });
+
+  it('UI-030.validation DER-40-02 a check date in the future shows "Prüfdatum darf nicht in der Zukunft liegen" at "Prüfdatum"', async () => {
+    const { sent } = mockApi();
+
+    await checkAkku('2999-12-31', 'Kanzlei Muster');
+
+    const message = await screen.findByText('Prüfdatum darf nicht in der Zukunft liegen');
+    expect(checkedOnInput().getAttribute('aria-describedby')).toBe(message.id);
+    expect(checkedByInput().getAttribute('aria-invalid')).toBeNull();
+    expect(sent).toEqual([]);
+    expectAccessiblePage();
+  });
+
+  it('UI-030.validation DER-40-06 a checking body of 101 characters shows exactly "Prüfende Stelle: höchstens 100 Zeichen" at the field, 100 characters are saved', async () => {
+    const { sent } = mockApi({
+      writes: {
+        [PATCH_AKKU]: (init) => {
+          const body = JSON.parse(String(init?.body)) as Record<string, string>;
+          return Response.json({
+            textBlock: { ...AKKU, ...body, version: 2 },
+            impact: NO_IMPACT,
+            legalStatusReset: false,
+          });
+        },
+      },
+    });
+
+    await checkAkku('2020-01-15', 'a'.repeat(101));
+
+    const message = await screen.findByText(CHECKED_BY_TOO_LONG);
+    expect(message.textContent).toBe(CHECKED_BY_TOO_LONG);
+    expect(checkedByInput().getAttribute('aria-describedby')).toBe(message.id);
+    expect(checkedOnInput().getAttribute('aria-invalid')).toBeNull();
+    expect(screen.queryByText('Prüfende Stelle fehlt')).toBeNull();
+    expect(screen.queryByText(LEGAL_REQUIRED)).toBeNull();
+    expect(sent).toEqual([]);
+    expectAccessiblePage();
+
+    fireEvent.change(checkedByInput(), { target: { value: 'a'.repeat(100) } });
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByText('Gespeichert')).toBeTruthy();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.body).toMatchObject({ legalCheckedBy: 'a'.repeat(100) });
+  });
+
+  it('UI-030.success DER-40-06 a checking body of 101 characters entered before going back to "rechtlich ungeprüft" does not block "Speichern"', async () => {
+    const { sent } = mockApi({
+      writes: {
+        [PATCH_AKKU]: () =>
+          Response.json({ textBlock: AKKU, impact: NO_IMPACT, legalStatusReset: false }),
+      },
+    });
+    await openPage();
+    fireEvent.click(row('Akku-Hinweis Notebook'));
+    fireEvent.change(legalStatusSelect() as HTMLSelectElement, { target: { value: 'checked' } });
+    fireEvent.change(checkedOnInput(), { target: { value: '2020-01-15' } });
+    fireEvent.change(checkedByInput(), { target: { value: 'a'.repeat(101) } });
+    fireEvent.change(legalStatusSelect() as HTMLSelectElement, { target: { value: 'unchecked' } });
+
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByText('Gespeichert')).toBeTruthy();
+    expect(screen.queryByText(CHECKED_BY_TOO_LONG)).toBeNull();
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/text-blocks/2',
+        body: { version: 1, legalStatus: 'unchecked', legalCheckedOn: '', legalCheckedBy: '' },
+      },
+    ]);
+  });
+
+  it('UI-030.validation DER-40-06 shows M-31 of a 422 validation_failed at "Prüfende Stelle"', async () => {
+    mockApi({
+      writes: {
+        [PATCH_AKKU]: () =>
+          Response.json(
+            errorBody('validation_failed', {
+              fields: [{ path: 'legalCheckedBy', code: 'too_big', message: CHECKED_BY_TOO_LONG }],
+            }),
+            { status: 422 },
+          ),
+      },
+    });
+
+    await checkAkku('2020-01-15', 'Kanzlei Muster');
+
+    expect(await screen.findByText(CHECKED_BY_TOO_LONG)).toBeTruthy();
+    expectLinkedErrors(checkedByInput());
+    expect(checkedOnInput().getAttribute('aria-invalid')).toBeNull();
+  });
+
+  it('UI-030.success DER-40-03 after a change of the text of a "rechtlich geprüft" text block shows "Prüfstatus wurde auf ‚rechtlich ungeprüft‘ zurückgesetzt"', async () => {
+    const saved = {
+      ...ALT,
+      body: 'Neuer Rechtsblock.',
+      legalStatus: 'unchecked',
+      legalCheckedOn: null,
+      legalCheckedBy: null,
+      version: 3,
+    } as const;
+    const { sent } = mockApi({
+      writes: {
+        'PATCH /api/text-blocks/3': () =>
+          Response.json({ textBlock: saved, impact: NO_IMPACT, legalStatusReset: true }),
+      },
+    });
+    await openPage();
+    fireEvent.click(row('Widerruf alt'));
+
+    changeBody('Neuer Rechtsblock.');
+
+    const hint = await screen.findByText(
+      'Prüfstatus wurde auf ‚rechtlich ungeprüft‘ zurückgesetzt',
+    );
+    expect(hint.closest('[role="status"]')).toBeTruthy();
+    expect(screen.getByText('Gespeichert')).toBeTruthy();
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/text-blocks/3',
+        body: { version: 2, body: 'Neuer Rechtsblock.' },
+      },
+    ]);
+    expect(legalStatusSelect()?.value).toBe('unchecked');
+    expect(within(detailForm()).queryByLabelText(/^Prüfdatum/)).toBeNull();
+    await vi.waitFor(() =>
+      expect(within(row('Widerruf alt')).getByText('rechtlich ungeprüft')).toBeTruthy(),
+    );
+
+    fireEvent.click(row('Abholung Hannover'));
+    expect(screen.queryByText(/Prüfstatus wurde/)).toBeNull();
+  });
+});
+
 describe('UI-030 text blocks (CU-101)', () => {
   it('UI-030.default lists name, kind and status from GET /api/text-blocks and opens the first one', async () => {
     const { reads } = mockApi();
@@ -164,8 +475,8 @@ describe('UI-030 text blocks (CU-101)', () => {
     });
     expect(rows.map((item) => item.textContent)).toEqual([
       'Abholung HannoverAbholung/Kontaktaktiv',
-      'Akku-Hinweis NotebookAkku-Hinweisaktiv',
-      'Widerruf altRechtlichesdeaktiviert',
+      'Akku-Hinweis NotebookAkku-Hinweisrechtlich ungeprüftaktiv',
+      'Widerruf altRechtlichesrechtlich geprüft am 05.11.2026 durch Kanzlei Musterdeaktiviert',
     ]);
     expect(rows[0]?.getAttribute('aria-current')).toBe('true');
     expect(reads[0]).toBe('/api/text-blocks?limit=200');
@@ -231,6 +542,7 @@ describe('UI-030 text blocks (CU-101)', () => {
       kind: 'delivery_scope',
       body: 'Gerät mit Netzteil',
       active: true,
+      ...NO_LEGAL_STATUS,
       version: 1,
     };
     const { sent } = mockApi({

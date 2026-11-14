@@ -30,6 +30,8 @@ export const MESSAGES = {
   'M-24': 'Prüfdatum und prüfende Stelle erforderlich',
   /** UI-030 "Name" of a text block, empty or longer than 100 characters after trimming. */
   'M-30': 'Name: 1 bis 100 Zeichen',
+  /** UI-030 "Prüfende Stelle", longer than 100 characters after trimming; missing is M-24. */
+  'M-31': 'Prüfende Stelle: höchstens 100 Zeichen',
 } as const;
 
 /**
@@ -91,6 +93,8 @@ export const FIELD_MESSAGES = {
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
+  /** UI-030 "Prüfdatum" after today (Technical Specification 2.2, DER-40-02). */
+  legalCheckedOnFuture: 'Prüfdatum darf nicht in der Zukunft liegen',
   /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
   manufacturerName: 'Name: 1 bis 50 Zeichen',
   /**

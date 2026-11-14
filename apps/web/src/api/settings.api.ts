@@ -49,6 +49,7 @@ import type {
   TextBlockList,
   TextBlockSaveResult,
   TextBlockUpdate,
+  TextBlockUpdateResult,
 } from '@resellr/domain/schemas/text-block.schema';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
@@ -164,9 +165,9 @@ export function useCreateTextBlockMutation() {
 /** "Speichern" and "Deaktivieren" of UI-030 (`PATCH /api/text-blocks/{id}`). */
 export function useUpdateTextBlockMutation() {
   const queryClient = useQueryClient();
-  return useMutation<TextBlockSaveResult, ApiError, TextBlockUpdate & { id: number }>({
+  return useMutation<TextBlockUpdateResult, ApiError, TextBlockUpdate & { id: number }>({
     mutationFn: ({ id, ...body }) =>
-      apiClient.patch<TextBlockSaveResult>(`/api/text-blocks/${id}`, body),
+      apiClient.patch<TextBlockUpdateResult>(`/api/text-blocks/${id}`, body),
     onSuccess: ({ textBlock }) =>
       storeSaved(queryClient, queryKeys.settings.textBlocks(), textBlock),
   });

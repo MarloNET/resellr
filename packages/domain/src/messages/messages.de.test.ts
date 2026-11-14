@@ -34,12 +34,14 @@ const MESSAGE_TABLE: [string, string][] = [
   ['M-22', 'Excel-Datei: höchstens 10 MB'],
   ['M-24', 'Prüfdatum und prüfende Stelle erforderlich'],
   ['M-30', 'Name: 1 bis 100 Zeichen'],
+  ['M-31', 'Prüfende Stelle: höchstens 100 Zeichen'],
 ];
 
 const EXPECTED_KEYS = [
   ...Array.from({ length: 22 }, (_, i) => `M-${String(i + 1).padStart(2, '0')}`),
   'M-24',
   'M-30',
+  'M-31',
 ];
 
 describe('message catalog (E1)', () => {
@@ -53,7 +55,7 @@ describe('message catalog (E1)', () => {
     );
   });
 
-  it('has exactly the keys M-01 to M-22, M-24 and M-30', () => {
+  it('has exactly the keys M-01 to M-22, M-24, M-30 and M-31', () => {
     expect(Object.keys(MESSAGES)).toEqual(EXPECTED_KEYS);
   });
 
@@ -105,6 +107,10 @@ describe('message catalog (E1)', () => {
 
   it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
     expect(FIELD_MESSAGES.manufacturerName).toBe('Name: 1 bis 50 Zeichen');
+  });
+
+  it('DER-40-02 has the field text of a check date in the future (UI-030, 2.2)', () => {
+    expect(FIELD_MESSAGES.legalCheckedOnFuture).toBe('Prüfdatum darf nicht in der Zukunft liegen');
   });
 
   it('has the text of name_taken for attributes (2.0.6, UI-027)', () => {
