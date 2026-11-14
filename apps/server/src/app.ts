@@ -1,3 +1,6 @@
+import { join } from 'node:path';
+
+import fastifyMultipart from '@fastify/multipart';
 import Fastify from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
@@ -5,6 +8,7 @@ import type { Database } from './db/database.ts';
 import type { DB } from './db/schema.ts';
 import { createUnitOfWork } from './db/unit-of-work.ts';
 import { createFrameworkErrorHandler, type HttpCoreDeps, registerHttpCore } from './http/index.ts';
+import { createMediaFileIntake, mediaRoutes } from './media/index.ts';
 import {
   createShutdownService,
   type OperationsLog,
@@ -55,8 +59,15 @@ export function buildApp(deps: AppDeps) {
     exit: deps.exit,
   });
 
+  // Media folder in the data folder (2.19); the file intake serves the logo (2.2).
+  const mediaDir = join(deps.ops.dataDirPath, 'media');
+  const mediaFiles = createMediaFileIntake({ mediaDir, clock: deps.clock });
+
+  // Uploads as `multipart/form-data` (2.0.1); each upload route sets its own size limit.
+  app.register(fastifyMultipart);
   app.register(opsRoutes, { ...deps.ops, lifecycle: deps.lifecycle, shutdownService });
-  app.register(settingsRoutes, { db: deps.database.db, uow, clock: deps.clock });
+  app.register(settingsRoutes, { db: deps.database.db, uow, clock: deps.clock, mediaFiles });
+  app.register(mediaRoutes, { db: deps.database.db, mediaDir });
 
   return { app, writeGate, uow };
 }

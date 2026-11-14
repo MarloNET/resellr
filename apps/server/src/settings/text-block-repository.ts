@@ -4,11 +4,19 @@ import type { DB, TextBlockTable } from '../db/schema.ts';
 
 export type TextBlockRow = Selectable<TextBlockTable>;
 
+/** Legal check status as stored (3.1): all `null` for the kinds without one. */
+export interface TextBlockLegalColumns {
+  legalStatus: string | null;
+  legalCheckedOn: string | null;
+  legalCheckedBy: string | null;
+}
+
 export interface TextBlockInsert {
   name: string;
   nameKey: string;
   kind: string;
   body: string;
+  legalStatus: string | null;
   at: string;
 }
 
@@ -18,6 +26,7 @@ export interface TextBlockChange {
   kind?: string;
   body?: string;
   active?: boolean;
+  legal?: TextBlockLegalColumns;
   version: number;
   at: string;
 }
@@ -60,10 +69,10 @@ export function createTextBlockRepository(db: Kysely<DB>) {
     },
 
     /**
-     * Inserts an active text block for all device types and all channels; returns its id. The
-     * choice of a scope follows with #163, the legal check status with #164.
+     * Inserts an active text block for all device types and all channels, without check date
+     * and checking body; returns its id. The choice of a scope follows with #163.
      */
-    async insert({ name, nameKey, kind, body, at }: TextBlockInsert): Promise<number> {
+    async insert({ name, nameKey, kind, body, legalStatus, at }: TextBlockInsert): Promise<number> {
       const { id } = await db
         .insertInto('text_block')
         .values({
@@ -74,7 +83,7 @@ export function createTextBlockRepository(db: Kysely<DB>) {
           active: 1,
           all_device_types: 1,
           all_channels: 1,
-          legal_status: null,
+          legal_status: legalStatus,
           legal_checked_on: null,
           legal_checked_by: null,
           version: 1,
@@ -87,7 +96,10 @@ export function createTextBlockRepository(db: Kysely<DB>) {
     },
 
     /** Stores the changed fields with the new version. */
-    async update(id: number, { name, nameKey, kind, body, active, version, at }: TextBlockChange) {
+    async update(
+      id: number,
+      { name, nameKey, kind, body, active, legal, version, at }: TextBlockChange,
+    ) {
       await db
         .updateTable('text_block')
         .set({
@@ -96,6 +108,11 @@ export function createTextBlockRepository(db: Kysely<DB>) {
           ...(kind !== undefined && { kind }),
           ...(body !== undefined && { body }),
           ...(active !== undefined && { active: active ? 1 : 0 }),
+          ...(legal !== undefined && {
+            legal_status: legal.legalStatus,
+            legal_checked_on: legal.legalCheckedOn,
+            legal_checked_by: legal.legalCheckedBy,
+          }),
           version,
           updated_at: at,
         })

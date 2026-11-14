@@ -10,7 +10,7 @@ import { collectLicenses } from './collect-licenses.mjs';
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
 
 // The real dependency tree of today's build passes the license check (FIND-222, Nachtrag
-// MAR-687, MAR-693, MAR-720): server and launcher from the esbuild metafile of CU-276 and its
+// MAR-687, MAR-693, MAR-720, MAR-758): server and launcher from the esbuild metafile of CU-276 and its
 // closure over dependencies, the native packages in app/node_modules and the packages Vite
 // bundles into web-ui.
 describe('collectLicenses on the real bundle', { timeout: 60_000 }, () => {
@@ -73,7 +73,30 @@ describe('collectLicenses on the real bundle', { timeout: 60_000 }, () => {
     }
   });
 
-  it('has no libvips section while sharp is not shipped (Nachtrag MAR-687)', () => {
-    expect(notices).not.toContain('libvips');
+  it('has the libvips section of sharp and the texts of LGPL-3.0 and GPL-3.0 (Nachtrag MAR-687, MAR-758)', () => {
+    expect(notices).toMatch(/^libvips aus @img\/sharp-(win32-x64|libvips-[^@\n]+)@\d/m);
+    expect(notices).toContain('GNU LESSER GENERAL PUBLIC LICENSE');
+    expect(notices).toContain('GNU GENERAL PUBLIC LICENSE');
+  });
+
+  it('refers a libvips package without license file to the appended texts (Nachtrag MAR-758)', () => {
+    const libvipsPackages = [...notices.matchAll(/^(@img\/sharp-libvips-[^@\n]+@[^\n]+)$/gm)].map(
+      (match) => match[1],
+    );
+    for (const pkg of libvipsPackages) {
+      expect(notices).toContain(
+        `${pkg}\nLizenz: LGPL-3.0-or-later\n${'='.repeat(80)}\n\nLizenztext nicht im Paket enthalten. Es gelten LGPL-3.0 und GPL-3.0, Texte am Ende dieser Datei; Bibliotheken und Quellcode im Abschnitt „libvips aus ${pkg}“.`,
+      );
+    }
+  });
+
+  it('lists the libraries built into libvips with license, source and text (Nachtrag MAR-711, MAR-719)', () => {
+    expect(notices).toContain(
+      '--- uhdr 2.0.2\nLizenz: MIT AND Apache-2.0\nQuelle: https://github.com/google/libultrahdr/tree/v2.0.2',
+    );
+    expect(notices).toContain('This product includes Gain Map technology under license by Adobe.');
+    expect(notices).toContain('--- cairo 1.18.6\nLizenz: LGPL-2.1-only OR MPL-1.1');
+    expect(notices).toContain('--- glib 2.90.0\nLizenz: LGPL-3.0-or-later');
+    expect(notices).not.toMatch(/^--- spng /m);
   });
 });

@@ -30,6 +30,8 @@ export const MESSAGES = {
   'M-24': 'Prüfdatum und prüfende Stelle erforderlich',
   /** UI-030 "Name" of a text block, empty or longer than 100 characters after trimming. */
   'M-30': 'Name: 1 bis 100 Zeichen',
+  /** UI-030 "Prüfende Stelle", longer than 100 characters after trimming; missing is M-24. */
+  'M-31': 'Prüfende Stelle: höchstens 100 Zeichen',
 } as const;
 
 /**
@@ -93,6 +95,8 @@ export const FIELD_MESSAGES = {
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
   /** UI-039 "Kopfzeilentext", longer than 50 characters (2.2). */
   headerLabel: 'Kopfzeilentext: höchstens 50 Zeichen',
+  /** UI-030 "Prüfdatum" after today (Technical Specification 2.2, DER-40-02). */
+  legalCheckedOnFuture: 'Prüfdatum darf nicht in der Zukunft liegen',
   /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
   manufacturerName: 'Name: 1 bis 50 Zeichen',
   /**
@@ -113,6 +117,9 @@ export const FIELD_MESSAGES = {
 
 type MessageText = string | ((...args: string[]) => string);
 
+/** UI-026 "Logo": one text for a too large file and a wrong type (AC-REQ-028-02). */
+const LOGO_FILE_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
+
 /**
  * Rejection texts by `<code>.<usage>` (Technical Specification 2.0.5, FIND-209): the service
  * sets the usage, `error-mapper` picks the text. `default` is the usage of a code with one
@@ -123,6 +130,7 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  'file_too_large.logo': LOGO_FILE_RULE,
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.condition_code': 'Diesen Code gibt es für diesen Lieferanten bereits',
@@ -135,6 +143,7 @@ export const ERROR_MESSAGES = {
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
+  'unsupported_media_type.logo': LOGO_FILE_RULE,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
 /**

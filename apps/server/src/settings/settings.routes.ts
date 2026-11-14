@@ -53,6 +53,7 @@ import {
   textBlockCreateSchema,
   textBlockListSchema,
   textBlockSaveResultSchema,
+  textBlockUpdateResultSchema,
   textBlockUpdateSchema,
 } from '@resellr/domain/schemas/text-block.schema';
 import type { Kysely } from 'kysely';
@@ -61,12 +62,14 @@ import { z } from 'zod';
 
 import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
+import type { MediaFileIntake } from '../media/index.ts';
 import type { Clock } from '../shared/clock.ts';
+import { BadRequestError } from '../shared/domain-error.ts';
 import { createConditionCodeService } from './condition-code-service.ts';
 import { createDatasheetLayoutService } from './datasheet-layout-service.ts';
 import { createDeviceTypeService } from './device-type-service.ts';
 import { createManufacturerService } from './manufacturer-service.ts';
-import { createMerchantProfileService } from './merchant-profile-service.ts';
+import { createMerchantProfileService, LOGO_MAX_BYTES } from './merchant-profile-service.ts';
 import { createPickListService } from './pick-list-service.ts';
 import { createSupplierService } from './supplier-service.ts';
 import { createTextBlockService } from './text-block-service.ts';
@@ -75,6 +78,8 @@ export interface SettingsRoutesOptions {
   db: Kysely<DB>;
   uow: UnitOfWorkRunner<DB>;
   clock: Clock;
+  /** File intake of `media` (CU-090) for the logo (2.2, FIND-203). */
+  mediaFiles: MediaFileIntake;
 }
 
 const idParams = z.strictObject({ id: z.coerce.number().pipe(idSchema) });
@@ -95,6 +100,9 @@ const includeInactiveQuery = pageQuery.extend({
 
 /** `DELETE …?version=`: the version last read (2.0.3). */
 const versionQuery = z.strictObject({ version: z.coerce.number().pipe(versionSchema) });
+
+/** Field `version` of the logo upload, sent as text before the file (2.2). */
+const logoVersionField = z.coerce.number().pipe(versionSchema);
 
 /**
  * `GET /api/condition-codes/resolve?code=&supplierId=`: without `supplierId` (or empty) only the
@@ -120,13 +128,13 @@ const resolveQuery = z.strictObject({
  */
 export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = async (
   app,
-  { db, uow, clock },
+  { db, uow, clock, mediaFiles },
 ) => {
   const deviceTypes = createDeviceTypeService({ db, uow, clock });
   const pickLists = createPickListService({ db, uow, clock });
   const manufacturers = createManufacturerService({ db, uow, clock });
   const suppliers = createSupplierService({ db, uow, clock });
-  const merchantProfile = createMerchantProfileService({ db, uow, clock });
+  const merchantProfile = createMerchantProfileService({ db, uow, clock, mediaFiles });
   const conditionCodes = createConditionCodeService({ db, uow, clock });
   const textBlocks = createTextBlockService({ db, uow, clock });
   const datasheetLayout = createDatasheetLayoutService({ db, uow, clock });
@@ -325,7 +333,7 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
       schema: {
         params: idParams,
         body: textBlockUpdateSchema,
-        response: { 200: textBlockSaveResultSchema },
+        response: { 200: textBlockUpdateResultSchema },
       },
     },
     async (request) => textBlocks.update(request.params.id, request.body),
@@ -341,6 +349,36 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
     '/api/merchant-profile',
     { schema: { body: merchantProfileUpdateSchema, response: { 200: merchantProfileSchema } } },
     async (request) => merchantProfile.update(request.body),
+  );
+
+  // multipart with the field `version` first, then exactly one file `file` (2.0.1, 2.2); the parser
+  // skips any further file. It stops one byte after the size limit, so the service sees the file
+  // is too large without reading it all.
+  app.put(
+    '/api/merchant-profile/logo',
+    { config: { upload: true }, schema: { response: { 200: merchantProfileSchema } } },
+    async (request) => {
+      const upload = await request.file({
+        limits: { fileSize: LOGO_MAX_BYTES + 1, files: 1 },
+        throwFileSizeLimit: false,
+      });
+      if (upload === undefined) throw new BadRequestError('file: missing');
+      const versionField = upload.fields.version;
+      const version = logoVersionField.safeParse(
+        versionField !== undefined && 'value' in versionField ? versionField.value : undefined,
+      );
+      if (upload.fieldname !== 'file' || !version.success) {
+        upload.file.resume();
+        throw new BadRequestError('file, version: multipart fields');
+      }
+      return merchantProfile.replaceLogo({ version: version.data, file: upload.file });
+    },
+  );
+
+  app.delete(
+    '/api/merchant-profile/logo',
+    { schema: { querystring: versionQuery, response: { 200: merchantProfileSchema } } },
+    async (request) => merchantProfile.removeLogo(request.query.version),
   );
 
   app.get(

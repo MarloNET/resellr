@@ -4,6 +4,7 @@ import { insertPickLists } from '../../test/pick-lists.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { runMigrations } from '../db/migrator.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
+import { createClock } from '../shared/clock.ts';
 
 type TestApp = ReturnType<typeof createTestApp>;
 let t: TestApp;
@@ -58,6 +59,7 @@ const fieldError = (path: string, message: string) => ({
 });
 
 const NO_IMPACT = { updated: 0, rerelease: 0, manualReview: 0 };
+const NO_LEGAL_STATUS = { legalStatus: null, legalCheckedOn: null, legalCheckedBy: null };
 
 describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
   it('creates an active text block and answers 201 { textBlock, impact }', async () => {
@@ -71,6 +73,7 @@ describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
         kind: 'pickup_contact',
         body: 'Abholung in Hannover nach Absprache.',
         active: true,
+        ...NO_LEGAL_STATUS,
         version: 1,
       },
       impact: NO_IMPACT,
@@ -244,9 +247,11 @@ describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
         kind: 'other',
         body: 'Abholung {Händler-Kontakt}',
         active: true,
+        ...NO_LEGAL_STATUS,
         version: 2,
       },
       impact: NO_IMPACT,
+      legalStatusReset: false,
     });
   });
 
@@ -318,7 +323,11 @@ describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
       active: true,
     });
 
-    expect(response.json()).toEqual({ textBlock: abholung, impact: NO_IMPACT });
+    expect(response.json()).toEqual({
+      textBlock: abholung,
+      impact: NO_IMPACT,
+      legalStatusReset: false,
+    });
     expect(auditRows()).toHaveLength(1);
   });
 
@@ -375,5 +384,331 @@ describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
     expect(response.statusCode).toBe(503);
     expect(response.json().error).toMatchObject({ code: 'shutting_down', referenceNumber: null });
     expect(countRows()).toBe(0);
+  });
+});
+
+describe('legal check status of text blocks (CU-082, REQ-054, Technical Specification 2.2)', () => {
+  const LEGAL_REQUIRED = 'Prüfdatum und prüfende Stelle erforderlich';
+  const CHECKED = {
+    legalStatus: 'checked',
+    legalCheckedOn: '2026-11-05',
+    legalCheckedBy: 'Kanzlei Muster',
+  } as const;
+
+  const createLegal = async (kind = 'legal') =>
+    (await create({ name: 'Widerruf', kind, body: 'Widerrufsbelehrung' })).json().textBlock;
+
+  /** A text block of the kind "Rechtliches" in "rechtlich geprüft", version 2. */
+  const createChecked = async () => {
+    const legal = await createLegal();
+    return (await patch(legal.id, { version: 1, ...CHECKED })).json().textBlock;
+  };
+
+  const storedLegal = (id: number) =>
+    t.database.sqlite
+      .prepare(
+        'SELECT legal_status, legal_checked_on, legal_checked_by, version FROM text_block WHERE id = ?',
+      )
+      .get(id);
+
+  it('AC-REQ-054-04 a new text block of the kind Akku-Hinweis is "rechtlich ungeprüft", one of the kind Abholung/Kontakt has no check status', async () => {
+    const battery = await create({ name: 'Akku', kind: 'battery_notice', body: 'Akku-Hinweis' });
+    const pickup = await create();
+
+    expect(battery.statusCode).toBe(201);
+    expect(battery.json().textBlock).toMatchObject({
+      kind: 'battery_notice',
+      legalStatus: 'unchecked',
+      legalCheckedOn: null,
+      legalCheckedBy: null,
+    });
+    expect(pickup.json().textBlock).toMatchObject({ kind: 'pickup_contact', ...NO_LEGAL_STATUS });
+  });
+
+  it('DER-40-05 a new text block of the kinds Lieferumfang and Sonstiges has no check status, one of the kind Rechtliches is "rechtlich ungeprüft"', async () => {
+    const kinds = ['delivery_scope', 'other', 'legal'];
+    const created = [];
+    for (const kind of kinds) {
+      created.push((await create({ name: kind, kind })).json().textBlock.legalStatus);
+    }
+
+    expect(created).toEqual([null, null, 'unchecked']);
+  });
+
+  it('sets "rechtlich geprüft" with check date and checking body', async () => {
+    const legal = await createLegal();
+
+    const response = await patch(legal.id, {
+      version: 1,
+      ...CHECKED,
+      legalCheckedBy: ' Kanzlei Muster ',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      textBlock: { ...legal, ...CHECKED, version: 2 },
+      impact: NO_IMPACT,
+      legalStatusReset: false,
+    });
+    expect(storedLegal(legal.id)).toEqual({
+      legal_status: 'checked',
+      legal_checked_on: '2026-11-05',
+      legal_checked_by: 'Kanzlei Muster',
+      version: 2,
+    });
+  });
+
+  it('AC-REQ-054-02 after a change of the text of a "rechtlich geprüft" text block it is "rechtlich ungeprüft" and the answer reports legalStatusReset: true', async () => {
+    const checked = await createChecked();
+
+    const response = await patch(checked.id, { version: 2, body: 'Neue Widerrufsbelehrung' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      textBlock: {
+        ...checked,
+        body: 'Neue Widerrufsbelehrung',
+        legalStatus: 'unchecked',
+        legalCheckedOn: null,
+        legalCheckedBy: null,
+        version: 3,
+      },
+      impact: NO_IMPACT,
+      legalStatusReset: true,
+    });
+  });
+
+  it('DER-40-03 a change of the text resets the status also if the request sends the check fields', async () => {
+    const checked = await createChecked();
+
+    const response = await patch(checked.id, { version: 2, body: 'Neu', ...CHECKED });
+
+    expect(response.json()).toMatchObject({
+      textBlock: { legalStatus: 'unchecked', legalCheckedOn: null, legalCheckedBy: null },
+      legalStatusReset: true,
+    });
+  });
+
+  it('DER-40-03 a change of name or kind only keeps "rechtlich geprüft" and reports no reset', async () => {
+    const checked = await createChecked();
+
+    const response = await patch(checked.id, {
+      version: 2,
+      name: 'Widerruf neu',
+      kind: 'battery_notice',
+    });
+
+    expect(response.json()).toMatchObject({
+      textBlock: { kind: 'battery_notice', ...CHECKED },
+      legalStatusReset: false,
+    });
+  });
+
+  it('DER-40-03 a change of the text of a "rechtlich ungeprüft" text block reports no reset', async () => {
+    const legal = await createLegal();
+
+    const response = await patch(legal.id, { version: 1, body: 'Neu' });
+
+    expect(response.json()).toMatchObject({
+      textBlock: { legalStatus: 'unchecked' },
+      legalStatusReset: false,
+    });
+  });
+
+  it('AC-REQ-054-03 "rechtlich geprüft" without check date is rejected with "Prüfdatum und prüfende Stelle erforderlich"', async () => {
+    const legal = await createLegal();
+
+    const response = await patch(legal.id, { version: 1, ...CHECKED, legalCheckedOn: '' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toEqual({
+      code: 'validation_failed',
+      message: '',
+      fields: [{ path: 'legalCheckedOn', code: 'legal_check_required', message: LEGAL_REQUIRED }],
+      details: {},
+      referenceNumber: null,
+    });
+    expect(storedLegal(legal.id)).toMatchObject({ legal_status: 'unchecked', version: 1 });
+  });
+
+  it.each([
+    ['the checking body', { legalCheckedBy: '' }, ['legalCheckedBy']],
+    ['a checking body of only spaces', { legalCheckedBy: '   ' }, ['legalCheckedBy']],
+    ['both', { legalCheckedOn: '', legalCheckedBy: '' }, ['legalCheckedOn', 'legalCheckedBy']],
+    [
+      'both, sending only the status',
+      { legalCheckedOn: undefined, legalCheckedBy: undefined },
+      ['legalCheckedOn', 'legalCheckedBy'],
+    ],
+  ])(
+    'DER-40-01 "rechtlich geprüft" without %s gives one entry per missing field with M-24',
+    async (_case, change, paths) => {
+      const legal = await createLegal();
+
+      const response = await patch(legal.id, { version: 1, ...CHECKED, ...change });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error.fields).toEqual(
+        paths.map((path) => ({ path, code: 'legal_check_required', message: LEGAL_REQUIRED })),
+      );
+      expect(storedLegal(legal.id)).toMatchObject({ legal_status: 'unchecked', version: 1 });
+    },
+  );
+
+  it('DER-40-02 a check date in the future is rejected at the field legalCheckedOn', async () => {
+    const legal = await createLegal();
+
+    const response = await patch(legal.id, {
+      version: 1,
+      ...CHECKED,
+      legalCheckedOn: '2999-12-31',
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toEqual(
+      fieldError('legalCheckedOn', 'Prüfdatum darf nicht in der Zukunft liegen'),
+    );
+    expect(storedLegal(legal.id)).toMatchObject({ legal_status: 'unchecked', version: 1 });
+  });
+
+  it('DER-40-02 a check date of today is accepted', async () => {
+    const legal = await createLegal();
+    const today = createClock().today();
+
+    const response = await patch(legal.id, { version: 1, ...CHECKED, legalCheckedOn: today });
+
+    expect(response.json().textBlock).toMatchObject({ legalCheckedOn: today });
+  });
+
+  it('DER-40-06 a checking body of 100 characters is accepted', async () => {
+    const legal = await createLegal();
+    const legalCheckedBy = 'a'.repeat(100);
+
+    const response = await patch(legal.id, { version: 1, ...CHECKED, legalCheckedBy });
+
+    expect(response.statusCode).toBe(200);
+    expect(storedLegal(legal.id)).toMatchObject({ legal_checked_by: legalCheckedBy });
+  });
+
+  it('DER-40-06 a checking body of 101 characters is rejected with validation_failed at legalCheckedBy and not stored', async () => {
+    const legal = await createLegal();
+
+    const response = await patch(legal.id, {
+      version: 1,
+      ...CHECKED,
+      legalCheckedBy: 'a'.repeat(101),
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toEqual(
+      fieldError('legalCheckedBy', 'Prüfende Stelle: höchstens 100 Zeichen'),
+    );
+    expect(storedLegal(legal.id)).toMatchObject({ legal_status: 'unchecked', version: 1 });
+  });
+
+  it('sets "rechtlich ungeprüft" again without check date and checking body', async () => {
+    const checked = await createChecked();
+
+    const response = await patch(checked.id, {
+      version: 2,
+      legalStatus: 'unchecked',
+      legalCheckedOn: '',
+      legalCheckedBy: '',
+    });
+
+    expect(response.json()).toMatchObject({
+      textBlock: { legalStatus: 'unchecked', legalCheckedOn: null, legalCheckedBy: null },
+      legalStatusReset: false,
+    });
+  });
+
+  it('DER-40-05 a change to a kind without check status empties the check fields, a change to Rechtliches makes it "rechtlich ungeprüft"', async () => {
+    const checked = await createChecked();
+    const abholung = await createAbholung();
+
+    const toOther = await patch(checked.id, { version: 2, kind: 'other' });
+    const toLegal = await patch(abholung.id, { version: 1, kind: 'legal' });
+
+    expect(toOther.json().textBlock).toMatchObject({ kind: 'other', ...NO_LEGAL_STATUS });
+    expect(toLegal.json().textBlock).toMatchObject({ kind: 'legal', legalStatus: 'unchecked' });
+  });
+
+  it('DER-40-05 check fields for a kind without check status are a structural error (400 bad_request)', async () => {
+    const abholung = await createAbholung();
+
+    const response = await patch(abholung.id, { version: 1, ...CHECKED });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
+    expect(storedLegal(abholung.id)).toMatchObject({ legal_status: null, version: 1 });
+  });
+
+  it('rejects a check date in another notation as a structural error (400 bad_request)', async () => {
+    const legal = await createLegal();
+
+    const response = await patch(legal.id, {
+      version: 1,
+      ...CHECKED,
+      legalCheckedOn: '05.11.2026',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(storedLegal(legal.id)).toMatchObject({ version: 1 });
+  });
+
+  it('writes the audit entry legal_status_changed with the changed check fields (3.6)', async () => {
+    const checked = await createChecked();
+    await patch(checked.id, { version: 2, body: 'Neu' });
+
+    const rows = auditRows();
+    expect(rows[0]).toMatchObject({
+      action: 'created',
+      new_value: JSON.stringify({
+        Name: 'Widerruf',
+        Art: 'Rechtliches',
+        Text: 'Widerrufsbelehrung',
+        Status: 'aktiv',
+        Prüfstatus: 'rechtlich ungeprüft',
+      }),
+    });
+    expect(rows.slice(1)).toEqual([
+      {
+        action: 'legal_status_changed',
+        object_id: checked.id,
+        object_label: 'Textbaustein Widerruf',
+        old_value: JSON.stringify({
+          Prüfstatus: 'rechtlich ungeprüft',
+          Prüfdatum: null,
+          'Prüfende Stelle': null,
+        }),
+        new_value: JSON.stringify({
+          Prüfstatus: 'rechtlich geprüft',
+          Prüfdatum: '2026-11-05',
+          'Prüfende Stelle': 'Kanzlei Muster',
+        }),
+      },
+      {
+        action: 'updated',
+        object_id: checked.id,
+        object_label: 'Textbaustein Widerruf',
+        old_value: JSON.stringify({ Text: 'Widerrufsbelehrung' }),
+        new_value: JSON.stringify({ Text: 'Neu' }),
+      },
+      {
+        action: 'legal_status_changed',
+        object_id: checked.id,
+        object_label: 'Textbaustein Widerruf',
+        old_value: JSON.stringify({
+          Prüfstatus: 'rechtlich geprüft',
+          Prüfdatum: '2026-11-05',
+          'Prüfende Stelle': 'Kanzlei Muster',
+        }),
+        new_value: JSON.stringify({
+          Prüfstatus: 'rechtlich ungeprüft',
+          Prüfdatum: null,
+          'Prüfende Stelle': null,
+        }),
+      },
+    ]);
   });
 });

@@ -1,14 +1,17 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { Readable } from 'node:stream';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { sha256, testImages } from '../../test/images.ts';
 import { openDatabase, type Database } from '../db/database.ts';
 import { runMigrations } from '../db/migrator.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import type { DB } from '../db/schema.ts';
 import { createUnitOfWork, emptyChangeReport, type EventHandlers } from '../db/unit-of-work.ts';
+import { createMediaFileIntake } from '../media/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import type { SettingsChanged } from '../shared/events.ts';
 import { createMerchantProfileService } from './merchant-profile-service.ts';
@@ -34,7 +37,8 @@ afterEach(async () => {
 
 function serviceWith(handlers: EventHandlers<DB> = {}) {
   const uow = createUnitOfWork(database.db, handlers);
-  return createMerchantProfileService({ db: database.db, uow, clock });
+  const mediaFiles = createMediaFileIntake({ mediaDir: join(dir, 'media'), clock });
+  return createMerchantProfileService({ db: database.db, uow, clock, mediaFiles });
 }
 
 const profileRows = () =>
@@ -236,5 +240,52 @@ describe('merchant profile service (CU-084)', () => {
     ).rejects.toThrow('audit');
 
     expect(profileRows()).toEqual([]);
+  });
+
+  it('replacing and removing the logo report no SettingsChanged (MAR-198 section 7.2)', async () => {
+    const handler = vi.fn(async () => emptyChangeReport());
+    const service = serviceWith({ change: { SettingsChanged: handler } });
+    const first = await testImages.png('#000000');
+    const second = await testImages.jpeg();
+
+    await service.replaceLogo({ version: 1, file: Readable.from([first]) });
+    const replaced = await service.replaceLogo({ version: 2, file: Readable.from([second]) });
+    const removed = await service.removeLogo(3);
+
+    expect(replaced.logo).toEqual({ hash: sha256(second), url: `/media/logo/${sha256(second)}` });
+    expect(removed).toMatchObject({ logo: null, version: 4 });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('sets logo_hash in the transaction that registers the file and rolls both back together', async () => {
+    database.sqlite.exec(
+      "CREATE TRIGGER fail_audit BEFORE INSERT ON audit_entry BEGIN SELECT RAISE(ABORT, 'audit'); END",
+    );
+    const png = await testImages.png();
+
+    await expect(
+      serviceWith().replaceLogo({ version: 1, file: Readable.from([png]) }),
+    ).rejects.toThrow('audit');
+
+    expect(profileRows()).toEqual([]);
+    expect(database.sqlite.prepare('SELECT COUNT(*) FROM media_file').pluck().get()).toBe(0);
+    // The placed file stays without row; the housekeeping removes it (2.11, 2.19).
+    expect(readdirSync(join(dir, 'media', 'logo'))).toEqual([`${sha256(png)}.png`]);
+  });
+
+  it('resets unreferenced_since of a file that is uploaded again', async () => {
+    const png = await testImages.png();
+    const service = serviceWith();
+    await service.replaceLogo({ version: 1, file: Readable.from([png]) });
+    await service.removeLogo(2);
+    database.sqlite
+      .prepare('UPDATE media_file SET unreferenced_since = ? WHERE hash = ?')
+      .run('2026-11-12T08:00:00.000Z', sha256(png));
+
+    await service.replaceLogo({ version: 3, file: Readable.from([png]) });
+
+    expect(
+      database.sqlite.prepare('SELECT unreferenced_since, created_at FROM media_file').all(),
+    ).toEqual([{ unreferenced_since: null, created_at: NOW.toISOString() }]);
   });
 });

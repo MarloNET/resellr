@@ -53,6 +53,7 @@ import type {
   TextBlockList,
   TextBlockSaveResult,
   TextBlockUpdate,
+  TextBlockUpdateResult,
 } from '@resellr/domain/schemas/text-block.schema';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
@@ -168,9 +169,9 @@ export function useCreateTextBlockMutation() {
 /** "Speichern" and "Deaktivieren" of UI-030 (`PATCH /api/text-blocks/{id}`). */
 export function useUpdateTextBlockMutation() {
   const queryClient = useQueryClient();
-  return useMutation<TextBlockSaveResult, ApiError, TextBlockUpdate & { id: number }>({
+  return useMutation<TextBlockUpdateResult, ApiError, TextBlockUpdate & { id: number }>({
     mutationFn: ({ id, ...body }) =>
-      apiClient.patch<TextBlockSaveResult>(`/api/text-blocks/${id}`, body),
+      apiClient.patch<TextBlockUpdateResult>(`/api/text-blocks/${id}`, body),
     onSuccess: ({ textBlock }) =>
       storeSaved(queryClient, queryKeys.settings.textBlocks(), textBlock),
   });
@@ -207,6 +208,33 @@ export function useSaveDatasheetLayoutMutation() {
   return useMutation<DatasheetLayout, ApiError, DatasheetLayoutUpdate>({
     mutationFn: (body) => apiClient.put<DatasheetLayout>('/api/datasheet-layout', body),
     onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.datasheetLayout(), saved),
+  });
+}
+
+/**
+ * "Logo ersetzen" of UI-026 (`PUT /api/merchant-profile/logo`, multipart with the field
+ * `version` before the file, 2.2); the answer is the saved profile.
+ */
+export function useReplaceLogoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, { version: number; file: File }>({
+    mutationFn: ({ version, file }) => {
+      const form = new FormData();
+      form.append('version', String(version));
+      form.append('file', file);
+      return apiClient.put<MerchantProfile>('/api/merchant-profile/logo', form);
+    },
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
+  });
+}
+
+/** "Logo entfernen" of UI-026 (`DELETE /api/merchant-profile/logo?version=`). */
+export function useRemoveLogoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, { version: number }>({
+    mutationFn: ({ version }) =>
+      apiClient.delete<MerchantProfile>(`/api/merchant-profile/logo?version=${version}`, {}),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
   });
 }
 
