@@ -647,6 +647,34 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     expect(panelField(/^Einheit/).value).toBe('MB');
   });
 
+  it('UI-027.error DER-34-27 a validation_failed without a field of the panel shows the error banner, no field error and keeps the focus and the inputs', async () => {
+    await openAttributes([RAM], {
+      'PATCH /api/attributes/12': () =>
+        Response.json(
+          errorBody('validation_failed', {
+            fields: [
+              { path: 'dataType', code: 'invalid_enum_value', message: 'Datentyp ungültig' },
+            ],
+          }),
+          { status: 422 },
+        ),
+    });
+    await openPanelOf('RAM');
+
+    act(() => panelField(/^Einheit/).focus());
+    fireEvent.change(panelField(/^Einheit/), { target: { value: 'MB' } });
+    fireEvent.click(panelSave());
+
+    expect(
+      await screen.findByText('Einstellungen konnten nicht gespeichert werden. Referenz: –'),
+    ).toBeTruthy();
+    expect(within(panel()).queryByText('Datentyp ungültig')).toBeNull();
+    expect(panel().querySelector('[aria-invalid="true"]')).toBeNull();
+    expect(document.activeElement).toBe(panelField(/^Einheit/));
+    expect(panelField(/^Einheit/).value).toBe('MB');
+    expectAccessiblePanel();
+  });
+
   it('UI-027.validation DER-34-02 "Akkukapazität" is allowed for the attribute with the role battery_capacity', async () => {
     const { sent } = await openAttributes([RAM, BATTERY_CAPACITY], {
       'PATCH /api/attributes/18': () => Response.json({ ...BATTERY_CAPACITY, version: 2 }),
@@ -1302,6 +1330,35 @@ describe('UI-027 device types (CU-095)', () => {
     expect(document.activeElement).toBe(nameInput());
     expect(nameInput().value).toBe('Laptop');
   });
+
+  it.each([
+    [
+      'a path without a field',
+      [{ path: 'active', code: 'invalid_type', message: 'Status ungültig' }],
+    ],
+    ['no fields', []],
+  ])(
+    'UI-027.error DER-33-13 a 422 validation_failed with %s shows the error banner, no field error at "Name" and keeps the input',
+    async (_case, fields) => {
+      mockApi({
+        writes: {
+          [PATCH_NOTEBOOK]: () =>
+            Response.json(errorBody('validation_failed', { fields }), { status: 422 }),
+        },
+      });
+      await openPage();
+
+      rename('Laptop');
+
+      expect(
+        await screen.findByText('Einstellungen konnten nicht gespeichert werden. Referenz: –'),
+      ).toBeTruthy();
+      expect(screen.queryByText('Status ungültig')).toBeNull();
+      expect(nameInput().getAttribute('aria-invalid')).toBeNull();
+      expect(nameInput().value).toBe('Laptop');
+      expectAccessibleForm();
+    },
+  );
 
   it('UI-027.validation AC-REQ-004-02 shows "Name ist bereits vergeben" at the field', async () => {
     mockApi({
