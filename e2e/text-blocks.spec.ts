@@ -26,7 +26,15 @@ function uniqueName(base: string, title: string, project: string) {
 async function createTextBlock(page: Page, baseUrl: string, name: string) {
   const response = await page.request.post(`${baseUrl}/api/text-blocks`, {
     headers: { origin: baseUrl },
-    data: { name, kind: 'pickup_contact', body: 'Abholung nach Absprache.' },
+    data: {
+      name,
+      kind: 'pickup_contact',
+      body: 'Abholung nach Absprache.',
+      allDeviceTypes: true,
+      deviceTypeIds: [],
+      allChannels: true,
+      channelIds: [],
+    },
   });
   expect(response.status()).toBe(201);
   return ((await response.json()) as { textBlock: { id: number; version: number } }).textBlock;
@@ -60,6 +68,11 @@ test.describe('UI-030 text blocks (CU-101)', () => {
     await bodyField(page).fill('Die Akkukapazität beträgt {Akkukapazität}.');
     await saveButton(page).click();
 
+    // DER-39-10: UI-043 follows the save; in S2 it is always `.empty` (QH-1) and Esc closes it.
+    const impact = page.getByRole('dialog', { name: 'Auswirkung der Änderung' });
+    await expect(impact).toContainText('Keine Kanal-Inhalte betroffen');
+    await page.keyboard.press('Escape');
+    await expect(impact).toBeHidden();
     const banner = page.getByRole('status').filter({ hasText: 'Gespeichert' });
     await expect(banner).toBeVisible();
     const row = textBlocks(page).getByRole('button', { name: new RegExp(`^${name}`) });

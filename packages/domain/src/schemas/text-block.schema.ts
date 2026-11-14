@@ -9,7 +9,7 @@ import {
   versionSchema,
 } from './common.schema.ts';
 
-// Text block (REQ-026, REQ-054; Technical Specification 2.2, 3.1). The scope follows with #163.
+// Text block (REQ-026, REQ-054; Technical Specification 2.2, 3.1).
 
 /** Kinds of a text block (3.1 `text_block.kind`). */
 export const TEXT_BLOCK_KINDS = [
@@ -135,20 +135,78 @@ export function legalCheckIssues(
 }
 
 /**
- * `POST /api/text-blocks`: a new text block is active; one of the kinds "Rechtliches" and
- * "Akku-Hinweis" is "rechtlich ungeprüft" (AC-REQ-054-04), so the request has no check fields.
+ * Scope of a text block (2.2, 3.1 `text_block_device_type`, `text_block_channel`): "alle" or a
+ * choice of device types and of channels. With "alle" the list is empty, otherwise the ids
+ * stand ascending in the answers.
  */
-export const textBlockCreateSchema = z.strictObject({
-  name: textBlockNameSchema,
-  kind: textBlockKindSchema,
-  body: textBlockBodySchema,
-});
+export interface TextBlockScope {
+  allDeviceTypes: boolean;
+  deviceTypeIds: number[];
+  allChannels: boolean;
+  channelIds: number[];
+}
+
+/** Ids of a choice; an id twice is a structural error (2.2, addendum MAR-773). */
+const idListSchema = z.array(idSchema);
+
+const SCOPE_PAIRS = [
+  {
+    all: 'allDeviceTypes',
+    ids: 'deviceTypeIds',
+    message: FIELD_MESSAGES.textBlockDeviceTypesRequired,
+  },
+  { all: 'allChannels', ids: 'channelIds', message: FIELD_MESSAGES.textBlockChannelsRequired },
+] as const;
+
+/**
+ * Rules of the scope (2.2 "Geltungsbereich des Textbausteins", addendum MAR-773). Structural
+ * errors have no path and answer `400 bad_request` (2.0.5 rule (4)): a pair sent only in part,
+ * "alle" with a list, an id twice. A choice without an entry is the field rule `scope_required`.
+ */
+function checkScope(scope: Partial<TextBlockScope>, context: z.RefinementCtx) {
+  for (const { all, ids, message } of SCOPE_PAIRS) {
+    const flag = scope[all];
+    const list = scope[ids];
+    if (flag === undefined && list === undefined) continue;
+    if (flag === undefined || list === undefined) {
+      context.addIssue({ code: 'custom', path: [], message: `${all} and ${ids} together` });
+    } else if (flag && list.length > 0) {
+      context.addIssue({ code: 'custom', path: [], message: `${ids} with ${all}` });
+    } else if (new Set(list).size !== list.length) {
+      context.addIssue({ code: 'custom', path: [], message: `${ids} with an id twice` });
+    } else if (!flag && list.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        path: [ids],
+        message,
+        params: { code: 'scope_required' },
+      });
+    }
+  }
+}
+
+/**
+ * `POST /api/text-blocks`: a new text block is active; the four scope fields are required. One
+ * of the kinds "Rechtliches" and "Akku-Hinweis" is "rechtlich ungeprüft" (AC-REQ-054-04), so the
+ * request has no check fields.
+ */
+export const textBlockCreateSchema = z
+  .strictObject({
+    name: textBlockNameSchema,
+    kind: textBlockKindSchema,
+    body: textBlockBodySchema,
+    allDeviceTypes: z.boolean(),
+    deviceTypeIds: idListSchema,
+    allChannels: z.boolean(),
+    channelIds: idListSchema,
+  })
+  .superRefine(checkScope);
 export type TextBlockCreate = z.infer<typeof textBlockCreateSchema>;
 
 /**
- * `PATCH /api/text-blocks/{id}`: the version last read and the changed fields (2.0.3). UI-030
- * sends the three check fields together; the service checks them on the state after the change
- * (`legalCheckIssues`).
+ * `PATCH /api/text-blocks/{id}`: the version last read and the changed fields (2.0.3). Each
+ * scope pair comes whole or not at all. UI-030 sends the three check fields together; the
+ * service checks them on the state after the change (`legalCheckIssues`).
  */
 export const textBlockUpdateSchema = z
   .strictObject({
@@ -160,9 +218,13 @@ export const textBlockUpdateSchema = z
     legalStatus: textBlockLegalStatusSchema.optional(),
     legalCheckedOn: z.string().optional(),
     legalCheckedBy: textBlockLegalCheckedBySchema.optional(),
+    allDeviceTypes: z.boolean().optional(),
+    deviceTypeIds: idListSchema.optional(),
+    allChannels: z.boolean().optional(),
+    channelIds: idListSchema.optional(),
   })
-  .superRefine(({ legalCheckedOn }, context) => {
-    if (legalCheckedOn !== undefined && !isCheckDate(legalCheckedOn)) {
+  .superRefine((value, context) => {
+    if (value.legalCheckedOn !== undefined && !isCheckDate(value.legalCheckedOn)) {
       context.addIssue({
         code: 'custom',
         path: [],
@@ -170,6 +232,7 @@ export const textBlockUpdateSchema = z
         params: { code: 'legal_checked_on_format' },
       });
     }
+    checkScope(value, context);
   });
 export type TextBlockUpdate = z.infer<typeof textBlockUpdateSchema>;
 
@@ -185,6 +248,10 @@ export const textBlockSchema = z.object({
   /** Only at "rechtlich geprüft". */
   legalCheckedOn: dateSchema.nullable(),
   legalCheckedBy: z.string().nullable(),
+  allDeviceTypes: z.boolean(),
+  deviceTypeIds: z.array(idSchema),
+  allChannels: z.boolean(),
+  channelIds: z.array(idSchema),
   version: versionSchema,
 });
 export type TextBlock = z.infer<typeof textBlockSchema>;

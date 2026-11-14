@@ -20,6 +20,10 @@ export const queryKeys = {
     pickLists: () => ['settings', 'pick-lists'] as const,
     pickListValues: (pickListId: number) => ['settings', 'pick-list-values', pickListId] as const,
   },
+  channels: {
+    all: ['channels'] as const,
+    channels: () => ['channels', 'channels'] as const,
+  },
 } as const;
 
 /**

@@ -109,6 +109,13 @@ export const FIELD_MESSAGES = {
    * Specification 8.2, table "Meldungstexte" (addendum MAR-493).
    */
   textBlockBody: 'Text: 1 bis 5.000 Zeichen',
+  /**
+   * UI-030 "Geltungsbereich", a choice without a device type or without a channel and not "alle"
+   * (`scope_required`; Technical Specification 2.2, 8.2, addendum MAR-773). UI-030 disables
+   * "Speichern" instead, so the texts only show when the server reports the rule.
+   */
+  textBlockDeviceTypesRequired: 'Gerätearten: mindestens eine wählen oder ‚alle‘',
+  textBlockChannelsRequired: 'Kanäle: mindestens einen wählen oder ‚alle‘',
   /** UI-033 "Vorschlag Optik-Note", not a whole number from 1 to 5 (REQ-022). */
   visualGrade: 'Optik-Note: ganze Zahl von 1 bis 5',
 } as const;
