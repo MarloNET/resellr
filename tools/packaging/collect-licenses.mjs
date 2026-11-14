@@ -1,5 +1,5 @@
 // License notices (CU-298, FIND-222, Technical Specification 2.19 "Build des Pakets", 4.3,
-// Nachtrag MAR-687, MAR-693, MAR-720, MAR-758): writes `THIRD-PARTY-NOTICES.txt` with the license texts of
+// Nachtrag MAR-687, MAR-693, MAR-711, MAR-719, MAR-720, MAR-758): writes `THIRD-PARTY-NOTICES.txt` with the license texts of
 // everything the package ships and fails the build for a shipped package whose license is
 // missing or not allowed.
 // Usage: `node tools/packaging/collect-licenses.mjs <program folder> --metafile <path>` after
@@ -53,6 +53,8 @@ const RULE = '='.repeat(80);
  * @typedef {{ license: string, file: string, source: string }} MissingLicenseEntry
  * @typedef {Record<string, MissingLicenseEntry>} MissingLicenseFiles
  * @typedef {{ name: string, version: string, license: string, text: string, dir: string }} PackageNotice
+ * @typedef {{ version: string, license: string, file: string | null, source: string }} LibvipsLibrary
+ * @typedef {Record<string, LibvipsLibrary>} LibvipsLibraries
  */
 
 /**
@@ -290,10 +292,11 @@ export function webPackageDirs(repoRoot, webDir = join(repoRoot, 'apps', 'web'))
 
 /**
  * Text of `THIRD-PARTY-NOTICES.txt` for all shipped packages, Node.js and Inter, with the libvips
- * section and the texts of LGPL-3.0 and GPL-3.0 as soon as a package has an LGPL-3.0 part.
+ * section (with the libraries built into its binaries) and the texts of LGPL-3.0 and GPL-3.0 as
+ * soon as a package has an LGPL-3.0 part.
  * @param {{ packageDirs: string[], nodeLicense: string, interLicense: string,
- *   missingLicenseFiles?: MissingLicenseFiles, licensesDir?: string,
- *   log?: (line: string) => void }} options
+ *   missingLicenseFiles?: MissingLicenseFiles, libvipsLibraries?: LibvipsLibraries,
+ *   licensesDir?: string, log?: (line: string) => void }} options
  * @returns {string}
  */
 export function buildNotices(options) {
@@ -319,11 +322,11 @@ export function buildNotices(options) {
 
   const libvips = packages.filter((notice) => hasLgpl(notice.license));
   for (const notice of libvips) {
-    const versions = join(notice.dir, 'versions.json');
-    const content = readRequired(versions, `versions.json of ${notice.name}@${notice.version}`);
+    const pkg = `${notice.name}@${notice.version}`;
+    const content = readRequired(join(notice.dir, 'versions.json'), `versions.json of ${pkg}`);
     sections.push(
       section(
-        `libvips aus ${notice.name}@${notice.version}`,
+        `libvips aus ${pkg}`,
         notice.license,
         [
           'Unverändert als dynamische Bibliothek ausgeliefert. Enthaltene Bibliotheken (versions.json):',
@@ -332,6 +335,8 @@ export function buildNotices(options) {
           '',
           'Quellcode:',
           ...LIBVIPS_SOURCES.map((url) => `  ${url}`),
+          '',
+          libraryNotices(pkg, JSON.parse(content), { ...options, licensesDir }),
         ].join('\n'),
       ),
     );
@@ -347,6 +352,58 @@ export function buildNotices(options) {
       '\n\n',
     ) + '\n'
   );
+}
+
+/**
+ * Name, version, license, source and text of each library built into the libvips binaries of a
+ * package, from `libvips-libraries.json`. Fails, naming library and package, for a key of
+ * `versions.json` without entry, a differing version or a missing text file; an entry without key
+ * in `versions.json` is unused and logged (Nachtrag MAR-711, MAR-719).
+ * @param {string} pkg name@version of the libvips package
+ * @param {Record<string, string>} versions content of its `versions.json`
+ * @param {{ libvipsLibraries?: LibvipsLibraries, licensesDir: string,
+ *   log?: (line: string) => void }} options
+ * @returns {string}
+ */
+function libraryNotices(pkg, versions, options) {
+  const { libvipsLibraries = {}, licensesDir, log = () => {} } = options;
+  const blocks = Object.keys(versions)
+    .sort(compare)
+    .map((key) => {
+      const version = versions[key];
+      const entry = Object.hasOwn(libvipsLibraries, key) ? libvipsLibraries[key] : undefined;
+      if (!entry) {
+        throw new Error(`${pkg}: library ${key} ${version} has no entry in libvips-libraries.json`);
+      }
+      if (entry.version !== version) {
+        throw new Error(
+          `${pkg}: library ${key} has version ${version}, but its entry in libvips-libraries.json says ${entry.version}`,
+        );
+      }
+      let text = 'Es gelten LGPL-3.0 und GPL-3.0, Texte am Ende dieser Datei.';
+      if (entry.file !== null) {
+        const file = join(licensesDir, 'libvips', entry.file);
+        if (!existsSync(file)) {
+          throw new Error(
+            `${pkg}: library ${key}: the license text ${entry.file} from libvips-libraries.json is missing`,
+          );
+        }
+        text = readFileSync(file, 'utf8').trim();
+      }
+      return [
+        `--- ${key} ${version}`,
+        `Lizenz: ${entry.license}`,
+        `Quelle: ${entry.source}`,
+        '',
+        text,
+      ].join('\n');
+    });
+  for (const key of Object.keys(libvipsLibraries)) {
+    if (!Object.hasOwn(versions, key)) {
+      log(`libvips-libraries.json: entry ${key} is unused, it is not in versions.json of ${pkg}`);
+    }
+  }
+  return ['Lizenzen der enthaltenen Bibliotheken:', '', blocks.join('\n\n')].join('\n');
 }
 
 /**
@@ -385,6 +442,9 @@ export function collectLicenses({ repoRoot, programDir, metafile, nodeLicense, l
   const missingLicenseFiles = JSON.parse(
     readFileSync(join(LICENSES_DIR, 'missing-license-files.json'), 'utf8'),
   );
+  const libvipsLibraries = JSON.parse(
+    readFileSync(join(LICENSES_DIR, 'libvips-libraries.json'), 'utf8'),
+  );
   const packageDirs = [
     ...bundledPackageDirs(metafile, repoRoot),
     ...nativePackageDirs(join(programDir, 'app', 'node_modules')),
@@ -395,6 +455,7 @@ export function collectLicenses({ repoRoot, programDir, metafile, nodeLicense, l
     nodeLicense,
     interLicense: join(repoRoot, 'apps', 'web', 'src', 'assets', 'fonts', 'LICENSE-Inter.txt'),
     missingLicenseFiles,
+    libvipsLibraries,
     log,
   });
   const target = join(programDir, NOTICES_FILE);

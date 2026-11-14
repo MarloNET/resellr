@@ -89,4 +89,14 @@ describe('collectLicenses on the real bundle', { timeout: 60_000 }, () => {
       );
     }
   });
+
+  it('lists the libraries built into libvips with license, source and text (Nachtrag MAR-711, MAR-719)', () => {
+    expect(notices).toContain(
+      '--- uhdr 2.0.2\nLizenz: MIT AND Apache-2.0\nQuelle: https://github.com/google/libultrahdr/tree/v2.0.2',
+    );
+    expect(notices).toContain('This product includes Gain Map technology under license by Adobe.');
+    expect(notices).toContain('--- cairo 1.18.6\nLizenz: LGPL-2.1-only OR MPL-1.1');
+    expect(notices).toContain('--- glib 2.90.0\nLizenz: LGPL-3.0-or-later');
+    expect(notices).not.toMatch(/^--- spng /m);
+  });
 });
