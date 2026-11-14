@@ -93,6 +93,16 @@ function sameOrders(a: AttributeOrderMap, b: AttributeOrderMap): boolean {
   return [...keys].every((key) => sameList(a[key] ?? [], b[key] ?? []));
 }
 
+/**
+ * The attribute orders the user changed. Only these are sent: an unchanged order from the
+ * loaded layout may meanwhile lack an attribute created in UI-027 and would lead to `409`.
+ */
+function changedOrders(draft: AttributeOrderMap, base: AttributeOrderMap): AttributeOrderMap {
+  return Object.fromEntries(
+    Object.entries(draft).filter(([key, ids]) => !sameList(ids, base[key] ?? [])),
+  );
+}
+
 /** Whether the form differs from the layout it is based on (UI-039 `.disabled`). */
 function isChanged(draft: Draft, base: DatasheetLayout): boolean {
   return (
@@ -229,7 +239,7 @@ export function DatasheetLayoutPage() {
   function save() {
     // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
-    if (draft === null) return;
+    if (draft === null || base === null) return;
     const found = checkAll(draft);
     if (hasErrors(found)) {
       showFieldErrors(found);
@@ -242,7 +252,7 @@ export function DatasheetLayoutPage() {
         version: draft.version,
         headerLabels: draft.headerLabels,
         blockOrder: draft.blockOrder,
-        attributeOrder: draft.attributeOrder,
+        attributeOrder: changedOrders(draft.attributeOrder, base.attributeOrder),
       },
       { onSuccess: onSaved, onError: onFailed },
     );

@@ -70,7 +70,11 @@ type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
  * `fetch` of the page: `GET /api/ops/status` for the frame (UI-044), the layout, the device types
  * and their attributes, and one handler per write `METHOD path`. Records every request.
  */
-function mockApi({ read, writes = {} }: { read?: Route; writes?: Record<string, Route> } = {}) {
+function mockApi({
+  read,
+  writes = {},
+  attributes = NOTEBOOK_ATTRIBUTES,
+}: { read?: Route; writes?: Record<string, Route>; attributes?: unknown[] } = {}) {
   const sent: { method: string; path: string; body: unknown }[] = [];
   const requested: string[] = [];
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
@@ -85,7 +89,7 @@ function mockApi({ read, writes = {} }: { read?: Route; writes?: Record<string, 
       return Response.json({ items: [NOTEBOOK, MONITOR], total: 2 });
     }
     if (method === 'GET' && path === '/api/device-types/1/attributes') {
-      return Response.json({ items: NOTEBOOK_ATTRIBUTES, total: NOTEBOOK_ATTRIBUTES.length });
+      return Response.json({ items: attributes, total: attributes.length });
     }
     if (method === 'GET' && path === '/api/device-types/2/attributes') {
       return Response.json({ items: [], total: 0 });
@@ -263,6 +267,35 @@ describe('UI-039 datasheet layout (CU-102)', () => {
 
     await act(() => vi.advanceTimersByTimeAsync(5000));
     expect(screen.queryByText('Datenblatt-Layout gespeichert')).toBeNull();
+  });
+
+  it('UI-039.success DER-85-01 an attribute created in UI-027 after loading the layout does not block saving a header label (FIND-379)', async () => {
+    // The layout stores [11, 12, 13, 14] for Notebook; attribute 15 was created in UI-027 since.
+    const created = [...NOTEBOOK_ATTRIBUTES, attribute(15, 'Akku', 'technical', 5)];
+    const { sent } = mockApi({
+      attributes: created,
+      writes: { [PUT]: () => Response.json({ ...LAYOUT, version: 4 }) },
+    });
+    await openPage();
+    expect(attributeNames('Technik')).toEqual(['Prozessor', 'RAM', 'Akku']);
+
+    changeLabel(2, 'Ebay-Nr.:');
+    fireEvent.click(saveButton());
+
+    await screen.findByText('Datenblatt-Layout gespeichert');
+    expect(sent).toEqual([
+      {
+        method: 'PUT',
+        path: '/api/datasheet-layout',
+        body: {
+          version: 3,
+          headerLabels: ['Shop:', 'Ebay-Nr.:', 'Kleinanzeigen:'],
+          blockOrder: BLOCKS,
+          attributeOrder: {},
+        },
+      },
+    ]);
+    expectAccessiblePage();
   });
 
   it('UI-039.success DER-85-01 dragging a block onto another and an attribute onto another changes the order to save', async () => {
