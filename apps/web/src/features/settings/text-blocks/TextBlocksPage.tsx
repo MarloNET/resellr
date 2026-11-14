@@ -164,9 +164,11 @@ const berlinDate = new Intl.DateTimeFormat('en-CA', {
 /**
  * Check fields in the browser with the rules of the service (2.2): M-31 at "Prüfende Stelle",
  * a date in the future at "Prüfdatum", M-24 once for both. "Today" is the calendar day in
- * Europe/Berlin, as on the server (2.0.1).
+ * Europe/Berlin, as on the server (2.0.1). Only "rechtlich geprüft" has the two fields; for
+ * "rechtlich ungeprüft" they are hidden and sent empty, so nothing is checked.
  */
 function checkLegal(draft: Draft): FieldErrors {
+  if (draft.legalStatus !== 'checked') return {};
   const errors: FieldErrors = { legalCheckedBy: check('legalCheckedBy', draft.legalCheckedBy) };
   const legalCheck = {
     legalStatus: draft.legalStatus,

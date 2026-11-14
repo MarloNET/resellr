@@ -375,6 +375,33 @@ describe('UI-030 legal check status (CU-101, REQ-054)', () => {
     expect(sent[0]?.body).toMatchObject({ legalCheckedBy: 'a'.repeat(100) });
   });
 
+  it('UI-030.success DER-40-06 a checking body of 101 characters entered before going back to "rechtlich ungeprüft" does not block "Speichern"', async () => {
+    const { sent } = mockApi({
+      writes: {
+        [PATCH_AKKU]: () =>
+          Response.json({ textBlock: AKKU, impact: NO_IMPACT, legalStatusReset: false }),
+      },
+    });
+    await openPage();
+    fireEvent.click(row('Akku-Hinweis Notebook'));
+    fireEvent.change(legalStatusSelect() as HTMLSelectElement, { target: { value: 'checked' } });
+    fireEvent.change(checkedOnInput(), { target: { value: '2020-01-15' } });
+    fireEvent.change(checkedByInput(), { target: { value: 'a'.repeat(101) } });
+    fireEvent.change(legalStatusSelect() as HTMLSelectElement, { target: { value: 'unchecked' } });
+
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByText('Gespeichert')).toBeTruthy();
+    expect(screen.queryByText(CHECKED_BY_TOO_LONG)).toBeNull();
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/text-blocks/2',
+        body: { version: 1, legalStatus: 'unchecked', legalCheckedOn: '', legalCheckedBy: '' },
+      },
+    ]);
+  });
+
   it('UI-030.validation DER-40-06 shows M-31 of a 422 validation_failed at "Prüfende Stelle"', async () => {
     mockApi({
       writes: {
