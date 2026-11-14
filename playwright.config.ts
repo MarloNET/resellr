@@ -38,6 +38,9 @@ const WRITE_PATHS_SPEC = 'write-paths.spec.ts';
 export default defineConfig<object, AppFixtureOptions>({
   testDir: 'e2e',
   fullyParallel: true,
+  // The CI runner has 2 vCPUs, so Playwright would start 1 worker. Each worker starts its own
+  // server (app fixture), so 2 workers run side by side (Technical Specification 10.2, MAR-787).
+  workers: process.env.CI ? 2 : undefined,
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
