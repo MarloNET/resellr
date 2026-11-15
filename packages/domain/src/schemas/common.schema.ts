@@ -28,6 +28,7 @@ export const impactSchema = z.object({
   rerelease: z.int().nonnegative(),
   manualReview: z.int().nonnegative(),
 });
+export type Impact = z.infer<typeof impactSchema>;
 
 /** List response `{ items, total }`. */
 export function listResponseSchema<T extends z.ZodType>(itemSchema: T) {

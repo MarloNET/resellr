@@ -1,7 +1,15 @@
+import { FIELD_MESSAGES } from '@resellr/domain/messages/messages.de';
 import {
+  EMPTY_GPSR,
+  GPSR_FIELDS,
+  GPSR_LABELS,
+  gpsrSchema,
   manufacturerNameSchema,
+  type Gpsr,
+  type GpsrField,
   type Manufacturer,
   type ManufacturerCreateResult,
+  type ManufacturerUpdateResult,
 } from '@resellr/domain/schemas/manufacturer.schema';
 import { useEffect, useRef, useState } from 'react';
 
@@ -25,7 +33,9 @@ import { UnreachableBanner } from '../../../components/patterns/UnreachableBanne
 import { Badge } from '../../../components/ui/Badge.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
 import { Input } from '../../../components/ui/Input.tsx';
+import { cn } from '../../../components/ui/cn.ts';
 import { ManufacturerCreateDialog } from '../../models/ManufacturerCreateDialog.tsx';
+import { ImpactDialog, type Impact } from '../ImpactDialog.tsx';
 
 // Texts of UI-031 and UI-008 `screen.md` and of pattern P-01 (UI/UX design v0.6.1).
 const TEXTS = {
@@ -40,6 +50,10 @@ const TEXTS = {
   cancel: 'Abbrechen',
   saved: 'Gespeichert',
   name: 'Name',
+  /** "Herstellername (rechtlich)"; its texts use "Herstellername" (M-05). */
+  legalName: 'Herstellername (rechtlich)',
+  postalAddress: 'Postanschrift',
+  euRp: 'Verantwortliche Person in der EU',
   active: 'aktiv',
   inactive: 'deaktiviert',
   gpsrComplete: 'GPSR vollständig',
@@ -57,6 +71,9 @@ interface Draft {
   name: string;
   /** Stored name; without a change "Speichern" is disabled (DER-37-07). */
   base: string;
+  gpsr: Gpsr;
+  /** Stored GPSR details, the base of the change like `base`. */
+  baseGpsr: Gpsr;
   /**
    * Version of the state the form is based on, taken when it is opened (2.0.3). A background
    * refetch does not change it, so a change from another window leads to `409` and P-05.
@@ -66,8 +83,18 @@ interface Draft {
 
 function draftOf(manufacturer: Manufacturer | undefined): Draft {
   const name = manufacturer?.name ?? '';
-  return { name, base: name, version: manufacturer?.version ?? null };
+  const gpsr = manufacturer?.gpsr ?? EMPTY_GPSR;
+  return { name, base: name, gpsr, baseGpsr: gpsr, version: manufacturer?.version ?? null };
 }
+
+/** Field of the form, the path of `fields[]` in a `validation_failed` (2.0.5). */
+type Field = 'name' | `gpsr.${GpsrField}`;
+type FieldErrors = Partial<Record<Field, string>>;
+
+const gpsrPath = (field: GpsrField): Field => `gpsr.${field}`;
+
+const isField = (path: string): path is Field =>
+  path === 'name' || GPSR_FIELDS.some((field) => gpsrPath(field) === path);
 
 /** First message of the Zod check in the browser, the same schema as on the server (2.0.7). */
 function checkName(name: string): string | undefined {
@@ -75,13 +102,37 @@ function checkName(name: string): string | undefined {
   return result.success ? undefined : result.error.issues[0]?.message;
 }
 
+const checkGpsrField = (field: GpsrField, value: string) =>
+  gpsrSchema.shape[field].safeParse(value).error?.issues[0]?.message;
+
+/** Field errors of the name and of every GPSR field, in the order of the form. */
+function checkAll(draft: Draft): FieldErrors {
+  const errors: FieldErrors = { name: checkName(draft.name) };
+  for (const field of GPSR_FIELDS)
+    errors[gpsrPath(field)] = checkGpsrField(field, draft.gpsr[field]);
+  return errors;
+}
+
+const hasErrors = (errors: FieldErrors) => Object.values(errors).some(Boolean);
+
+const gpsrChanged = (draft: Draft) =>
+  GPSR_FIELDS.some((field) => draft.gpsr[field] !== draft.baseGpsr[field]);
+
+/** Text area for the multi-line address of the responsible person (3.1 "mehrzeilig"). */
+const TEXT_AREA_CLASS = cn(
+  'w-full min-w-0 rounded-control bg-surface px-2 py-1 ring-1 ring-border-input ring-inset',
+  'text-body text-text aria-invalid:ring-error disabled:bg-bg',
+);
+
 /**
  * Manufacturers of UI-031 (CU-098, REQ-100, REQ-101; Technical Specification 2.2): maintenance
  * list P-01 with name, status and GPSR chip, "Hersteller anlegen" through dialog UI-008
  * (CU-115), rename with the hint before saving and the row action "Deaktivieren". There is no
- * deletion. The GPSR details follow with #165. States after 2.0.7: loading, empty, validation,
- * success, error, disabled, speichert (P-08), conflict (P-05), unreachable (P-06), wird-beendet
- * (P-07), ausgang-unbekannt (P-08).
+ * deletion. The detail area keeps the GPSR details with the responsible person in the EU
+ * (REQ-027); saving is allowed while incomplete, each missing part shows "<Teil> fehlt" at its
+ * field (DER-41-03). After "Speichern" dialog UI-043 shows `impact` of the answer (DER-41-04).
+ * States after 2.0.7: loading, empty, validation, success, error, disabled, speichert (P-08),
+ * conflict (P-05), unreachable (P-06), wird-beendet (P-07), ausgang-unbekannt (P-08).
  */
 export function ManufacturersPage() {
   const query = useManufacturersQuery();
@@ -93,8 +144,9 @@ export function ManufacturersPage() {
   // `null` until the list has arrived and the first manufacturer is open.
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft>(draftOf(undefined));
-  const [nameError, setNameError] = useState<string | undefined>();
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
+  const [impact, setImpact] = useState<Impact | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   // The manufacturer just created through UI-008, with its hint until another is chosen.
   const [createdId, setCreatedId] = useState<number | null>(null);
@@ -122,21 +174,25 @@ export function ManufacturersPage() {
     if (!takeReloaded || query.isFetching) return;
     setTakeReloaded(false);
     setDraft(draftOf(selected));
-    setNameError(undefined);
+    setErrors({});
   }, [takeReloaded, query.isFetching, selected]);
 
   function open(manufacturer: Manufacturer) {
     blurCheck.cancel();
     setSelectedId(manufacturer.id);
     setDraft(draftOf(manufacturer));
-    setNameError(undefined);
+    setErrors({});
     if (manufacturer.id !== createdId) setCreatedId(null);
     if (notice?.kind !== 'success') setNotice(null);
   }
 
-  function showFieldError(message: string) {
-    setNameError(message);
+  function showFieldErrors(next: FieldErrors) {
+    setErrors(next);
     focusFirstError();
+  }
+
+  function checkOnBlur(field: Field, check: () => string | undefined) {
+    blurCheck.checkOnBlur(() => setErrors((current) => ({ ...current, [field]: check() })));
   }
 
   /** Answer of UI-008: the new or the existing manufacturer is chosen (DER-37-12, Q-7). */
@@ -149,42 +205,52 @@ export function ManufacturersPage() {
   }
 
   function onSaveFailed(error: ApiError) {
-    const field =
-      error.kind === 'validation'
-        ? error.error?.fields.find((entry) => entry.path === 'name')
-        : undefined;
-    if (field) {
-      showFieldError(field.message);
-      return;
+    if (error.kind === 'validation') {
+      const next: FieldErrors = {};
+      for (const { path, message } of error.error?.fields ?? []) {
+        if (isField(path)) next[path] ??= message;
+      }
+      if (hasErrors(next)) {
+        showFieldErrors(next);
+        return;
+      }
     }
     // `name_taken.manufacturer` "Name ist bereits vergeben" stands at the field (DER-37-04).
     if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
-      showFieldError(error.error.message);
+      showFieldErrors({ name: error.error.message });
       return;
     }
     setNotice(noticeOf(error));
   }
 
+  /** "Gespeichert", then UI-043 with `impact` of the answer (DER-41-04, DER-41-05). */
+  function onSaved({ manufacturer, impact: saved }: ManufacturerUpdateResult) {
+    setDraft(draftOf(manufacturer));
+    setNotice({ kind: 'success' });
+    setImpact(saved);
+  }
+
   function save() {
-    // The save checks the name itself; a later check on leaving must not hide its result.
+    // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
-    if (draft.name === draft.base || selectedId === null || draft.version === null) return;
-    const message = checkName(draft.name);
-    if (message) {
-      showFieldError(message);
+    const renamed = draft.name !== draft.base;
+    const gpsrSent = gpsrChanged(draft);
+    if ((!renamed && !gpsrSent) || selectedId === null || draft.version === null) return;
+    const next = checkAll(draft);
+    if (hasErrors(next)) {
+      showFieldErrors(next);
       return;
     }
-    setNameError(undefined);
+    setErrors({});
     setNotice(null);
     saveMutation.mutate(
-      { id: selectedId, version: draft.version, name: draft.name },
       {
-        onSuccess: ({ manufacturer }) => {
-          setDraft(draftOf(manufacturer));
-          setNotice({ kind: 'success' });
-        },
-        onError: onSaveFailed,
+        id: selectedId,
+        version: draft.version,
+        ...(renamed && { name: draft.name }),
+        ...(gpsrSent && { gpsr: draft.gpsr }),
       },
+      { onSuccess: onSaved, onError: onSaveFailed },
     );
   }
 
@@ -208,8 +274,49 @@ export function ManufacturersPage() {
 
   const formLocked = busy || selectedId === null;
   const renamed = selectedId !== null && draft.name.trim() !== draft.base;
-  const unchanged = draft.name === draft.base;
+  const unchanged = draft.name === draft.base && !gpsrChanged(draft);
   const loadFailed = query.isError ? query.error : null;
+
+  // While an input is faulty only its errors show, so the focus and the reading go to them.
+  const inputFaulty = hasErrors(errors);
+
+  /**
+   * Error of a GPSR field: the check of the input, else "<Teil> fehlt" for a part the stored
+   * details miss while the field is still empty (DER-41-03).
+   */
+  const gpsrError = (field: GpsrField) =>
+    errors[gpsrPath(field)] ??
+    (!inputFaulty &&
+    selected?.gpsrMissing.some((part) => part === field) &&
+    draft.gpsr[field].trim() === ''
+      ? FIELD_MESSAGES.gpsrMissing(GPSR_LABELS[field])
+      : undefined);
+
+  function gpsrField(field: GpsrField, label: string, required: boolean) {
+    const multiLine = field === 'euRpAddress';
+    return (
+      <FormField key={field} label={label} required={required} error={gpsrError(field)}>
+        {(control) => {
+          const props = {
+            ...control,
+            value: draft.gpsr[field],
+            disabled: formLocked,
+            onChange: (event: { target: { value: string } }) =>
+              setDraft({ ...draft, gpsr: { ...draft.gpsr, [field]: event.target.value } }),
+            onBlur: () => {
+              const value = draft.gpsr[field];
+              checkOnBlur(gpsrPath(field), () => checkGpsrField(field, value));
+            },
+          };
+          return multiLine ? (
+            <textarea {...props} rows={3} className={TEXT_AREA_CLASS} />
+          ) : (
+            <Input {...props} />
+          );
+        }}
+      </FormField>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 p-6">
@@ -288,7 +395,7 @@ export function ManufacturersPage() {
           }}
         >
           <div className="flex flex-col gap-1 full:w-80">
-            <FormField label={TEXTS.name} required error={nameError}>
+            <FormField label={TEXTS.name} required error={errors.name}>
               {(control) => (
                 <Input
                   {...control}
@@ -297,12 +404,30 @@ export function ManufacturersPage() {
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                   onBlur={() => {
                     const name = draft.name;
-                    blurCheck.checkOnBlur(() => setNameError(checkName(name)));
+                    checkOnBlur('name', () => checkName(name));
                   }}
                 />
               )}
             </FormField>
             {renamed && <p className="m-0 text-label text-text-secondary">{TEXTS.renameHint}</p>}
+          </div>
+          <div className="flex w-full flex-col gap-4">
+            <div className="full:w-80">{gpsrField('legalName', TEXTS.legalName, true)}</div>
+            <fieldset className="m-0 grid gap-3 border-0 p-0 full:grid-cols-2">
+              <legend className="mb-1 p-0 text-label font-semibold text-text">
+                {TEXTS.postalAddress}
+              </legend>
+              {(['street', 'postalCode', 'city', 'country'] as const).map((field) =>
+                gpsrField(field, GPSR_LABELS[field], true),
+              )}
+            </fieldset>
+            <div className="full:w-80">{gpsrField('contact', GPSR_LABELS.contact, true)}</div>
+            <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
+              <legend className="mb-1 p-0 text-label font-semibold text-text">{TEXTS.euRp}</legend>
+              {(['euRpName', 'euRpAddress', 'euRpContact'] as const).map((field) =>
+                gpsrField(field, GPSR_LABELS[field], false),
+              )}
+            </fieldset>
           </div>
           <div className="flex flex-wrap gap-2 full:ml-auto full:mt-6">
             <Button
@@ -334,6 +459,7 @@ export function ManufacturersPage() {
         onOpenChange={setDialogOpen}
         onCreated={onCreated}
       />
+      <ImpactDialog impact={impact} onClose={() => setImpact(null)} />
     </div>
   );
 }

@@ -888,6 +888,22 @@ describe('manufacturer API (CU-087, Technical Specification 2.2)', () => {
 
   const NO_IMPACT = { updated: 0, rerelease: 0, manualReview: 0 };
 
+  /** GPSR part of a manufacturer without details, as created (2.2). */
+  const NO_GPSR = {
+    gpsrMissing: ['legalName', 'street', 'postalCode', 'city', 'country', 'contact'],
+    gpsr: {
+      legalName: '',
+      street: '',
+      postalCode: '',
+      city: '',
+      country: '',
+      contact: '',
+      euRpName: '',
+      euRpAddress: '',
+      euRpContact: '',
+    },
+  };
+
   const createLenovo = async () => (await create({ name: 'Lenovo' })).json();
 
   const manufacturerCount = () =>
@@ -918,12 +934,20 @@ describe('manufacturer API (CU-087, Technical Specification 2.2)', () => {
       name: 'Fujitsu',
       active: true,
       gpsrComplete: false,
+      ...NO_GPSR,
       version: 1,
       existing: false,
     });
     expect((await list()).json()).toEqual({
       items: [
-        { id: created.json().id, name: 'Fujitsu', active: true, gpsrComplete: false, version: 1 },
+        {
+          id: created.json().id,
+          name: 'Fujitsu',
+          active: true,
+          gpsrComplete: false,
+          ...NO_GPSR,
+          version: 1,
+        },
       ],
       total: 1,
     });
@@ -985,7 +1009,14 @@ describe('manufacturer API (CU-087, Technical Specification 2.2)', () => {
     ).toEqual([lenovo.id]);
     expect((await listAll()).json().items).toEqual([
       expect.objectContaining({ name: 'HP', active: true }),
-      { id: lenovo.id, name: 'Lenovo', active: false, gpsrComplete: false, version: 2 },
+      {
+        id: lenovo.id,
+        name: 'Lenovo',
+        active: false,
+        gpsrComplete: false,
+        ...NO_GPSR,
+        version: 2,
+      },
     ]);
   });
 
@@ -1063,7 +1094,14 @@ describe('manufacturer API (CU-087, Technical Specification 2.2)', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
-      manufacturer: { id: lenvo.id, name: 'Lenovo', active: true, gpsrComplete: false, version: 2 },
+      manufacturer: {
+        id: lenvo.id,
+        name: 'Lenovo',
+        active: true,
+        gpsrComplete: false,
+        ...NO_GPSR,
+        version: 2,
+      },
       impact: NO_IMPACT,
     });
   });
@@ -1110,6 +1148,141 @@ describe('manufacturer API (CU-087, Technical Specification 2.2)', () => {
       items: [{ name: 'B' }],
       total: 3,
     });
+  });
+
+  const LENOVO_GPSR = {
+    ...NO_GPSR.gpsr,
+    legalName: 'Lenovo PC HK Limited',
+    street: 'Meitnerstraße 9',
+    postalCode: '70563',
+    city: 'Stuttgart',
+    country: 'Deutschland',
+    contact: 'info@lenovo.com',
+  };
+
+  it('AC-REQ-027-01 Lenovo without GPSR details is "GPSR vollständig" after saving legal name, full postal address and e-mail address', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await patch(lenovo.id, { version: 1, gpsr: LENOVO_GPSR });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().manufacturer).toEqual({
+      id: lenovo.id,
+      name: 'Lenovo',
+      active: true,
+      gpsrComplete: true,
+      gpsrMissing: [],
+      gpsr: LENOVO_GPSR,
+      version: 2,
+    });
+    expect((await listAll()).json().items).toEqual([response.json().manufacturer]);
+  });
+
+  it('AC-REQ-027-02 a postal address without postal code is saved, gpsrComplete stays false and gpsrMissing names the postal code', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await patch(lenovo.id, {
+      version: 1,
+      gpsr: { ...LENOVO_GPSR, postalCode: '' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().manufacturer).toMatchObject({
+      gpsrComplete: false,
+      gpsrMissing: ['postalCode'],
+      gpsr: { ...LENOVO_GPSR, postalCode: '' },
+      version: 2,
+    });
+  });
+
+  it('DER-41-03 a save with only some parts names every missing one in gpsrMissing', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await patch(lenovo.id, {
+      version: 1,
+      gpsr: { ...NO_GPSR.gpsr, legalName: 'Lenovo PC HK Limited', city: 'Stuttgart' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().manufacturer).toMatchObject({
+      gpsrComplete: false,
+      gpsrMissing: ['street', 'postalCode', 'country', 'contact'],
+    });
+  });
+
+  it.each([
+    ['legalName', 201, 'Herstellername: höchstens 200 Zeichen'],
+    ['postalCode', 21, 'Postleitzahl: höchstens 20 Zeichen'],
+    ['contact', 255, 'Elektronische Kontaktadresse: höchstens 254 Zeichen'],
+    ['euRpAddress', 501, 'Postanschrift der verantwortlichen Person: höchstens 500 Zeichen'],
+  ])(
+    'DER-41-01 rejects %s of %i characters with validation_failed and the text at the field',
+    async (field, length, message) => {
+      const lenovo = await createLenovo();
+
+      const response = await patch(lenovo.id, {
+        version: 1,
+        gpsr: { ...LENOVO_GPSR, [field]: 'x'.repeat(length) },
+      });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'validation_failed',
+        fields: [{ path: `gpsr.${field}`, message }],
+      });
+      expect((await listAll()).json().items[0]).toMatchObject({ ...NO_GPSR, version: 1 });
+    },
+  );
+
+  it('DER-41-02 rejects a contact that is neither an e-mail nor an http(s) address with "E-Mail-Adresse oder Internetadresse ungültig"', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await patch(lenovo.id, {
+      version: 1,
+      gpsr: { ...LENOVO_GPSR, contact: 'www.lenovo.com' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
+      {
+        path: 'gpsr.contact',
+        code: expect.any(String),
+        message: 'E-Mail-Adresse oder Internetadresse ungültig',
+      },
+    ]);
+    expect((await listAll()).json().items[0]).toMatchObject({ version: 1 });
+  });
+
+  it('DER-41-02 accepts an https address as contact', async () => {
+    const lenovo = await createLenovo();
+
+    const response = await patch(lenovo.id, {
+      version: 1,
+      gpsr: { ...LENOVO_GPSR, contact: 'https://www.lenovo.com/de/kontakt' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().manufacturer.gpsrComplete).toBe(true);
+  });
+
+  it('DER-41-05 saving the GPSR details answers impact 0, 0, 0 while there is no channel content', async () => {
+    const lenovo = await createLenovo();
+    insertModelTemplate(lenovo.id);
+
+    const response = await patch(lenovo.id, { version: 1, gpsr: LENOVO_GPSR });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().impact).toEqual(NO_IMPACT);
+  });
+
+  it('DER-37-06 (a) rejects a GPSR change with an outdated version with 409 version_conflict', async () => {
+    const lenovo = await createLenovo();
+    await patch(lenovo.id, { version: 1, name: 'Lenovo neu' });
+
+    const response = await patch(lenovo.id, { version: 1, gpsr: LENOVO_GPSR });
+
+    expect(response.statusCode).toBe(409);
+    expect((await listAll()).json().items[0]).toMatchObject({ ...NO_GPSR, version: 2 });
   });
 
   it('there is no DELETE route for manufacturers (2.2, REQ-101)', () => {

@@ -1,10 +1,113 @@
 import { z } from 'zod';
 
-import { FIELD_MESSAGES } from '../messages/messages.de.ts';
+import { FIELD_MESSAGES, MESSAGES } from '../messages/messages.de.ts';
 import { idSchema, impactSchema, listResponseSchema, versionSchema } from './common.schema.ts';
 
-// Manufacturer (REQ-100, REQ-101; Technical Specification 2.2, 3.1). The GPSR fields, `gpsr`
-// and `gpsrMissing[]` follow with #165.
+// Manufacturer with its GPSR details (REQ-027, REQ-100, REQ-101; Technical Specification 2.2,
+// 3.1).
+
+/** Fields of the GPSR details in the order of UI-031; `euRp…` is the responsible person in the EU. */
+export const GPSR_FIELDS = [
+  'legalName',
+  'street',
+  'postalCode',
+  'city',
+  'country',
+  'contact',
+  'euRpName',
+  'euRpAddress',
+  'euRpContact',
+] as const;
+export type GpsrField = (typeof GPSR_FIELDS)[number];
+
+/**
+ * Parts that make the details complete (2.2 `gpsrComplete`): legal name, street and house
+ * number, postal code, city, country and contact. The responsible person in the EU is optional.
+ */
+export const GPSR_REQUIRED_FIELDS = [
+  'legalName',
+  'street',
+  'postalCode',
+  'city',
+  'country',
+  'contact',
+] as const satisfies readonly GpsrField[];
+export type GpsrRequiredField = (typeof GPSR_REQUIRED_FIELDS)[number];
+
+/** Labels of the fields in UI-031, also the parts of "<Teil> fehlt" and of the audit entry. */
+export const GPSR_LABELS: Record<GpsrField, string> = {
+  legalName: 'Herstellername',
+  street: 'Straße und Hausnummer',
+  postalCode: 'Postleitzahl',
+  city: 'Ort',
+  country: 'Land',
+  contact: 'Elektronische Kontaktadresse',
+  euRpName: 'Name der verantwortlichen Person',
+  euRpAddress: 'Postanschrift der verantwortlichen Person',
+  euRpContact: 'Kontaktadresse der verantwortlichen Person',
+};
+
+/** Technical upper bounds of the architect (3.1) with their texts M-05 to M-13 (8.2). */
+const GPSR_LIMITS: Record<GpsrField, { max: number; message: string }> = {
+  legalName: { max: 200, message: MESSAGES['M-05'] },
+  street: { max: 200, message: MESSAGES['M-06'] },
+  postalCode: { max: 20, message: MESSAGES['M-07'] },
+  city: { max: 100, message: MESSAGES['M-08'] },
+  country: { max: 100, message: MESSAGES['M-09'] },
+  contact: { max: 254, message: MESSAGES['M-10'] },
+  euRpName: { max: 200, message: MESSAGES['M-11'] },
+  euRpAddress: { max: 500, message: MESSAGES['M-12'] },
+  euRpContact: { max: 254, message: MESSAGES['M-13'] },
+};
+
+const gpsrTextSchema = (field: GpsrField) =>
+  z.string().trim().max(GPSR_LIMITS[field].max, GPSR_LIMITS[field].message);
+
+const emailSchema = z.email();
+const webAddressSchema = z.httpUrl();
+
+/** An e-mail address or an address with `http://` or `https://` (2.2). */
+const isContact = (value: string) =>
+  emailSchema.safeParse(value).success || webAddressSchema.safeParse(value).success;
+
+/**
+ * GPSR details as entered: each field 0 to its bound after removing the spaces at the edges,
+ * `''` = not given. A given contact must be an e-mail or web address (DER-41-02); a too long
+ * contact only gets M-10 (meldungskatalog M-10).
+ */
+export const gpsrSchema = z.strictObject({
+  legalName: gpsrTextSchema('legalName'),
+  street: gpsrTextSchema('street'),
+  postalCode: gpsrTextSchema('postalCode'),
+  city: gpsrTextSchema('city'),
+  country: gpsrTextSchema('country'),
+  contact: gpsrTextSchema('contact').refine(
+    (value) => value === '' || value.length > GPSR_LIMITS.contact.max || isContact(value),
+    FIELD_MESSAGES.gpsrContact,
+  ),
+  euRpName: gpsrTextSchema('euRpName'),
+  euRpAddress: gpsrTextSchema('euRpAddress'),
+  euRpContact: gpsrTextSchema('euRpContact'),
+});
+export type Gpsr = z.infer<typeof gpsrSchema>;
+
+/** A manufacturer without GPSR details, as created (UI-008). */
+export const EMPTY_GPSR: Gpsr = {
+  legalName: '',
+  street: '',
+  postalCode: '',
+  city: '',
+  country: '',
+  contact: '',
+  euRpName: '',
+  euRpAddress: '',
+  euRpContact: '',
+};
+
+/** `gpsrMissing[]`: the required parts without a value, in the order of UI-031 (2.2). */
+export function gpsrMissingOf(gpsr: Gpsr): GpsrRequiredField[] {
+  return GPSR_REQUIRED_FIELDS.filter((field) => gpsr[field] === '');
+}
 
 /** Longest name of a manufacturer after trimming (3.1). */
 export const MANUFACTURER_NAME_MAX = 50;
@@ -31,15 +134,33 @@ export const manufacturerUpdateSchema = z.strictObject({
   version: versionSchema,
   name: manufacturerNameSchema.optional(),
   active: z.boolean().optional(),
+  /** All nine fields; saving is allowed while incomplete (AC-REQ-027-02). */
+  gpsr: gpsrSchema.optional(),
 });
 export type ManufacturerUpdate = z.infer<typeof manufacturerUpdateSchema>;
 
-/** Manufacturer in the answers (2.2); `gpsrComplete` gives the chip of UI-031 (DER-37-08). */
+/**
+ * Manufacturer in the answers (2.2); `gpsrComplete` gives the chip of UI-031 (DER-37-08),
+ * `gpsrMissing[]` the parts named "<Teil> fehlt" (DER-41-03).
+ */
 export const manufacturerSchema = z.object({
   id: idSchema,
   name: z.string(),
   active: z.boolean(),
   gpsrComplete: z.boolean(),
+  gpsrMissing: z.array(z.enum(GPSR_REQUIRED_FIELDS)),
+  /** As stored, `''` for a field without a value. */
+  gpsr: z.object({
+    legalName: z.string(),
+    street: z.string(),
+    postalCode: z.string(),
+    city: z.string(),
+    country: z.string(),
+    contact: z.string(),
+    euRpName: z.string(),
+    euRpAddress: z.string(),
+    euRpContact: z.string(),
+  }),
   version: versionSchema,
 });
 export type Manufacturer = z.infer<typeof manufacturerSchema>;
