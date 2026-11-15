@@ -151,8 +151,11 @@ export function DatasheetLayoutPage() {
   const [chosenId, setChosenId] = useState<number | null>(null);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
   const [takeReloaded, setTakeReloaded] = useState(false);
+  // Counts the results of "Speichern" that show a banner; each one brings the banners into view.
+  const [results, setResults] = useState(0);
 
   const formRef = useRef<HTMLFormElement>(null);
+  const bannersRef = useRef<HTMLDivElement>(null);
   const focusFirstError = useFocusFirstError(formRef);
   const blurCheck = useDeferredBlurCheck();
 
@@ -177,6 +180,15 @@ export function DatasheetLayoutPage() {
     setDraft(draftOf(layout));
     setErrors({});
   }, [takeReloaded, query.isFetching, layout]);
+
+  // "Speichern" is at the end of a long page, the banners at its top (QA-R2-01): the result of a
+  // save is scrolled into view and gets the focus, so "Neu laden" of P-05 is the next stop.
+  useEffect(() => {
+    const banners = bannersRef.current;
+    if (results === 0 || banners === null || !banners.hasChildNodes()) return;
+    banners.focus({ preventScroll: true });
+    banners.scrollIntoView({ block: 'nearest' });
+  }, [results]);
 
   function changeLabel(position: number, value: string) {
     if (draft === null) return;
@@ -219,6 +231,7 @@ export function DatasheetLayoutPage() {
     setDraft(draftOf(saved));
     setErrors({});
     setNotice({ kind: 'success' });
+    setResults((count) => count + 1);
   }
 
   function onFailed(error: ApiError) {
@@ -233,7 +246,9 @@ export function DatasheetLayoutPage() {
         return;
       }
     }
+    // An unknown outcome sets no notice; P-08 shows itself once the page is locked.
     setNotice(noticeOf(error));
+    setResults((count) => count + 1);
   }
 
   function save() {
@@ -272,23 +287,25 @@ export function DatasheetLayoutPage() {
     <div className="flex flex-col gap-4 p-6">
       <h1 className="m-0 text-page-title font-semibold">{TEXTS.title}</h1>
 
-      <OutcomeUnknownBanner />
-      {loadFailed?.kind === 'unreachable' && <UnreachableBanner />}
-      {loadFailed && loadFailed.kind !== 'unreachable' && (
-        <PageBanner variant="error" error={loadFailed}>
-          {TEXTS.error}
-        </PageBanner>
-      )}
-      <SaveNoticeBanners
-        notice={notice}
-        onClose={() => setNotice(null)}
-        onReloaded={() => {
-          setNotice(null);
-          setTakeReloaded(true);
-        }}
-        successText={TEXTS.saved}
-        errorText={TEXTS.error}
-      />
+      <div ref={bannersRef} tabIndex={-1} className="flex flex-col gap-4 outline-none empty:hidden">
+        <OutcomeUnknownBanner />
+        {loadFailed?.kind === 'unreachable' && <UnreachableBanner />}
+        {loadFailed && loadFailed.kind !== 'unreachable' && (
+          <PageBanner variant="error" error={loadFailed}>
+            {TEXTS.error}
+          </PageBanner>
+        )}
+        <SaveNoticeBanners
+          notice={notice}
+          onClose={() => setNotice(null)}
+          onReloaded={() => {
+            setNotice(null);
+            setTakeReloaded(true);
+          }}
+          successText={TEXTS.saved}
+          errorText={TEXTS.error}
+        />
+      </div>
 
       {query.isPending && (
         <p role="status" className="m-0 text-body text-text-secondary">

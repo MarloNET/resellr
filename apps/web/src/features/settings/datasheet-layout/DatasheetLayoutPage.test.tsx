@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { createQueryClient } from '../../../app/query-client.ts';
@@ -166,6 +166,29 @@ function expectAccessiblePage() {
     expect(describedBy && document.getElementById(describedBy)?.textContent).toBeTruthy();
   }
 }
+
+/**
+ * Stubs `scrollIntoView` (not part of jsdom) and records the elements it scrolled to; on a long
+ * page "Speichern" is at the end, the banners at the top (QA-R2-01).
+ */
+function recordScrolls() {
+  const scrolled: Element[] = [];
+  Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
+    scrolled.push(this);
+  });
+  return scrolled;
+}
+
+/** The result banner of "Speichern" was scrolled into view and has the focus (QA-R2-01). */
+function expectBannerInView(banner: HTMLElement, scrolled: Element[]) {
+  const region = document.activeElement as HTMLElement;
+  expect(region.contains(banner)).toBe(true);
+  expect(scrolled).toContain(region);
+}
+
+beforeEach(() => {
+  recordScrolls();
+});
 
 afterEach(() => {
   cleanup();
@@ -433,6 +456,44 @@ describe('UI-039 datasheet layout (CU-102)', () => {
     expectAccessiblePage();
   });
 
+  it.each([
+    ['success', () => Response.json({ ...LAYOUT, version: 4 }), 'Datenblatt-Layout gespeichert'],
+    [
+      'error',
+      () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+          status: 500,
+        }),
+      'Referenz: R-7K2M-9QX4',
+    ],
+    [
+      'conflict',
+      () => Response.json(errorBody('version_conflict'), { status: 409 }),
+      'Bitte neu laden und erneut prüfen.',
+    ],
+    [
+      'wird-beendet',
+      () => Response.json(errorBody('shutting_down'), { status: 503 }),
+      'resellr wird gerade beendet.',
+    ],
+  ])(
+    'UI-039.%s brings the banner after "Speichern" at the end of a long page into view and focuses it (QA-R2-01)',
+    async (state, answer, text) => {
+      mockApi({ writes: { [PUT]: answer } });
+      await openPage();
+      const scrolled = recordScrolls();
+
+      changeLabel(2, 'Ebay-Nr.:');
+      saveButton().focus();
+      fireEvent.click(saveButton());
+
+      const banner = await screen.findByRole(state === 'success' ? 'status' : 'alert');
+      expect(banner.textContent).toContain(text);
+      expectBannerInView(banner, scrolled);
+      expectAccessiblePage();
+    },
+  );
+
   it('UI-039.speichert shows "Speichern …" and locks the inputs while the write runs', async () => {
     mockApi({ writes: { [PUT]: pending } });
     await openPage();
@@ -526,12 +587,14 @@ describe('UI-039 datasheet layout (CU-102)', () => {
       },
     });
     await openPage();
+    const scrolled = recordScrolls();
 
     changeLabel(2, 'Ebay-Nr.:');
     fireEvent.click(saveButton());
 
     const banner = await screen.findByRole('alert');
     expect(banner.textContent).toContain('Ausgang unbekannt, bitte neu laden.');
+    expectBannerInView(banner, scrolled);
     expect(within(banner).queryByRole('button')).toBeNull();
     expect(labelInput(2).value).toBe('Ebay-Nr.:');
     expect(saveButton().disabled).toBe(true);
