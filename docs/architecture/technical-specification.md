@@ -2936,7 +2936,7 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | --- | --- | --- | --- | --- |
 | CU-001 | Workspace-Wurzel | `package.json`, `tsconfig.base.json`, `.nvmrc`, `vitest.config.ts` | Workspaces, gemeinsame TypeScript-Optionen (strict), Node-Version, Skripte `build`, `test`, `e2e`, `lint`, `typecheck`, `demo`; Vitest-Projekte je Workspace über `test.projects` (Nachtrag MAR-213) | alle |
 | CU-002 | Lint-Regeln | `eslint.config.mjs`, `.prettierrc` | Codeformat (Prettier, über ESLint geprüft), Importgrenzen zwischen Komponenten (Kap. 4.1) einschließlich `main.ts` → `app.ts` (nur diese Richtung; Nachtrag MAR-240) | alle |
-| CU-003 | Linux-CI | `.github/workflows/ci.yml` | Lint, Typprüfung, Unit-, Integrations- und E2E-Tests unter Linux mit Google Chrome; `npm audit` in zwei Schritten (Kap. 4.3, TH-07); bei reinen Doku-Änderungen kein Lauf auf `main` und im PR nur die Diff-Prüfung (Nachtrag MAR-787) | alle |
+| CU-003 | Linux-CI | `.github/workflows/ci.yml` | Lint, Typprüfung, Unit-, Integrations- und E2E-Tests unter Linux mit Google Chrome; `npm audit` in zwei Schritten (Kap. 4.3, TH-07); bei reinen Doku-Änderungen kein Lauf auf `main` und im PR nur die Diff-Prüfung (Nachtrag MAR-787); Abbruch laufender Läufe nur in PRs, manueller Lauf (`workflow_dispatch`) mit Auswahl der Playwright-Worker unter eigenem Check-Namen; der Job-Name `Lint, type check, tests (Linux)` ist der Pflicht-Check des Rulesets auf `main` (Nachtrag MAR-826) | alle |
 | CU-004 | Demo-Start | `tools/demo/run-demo.ts` | `npm run demo`: bauen, temporären Datenordner anlegen, Server auf `127.0.0.1:${PORT:-4310}` starten, nach `ready` Beispieldaten über die HTTP-API einspielen (CU-061), erst danach die Adresse ausgeben (Baseline 11.3, Nachtrag MAR-305); die Startbelegung kommt erst mit S2 über CU-071 (FIND-223) | O5 |
 | CU-005 | Laufzeitpfade | `packages/runtime-shared/src/paths.ts` | Pfade von Daten-, Protokoll-, Übergabe- und Update-Kopie-Ordner aus Umgebung bzw. `%LOCALAPPDATA%`; einzige Stelle für den Aufbau von `app\…` im Programmordner (Kap. 2.19): `programFolderPaths(programDir)` mit `appDir` (`app`), `serverEntry` (`app/server.mjs`), `launcherEntry` (`app/launcher.mjs`), `webRoot` (`app/web`) und `nativeModulesDir` (`app/node_modules`), gebildet mit `join` aus `node:path`; reicht `IS_BUNDLED` aus CU-313 unverändert weiter (`export { IS_BUNDLED } from './bundled.ts'`), Verwender importieren es weiter von hier. `launcher-pages` bleibt bei CU-310 (Nachtrag MAR-446, MAR-474) | F-19 |
 | CU-006 | Exit-Codes | `packages/runtime-shared/src/exit-codes.ts` | Konstanten 0, 10, 11, 12 und ihre Bedeutung | F-18 |
@@ -3001,7 +3001,7 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-059 | Design-Tokens | `apps/web/src/styles/tokens.css`, `tailwind.css` | Farben, Typografie, Radien, Abstände aus `DESIGN.md` als CSS-Variablen und Tailwind-Theme; Bruchstelle `full` (1366 px, Kap. 2.0.10) | DESIGN.md |
 | CU-060 | Schriftdateien | `apps/web/src/assets/fonts/` | Inter 4.1 woff2 (Regular, Semibold), lokal gebündelt | REQ-079 |
 | CU-061 | Demo-Daten | `packages/test-data/src/demo-seed.ts` | synthetische, deterministische Beispieldaten für `npm run demo`, erweitert in jedem Schritt (Hotspot); eingespielt nur über die HTTP-API des laufenden Servers: `createDemoApi(baseUrl)` und `seedDemoData(api)`, das die Funktionen `seed<Bereich>(api)` in Schrittreihenfolge aufruft (Nachtrag MAR-305) | O5 |
-| CU-062 | E2E-Grundlage | `playwright.config.ts`, `e2e/fixtures/app-fixture.ts`, `e2e/fixtures/reachability.ts` | Server je Test-Worker mit eigenem Datenordner starten, in der CI zwei Worker (Nachtrag MAR-787); ein Playwright-Projekt je Zeile der Fenstergrößen-Matrix FM-1 bis FM-7; Erreichbarkeitsprüfung je Screen; Testdaten `copy-view-few-fields` (9 Felder) und `copy-view-many-fields` (18 Felder) für die Lage des Streifens in UI-019 schmal (Kap. 6.3, FIND-235) | Kap. 6 |
+| CU-062 | E2E-Grundlage | `playwright.config.ts`, `e2e/fixtures/app-fixture.ts`, `e2e/fixtures/reachability.ts` | Server je Test-Worker mit eigenem Datenordner starten, in der CI die gemessene Worker-Zahl (Nachtrag MAR-787, MAR-826); ein Playwright-Projekt je Zeile der Fenstergrößen-Matrix FM-1 bis FM-7; Erreichbarkeitsprüfung je Screen; Testdaten `copy-view-few-fields` (9 Felder) und `copy-view-many-fields` (18 Felder) für die Lage des Streifens in UI-019 schmal (Kap. 6.3, FIND-235) | Kap. 6 |
 | CU-284 | AC-Abdeckungsprüfung | `tools/qa/check-ac-coverage.mjs` | prüft in der CI, dass jede AC-REQ-ID der **abgeschlossenen** Schritte (CU-299) in mindestens einem Testtitel steht, und zwar am **Anfang** des Titels (Kap. 6.2, FIND-223, Nachtrag MAR-305) | Kap. 6 |
 | CU-299 | AC-Schrittliste | `tools/qa/ac-steps.json` | Zuordnung jeder AC-REQ-ID zu ihrem Bauschritt und Liste der abgeschlossenen Schritte; jeder Schritt trägt seine AC-REQ-IDs spätestens bei seiner Abnahme ein, bei der Abnahme von S10 enthält die Datei jede AC-REQ-ID nach Kap. 6.2 (Nachtrag MAR-305) | Kap. 6 |
 
@@ -3367,7 +3367,7 @@ Fehlt eine Einheit oder ist eine Verantwortung unklar, fragt der Entwickler den 
 
 ### 6.1 Testebenen und Werkzeuge
 
-Verfeinert Baseline 11.1. Alle Tests außer den Windows-Tests laufen unter Linux in der CI (CU-003). Ändert ein PR oder Push nur Dokumentation nach der Liste D in Nachtrag MAR-787 (Kap. 10.2), entfallen sie; jede andere Änderung prüft die CI vollständig.
+Verfeinert Baseline 11.1. Alle Tests außer den Windows-Tests laufen unter Linux in der CI (CU-003). Ändert ein PR oder Push nur Dokumentation nach der Liste D in Nachtrag MAR-787 (Kap. 10.2), entfallen sie; jede andere Änderung prüft die CI vollständig. Ein manueller Lauf (`workflow_dispatch`) prüft immer vollständig (Nachtrag MAR-826).
 
 | Ebene | Gegenstand | Werkzeug, Ort |
 | --- | --- | --- |
@@ -4709,6 +4709,143 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
   - Den Fokus prüft der Test nach Kap. 6.3 an der Geometrie, nicht daran, ob der Ring gezeichnet ist (`:focus-visible` nach programmatischem `focus()`). Reicht das Scrollen des Browsers beim Fokussieren für Bedingung (2) nicht aus, setzt CU-095 an der Zeilenaktion einen Scroll-Abstand in Breite des Rings (`scroll-mx-1`).
 - Kap. 2.0.10 (Seitenpanels), Kap. 2.1 (offenes Panel), Kap. 4.4 (CU-058, CU-094) und Kap. 6.3 („Fokus vollständig sichtbar“) entsprechend ergänzt. Im Nachtrag MAR-831 sind Punkt 5 und die Testerwartungen als ersetzt markiert.
 - **Keine Owner-Freigabe nötig (Kap. 4.7):** Der Nachtrag setzt den freigegebenen Wortlaut von UI-027 v0.6.4 um („Seitenpanel überlagert bei schmaler Breite die Tabelle“). Das ist die Auslegung des Product Owners in MAR-832. Das `Sheet` mit „Schließen“, Fokus im Panel und Esc ist der freigegebene Baustein aus R-1 (3). Es gibt keinen neuen Text, keinen neuen Zustand, keine neue Einheit und keine Schnittstelle. Die Schwelle ist technische Umsetzung (MAR-832). Den Satz in `screen.md` und den Vermerk zum Mockup klärt der Product Owner mit dem UI/UX Designer gesondert.
+
+**Spezifikations- und Code-Struktur-Nachtrag 15.11.2026 (MAR-826, CI-Läufe auf `main`, manueller Lauf, Messlauf mit vier Playwright-Workern; Owner-Entscheid MAR-780 zu den Hinweisen aus Review MAR-824):** keine neue Einheit, Verantwortung von CU-003 und CU-062 ergänzt, keine Komponentengrenze berührt, keine Migration, kein Diagramm, kein neuer Text.
+
+- **Ausgangslage:**
+  - Das Repository ist seit dem 15.11. öffentlich. Läufe auf den Standard-Runnern kosten keine Minuten mehr. Der Linux-Runner hat 4 vCPU, nicht 2 wie in Nachtrag MAR-787 angenommen.
+  - Von 96 `push`-Läufen auf `main` (08. bis 15.11.) hat `cancel-in-progress` 34 abgebrochen. Ein abgebrochener Lauf belegt keinen Stand.
+  - Bezugswert: Lauf 43631354703 auf `main` (`cc862eb`) mit 2 Workern. Der Job dauerte 7:38 min, der E2E-Step 5:15 min mit 703 Tests.
+  - Seit dem 15.11. gilt auf `main` das Ruleset „main protection“: Merge nur über Pull Request, Pflicht-Check `Lint, type check, tests (Linux)` aus jeder Quelle, 0 Pflicht-Approvals, ohne „strict“, ohne Bypass, kein Löschen, kein Force-Push.
+  - Der Owner hat entschieden: (a) `cancel-in-progress` nur für Pull Requests, (b) Auslöser `workflow_dispatch`, (c) ein Messlauf mit 4 statt 2 Workern. Die vier Vorschläge aus MAR-824 werden nicht umgesetzt: Draft-PRs, `push`-Lauf auf `main`, Nachweis REQ-068/REQ-069 und erster `npm audit` bleiben, wie sie sind.
+- **Festlegung (a), Concurrency (CU-003 `.github/workflows/ci.yml`):**
+  1. Der Block `concurrency` lautet:
+     ```yaml
+     concurrency:
+       group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || format('ci-run-{0}', github.run_id) }}
+       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+     ```
+     Ein Kommentar darüber nennt die Regel und diesen Nachtrag.
+  2. **Pull Request:** Die Gruppe bleibt `ci-refs/pull/<N>/merge`, also wie bisher. Ein neuer Push auf den PR bricht dessen laufenden Lauf ab. Andere PRs und `main` berührt das nicht.
+  3. **`push` und `workflow_dispatch`:** Jeder Lauf hat eine eigene Gruppe, gebildet aus der Lauf-ID. Kein Lauf bricht einen anderen ab, und keiner wartet auf einen anderen. „Re-run“ behält die Lauf-ID und bleibt in seiner Gruppe. Läufe auf `main` laufen parallel auf eigenen Runnern. Jeder Stand von `main` mit Code bekommt so genau einen vollständigen Lauf, und ein roter Lauf zeigt auf den Merge, der ihn verursacht hat.
+  4. **Warum nicht `ci-${{ github.ref }}` ohne Abbruch:** GitHub hält je Gruppe höchstens einen wartenden Lauf. Ein neu wartender Lauf bricht den bisher wartenden ab, auch ohne `cancel-in-progress`. *Beispiel:* Merge A läuft, Merge B wartet, Merge C kommt dazu. B wird abgebrochen, und B hat dann keinen eigenen Lauf.
+  5. **PR-Läufe werden nicht schlechter gestellt:** Ihre Gruppen sind von denen der `main`-Läufe getrennt. Ein Lauf auf `main` belegt einen Runner mehr. Bei etwa zwölf Pushes auf `main` am Tag (08. bis 15.11.) bleibt die Grenze paralleler Jobs ohne Wirkung.
+- **Festlegung (b), manueller Lauf (CU-003):**
+  1. **Auslöser:** `on.workflow_dispatch` mit einer Eingabe `e2e_workers`: `type: choice`, Optionen `config`, `'2'`, `'4'`, Vorgabe `config`, Beschreibung „Playwright workers for the E2E tests (config = value of playwright.config.ts)“. `push` (mit `paths-ignore` nach Liste D) und `pull_request` (ohne Filter) bleiben unverändert.
+  2. **`paths-ignore`:** Der Filter gilt nur für `push`. Ein manueller Lauf startet für jeden Branch und jeden Tag, auch wenn der letzte Commit nur Dokumentation ändert.
+  3. **Diff-Prüfung (`Detect documentation-only change`):**
+     - Die Bedingung bleibt `if [ "$EVENT_NAME" = pull_request ]`. Jedes andere Ereignis, also auch `workflow_dispatch`, ergibt `docs_only=false`, und alle Steps laufen.
+     - Die Bedingung wird nicht als „nicht `push`“ formuliert, sonst übersprängen manuelle Läufe die Prüfung.
+     - Neu ist eine Logzeile vor dem Schreiben der Ausgabe: `echo "Event $EVENT_NAME: docs_only=$docs_only"`.
+     - Der Kommentar über dem Step nennt: `push` und `workflow_dispatch` laufen immer vollständig.
+  4. **Check-Name:** Der Job `linux` bekommt einen berechneten Namen:
+     ```yaml
+     name: ${{ github.event_name == 'workflow_dispatch' && 'Lint, type check, tests (Linux, manual)' || 'Lint, type check, tests (Linux)' }}
+     ```
+     - **Grund:** Das Ruleset verlangt den Check `Lint, type check, tests (Linux)` aus jeder Quelle. Ein manueller Lauf auf dem Branch eines PR hängt seinen Check an denselben Head-Commit wie der PR-Lauf.
+     - Bei gleichem Namen könnte ein grüner manueller Lauf einen roten PR-Lauf überdecken. Der manuelle Lauf prüft den Branch-Stand ohne `main`, der PR-Lauf den Merge-Commit mit `main`. Ebenso könnte ein roter Messlauf den Check des PR rot färben.
+     - Mit eigenem Namen kommt der Pflicht-Check nur aus dem Lauf zu `pull_request`.
+     - Bei `push` und `pull_request` bleibt der Name zeichengleich. Weicht er ab, meldet sich der Pflicht-Check nie, und kein PR ist mehr mergebar. Der PR dieser Änderung zeigt das selbst.
+  5. **Zweck:** einen Lauf für einen Stand nachholen, zum Beispiel für einen vor diesem Nachtrag abgebrochenen `main`-Lauf oder für einen Commit, bevor der Owner einen Release-Tag setzt. Außerdem dient er für Messläufe nach Festlegung (c). Starten darf ihn, wer Schreibrechte hat. `permissions: contents: read` gilt auch hier.
+- **Festlegung (c), Messlauf mit vier Workern (CU-003, CU-062 `playwright.config.ts`):**
+  1. **Worker-Auswahl im E2E-Step:** Der Step bekommt `env: E2E_WORKERS: ${{ inputs.e2e_workers }}` und dieses Skript:
+     ```bash
+     set -euo pipefail
+     echo "CPUs: $(nproc)"
+     if [ -n "${E2E_WORKERS:-}" ] && [ "$E2E_WORKERS" != config ]; then
+       npm run e2e -- --workers="$E2E_WORKERS"
+     else
+       npm run e2e
+     fi
+     ```
+     - Bei `push` und `pull_request` ist `inputs` leer, also gilt der Wert aus `playwright.config.ts`.
+     - `--workers` auf der Kommandozeile hat Vorrang vor der Konfiguration. Die Auswahl braucht deshalb keine Änderung an `playwright.config.ts`.
+     - Name, Bedingung und Lage des Steps bleiben gleich. Die Eingabe kommt nur über `env` ins Skript, nicht als Ausdruck im Skripttext.
+  2. **Messung vor dem Merge:**
+     - Stand ist H, der Head des PR mit (a), (b) und (c) 1. `playwright.config.ts` steht dort noch auf 2.
+     - Der Developer startet 5 manuelle Läufe mit `e2e_workers=4` und 3 mit `e2e_workers=2`, alle auf H, gleichzeitig: `gh workflow run ci.yml --ref <branch> -f e2e_workers=4` bzw. `=2`.
+     - Bis zur Entscheidung kommt kein neuer Commit auf den Branch. Ändert sich H, wird neu gemessen.
+     - Die gleichzeitigen Läufe belegen zugleich (a) 3: Keiner wird abgebrochen.
+  3. **Kennzahlen je Lauf:**
+     - **K1:** Dauer des Jobs, von `started_at` bis `completed_at` aus `gh api repos/MarloNET/resellr/actions/runs/<id>/jobs`.
+     - **K2:** Dauer des E2E-Steps aus derselben Antwort.
+     - **K3:** die Zeile „Running N tests using M workers“ und die Zeile `CPUs` aus dem Log. M entspricht der Auswahl, N ist in allen Läufen gleich.
+     - **K4:** Zahl der roten Tests in der Zusammenfassung von Playwright. `retries: 0` bleibt, also zählt jeder rote Test.
+  4. **Entscheidungsregel:**
+     - Ist ein Lauf mit 2 Workern rot, liegt ein Fehler vor, der nicht an der Worker-Zahl hängt. Er wird wie jeder rote Test untersucht und behoben, dann wird auf dem neuen H neu gemessen. Eine Entscheidung fällt in diesem Fall nicht.
+     - Sonst gilt **`workers: 4`**, wenn alle drei Bedingungen erfüllt sind: (i) alle 5 Läufe mit 4 Workern sind grün, (ii) der Median von K2 mit 4 Workern liegt höchstens bei 85 % des Medians von K2 mit 2 Workern, (iii) K3 stimmt in allen 8 Läufen.
+     - Sonst bleibt **`workers: 2`**.
+     - Ein roter Lauf mit 4 Workern ist ein Flaky-Befund nach Nachtrag MAR-787, Festlegung M3 Punkt 4. Der Developer meldet ihn mit Lauf-ID und Testname an den CEOrchestrator. Läufe werden nicht wiederholt, „bis es grün ist“.
+     - *Beispiel:* K2 mit 2 Workern hat den Median 5:15 min. Mit 4 Workern ist der Median 3:40 min, also 70 %, und alle 8 Läufe sind grün → 4 Worker.
+  5. **Ergebnis im selben PR:**
+     - Bei 4 Workern: `workers: process.env.CI ? 4 : undefined`. Bei 2 Workern bleibt der Wert.
+     - In beiden Fällen bekommt die Zeile den Kommentar: Der Linux-Runner des öffentlichen Repositorys hat 4 vCPU, jeder Worker startet seinen eigenen Server, die Zahl ist gemessen nach Technical Specification 10.2, Nachtrag MAR-826. Der bisherige Kommentar „2 vCPUs“ fällt weg.
+     - Der Lauf des PR selbst prüft dann mit der gewählten Zahl und muss grün sein.
+  6. **PR-Beschreibung:**
+     - eine Tabelle mit Lauf-ID, Worker, K1, K2, N, M, CPUs und Ergebnis für alle 8 Läufe;
+     - die Mediane von K1 und K2 je Worker-Zahl;
+     - die Entscheidung mit der angewandten Regel.
+  7. **Rückfallweg, falls GitHub den manuellen Lauf auf dem Branch ablehnt:**
+     - GitHub nimmt `workflow_dispatch` nur für Workflows an, deren Datei auf der Default-Branch liegt. Es ist nicht dokumentiert, ob die Branch-Version mit dem neuen Auslöser genügt, solange die Version auf `main` ihn nicht hat.
+     - Lehnt `gh workflow run` ab (etwa „does not have 'workflow_dispatch' trigger“ oder HTTP 422), wird der PR mit (a), (b) und (c) 1 gemergt. `workers` bleibt dabei 2, und der Fehlschlag steht in der PR-Beschreibung.
+     - Danach misst der Developer genauso mit `--ref main` auf dem Merge-Commit.
+     - Gilt dann 4, folgt ein zweiter PR nur mit `playwright.config.ts` und der Messtabelle. Bleibt 2, folgt ein zweiter PR nur mit dem neuen Kommentar.
+  8. **Nach der Übernahme von 4 Workern** gilt das Abbruchkriterium aus Nachtrag MAR-787, Festlegung M3 Punkt 4, weiter. Bei zwei Befunden in zehn aufeinanderfolgenden vollen Läufen geht die Rücknahme von 4 auf 2, nicht auf 1. Sie ist im Voraus erlaubt und braucht nur eine Info an den CEOrchestrator. Bei 2 Workern bleibt es bei der Rücknahme auf einen Worker.
+  9. **Unverändert:** `fullyParallel: true`, `forbidOnly`, `retries: 0`, der Reporter, alle Projekte und ihre Abhängigkeiten, alle Zeitgrenzen, `e2e/fixtures/*` und lokal der Standard von Playwright. Flakiness wird nicht mit längeren Zeitgrenzen, Wiederholungen oder `mode: 'serial'` überdeckt.
+- **Branch-Schutz auf `main` (zur Kenntnis):**
+  1. **CU-003:** Der Job-Name `Lint, type check, tests (Linux)` ist der Pflicht-Check des Rulesets. Er wird nur zusammen mit dem Ruleset geändert, und das entscheidet der Owner.
+     - Doku-PRs bekommen den Check weiter, weil Festlegung M1 nur Steps überspringt, nicht den Job.
+     - Der Merge eines Doku-PR ist ein `push` nur mit Dateien aus Liste D und startet keinen Lauf.
+     - Dass Veröffentlichungen über Doku-PRs gehen, ist Prozess des CEOrchestrators und ändert an der Spezifikation nichts.
+  2. **Ohne „strict“** können zwei einzeln grüne PRs zusammen `main` brechen, so geschehen bei #305 und #311. Der `push`-Lauf auf `main` ist dafür das Signal. Mit (a) wird er nicht mehr abgebrochen.
+  3. **`release.yml` (CU-279) ist nicht betroffen:**
+     - Das Ruleset gilt nur für die Branch `main` (`~DEFAULT_BRANCH`), nicht für Tags.
+     - Der Workflow schreibt auf keine Branch. `publish` schreibt nur das Release.
+     - Die Prüfung „Commit des Tags ist in `origin/main` enthalten“ gilt unverändert.
+     - Neu ist nur der Weg der Versionsanhebung: Sie kommt in der Wurzel-`package.json` per PR auf `main`, danach setzt der Owner den Tag.
+- **Was nicht geändert wird:**
+  - der Nachweis REQ-068/REQ-069;
+  - beide `npm audit`-Steps nach TH-07;
+  - das Verhalten bei Draft-PRs, also keine Sonderbehandlung;
+  - der `push`-Lauf auf `main` mit `paths-ignore` nach Liste D, `pull_request` ohne Filter, Liste D an beiden Stellen;
+  - `runs-on`, `timeout-minutes: 30`, `permissions`, `fetch-depth: 2`;
+  - alle Steps mit Reihenfolge und Inhalt, außer der Logzeile der Diff-Prüfung und dem E2E-Step nach (c) 1;
+  - `release.yml`, `package.json`.
+- **Abgelöst in Nachtrag MAR-787:**
+  - „Was nicht geändert wird: … `concurrency`“ gilt nicht mehr, siehe (a).
+  - Der Kommentar „2-vCPU-Runner“ (M3 Punkt 1) und Verworfen (e) „Mehr als zwei Worker“ gelten nicht mehr. Der Runner hat 4 vCPU, die Zahl folgt aus der Messung nach (c).
+  - Das Ziel der Rücknahme in M3 Punkt 4 richtet sich nach (c) 8.
+- **Verworfen:**
+  - (a) Gruppe `ci-${{ github.ref }}` ohne Abbruch: GitHub ersetzt einen wartenden Lauf, siehe (a) 4.
+  - (b) Gruppe mit `github.sha` für andere Ereignisse als PRs: Zwei manuelle Läufe auf demselben Stand, etwa Messläufe, würden nacheinander laufen, und ab dem dritten bräche GitHub den wartenden ab. Die Lauf-ID ist für jeden Lauf eindeutig.
+  - (c) `queue: max` in einer Gruppe je Ref: Läufe auf `main` liefen nacheinander und warteten ohne Nutzen, weil jeder Lauf einen eigenen Runner hat. Außerdem ist `queue: max` zusammen mit `cancel-in-progress: true` ein Validierungsfehler, und dass `queue` einen Ausdruck annimmt, ist nicht dokumentiert.
+  - (d) Gleicher Check-Name für manuelle Läufe: siehe (b) 4.
+  - (e) Worker-Zahl über eine Umgebungsvariable in `playwright.config.ts`: Die Konfiguration bräuchte Auslesen und Prüfung. `--workers` leistet dasselbe ohne Code, und die Auswahl lässt nur gültige Werte zu.
+  - (f) Messung nur über den Lauf des PR wie in MAR-787: Das ist ein einziger Lauf, verglichen wird mit einem anderen Code-Stand, und er belegt keine Stabilität bei `retries: 0`.
+  - (g) Ein eigener Mess-Workflow: Er müsste alle Steps doppelt führen, und beide Fassungen liefen auseinander.
+- **Umfang:**
+  - Ein Issue des Product Owners (MAR-827) mit **einem** PR.
+  - Geändert werden nur `.github/workflows/ci.yml` (CU-003) und `playwright.config.ts` (CU-062: Wert nach (c) 4 und Kommentar).
+  - Der Developer prüft `ci.yml` vor dem Push mit `actionlint`.
+- **Prüfkriterien Code Review:**
+  - (R1) `concurrency` ist zeichengleich mit (a) 1.
+  - (R2) `workflow_dispatch` hat genau die Eingabe nach (b) 1. `on.push` mit `paths-ignore` und `on.pull_request` sind unverändert.
+  - (R3) Die Diff-Prüfung behält `= pull_request`, die Logzeile ist ergänzt, die Liste D ist unverändert.
+  - (R4) Der Job-Name ist der Ausdruck aus (b) 4, und der Teil für PRs ist zeichengleich mit dem Pflicht-Check.
+  - (R5) Der E2E-Step entspricht (c) 1, ohne `${{ }}` im Skripttext.
+  - (R6) `playwright.config.ts` ändert nur den Wert nach der Entscheidungsregel und den Kommentar.
+  - (R7) Sonst ändert sich nichts aus der Liste „Was nicht geändert wird“.
+- **Prüfkriterien QA:**
+  - (Q1) Der Lauf zu `pull_request` des PR heißt `Lint, type check, tests (Linux)`, läuft vollständig (`Event pull_request: docs_only=false`), ist grün, und der PR ist mergebar.
+  - (Q2) Die Messtabelle nach (c) 6 ist vollständig. Die Entscheidung folgt der Regel in (c) 4, nachrechenbar aus den Lauf-IDs.
+  - (Q3) In jedem Messlauf heißt der Check `Lint, type check, tests (Linux, manual)`. Das Log zeigt `Event workflow_dispatch: docs_only=false`, keine Steps sind „skipped“, und „using M workers“ entspricht der Auswahl.
+  - (Q4) Keiner der 8 gleichzeitig gestarteten Messläufe wurde abgebrochen.
+  - (Q5) Der Check der Messläufe erscheint im PR nicht als Pflicht-Check. Der Pflicht-Check zeigt nur den Lauf zu `pull_request`.
+  - (Q6) Nach dem Merge prüfen QA und Developer die ersten fünf `push`-Läufe auf `main`: Keiner ist durch Concurrency abgebrochen, jeder Code-Merge hat seinen Lauf. Ein Doku-Merge hat keinen Lauf. Abweichungen gehen an den CEOrchestrator.
+- **Keine Owner-Freigabe nötig (Kap. 4.7):**
+  - Der Owner hat (a) bis (c) entschieden (MAR-780). Es entsteht keine Einheit.
+  - Der Pflicht-Check und jede Prüfung von PRs und `main` bleiben vollständig. `main`-Läufe werden sogar nicht mehr abgebrochen.
+  - Die bindende Matrix in Kap. 6.3 und die Regeln in Kap. 6.2 bleiben unverändert.
 
 **Spezifikations- und Code-Struktur-Nachtrag 11.11.2026 (MAR-510, Rückfrage aus dem Code Review von PR #331, GitHub-Issue #143, MAR-509):** keine neue Einheit, keine Komponentengrenze berührt, keine Migration, kein Diagramm, kein neuer Text.
 
