@@ -58,6 +58,7 @@ jobs:
 
       # A pull request that changes only documentation (list D, Technical Specification 10.2,
       # addendum MAR-787) skips every following step; the check still appears and passes.
+      # push and workflow_dispatch always run completely (addendum MAR-826).
       # Keep the list equal to `on.push.paths-ignore`.
       - name: Detect documentation-only change
         id: changes
@@ -85,6 +86,7 @@ jobs:
           if [ "$docs_only" = true ]; then
             echo "::notice::Only documentation changed; lint, type check and tests are skipped (MAR-787)."
           fi
+          echo "Event $EVENT_NAME: docs_only=$docs_only"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v7
@@ -182,4 +184,13 @@ jobs:
 
       - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7, REQ-079 connections, REQ-106 write paths)
         if: steps.changes.outputs.docs_only != 'true'
-        run: npm run e2e
+        env:
+          E2E_WORKERS: ${{ inputs.e2e_workers }}
+        run: |
+          set -euo pipefail
+          echo "CPUs: $(nproc)"
+          if [ -n "${E2E_WORKERS:-}" ] && [ "$E2E_WORKERS" != config ]; then
+            npm run e2e -- --workers="$E2E_WORKERS"
+          else
+            npm run e2e
+          fi
