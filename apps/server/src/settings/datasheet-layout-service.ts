@@ -3,10 +3,11 @@ import {
   DATASHEET_BLOCKS,
   type DatasheetBlock,
 } from '@resellr/domain/schemas/attribute.schema';
-import type {
-  AttributeOrderMap,
-  DatasheetLayout,
-  DatasheetLayoutUpdate,
+import {
+  HEADER_LABEL_COUNT,
+  type AttributeOrderMap,
+  type DatasheetLayout,
+  type DatasheetLayoutUpdate,
 } from '@resellr/domain/schemas/datasheet-layout.schema';
 import type { Kysely } from 'kysely';
 
@@ -118,9 +119,10 @@ export function createDatasheetLayoutService({ db, uow, clock }: DatasheetLayout
     /**
      * `PUT /api/datasheet-layout`: `409 version_conflict` if the version read differs (2.0.3) or
      * an attribute order is no longer exactly the attributes of its device type (an attribute
-     * created in another window, as for the order in UI-027, 2.1). A block order that is no
-     * permutation of the six blocks or an unknown device type is a program error of the user
-     * interface (`400 bad_request`, 2.0.5). Without a change nothing is stored or logged.
+     * created in another window, as for the order in UI-027, 2.1). Another number of header
+     * labels than `HEADER_LABEL_COUNT`, a block order that is no permutation of the six blocks or
+     * an unknown device type is a program error of the user interface (`400 bad_request`, 2.0.5).
+     * Without a change nothing is stored or logged.
      */
     async update({
       version,
@@ -128,6 +130,9 @@ export function createDatasheetLayoutService({ db, uow, clock }: DatasheetLayout
       blockOrder,
       attributeOrder,
     }: DatasheetLayoutUpdate): Promise<DatasheetLayout> {
+      if (headerLabels.length !== HEADER_LABEL_COUNT) {
+        throw new BadRequestError('headerLabels wrong_count');
+      }
       if (!isBlockPermutation(blockOrder)) throw new BadRequestError('blockOrder not_permutation');
 
       const { result } = await uow.run(async (tx) => {

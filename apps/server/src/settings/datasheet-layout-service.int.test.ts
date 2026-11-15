@@ -110,7 +110,7 @@ describe('datasheet layout service (CU-085)', () => {
 
     await service.update({
       version: 1,
-      headerLabels: ['Ebay-Nr.:'],
+      headerLabels: ['Shop:', 'Ebay-Nr.:', 'Kleinanzeigen:'],
       blockOrder: [
         'identification',
         'condition',
@@ -132,7 +132,7 @@ describe('datasheet layout service (CU-085)', () => {
     const service = serviceWith();
     await service.update({
       version: 1,
-      headerLabels: ['Shop:'],
+      headerLabels: ['Shop:', 'eBay:', 'Kleinanzeigen:'],
       blockOrder: [...BLOCKS],
       attributeOrder: { [notebook]: [cpu, ram] },
     });
@@ -149,14 +149,14 @@ describe('datasheet layout service (CU-085)', () => {
     const service = serviceWith();
     await service.update({
       version: 1,
-      headerLabels: ['Shop:'],
+      headerLabels: ['Shop:', 'eBay:', 'Kleinanzeigen:'],
       blockOrder: [...BLOCKS],
       attributeOrder: { [notebook]: [cpu, ram] },
     });
 
     const saved = await service.update({
       version: 2,
-      headerLabels: ['Kasse:'],
+      headerLabels: ['Kasse:', 'eBay:', 'Kleinanzeigen:'],
       blockOrder: [...BLOCKS],
       attributeOrder: {},
     });

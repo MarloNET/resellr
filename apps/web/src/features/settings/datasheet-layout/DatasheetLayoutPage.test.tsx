@@ -455,7 +455,9 @@ describe('UI-039 datasheet layout (CU-102)', () => {
       read: () => {
         reads += 1;
         return Response.json(
-          reads === 1 ? LAYOUT : { ...LAYOUT, headerLabels: ['Webshop:'], version: 4 },
+          reads === 1
+            ? LAYOUT
+            : { ...LAYOUT, headerLabels: ['Webshop:', 'eBay:', 'Kleinanzeigen:'], version: 4 },
         );
       },
       writes: { [PUT]: () => Response.json(errorBody('version_conflict'), { status: 409 }) },
@@ -475,7 +477,7 @@ describe('UI-039 datasheet layout (CU-102)', () => {
 
     fireEvent.click(within(banner).getByRole('button', { name: 'Neu laden' }));
     await vi.waitFor(() => expect(labelInput(1).value).toBe('Webshop:'));
-    expect(screen.queryByRole('textbox', { name: 'Kopfzeilentext 2' })).toBeNull();
+    expect(labelInput(2).value).toBe('eBay:');
     expect(screen.queryByRole('alert')).toBeNull();
   });
 

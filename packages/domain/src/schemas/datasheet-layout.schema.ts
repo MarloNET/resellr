@@ -9,6 +9,13 @@ import { idSchema, versionSchema } from './common.schema.ts';
 /** Longest header label (UI-039, assumption of the design; 2.2). */
 export const HEADER_LABEL_MAX = 50;
 
+/**
+ * Number of header labels: exactly the three of the initial layout (UI-039 neither adds nor
+ * removes one; 2.2, addendum MAR-815). The service checks it (`400 bad_request`), not the schema,
+ * so no Zod default text reaches the user (2.0.5).
+ */
+export const HEADER_LABEL_COUNT = 3;
+
 /** Header label: 0–50 characters, stored as entered (UI-039 "Kopfzeilentext: höchstens 50 Zeichen"). */
 export const headerLabelSchema = z.string().max(HEADER_LABEL_MAX, FIELD_MESSAGES.headerLabel);
 

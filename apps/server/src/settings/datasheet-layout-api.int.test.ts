@@ -155,7 +155,7 @@ describe('datasheet layout API (CU-087, CU-085, Technical Specification 2.2)', (
       (
         await put({
           version: 1,
-          headerLabels: ['Shop:', 'eBay:', 'Kleinanzeigen:', 'Kasse:'],
+          headerLabels: ['Shop:', 'eBay:', 'Kasse:'],
           blockOrder: INITIAL_BLOCKS,
           attributeOrder: {},
         })
@@ -165,7 +165,7 @@ describe('datasheet layout API (CU-087, CU-085, Technical Specification 2.2)', (
 
     const response = await put({
       version: 1,
-      headerLabels: ['Shop:'],
+      headerLabels: ['Webshop:', 'eBay:', 'Kleinanzeigen:'],
       blockOrder: INITIAL_BLOCKS,
       attributeOrder: {},
     });
@@ -196,6 +196,8 @@ describe('datasheet layout API (CU-087, CU-085, Technical Specification 2.2)', (
     ['a block twice', { blockOrder: [...INITIAL_BLOCKS.slice(0, 5), 'identification'] }],
     ['five blocks', { blockOrder: INITIAL_BLOCKS.slice(0, 5) }],
     ['an unknown device type', { attributeOrder: { '9999': [] } }],
+    ['two header labels', { headerLabels: ['Shop:', 'eBay:'] }],
+    ['four header labels', { headerLabels: ['Shop:', 'eBay:', 'Kleinanzeigen:', 'Kasse:'] }],
   ])('answers 400 bad_request for %s and stores nothing', async (_case, change) => {
     const before = storedRow();
 
@@ -210,6 +212,7 @@ describe('datasheet layout API (CU-087, CU-085, Technical Specification 2.2)', (
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ error: { code: 'bad_request' } });
     expect(storedRow()).toEqual(before);
+    expect(auditRows()).toEqual([]);
   });
 
   it('stores and logs nothing without a change', async () => {
