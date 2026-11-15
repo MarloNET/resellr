@@ -50,15 +50,14 @@ type ListHandler = (
  */
 function mockApi({
   list = () => Response.json({ items: [PROART, MV_A], total: 2 }),
-}: { list?: ListHandler } = {}) {
+  deviceTypes = () => Response.json({ items: [NOTEBOOK, MONITOR], total: 2 }),
+}: { list?: ListHandler; deviceTypes?: () => Promise<Response> | Response } = {}) {
   const searches: URLSearchParams[] = [];
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://127.0.0.1');
     if (url.pathname === '/api/ops/status') return Response.json(OPS_STATUS);
     if (url.pathname === '/api/ops/health') return Response.json({ state: 'ready' });
-    if (url.pathname === '/api/device-types') {
-      return Response.json({ items: [NOTEBOOK, MONITOR], total: 2 });
-    }
+    if (url.pathname === '/api/device-types') return deviceTypes();
     if (url.pathname === '/api/model-templates') {
       searches.push(url.searchParams);
       return list(url.searchParams, init);
@@ -202,7 +201,7 @@ describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     expectAccessiblePage();
   });
 
-  it('UI-006.empty (Treffer) AC-REQ-009-03 shows "Keine Modellvorlage gefunden" for "Zenbook" and offers creating one', async () => {
+  it('AC-REQ-009-03 UI-006.empty (Treffer) shows "Keine Modellvorlage gefunden" for "Zenbook" and offers creating one', async () => {
     const { searches } = mockApi({
       list: (params) =>
         params.has('q')
@@ -220,7 +219,7 @@ describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     expectAccessiblePage();
   });
 
-  it('UI-006.validation AC-REQ-009-04 a search term with 1 character shows "Mindestens 2 Zeichen" and does not search', async () => {
+  it('AC-REQ-009-04 UI-006.validation a search term with 1 character shows "Mindestens 2 Zeichen" and does not search', async () => {
     const { searches } = mockApi();
     await openPage();
 
@@ -255,6 +254,22 @@ describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     const banner = await screen.findByRole('alert');
     expect(banner.textContent).toBe('Suche fehlgeschlagen. Referenz: R-7K2M-9QX4');
     expect(searchField().value).toBe('macbook');
+    expectAccessiblePage();
+  });
+
+  it('UI-006.error DER-51-04 shows the same banner when the device types for the filter fail', async () => {
+    mockApi({
+      deviceTypes: () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-3P8D-2WN6' }), {
+          status: 500,
+        }),
+    });
+
+    await openPage();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toBe('Suche fehlgeschlagen. Referenz: R-3P8D-2WN6');
+    expect(rowLink('MacBook Pro 13')).toBeTruthy();
     expectAccessiblePage();
   });
 

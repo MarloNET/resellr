@@ -158,7 +158,7 @@ test.describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     await expect(hitList(page).getByRole('row').filter({ hasText: manufacturer })).toHaveCount(1);
   });
 
-  test('UI-006.validation AC-REQ-009-04 a search term with 1 character shows "Mindestens 2 Zeichen"', async ({
+  test('AC-REQ-009-04 UI-006.validation a search term with 1 character shows "Mindestens 2 Zeichen"', async ({
     page,
   }) => {
     await page.goto(PAGE);
@@ -170,7 +170,7 @@ test.describe('UI-006 Modell-Bibliothek (CU-113)', () => {
     await expectReachable(page);
   });
 
-  test('UI-006.empty (Treffer) AC-REQ-009-03 the search "Zenbook" shows "Keine Modellvorlage gefunden" and offers creating one', async ({
+  test('AC-REQ-009-03 UI-006.empty (Treffer) the search "Zenbook" shows "Keine Modellvorlage gefunden" and offers creating one', async ({
     page,
   }) => {
     await page.goto(PAGE);

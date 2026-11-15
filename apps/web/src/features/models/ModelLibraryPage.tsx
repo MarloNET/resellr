@@ -120,7 +120,8 @@ export function ModelLibraryPage() {
     else if (event.key === 'ArrowUp') focusSearch();
   }
 
-  const failed = query.isError ? query.error : null;
+  // A failed device type request for the filter shows the same states as the search (2.0.7).
+  const failed = query.isError ? query.error : deviceTypes.isError ? deviceTypes.error : null;
   const unreachable = failed?.kind === 'unreachable' || deviceTypes.error?.kind === 'unreachable';
   const filtered = searchTerm !== undefined || deviceTypeId !== undefined;
   const data = query.data;
