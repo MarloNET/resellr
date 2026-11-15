@@ -243,7 +243,8 @@ export function DeviceTypesPage() {
 
   /**
    * Field errors of an attribute stand at their field in the panel (`UI-027.validation`);
-   * `attribute_has_values` at the locked field the save changed (`lockedField`).
+   * `attribute_has_values` at the locked field the save changed (`lockedField`) and
+   * `variant_flag_would_merge_listings` at "Variantenbildend".
    */
   function onAttributeFailed(error: ApiError, lockedField: 'dataType' | 'level' = 'level') {
     if (error.kind === 'validation') {
@@ -266,6 +267,12 @@ export function DeviceTypesPage() {
     // `name_taken.attribute` "Bezeichnung ist bei dieser Geräteart bereits vergeben" (DER-34-05).
     if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
       setAttributeErrors({ label: error.error.message });
+      setAttributeErrorFocus((count) => count + 1);
+      return;
+    }
+    // Removing the flag would merge model listings (2.1, DER-34-11): the text names them.
+    if (error.kind === 'rejected' && error.error?.code === 'variant_flag_would_merge_listings') {
+      setAttributeErrors({ variantForming: error.error.message });
       setAttributeErrorFocus((count) => count + 1);
       return;
     }

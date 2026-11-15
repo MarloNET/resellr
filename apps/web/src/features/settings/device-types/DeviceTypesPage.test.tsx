@@ -786,6 +786,63 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
     expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
   });
 
+  it('UI-027.validation DER-34-11 variant_flag_would_merge_listings shows the text with the model listings of details.groups at "Variantenbildend" with the focus on it', async () => {
+    const message =
+      'Änderung nicht möglich: Modell-Inserate MacBook Air M2: „MacBook Air M2 16GB“ (626198), ' +
+      '„MacBook Air M2 8GB“ (626199) würden gleiche Variantenangaben haben';
+    const { sent, listed } = await openAttributes([RAM], {
+      'PATCH /api/attributes/12': () =>
+        Response.json(
+          errorBody('variant_flag_would_merge_listings', {
+            message,
+            details: { groups: [{ modelTemplateId: 7, listingIds: [21, 22] }] },
+          }),
+          { status: 422 },
+        ),
+    });
+    await openPanelOf('RAM');
+    const flag = () => within(panel()).getByLabelText<HTMLInputElement>('Variantenbildend');
+
+    fireEvent.click(flag());
+    fireEvent.click(panelSave());
+
+    expect(await within(panel()).findByText(message)).toBeTruthy();
+    expect(sent).toEqual([
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.objectContaining({ variantForming: false }),
+      }),
+    ]);
+    expect(flag().getAttribute('aria-invalid')).toBe('true');
+    expect(
+      document.getElementById(flag().getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe(message);
+    expect(document.activeElement).toBe(flag());
+    // Nothing was stored: the panel stays open and the row still shows "Ja".
+    expect(listed[0]?.variantForming).toBe(true);
+    expect(
+      within(attributeRow('RAM'))
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toContain('Ja');
+    expect(screen.queryByText('Merkmal gespeichert')).toBeNull();
+    expectAccessiblePanel();
+  });
+
+  it('UI-027.speichert removing "Variantenbildend" shows "Speichern …" and locks the flag until the answer', async () => {
+    await openAttributes([RAM], { 'PATCH /api/attributes/12': pending });
+    await openPanelOf('RAM');
+    const flag = () => within(panel()).getByLabelText<HTMLInputElement>('Variantenbildend');
+
+    fireEvent.click(flag());
+    fireEvent.click(panelSave());
+
+    expect(await within(panel()).findByRole('button', { name: 'Speichern …' })).toBeTruthy();
+    expect(flag().disabled).toBe(true);
+    expect(flag().checked).toBe(false);
+    expectAccessiblePanel();
+  });
+
   it('UI-027.validation shows "Einheit: höchstens 20 Zeichen" for a unit over 20 characters', async () => {
     await openAttributes([RAM]);
     await openPanelOf('RAM');

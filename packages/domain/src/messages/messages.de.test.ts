@@ -161,6 +161,17 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('DER-34-11 names the model listings in variant_flag_would_merge_listings (2.0.6, UI-027)', () => {
+    expect(
+      ERROR_MESSAGES['variant_flag_would_merge_listings.flag'](
+        'ThinkPad T14: „A“ (A-1), „B“ (A-2)',
+      ),
+    ).toBe(
+      'Änderung nicht möglich: Modell-Inserate ThinkPad T14: „A“ (A-1), „B“ (A-2) würden gleiche ' +
+        'Variantenangaben haben',
+    );
+  });
+
   it('has the text of name_taken for suppliers (2.0.6, UI-032)', () => {
     expect(ERROR_MESSAGES['name_taken.supplier']).toBe('Name ist bereits vergeben');
   });

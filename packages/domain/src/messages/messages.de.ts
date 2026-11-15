@@ -149,6 +149,9 @@ export const ERROR_MESSAGES = {
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
+  /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
+  'variant_flag_would_merge_listings.flag': (listings: string) =>
+    `Änderung nicht möglich: Modell-Inserate ${listings} würden gleiche Variantenangaben haben`,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
 /**

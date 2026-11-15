@@ -62,7 +62,17 @@ export interface AttributeDraft {
 }
 
 export type AttributeFieldErrors = Partial<
-  Record<'label' | 'dataType' | 'unit' | 'minValue' | 'maxValue' | 'pickListId' | 'level', string>
+  Record<
+    | 'label'
+    | 'dataType'
+    | 'unit'
+    | 'minValue'
+    | 'maxValue'
+    | 'pickListId'
+    | 'level'
+    | 'variantForming',
+    string
+  >
 >;
 
 /**
@@ -456,6 +466,7 @@ export function AttributePanel({
           label={PANEL_TEXTS.variantForming}
           checked={offersVariantFlag(draft.level, systemRole) && draft.variantForming}
           disabled={locked || !offersVariantFlag(draft.level, systemRole)}
+          error={errors.variantForming}
           onChange={(variantForming) => change({ variantForming })}
         />
       )}
