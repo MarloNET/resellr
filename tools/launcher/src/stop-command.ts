@@ -48,11 +48,13 @@ type StopOutcome =
  * 1. `stop` creates `launcher-state.js` (CU-268) and opens LP-03 in the state `loading`;
  *    `--for-update` opens no page.
  * 2. If a supervisor listens on the pipe, it sends `{"cmd":"stop"}` and waits for `stopped` or
- *    `error`. Otherwise, and if the supervisor ends without either, it sends
- *    `POST /api/ops/shutdown` directly; no answer means resellr does not run.
+ *    `error`. Otherwise, and if the supervisor ends without either (e.g. `already_running`: its
+ *    own start met a server that already runs), it sends `POST /api/ops/shutdown` directly; no
+ *    answer means resellr does not run.
  * 3. `stop` writes the result for LP-03: `stopped` with the data folder, `error` with the
  *    reference number or `not_running`.
- * 4. `--for-update` waits after `stopped` over the pipe until the pipe is free, at most 30 s.
+ * 4. `--for-update` waits after `stopped` until the pipe of a supervisor that answered is free, at
+ *    most 30 s.
  *
  * Exit code 0: stopped or not running; 1: stopping failed or the pipe is still held after 30 s.
  */
@@ -90,10 +92,12 @@ async function stop(deps: StopCommandDeps): Promise<StopOutcome> {
   if (result?.phase === 'stopped') return { state: 'stopped', overPipe: true };
   if (result?.phase === 'error') return { state: 'error', refNo: result.refNo ?? null };
 
-  // No supervisor, or it ended without a result of the stop: maybe a server runs without one.
+  // No supervisor, or it ended without a result of the stop: maybe a server runs without one,
+  // e.g. after `already_running` from `stop_pending` (2.18, Hinweis 5.1 R3).
   const response = await deps.healthClient.shutdown();
   if (response === null) return { state: 'not_running' };
-  if (response.status === 200) return { state: 'stopped', overPipe: false };
+  // A supervisor that answered ends now; `--for-update` waits for its free pipe as well.
+  if (response.status === 200) return { state: 'stopped', overPipe: result !== null };
   return { state: 'error', refNo: response.refNo };
 }
 

@@ -24,6 +24,9 @@ export interface CrashEntry {
  */
 export type StartAbortCause = 'start_aborted' | 'start_result_missing' | 'start_limit';
 
+/** End of the server after `stop`; `cause` names an end by the start limit (Nachtrag MAR-764). */
+export type StopCrashEntry = CrashEntry & { cause?: 'start_limit' };
+
 /** A reference number the launcher shows, with the start it belongs to. */
 export interface ShownRefNo {
   /** Start the supervisor watched, null for `open`. */
@@ -48,8 +51,16 @@ export interface LauncherLog {
   alreadyRunning(entry: ShownRefNo): void;
   /** Event `start_timeout` of `open` after 120 s without a result, also into the error log (K-07). */
   startTimeout(entry: ShownRefNo): void;
-  /** Event `stop_crash`: the server ended with a code other than 0 while stopping (FIND-234). */
-  stopCrash(entry: CrashEntry): void;
+  /**
+   * Event `stop_crash`: the server ended with a code other than 0 while stopping (FIND-234), or
+   * by the start limit in `stop_pending` (Nachtrag MAR-764).
+   */
+  stopCrash(entry: StopCrashEntry): void;
+  /**
+   * Event `shutdown_failed`: the server still runs 30 s after `stop`, also into the error log as
+   * `launcher.shutdown_timeout` (Nachtrag MAR-764).
+   */
+  shutdownTimeout(entry: ShownRefNo): void;
 }
 
 type Details = Record<string, string | number | null>;
@@ -62,6 +73,7 @@ const ERROR_MESSAGES = {
   gave_up: 'resellr-server not restarted after the fourth crash in 10 minutes',
   already_running: 'resellr-server ended because another server already runs',
   start_timeout: 'no result of the start of resellr-server after 120 s',
+  shutdown_timeout: 'resellr-server still runs 30 s after the request to stop',
 } as const;
 
 const exitDescription = ({ exitCode, signal }: CrashEntry) =>
@@ -72,7 +84,7 @@ const exitDescription = ({ exitCode, signal }: CrashEntry) =>
  * daily operations log as the server, through the same `DailyJsonlWriter`. Every entry has
  * `ts`, `level`, `event`, the details, `appVersion` and `startId` (the start the process watches,
  * otherwise null, e.g. for `open`). Every reference number the launcher shows (`start_timeout`,
- * `start_aborted`, `crash`, `gave_up`, `already_running`) also goes into the error log with
+ * `start_aborted`, `crash`, `gave_up`, `already_running`, `shutdown_failed`) also goes into the error log with
  * `refNo` and `function` `launcher.<event>`, so the hint to the error log holds (2.0.5, FIND-210).
  */
 export function createLauncherLog({ dir, appVersion, now }: LauncherLogOptions): LauncherLog {
@@ -126,8 +138,14 @@ export function createLauncherLog({ dir, appVersion, now }: LauncherLogOptions):
     gaveUp: (shown) => writeShown('gave_up', 'gave_up', shown),
     alreadyRunning: (shown) => writeShown('already_running', 'already_running', shown),
     startTimeout: (shown) => writeShown('start_timeout', 'start_timeout', shown),
+    shutdownTimeout: (shown) => writeShown('shutdown_failed', 'shutdown_timeout', shown),
     // Only the operations log: LP-03 shows the number of `error`, not of `stop_crash` (2.18).
-    stopCrash: ({ startId, refNo, exitCode, signal }) =>
-      write('warn', 'stop_crash', startId, { refNo, exitCode, signal }),
+    stopCrash: ({ startId, refNo, exitCode, signal, cause }) =>
+      write('warn', 'stop_crash', startId, {
+        refNo,
+        exitCode,
+        signal,
+        ...(cause === undefined ? {} : { cause }),
+      }),
   };
 }

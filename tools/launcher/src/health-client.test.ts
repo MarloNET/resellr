@@ -166,6 +166,20 @@ describe('health client (CU-266)', () => {
     await expect(createHealthClient({ port }).shutdown()).resolves.toMatchObject({ refNo: null });
   });
 
+  it('DER-104-02 ends POST /api/ops/shutdown with null when the signal of the caller aborts it', async () => {
+    let requested: () => void = () => {};
+    const received = new Promise<void>((resolve) => (requested = resolve));
+    // The server takes the request but never answers.
+    const port = await startServer(() => requested());
+    const abort = new AbortController();
+
+    const shutdown = createHealthClient({ port }).shutdown(abort.signal);
+    await received;
+    abort.abort();
+
+    await expect(shutdown).resolves.toBeNull();
+  });
+
   it('returns null from shutdown when no server listens on the port', async () => {
     const port = await closedPort();
     await expect(createHealthClient({ port }).shutdown()).resolves.toBeNull();
