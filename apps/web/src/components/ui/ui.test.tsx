@@ -258,6 +258,34 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('Sheet opened via `open` returns the focus to the element that had it after Esc', async () => {
+    function Screen() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            RAM
+          </button>
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetContent title="Merkmal bearbeiten" width={360}>
+              <input aria-label="Bezeichnung" />
+            </SheetContent>
+          </Sheet>
+        </>
+      );
+    }
+    render(<Screen />);
+    const opener = screen.getByRole('button', { name: 'RAM' });
+    opener.focus();
+    fireEvent.click(opener);
+    const sheet = screen.getByRole('dialog', { name: 'Merkmal bearbeiten' });
+    await waitFor(() => expect(sheet.contains(document.activeElement)).toBe(true));
+
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
   it('Table scrolls horizontally in its own container with a first column fixed only in a wide enough container', () => {
     render(
       <Table>

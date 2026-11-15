@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -133,6 +133,129 @@ describe('maintenance table P-01 (CU-094)', () => {
         .getAllByRole('button')
         .map((button) => button.textContent),
     ).toEqual(['Notebook', 'Tablet']);
+  });
+});
+
+/** Panel of 360 px as in UI-027: list 320 px and two gaps of 16 px leave `root − 712` px. */
+const PANEL_WIDTH = 360;
+const rootFor = (available: number) => available + 320 + 2 * 16 + PANEL_WIDTH;
+
+/**
+ * Viewport `full` or narrower, and a `ResizeObserver` that reports the width of the root element
+ * set with the returned `resize`; without `observer` there is none, as in jsdom.
+ */
+function stubLayout({
+  full,
+  width,
+  observer = true,
+}: {
+  full: boolean;
+  width: number;
+  observer?: boolean;
+}) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((media: string) => ({
+      media,
+      matches: full,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })),
+  );
+  let current = width;
+  const callbacks: (() => void)[] = [];
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () => ({ width: current }) as DOMRect,
+  );
+  vi.stubGlobal(
+    'ResizeObserver',
+    observer
+      ? class {
+          constructor(callback: () => void) {
+            callbacks.push(callback);
+          }
+          observe() {}
+          disconnect() {}
+        }
+      : undefined,
+  );
+  return (next: number) => {
+    current = next;
+    act(() => callbacks.forEach((callback) => callback()));
+  };
+}
+
+/** Without `renderTable`: behind an open sheet the list is `aria-hidden`. */
+function renderWithPanel() {
+  render(
+    <MaintenanceTable
+      title="Gerätearten"
+      items={ENTRIES}
+      getId={(entry) => entry.id}
+      selectedId={1}
+      onSelect={vi.fn()}
+      renderItem={(entry) => entry.name}
+      panel={{
+        title: 'Merkmal bearbeiten',
+        width: PANEL_WIDTH,
+        content: <p>Inhalt</p>,
+        onClose: vi.fn(),
+      }}
+    >
+      <p>Detail</p>
+    </MaintenanceTable>,
+  );
+}
+
+const panelForm = () => ({
+  beside: screen.queryByRole('complementary', { name: 'Merkmal bearbeiten' }) !== null,
+  sheet: screen.queryByRole('dialog', { name: 'Merkmal bearbeiten' }) !== null,
+});
+
+describe('side panel of P-01 beside or as sheet (CU-094, addendum MAR-834)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('overlays as sheet with 479 px of room for the detail area', () => {
+    stubLayout({ full: true, width: rootFor(479) });
+    renderWithPanel();
+    expect(panelForm()).toEqual({ beside: false, sheet: true });
+  });
+
+  it('stands beside with 480 px of room for the detail area', () => {
+    stubLayout({ full: true, width: rootFor(480) });
+    renderWithPanel();
+    expect(panelForm()).toEqual({ beside: true, sheet: false });
+  });
+
+  it('stays a sheet up to 503 px of room and stands beside again from 504 px on', () => {
+    const resize = stubLayout({ full: true, width: rootFor(479) });
+    renderWithPanel();
+
+    resize(rootFor(480));
+    expect(panelForm()).toEqual({ beside: false, sheet: true });
+    resize(rootFor(503));
+    expect(panelForm()).toEqual({ beside: false, sheet: true });
+    resize(rootFor(504));
+    expect(panelForm()).toEqual({ beside: true, sheet: false });
+    resize(rootFor(480));
+    expect(panelForm()).toEqual({ beside: true, sheet: false });
+    resize(rootFor(479));
+    expect(panelForm()).toEqual({ beside: false, sheet: true });
+  });
+
+  it('stands beside from `full` on without ResizeObserver', () => {
+    stubLayout({ full: true, width: 0, observer: false });
+    renderWithPanel();
+    expect(panelForm()).toEqual({ beside: true, sheet: false });
+  });
+
+  it('always overlays as sheet below `full`', () => {
+    stubLayout({ full: false, width: rootFor(2000) });
+    renderWithPanel();
+    expect(panelForm()).toEqual({ beside: false, sheet: true });
   });
 });
 

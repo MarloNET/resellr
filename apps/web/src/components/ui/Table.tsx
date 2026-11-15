@@ -7,8 +7,9 @@ import { cn } from './cn.ts';
  * container so the page never does; the first column stays fixed. Rows 36 px, column heads
  * in text-secondary, row hover bg, tabular figures (DESIGN.md "Tabellen", "Typografie").
  * The first column stays fixed only while the container is at least 24rem wide: in a narrower
- * one, e.g. beside an open side panel at 1366 px (UI-027, #372), it would cover every other
- * column at each scroll position, so there it scrolls with them.
+ * one it would cover every other column at each scroll position, so there it scrolls with them
+ * (2.0.10, addenda MAR-831 and MAR-834). `MaintenanceTable` keeps its tables wider than that;
+ * the rule protects containers it does not control, e.g. a table in a `Dialog` or `Sheet`.
  */
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
