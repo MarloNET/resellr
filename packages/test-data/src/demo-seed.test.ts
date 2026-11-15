@@ -236,6 +236,10 @@ describe('seedDemoData', () => {
       name: 'Akku-Hinweis',
       kind: 'battery_notice',
       body: 'Die Akkukapazität beträgt {Akkukapazität}. Bei gebrauchten Akkus ist eine verringerte Laufzeit normal.',
+      allDeviceTypes: true,
+      deviceTypeIds: [],
+      allChannels: true,
+      channelIds: [],
     });
     expect(requests[4]?.[2]).toEqual({ version: 1, active: false });
   });

@@ -4,6 +4,7 @@ import fastifyMultipart from '@fastify/multipart';
 import Fastify from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
+import { channelsRoutes } from './channels/index.ts';
 import type { Database } from './db/database.ts';
 import type { DB } from './db/schema.ts';
 import { createUnitOfWork } from './db/unit-of-work.ts';
@@ -68,6 +69,7 @@ export function buildApp(deps: AppDeps) {
   app.register(opsRoutes, { ...deps.ops, lifecycle: deps.lifecycle, shutdownService });
   app.register(settingsRoutes, { db: deps.database.db, uow, clock: deps.clock, mediaFiles });
   app.register(mediaRoutes, { db: deps.database.db, mediaDir });
+  app.register(channelsRoutes, { db: deps.database.db });
 
   return { app, writeGate, uow };
 }

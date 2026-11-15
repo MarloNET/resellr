@@ -22,6 +22,10 @@ const CHECKED_BY_TEXT = 'Prüfende Stelle: höchstens 100 Zeichen';
 const FUTURE_TEXT = 'Prüfdatum darf nicht in der Zukunft liegen';
 const TODAY = '2026-11-13';
 
+const ALL_SCOPE = { allDeviceTypes: true, deviceTypeIds: [], allChannels: true, channelIds: [] };
+const DEVICE_TYPES_TEXT = 'Gerätearten: mindestens eine wählen oder ‚alle‘';
+const CHANNELS_TEXT = 'Kanäle: mindestens einen wählen oder ‚alle‘';
+
 const messagesOf = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.error?.issues.map((issue) => issue.message) ?? [];
 
@@ -61,11 +65,19 @@ describe('text block schemas (CU-066)', () => {
     expect(messagesOf(textBlockBodySchema.safeParse(body))).toEqual([BODY_TEXT]);
   });
 
-  it('needs name, kind and text to create a text block and no other field', () => {
-    const input = { name: ' Abholung', kind: 'pickup_contact', body: 'Abholung in Hannover' };
+  it('needs name, kind, text and the four scope fields to create a text block and no other field', () => {
+    const input = {
+      name: ' Abholung',
+      kind: 'pickup_contact',
+      body: 'Abholung in Hannover',
+      ...ALL_SCOPE,
+    };
     expect(textBlockCreateSchema.parse(input)).toEqual({ ...input, name: 'Abholung' });
     expect(textBlockCreateSchema.safeParse({ ...input, kind: undefined }).success).toBe(false);
     expect(textBlockCreateSchema.safeParse({ ...input, id: 1 }).success).toBe(false);
+    expect(textBlockCreateSchema.safeParse({ ...input, channelIds: undefined }).success).toBe(
+      false,
+    );
   });
 
   it('needs the version to change a text block; the other fields are optional', () => {
@@ -88,6 +100,7 @@ describe('text block schemas (CU-066)', () => {
     legalStatus: 'checked',
     legalCheckedOn: '2026-11-05',
     legalCheckedBy: 'Kanzlei Muster',
+    ...ALL_SCOPE,
     version: 1,
   };
   const impact = { updated: 0, rerelease: 0, manualReview: 0 };
@@ -134,7 +147,7 @@ describe('legal check status of a text block (CU-066, REQ-054)', () => {
       ...change,
       legalCheckedBy: 'Kanzlei Muster',
     });
-    const input = { name: 'Akku', kind: 'battery_notice', body: 'Akku-Hinweis' };
+    const input = { name: 'Akku', kind: 'battery_notice', body: 'Akku-Hinweis', ...ALL_SCOPE };
     expect(textBlockCreateSchema.safeParse({ ...input, legalStatus: 'checked' }).success).toBe(
       false,
     );
@@ -198,5 +211,73 @@ describe('legal check status of a text block (CU-066, REQ-054)', () => {
     expect(
       legalCheckIssues({ legalStatus: 'unchecked', legalCheckedOn: '', legalCheckedBy: '' }, TODAY),
     ).toEqual([]);
+  });
+
+  describe('scope (2.2 "Geltungsbereich des Textbausteins", addendum MAR-773)', () => {
+    const base = { name: 'Abholung', kind: 'pickup_contact', body: 'Abholung in Hannover' };
+    const issuesOf = (result: {
+      error?: { issues: { path: PropertyKey[]; message: string; params?: unknown }[] };
+    }) => result.error?.issues ?? [];
+
+    it('accepts "alle" and a choice of ids', () => {
+      const choice = {
+        allDeviceTypes: false,
+        deviceTypeIds: [3, 1],
+        allChannels: false,
+        channelIds: [2],
+      };
+      expect(textBlockCreateSchema.safeParse({ ...base, ...ALL_SCOPE }).success).toBe(true);
+      expect(textBlockCreateSchema.parse({ ...base, ...choice })).toMatchObject(choice);
+    });
+
+    it.each([
+      ['"alle" device types with a list', { ...ALL_SCOPE, deviceTypeIds: [1] }],
+      ['"alle" channels with a list', { ...ALL_SCOPE, channelIds: [1] }],
+      ['a device type twice', { ...ALL_SCOPE, allDeviceTypes: false, deviceTypeIds: [1, 1] }],
+      ['a channel twice', { ...ALL_SCOPE, allChannels: false, channelIds: [2, 2] }],
+    ])('rejects %s as a structural error without path (bad_request)', (_case, scope) => {
+      const issues = issuesOf(textBlockCreateSchema.safeParse({ ...base, ...scope }));
+      expect(issues).toHaveLength(1);
+      expect(issues[0]!.path).toEqual([]);
+    });
+
+    it.each([
+      ['allDeviceTypes alone', { allDeviceTypes: true }],
+      ['deviceTypeIds alone', { deviceTypeIds: [1] }],
+      ['allChannels alone', { allChannels: false }],
+      ['channelIds alone', { channelIds: [] }],
+    ])('rejects a PATCH with %s as a structural error without path', (_case, change) => {
+      const issues = issuesOf(textBlockUpdateSchema.safeParse({ version: 1, ...change }));
+      expect(issues).toHaveLength(1);
+      expect(issues[0]!.path).toEqual([]);
+    });
+
+    it('accepts a PATCH with a whole pair or without scope', () => {
+      expect(
+        textBlockUpdateSchema.safeParse({ version: 1, allChannels: false, channelIds: [1] })
+          .success,
+      ).toBe(true);
+      expect(textBlockUpdateSchema.safeParse({ version: 1, name: 'Neu' }).success).toBe(true);
+    });
+
+    it.each([
+      [
+        'device types',
+        { allDeviceTypes: false, deviceTypeIds: [] },
+        'deviceTypeIds',
+        DEVICE_TYPES_TEXT,
+      ],
+      ['channels', { allChannels: false, channelIds: [] }, 'channelIds', CHANNELS_TEXT],
+    ])(
+      'rejects a choice of %s without an entry with the field rule scope_required',
+      (_case, change, path, message) => {
+        const issues = issuesOf(
+          textBlockCreateSchema.safeParse({ ...base, ...ALL_SCOPE, ...change }),
+        );
+        expect(issues).toEqual([
+          expect.objectContaining({ path: [path], message, params: { code: 'scope_required' } }),
+        ]);
+      },
+    );
   });
 });

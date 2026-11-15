@@ -15,13 +15,16 @@ import {
   type TextBlockKind,
   type TextBlockLegalStatus,
   type TextBlockSaveResult,
+  type TextBlockScope,
   type TextBlockUpdateResult,
 } from '@resellr/domain/schemas/text-block.schema';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import type { ApiError } from '../../../api/api-client.ts';
+import { useChannelsQuery } from '../../../api/channels.api.ts';
 import {
   useCreateTextBlockMutation,
+  useDeviceTypesQuery,
   useTextBlocksQuery,
   useUpdateTextBlockMutation,
 } from '../../../api/settings.api.ts';
@@ -43,9 +46,11 @@ import {
 import { UnreachableBanner } from '../../../components/patterns/UnreachableBanner.tsx';
 import { Badge } from '../../../components/ui/Badge.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
+import { Checkbox } from '../../../components/ui/Checkbox.tsx';
 import { cn } from '../../../components/ui/cn.ts';
 import { Input } from '../../../components/ui/Input.tsx';
 import { Select } from '../../../components/ui/Select.tsx';
+import { ImpactDialog, type Impact } from '../ImpactDialog.tsx';
 
 // Texts of UI-030 `screen.md` and of pattern P-01 (UI/UX design v0.6.2).
 const TEXTS = {
@@ -62,6 +67,11 @@ const TEXTS = {
   kind: 'Art',
   body: 'Text',
   placeholders: 'Platzhalter',
+  scope: 'Geltungsbereich',
+  deviceTypes: 'Gerätearten',
+  channels: 'Kanäle',
+  allDeviceTypes: 'alle Gerätearten',
+  allChannels: 'alle Kanäle',
   active: 'aktiv',
   inactive: 'deaktiviert',
   legalStatus: 'Prüfstatus',
@@ -87,13 +97,24 @@ const PLACEHOLDERS = fixedPlaceholdersFor('text_block');
 const NEW_KIND: TextBlockKind = 'other';
 
 type Field = 'name' | 'body' | 'legalCheckedBy';
+/** The scope lists only carry the server's `scope_required` (2.2, addendum MAR-773). */
+type ScopeField = 'deviceTypeIds' | 'channelIds';
 /**
  * Errors of the form: `legalCheck` is M-24, shown once below "Prüfdatum" and "Prüfende Stelle"
  * and marking both (K-05, DER-40-01).
  */
-type FieldErrors = Partial<Record<Field | 'legalCheckedOn' | 'legalCheck', string>>;
+type FieldErrors = Partial<Record<Field | ScopeField | 'legalCheckedOn' | 'legalCheck', string>>;
 
-interface Values {
+const FIELDS_OF_ANSWER: readonly (Field | ScopeField | 'legalCheckedOn')[] = [
+  'name',
+  'body',
+  'legalCheckedOn',
+  'legalCheckedBy',
+  'deviceTypeIds',
+  'channelIds',
+];
+
+interface Values extends TextBlockScope {
   name: string;
   kind: TextBlockKind;
   body: string;
@@ -121,6 +142,11 @@ function draftOf(textBlock: TextBlock | undefined): Draft {
     name: textBlock?.name ?? '',
     kind: textBlock?.kind ?? NEW_KIND,
     body: textBlock?.body ?? '',
+    // A new text block applies to all device types and channels until the user chooses.
+    allDeviceTypes: textBlock?.allDeviceTypes ?? true,
+    deviceTypeIds: textBlock?.deviceTypeIds ?? [],
+    allChannels: textBlock?.allChannels ?? true,
+    channelIds: textBlock?.channelIds ?? [],
     // A text block that becomes "Rechtliches" or "Akku-Hinweis" is "rechtlich ungeprüft" (2.2).
     legalStatus: textBlock?.legalStatus ?? 'unchecked',
     legalCheckedOn: textBlock?.legalCheckedOn ?? '',
@@ -136,10 +162,23 @@ const legalChanged = (draft: Draft) =>
     draft.legalCheckedOn !== draft.base.legalCheckedOn ||
     draft.legalCheckedBy !== draft.base.legalCheckedBy);
 
+const sameIds = (a: number[], b: number[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
+
+const deviceTypesChanged = (draft: Draft) =>
+  draft.allDeviceTypes !== draft.base.allDeviceTypes ||
+  (!draft.allDeviceTypes && !sameIds(draft.deviceTypeIds, draft.base.deviceTypeIds));
+
+const channelsChanged = (draft: Draft) =>
+  draft.allChannels !== draft.base.allChannels ||
+  (!draft.allChannels && !sameIds(draft.channelIds, draft.base.channelIds));
+
 const changed = (draft: Draft) =>
   draft.name !== draft.base.name ||
   draft.kind !== draft.base.kind ||
   draft.body !== draft.base.body ||
+  deviceTypesChanged(draft) ||
+  channelsChanged(draft) ||
   legalChanged(draft);
 
 const FIELD_SCHEMAS = {
@@ -147,6 +186,53 @@ const FIELD_SCHEMAS = {
   body: textBlockBodySchema,
   legalCheckedBy: textBlockLegalCheckedBySchema,
 };
+
+/** A choice of device types or channels needs one entry; "Speichern" waits for it (UI-030). */
+const scopeIncomplete = (draft: Draft) =>
+  (!draft.allDeviceTypes && draft.deviceTypeIds.length === 0) ||
+  (!draft.allChannels && draft.channelIds.length === 0);
+
+type Named = { id: number; name: string };
+
+/** One part of the scope in the list: "alle …" or the names in their order (mockup). */
+function scopePart(all: boolean, allText: string, ids: number[], targets: Named[]) {
+  if (all) return allText;
+  return targets
+    .filter(({ id }) => ids.includes(id))
+    .map(({ name }) => name)
+    .join(', ');
+}
+
+/**
+ * Error line below a group of controls, as `FormField` shows it below one control: M-24 below
+ * both check fields, and `scope_required` below a scope list. Only a server answer fills the
+ * latter; in the browser the rule just disables "Speichern" (2.2).
+ */
+function GroupError({ id, error }: { id: string; error?: string }) {
+  if (!error) return null;
+  return (
+    <p className="m-0 flex items-start gap-1 text-label text-error">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        className="mt-0.5 size-3 shrink-0"
+        fill="currentColor"
+      >
+        <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 3.5h1.5v5h-1.5v-5Zm0 6.25h1.5v1.5h-1.5v-1.5Z" />
+      </svg>
+      <span id={id} className="min-w-0 [overflow-wrap:anywhere]">
+        {error}
+      </span>
+    </p>
+  );
+}
+
+/**
+ * Entries a choice offers: the active ones and the chosen ones, also when deactivated since,
+ * so a stored choice stays visible.
+ */
+const choosable = <T extends Named & { active: boolean }>(targets: T[], chosen: number[]) =>
+  targets.filter(({ id, active }) => active || chosen.includes(id));
 
 /** First message of the Zod check in the browser, the same schemas as on the server (2.0.7). */
 function check(field: Field, value: string): string | undefined {
@@ -188,13 +274,9 @@ function fieldErrorsOf(error: ApiError): FieldErrors | null {
     const errors: FieldErrors = {};
     for (const entry of error.error?.fields ?? []) {
       if (entry.code === 'legal_check_required') errors.legalCheck = entry.message;
-      else if (
-        entry.path === 'name' ||
-        entry.path === 'body' ||
-        entry.path === 'legalCheckedOn' ||
-        entry.path === 'legalCheckedBy'
-      ) {
-        errors[entry.path] = entry.message;
+      else {
+        const path = FIELDS_OF_ANSWER.find((field) => field === entry.path);
+        if (path) errors[path] = entry.message;
       }
     }
     return Object.keys(errors).length > 0 ? errors : null;
@@ -215,15 +297,21 @@ function fieldErrorsOf(error: ApiError): FieldErrors | null {
 
 /**
  * Text blocks of UI-030 (CU-101, REQ-026, REQ-054; Technical Specification 2.2): maintenance
- * list P-01 with name, kind, status and the legal check status, the detail area with name, kind,
- * text, the check fields of the kinds "Rechtliches" and "Akku-Hinweis" and the list of
- * placeholders, "Textbaustein anlegen" and the row action "Deaktivieren". There is no deletion
- * (DER-39-13). The scope and dialog UI-043 follow with #163.
+ * list P-01 with name, kind, scope, status and the legal check status, the detail area with
+ * name, kind, text, the list of placeholders, the scope ("alle" or a choice of device types and
+ * channels, DER-39-09) and the check fields of the kinds "Rechtliches" and "Akku-Hinweis",
+ * "Textbaustein anlegen" and the row action "Deaktivieren". There is no deletion (DER-39-13).
+ * After "Speichern" dialog UI-043 shows `impact` of the answer (DER-39-10).
  * States after 2.0.7: loading, empty, validation, success, error, disabled, speichert (P-08),
  * conflict (P-05), unreachable (P-06), wird-beendet (P-07), ausgang-unbekannt (P-08).
  */
 export function TextBlocksPage() {
   const query = useTextBlocksQuery();
+  // Device types and channels name the scope in the list and offer its choice (UI-030).
+  const deviceTypesQuery = useDeviceTypesQuery();
+  const channelsQuery = useChannelsQuery();
+  const deviceTypes = deviceTypesQuery.data?.items ?? [];
+  const channels = channelsQuery.data?.items ?? [];
   const createMutation = useCreateTextBlockMutation();
   const updateMutation = useUpdateTextBlockMutation();
   const deactivateMutation = useUpdateTextBlockMutation();
@@ -236,6 +324,7 @@ export function TextBlocksPage() {
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   // Hint of UI-030 "Speichern" after a change of the text set the status back (DER-40-03).
   const [legalReset, setLegalReset] = useState(false);
+  const [impact, setImpact] = useState<Impact | null>(null);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
   const [takeReloaded, setTakeReloaded] = useState(false);
 
@@ -244,6 +333,7 @@ export function TextBlocksPage() {
   const blurCheck = useDeferredBlurCheck();
   const placeholdersId = useId();
   const legalCheckErrorId = useId();
+  const scopeErrorId = useId();
 
   const saving = createMutation.isPending || updateMutation.isPending;
   const busy = saving || deactivateMutation.isPending;
@@ -288,6 +378,7 @@ export function TextBlocksPage() {
 
   function onSaved({
     textBlock,
+    impact: saved,
     legalStatusReset = false,
   }: TextBlockSaveResult & Partial<TextBlockUpdateResult>) {
     setSelection({ id: textBlock.id });
@@ -295,6 +386,7 @@ export function TextBlocksPage() {
     setErrors({});
     setLegalReset(legalStatusReset);
     setNotice({ kind: 'success' });
+    setImpact(saved);
   }
 
   function onSaveFailed(error: ApiError) {
@@ -313,7 +405,7 @@ export function TextBlocksPage() {
   function save() {
     // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
-    if (!changed(draft)) return;
+    if (!changed(draft) || scopeIncomplete(draft)) return;
     const fieldErrors: FieldErrors = {
       name: check('name', draft.name),
       body: check('body', draft.body),
@@ -327,8 +419,25 @@ export function TextBlocksPage() {
     setNotice(null);
     setLegalReset(false);
     const callbacks = { onSuccess: onSaved, onError: onSaveFailed };
+    const deviceTypeScope = {
+      allDeviceTypes: draft.allDeviceTypes,
+      deviceTypeIds: draft.allDeviceTypes ? [] : draft.deviceTypeIds,
+    };
+    const channelScope = {
+      allChannels: draft.allChannels,
+      channelIds: draft.allChannels ? [] : draft.channelIds,
+    };
     if (selectedId === null) {
-      createMutation.mutate({ name: draft.name, kind: draft.kind, body: draft.body }, callbacks);
+      createMutation.mutate(
+        {
+          name: draft.name,
+          kind: draft.kind,
+          body: draft.body,
+          ...deviceTypeScope,
+          ...channelScope,
+        },
+        callbacks,
+      );
     } else if (draft.version !== null) {
       // Only the changed fields are sent; a text block saved unchanged keeps its version.
       updateMutation.mutate(
@@ -338,6 +447,8 @@ export function TextBlocksPage() {
           ...(draft.name !== draft.base.name && { name: draft.name }),
           ...(draft.kind !== draft.base.kind && { kind: draft.kind }),
           ...(draft.body !== draft.base.body && { body: draft.body }),
+          ...(deviceTypesChanged(draft) && deviceTypeScope),
+          ...(channelsChanged(draft) && channelScope),
           // The three check fields together; "rechtlich ungeprüft" stores neither date nor body.
           ...(legalChanged(draft) && {
             legalStatus: draft.legalStatus,
@@ -383,7 +494,11 @@ export function TextBlocksPage() {
         }
       : control;
   const unchanged = !changed(draft);
-  const loadFailed = query.isError ? query.error : null;
+  const toggle = (ids: number[], id: number, on: boolean) =>
+    on ? [...ids, id] : ids.filter((other) => other !== id);
+  const loadFailed =
+    [query, deviceTypesQuery, channelsQuery].find((each) => each.isError)?.error ?? null;
+  const loading = query.isPending || deviceTypesQuery.isPending || channelsQuery.isPending;
 
   return (
     <div className="flex flex-col gap-4 p-6">
@@ -420,6 +535,9 @@ export function TextBlocksPage() {
               <span className="text-label text-text-secondary">
                 {TEXT_BLOCK_KIND_LABELS[item.kind]}
               </span>
+              <span className="text-label text-text-secondary [overflow-wrap:anywhere]">
+                {`${scopePart(item.allDeviceTypes, TEXTS.allDeviceTypes, item.deviceTypeIds, deviceTypes)}, ${scopePart(item.allChannels, TEXTS.allChannels, item.channelIds, channels)}`}
+              </span>
               {item.legalStatus !== null && (
                 <Badge
                   variant={item.legalStatus === 'checked' ? 'approved' : 'warn'}
@@ -449,9 +567,9 @@ export function TextBlocksPage() {
         createLabel={TEXTS.create}
         onCreate={() => open({ id: null })}
         disabled={busy || writesLocked}
-        emptyText={query.isSuccess ? TEXTS.empty : undefined}
+        emptyText={query.isSuccess && !loading ? TEXTS.empty : undefined}
         placeholder={
-          query.isPending ? (
+          loading ? (
             <p role="status" className="m-0 px-4 py-2 text-body text-text-secondary">
               {TEXTS.loading}
             </p>
@@ -540,6 +658,71 @@ export function TextBlocksPage() {
             </ul>
           </section>
 
+          <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
+            <legend className="mb-1 p-0 text-label font-semibold text-text">
+              {TEXTS.scope}
+              <span aria-hidden="true"> *</span>
+            </legend>
+            <div
+              role="group"
+              aria-label={TEXTS.deviceTypes}
+              aria-describedby={errors.deviceTypeIds ? `${scopeErrorId}-device-types` : undefined}
+              className="flex flex-col gap-1"
+            >
+              <Checkbox
+                label={TEXTS.allDeviceTypes}
+                checked={draft.allDeviceTypes}
+                disabled={formLocked}
+                onChange={(all) => setDraft({ ...draft, allDeviceTypes: all })}
+              />
+              {!draft.allDeviceTypes && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 pl-6">
+                  {choosable(deviceTypes, draft.deviceTypeIds).map(({ id, name }) => (
+                    <Checkbox
+                      key={id}
+                      label={name}
+                      checked={draft.deviceTypeIds.includes(id)}
+                      disabled={formLocked}
+                      onChange={(on) =>
+                        setDraft({ ...draft, deviceTypeIds: toggle(draft.deviceTypeIds, id, on) })
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+              <GroupError id={`${scopeErrorId}-device-types`} error={errors.deviceTypeIds} />
+            </div>
+            <div
+              role="group"
+              aria-label={TEXTS.channels}
+              aria-describedby={errors.channelIds ? `${scopeErrorId}-channels` : undefined}
+              className="flex flex-col gap-1"
+            >
+              <Checkbox
+                label={TEXTS.allChannels}
+                checked={draft.allChannels}
+                disabled={formLocked}
+                onChange={(all) => setDraft({ ...draft, allChannels: all })}
+              />
+              {!draft.allChannels && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 pl-6">
+                  {choosable(channels, draft.channelIds).map(({ id, name }) => (
+                    <Checkbox
+                      key={id}
+                      label={name}
+                      checked={draft.channelIds.includes(id)}
+                      disabled={formLocked}
+                      onChange={(on) =>
+                        setDraft({ ...draft, channelIds: toggle(draft.channelIds, id, on) })
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+              <GroupError id={`${scopeErrorId}-channels`} error={errors.channelIds} />
+            </div>
+          </fieldset>
+
           {showLegal && (
             <div className="flex flex-col gap-1">
               <FormField label={TEXTS.legalStatus} required>
@@ -596,21 +779,7 @@ export function TextBlocksPage() {
                   />
                 )}
               </FormField>
-              {errors.legalCheck && (
-                <p className="flex items-start gap-1 text-label text-error">
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 16 16"
-                    className="mt-0.5 size-3 shrink-0"
-                    fill="currentColor"
-                  >
-                    <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 3.5h1.5v5h-1.5v-5Zm0 6.25h1.5v1.5h-1.5v-1.5Z" />
-                  </svg>
-                  <span id={legalCheckErrorId} className="min-w-0 [overflow-wrap:anywhere]">
-                    {errors.legalCheck}
-                  </span>
-                </p>
-              )}
+              <GroupError id={legalCheckErrorId} error={errors.legalCheck} />
             </div>
           )}
 
@@ -618,7 +787,7 @@ export function TextBlocksPage() {
             <Button
               type="submit"
               variant="primary"
-              disabled={formLocked || writesLocked || unchanged}
+              disabled={formLocked || writesLocked || unchanged || scopeIncomplete(draft)}
             >
               {saving ? TEXTS.saving : TEXTS.save}
             </Button>
@@ -633,6 +802,8 @@ export function TextBlocksPage() {
           </div>
         </form>
       </MaintenanceTable>
+
+      <ImpactDialog impact={impact} onClose={() => setImpact(null)} />
     </div>
   );
 }

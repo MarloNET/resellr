@@ -17,6 +17,8 @@ export interface TextBlockInsert {
   kind: string;
   body: string;
   legalStatus: string | null;
+  allDeviceTypes: boolean;
+  allChannels: boolean;
   at: string;
 }
 
@@ -27,8 +29,16 @@ export interface TextBlockChange {
   body?: string;
   active?: boolean;
   legal?: TextBlockLegalColumns;
+  allDeviceTypes?: boolean;
+  allChannels?: boolean;
   version: number;
   at: string;
+}
+
+/** Chosen device types and channels of a text block; empty when it applies to all (3.1). */
+export interface TextBlockScopeIds {
+  deviceTypeIds: number[];
+  channelIds: number[];
 }
 
 /**
@@ -69,10 +79,19 @@ export function createTextBlockRepository(db: Kysely<DB>) {
     },
 
     /**
-     * Inserts an active text block for all device types and all channels, without check date
-     * and checking body; returns its id. The choice of a scope follows with #163.
+     * Inserts an active text block without check date and checking body; returns its id. The
+     * chosen device types and channels are stored with `replaceScope`.
      */
-    async insert({ name, nameKey, kind, body, legalStatus, at }: TextBlockInsert): Promise<number> {
+    async insert({
+      name,
+      nameKey,
+      kind,
+      body,
+      legalStatus,
+      allDeviceTypes,
+      allChannels,
+      at,
+    }: TextBlockInsert): Promise<number> {
       const { id } = await db
         .insertInto('text_block')
         .values({
@@ -81,8 +100,8 @@ export function createTextBlockRepository(db: Kysely<DB>) {
           kind,
           body,
           active: 1,
-          all_device_types: 1,
-          all_channels: 1,
+          all_device_types: allDeviceTypes ? 1 : 0,
+          all_channels: allChannels ? 1 : 0,
           legal_status: legalStatus,
           legal_checked_on: null,
           legal_checked_by: null,
@@ -96,10 +115,9 @@ export function createTextBlockRepository(db: Kysely<DB>) {
     },
 
     /** Stores the changed fields with the new version. */
-    async update(
-      id: number,
-      { name, nameKey, kind, body, active, legal, version, at }: TextBlockChange,
-    ) {
+    async update(id: number, change: TextBlockChange) {
+      const { name, nameKey, kind, body, active, legal, allDeviceTypes, allChannels } = change;
+      const { version, at } = change;
       await db
         .updateTable('text_block')
         .set({
@@ -113,11 +131,61 @@ export function createTextBlockRepository(db: Kysely<DB>) {
             legal_checked_on: legal.legalCheckedOn,
             legal_checked_by: legal.legalCheckedBy,
           }),
+          ...(allDeviceTypes !== undefined && { all_device_types: allDeviceTypes ? 1 : 0 }),
+          ...(allChannels !== undefined && { all_channels: allChannels ? 1 : 0 }),
           version,
           updated_at: at,
         })
         .where('id', '=', id)
         .execute();
+    },
+
+    /** Chosen device types and channels of the text blocks, by text block id, ids ascending. */
+    async scopesOf(ids: number[]): Promise<Map<number, TextBlockScopeIds>> {
+      const scopes = new Map<number, TextBlockScopeIds>(
+        ids.map((id) => [id, { deviceTypeIds: [], channelIds: [] }]),
+      );
+      if (ids.length === 0) return scopes;
+      const deviceTypes = await db
+        .selectFrom('text_block_device_type')
+        .select(['text_block_id', 'device_type_id'])
+        .where('text_block_id', 'in', ids)
+        .orderBy('device_type_id')
+        .execute();
+      for (const row of deviceTypes) {
+        scopes.get(row.text_block_id)?.deviceTypeIds.push(row.device_type_id);
+      }
+      const channels = await db
+        .selectFrom('text_block_channel')
+        .select(['text_block_id', 'channel_id'])
+        .where('text_block_id', 'in', ids)
+        .orderBy('channel_id')
+        .execute();
+      for (const row of channels) scopes.get(row.text_block_id)?.channelIds.push(row.channel_id);
+      return scopes;
+    },
+
+    /** Replaces the chosen device types and channels; empty lists for "alle" (3.1). */
+    async replaceScope(id: number, { deviceTypeIds, channelIds }: TextBlockScopeIds) {
+      await db.deleteFrom('text_block_device_type').where('text_block_id', '=', id).execute();
+      await db.deleteFrom('text_block_channel').where('text_block_id', '=', id).execute();
+      if (deviceTypeIds.length > 0) {
+        await db
+          .insertInto('text_block_device_type')
+          .values(
+            deviceTypeIds.map((deviceTypeId) => ({
+              text_block_id: id,
+              device_type_id: deviceTypeId,
+            })),
+          )
+          .execute();
+      }
+      if (channelIds.length > 0) {
+        await db
+          .insertInto('text_block_channel')
+          .values(channelIds.map((channelId) => ({ text_block_id: id, channel_id: channelId })))
+          .execute();
+      }
     },
   };
 }

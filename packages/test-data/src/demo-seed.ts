@@ -154,12 +154,15 @@ export const DEMO_TEXT_BLOCKS = [
   },
 ] as const;
 
+/** Scope of the demo text blocks: "alle" device types and channels (#163). */
+const ALL_SCOPE = { allDeviceTypes: true, deviceTypeIds: [], allChannels: true, channelIds: [] };
+
 export const seedTextBlocks: SeedArea = async (api) => {
   for (const { active, ...textBlock } of DEMO_TEXT_BLOCKS) {
     const created = await api.request<{ textBlock: { id: number; version: number } }>(
       'POST',
       '/api/text-blocks',
-      textBlock,
+      { ...textBlock, ...ALL_SCOPE },
     );
     if (!active) {
       await api.request('PATCH', `/api/text-blocks/${created.textBlock.id}`, {
