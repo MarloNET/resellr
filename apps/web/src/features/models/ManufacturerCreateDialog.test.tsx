@@ -9,7 +9,25 @@ import { routes } from '../../app/router.tsx';
 // Component tests of dialog UI-008 opened from UI-031 (Q-7, DER-37-13) with a mocked `fetch`
 // (Technical Specification 6.1, 6.2).
 
-const HP = { id: 2, name: 'HP', active: true, gpsrComplete: true, version: 1 };
+const HP = {
+  id: 2,
+  name: 'HP',
+  active: true,
+  gpsrComplete: true,
+  gpsrMissing: [],
+  gpsr: {
+    legalName: 'HP Deutschland GmbH',
+    street: 'Schickardstraße 32',
+    postalCode: '71034',
+    city: 'Böblingen',
+    country: 'Deutschland',
+    contact: 'https://www.hp.com/de-de/kontakt',
+    euRpName: '',
+    euRpAddress: '',
+    euRpContact: '',
+  },
+  version: 1,
+};
 
 const OPS_STATUS = {
   dataDirPath: 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten',

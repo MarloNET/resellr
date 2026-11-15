@@ -254,12 +254,14 @@ export function useCreateManufacturerMutation() {
   const queryClient = useQueryClient();
   return useMutation<ManufacturerCreateResult, ApiError, ManufacturerCreate>({
     mutationFn: (body) => apiClient.post<ManufacturerCreateResult>('/api/manufacturers', body),
-    onSuccess: ({ id, name, active, gpsrComplete, version }) =>
+    onSuccess: ({ id, name, active, gpsrComplete, gpsrMissing, gpsr, version }) =>
       storeSaved<Manufacturer>(queryClient, queryKeys.settings.manufacturers(), {
         id,
         name,
         active,
         gpsrComplete,
+        gpsrMissing,
+        gpsr,
         version,
       }),
   });

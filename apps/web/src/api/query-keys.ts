@@ -25,6 +25,11 @@ export const queryKeys = {
     all: ['channels'] as const,
     channels: () => ['channels', 'channels'] as const,
   },
+  catalog: {
+    all: ['catalog'] as const,
+    modelTemplates: (filter: { q?: string; deviceTypeId?: number }) =>
+      ['catalog', 'model-templates', filter] as const,
+  },
 } as const;
 
 /**

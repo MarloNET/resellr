@@ -89,6 +89,73 @@ const isEmpty = (input: unknown) =>
   (typeof input === 'string' && input.trim() === '') ||
   (Array.isArray(input) && input.length === 0);
 
+const storedPort = z.strictObject({
+  count: z.int().min(1),
+  typeId: idSchema,
+  positionId: idSchema.nullable(),
+});
+
+/** The stored format of a data type or role (3.4), without the rules of the definition. */
+function storedFormat(attribute: AttributeValueDefinition): z.ZodType<AttributeValue> {
+  if (attribute.systemRole === 'battery_capacity') {
+    return z.union([
+      z.strictObject({ percent: z.int().min(0).max(100) }),
+      z.strictObject({ notDeterminable: z.literal(true) }),
+    ]);
+  }
+  switch (attribute.dataType) {
+    case 'text':
+      return z.string().trim().max(ATTRIBUTE_TEXT_VALUE_MAX);
+    case 'integer':
+      return z.int();
+    case 'decimal':
+      return z.string().refine((input) => parseDecimal(input) === input);
+    case 'boolean':
+      return z.boolean();
+    case 'pick':
+      return idSchema;
+    case 'ports':
+      return z.array(storedPort);
+  }
+}
+
+/**
+ * Whether the input is no value for the data type of the attribute (2.5): `null` or a missing
+ * key, for text also `""` after trimming, for ports also `[]`. Any other input is a value.
+ */
+function isNoValue({ dataType, systemRole }: AttributeValueDefinition, input: unknown): boolean {
+  if (input === null || input === undefined) return true;
+  if (systemRole === 'battery_capacity') return false;
+  if (dataType === 'text') return typeof input === 'string' && input.trim() === '';
+  if (dataType === 'ports') return Array.isArray(input) && input.length === 0;
+  return false;
+}
+
+/**
+ * Schema of the value of a deactivated attribute: only the structure of its stored format (3.4),
+ * without required, range and pick list of the current definition (2.5, FIND-350). A value in
+ * another form, such as `""` for an integer, is a structural error (`invalid_type`, 2.0.5 rule
+ * (4)) and never a field error, because `web-ui` does not ask for a deactivated attribute.
+ * Returns `undefined` for no value.
+ */
+function deactivatedValueSchema(
+  attribute: AttributeValueDefinition,
+): z.ZodType<AttributeValue | undefined> {
+  const format = storedFormat(attribute);
+  return z.unknown().transform((input, context): AttributeValue | undefined => {
+    if (isNoValue(attribute, input)) return undefined;
+    const result = format.safeParse(input);
+    if (result.success) return result.data;
+    context.addIssue({
+      code: 'invalid_type',
+      expected: 'custom',
+      input,
+      message: `stored format of ${attribute.systemRole ?? attribute.dataType}`,
+    });
+    return z.NEVER;
+  });
+}
+
 /**
  * Schema of the value of one attribute: the input type, then one refinement with the rules in
  * the order required, format, length or range, so a wrong input such as "3 bis 4" stays a field
@@ -96,9 +163,9 @@ const isEmpty = (input: unknown) =>
  * the stored form, `undefined` for no value.
  */
 function valueSchema(attribute: AttributeValueDefinition): z.ZodType<AttributeValue | undefined> {
-  const { label } = attribute;
   // A deactivated attribute is no longer asked for; its stored value stays valid (REQ-005).
-  const mandatory = attribute.active && attribute.required;
+  if (!attribute.active) return deactivatedValueSchema(attribute);
+  const { label, required: mandatory } = attribute;
   /** No value: "<Merkmal> fehlt" for a required attribute, else nothing is stored. */
   const missing = (context: Context) =>
     mandatory
@@ -236,8 +303,8 @@ function batteryCapacityRule(
  * Schema of the values of one level ("Modell" for model templates, "Gerät" for devices) built
  * from the attributes of the device type (2.5): one optional key per attribute of the level, the
  * attribute id as string (3.4). An active required attribute without a value is rejected with
- * "<Merkmal> fehlt"; a deactivated attribute is no longer asked for, but a stored value of it
- * stays valid (REQ-005). The battery capacity is required by the flag "Akku vorhanden" of the
+ * "<Merkmal> fehlt"; a deactivated attribute is no longer asked for, and a value of it is checked
+ * only for the structure of its stored format (REQ-005, FIND-350). The battery capacity is required by the flag "Akku vorhanden" of the
  * chosen value among `batteryValues`, the values of the list battery; without them it is never
  * required. Each attribute has at most one field error, at its id. The output holds only the
  * attributes with a value, in their stored form.
@@ -273,4 +340,19 @@ export function attributeValuesSchema(
     }
     return stored;
   });
+}
+
+/**
+ * The values after a `PATCH` (2.5 "Merkmalswerte bei `PATCH` sind Änderungen"): a key of
+ * `changes` overwrites the stored value, `null` removes it, a missing key leaves it unchanged;
+ * without `changes` all stored values stay. The only implementation of this rule; the services
+ * check the result with `attributeValuesSchema`.
+ */
+export function mergeAttributeValues(
+  stored: Readonly<AttributeValues>,
+  changes: Readonly<Record<string, unknown>> | undefined,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries({ ...stored, ...changes }).filter(([, value]) => value !== null),
+  );
 }

@@ -9,9 +9,40 @@ import { routes } from '../../../app/router.tsx';
 // Component tests of UI-031 and of dialog UI-008 opened from it, with a mocked `fetch`
 // (Technical Specification 6.1, 6.2).
 
-const LENOVO = { id: 1, name: 'Lenovo', active: true, gpsrComplete: false, version: 3 };
-const HP = { id: 2, name: 'HP', active: true, gpsrComplete: true, version: 1 };
-const TOSHIBA = { id: 3, name: 'Toshiba', active: false, gpsrComplete: false, version: 2 };
+const EMPTY_GPSR = {
+  legalName: '',
+  street: '',
+  postalCode: '',
+  city: '',
+  country: '',
+  contact: '',
+  euRpName: '',
+  euRpAddress: '',
+  euRpContact: '',
+};
+const ALL_MISSING = ['legalName', 'street', 'postalCode', 'city', 'country', 'contact'];
+const NO_GPSR = { gpsrComplete: false, gpsrMissing: ALL_MISSING, gpsr: EMPTY_GPSR };
+const HP_GPSR = {
+  ...EMPTY_GPSR,
+  legalName: 'HP Deutschland GmbH',
+  street: 'Schickardstraße 32',
+  postalCode: '71034',
+  city: 'Böblingen',
+  country: 'Deutschland',
+  contact: 'https://www.hp.com/de-de/kontakt',
+};
+
+const LENOVO = { id: 1, name: 'Lenovo', active: true, ...NO_GPSR, version: 3 };
+const HP = {
+  id: 2,
+  name: 'HP',
+  active: true,
+  gpsrComplete: true,
+  gpsrMissing: [] as string[],
+  gpsr: HP_GPSR,
+  version: 1,
+};
+const TOSHIBA = { id: 3, name: 'Toshiba', active: false, ...NO_GPSR, version: 2 };
 
 const NO_IMPACT = { updated: 0, rerelease: 0, manualReview: 0 };
 
@@ -26,7 +57,7 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
-type ManufacturerItem = typeof LENOVO;
+type ManufacturerItem = typeof HP;
 
 /**
  * `fetch` of the page: `GET /api/ops/status` for the frame (UI-044), the manufacturers and one
@@ -57,9 +88,11 @@ function mockApi({
     if (response.ok) {
       const answer = (await response.clone().json()) as
         { manufacturer: ManufacturerItem } | (ManufacturerItem & { existing: boolean });
-      const { id, name, active, gpsrComplete, version } =
-        'manufacturer' in answer ? answer.manufacturer : answer;
-      const saved = { id, name, active, gpsrComplete, version };
+      // `existing` of POST is no field of the list; JSON leaves `undefined` out.
+      const saved = {
+        ...('manufacturer' in answer ? answer.manufacturer : answer),
+        existing: undefined,
+      };
       const index = items.findIndex((item) => item.id === saved.id);
       if (index === -1) items.push(saved);
       else items[index] = saved;
@@ -83,7 +116,7 @@ function renderManufacturers() {
 const listRegion = () => screen.getByRole('region', { name: 'Hersteller' });
 const detailForm = () => screen.getByRole('form', { name: 'Hersteller' });
 const nameInput = () =>
-  within(detailForm()).getByRole<HTMLInputElement>('textbox', { name: /^Name/ });
+  within(detailForm()).getByRole<HTMLInputElement>('textbox', { name: 'Name' });
 const saveButton = () =>
   screen.getByRole<HTMLButtonElement>('button', { name: /^(Speichern|Speichern …)$/ });
 const cancelButton = () =>
@@ -98,7 +131,15 @@ const dialog = () => screen.getByRole('dialog', { name: 'Hersteller anlegen' });
 const dialogInput = () =>
   within(dialog()).getByRole<HTMLInputElement>('textbox', { name: /^Name des Herstellers/ });
 
+/** Inputs of the GPSR details in UI-031 by their label. */
+const gpsrInput = (label: string) =>
+  within(detailForm()).getByRole<HTMLInputElement | HTMLTextAreaElement>('textbox', {
+    name: label,
+  });
+const impactDialog = () => screen.getByRole('dialog', { name: 'Auswirkung der Änderung' });
+
 const PATCH_HP = 'PATCH /api/manufacturers/2';
+const PATCH_LENOVO = 'PATCH /api/manufacturers/1';
 const RENAMED_HP = { ...HP, name: 'Hewlett-Packard', version: 2 };
 
 /** A response that never arrives, e.g. a write without time limit (P-08). */
@@ -140,6 +181,278 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+// Before the tests of CU-098: its last test locks every write of the module until a reload (P-08).
+describe('UI-031 GPSR details and UI-043 (#165)', () => {
+  const LABELS = {
+    legalName: 'Herstellername (rechtlich)',
+    street: 'Straße und Hausnummer',
+    postalCode: 'Postleitzahl',
+    city: 'Ort',
+    country: 'Land',
+    contact: 'Elektronische Kontaktadresse',
+    euRpName: 'Name der verantwortlichen Person',
+    euRpAddress: 'Postanschrift der verantwortlichen Person',
+    euRpContact: 'Kontaktadresse der verantwortlichen Person',
+  } as const;
+
+  const MISSING_TEXTS = [
+    'Herstellername fehlt',
+    'Straße und Hausnummer fehlt',
+    'Postleitzahl fehlt',
+    'Ort fehlt',
+    'Land fehlt',
+    'Elektronische Kontaktadresse fehlt',
+  ];
+
+  const LENOVO_GPSR = {
+    ...EMPTY_GPSR,
+    legalName: 'Lenovo PC HK Limited',
+    street: 'Meitnerstraße 9',
+    postalCode: '70563',
+    city: 'Stuttgart',
+    country: 'Deutschland',
+    contact: 'info@lenovo.com',
+  };
+
+  async function openLenovo() {
+    await openPage();
+    fireEvent.click(row('Lenovo'));
+    await vi.waitFor(() => expect(nameInput().value).toBe('Lenovo'));
+  }
+
+  function enter(values: Partial<Record<keyof typeof LABELS, string>>) {
+    for (const [field, value] of Object.entries(values)) {
+      fireEvent.change(gpsrInput(LABELS[field as keyof typeof LABELS]), { target: { value } });
+    }
+  }
+
+  /** Field error of the input `label`, linked through `aria-describedby`. */
+  const errorOf = (label: string) => {
+    const input = gpsrInput(label);
+    const describedBy = input.getAttribute('aria-describedby');
+    return describedBy ? document.getElementById(describedBy)?.textContent : undefined;
+  };
+
+  it('UI-031.default shows the stored GPSR details of the open manufacturer with the responsible person in the EU', async () => {
+    mockApi();
+    await openPage();
+
+    expect(Object.values(LABELS).map((label) => gpsrInput(label).value)).toEqual([
+      'HP Deutschland GmbH',
+      'Schickardstraße 32',
+      '71034',
+      'Böblingen',
+      'Deutschland',
+      'https://www.hp.com/de-de/kontakt',
+      '',
+      '',
+      '',
+    ]);
+    expect(gpsrInput(LABELS.euRpAddress).tagName).toBe('TEXTAREA');
+    expect(screen.getByRole('group', { name: 'Postanschrift' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Verantwortliche Person in der EU' })).toBeTruthy();
+    expect(screen.queryByText(/ fehlt$/)).toBeNull();
+    expectAccessiblePage();
+  });
+
+  it('UI-031.validation DER-41-03 names each missing part of a manufacturer with incomplete details as "<Teil> fehlt" at its field', async () => {
+    mockApi();
+    await openLenovo();
+
+    expect(
+      [
+        LABELS.legalName,
+        LABELS.street,
+        LABELS.postalCode,
+        LABELS.city,
+        LABELS.country,
+        LABELS.contact,
+      ].map(errorOf),
+    ).toEqual(MISSING_TEXTS);
+    expect(errorOf(LABELS.euRpName)).toBeUndefined();
+    expectAccessiblePage();
+  });
+
+  it.each([
+    ['legalName', 201, 'Herstellername: höchstens 200 Zeichen'],
+    ['street', 201, 'Straße und Hausnummer: höchstens 200 Zeichen'],
+    ['postalCode', 21, 'Postleitzahl: höchstens 20 Zeichen'],
+    ['city', 101, 'Ort: höchstens 100 Zeichen'],
+    ['country', 101, 'Land: höchstens 100 Zeichen'],
+    ['contact', 255, 'Elektronische Kontaktadresse: höchstens 254 Zeichen'],
+    ['euRpName', 201, 'Name der verantwortlichen Person: höchstens 200 Zeichen'],
+    ['euRpAddress', 501, 'Postanschrift der verantwortlichen Person: höchstens 500 Zeichen'],
+    ['euRpContact', 255, 'Kontaktadresse der verantwortlichen Person: höchstens 254 Zeichen'],
+  ] as const)(
+    'UI-031.validation DER-41-01 %s with %i characters shows "%s" at the field and saves nothing',
+    async (field, length, text) => {
+      const { sent } = mockApi();
+      await openPage();
+
+      enter({ [field]: 'x'.repeat(length) });
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(errorOf(LABELS[field])).toBe(text));
+      expect(document.activeElement).toBe(gpsrInput(LABELS[field]));
+      expect(sent).toEqual([]);
+      expectAccessiblePage();
+    },
+  );
+
+  it('UI-031.validation DER-41-01 with incomplete details the focus goes to the input error, the "<Teil> fehlt" texts wait until it is corrected', async () => {
+    const { sent } = mockApi();
+    await openLenovo();
+
+    enter({ postalCode: '1'.repeat(21) });
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(document.activeElement).toBe(gpsrInput(LABELS.postalCode)));
+    expect(errorOf(LABELS.postalCode)).toBe('Postleitzahl: höchstens 20 Zeichen');
+    expect(errorOf(LABELS.legalName)).toBeUndefined();
+    expect(sent).toEqual([]);
+
+    enter({ postalCode: '' });
+    fireEvent.blur(gpsrInput(LABELS.postalCode));
+    await vi.waitFor(() => expect(errorOf(LABELS.legalName)).toBe('Herstellername fehlt'));
+  });
+
+  it('UI-031.validation DER-41-02 leaving a contact that is neither e-mail nor http(s) address shows "E-Mail-Adresse oder Internetadresse ungültig"; saving sends nothing', async () => {
+    const { sent } = mockApi();
+    await openPage();
+
+    enter({ contact: 'www.hp.com' });
+    fireEvent.blur(gpsrInput(LABELS.contact));
+
+    await vi.waitFor(() =>
+      expect(errorOf(LABELS.contact)).toBe('E-Mail-Adresse oder Internetadresse ungültig'),
+    );
+    fireEvent.click(saveButton());
+    expect(sent).toEqual([]);
+  });
+
+  it('UI-031.validation DER-41-01 DER-41-02 shows a field error of a 422 validation_failed at its GPSR field', async () => {
+    mockApi({
+      writes: {
+        [PATCH_HP]: () =>
+          Response.json(
+            errorBody('validation_failed', {
+              fields: [
+                {
+                  path: 'gpsr.contact',
+                  code: 'custom',
+                  message: 'E-Mail-Adresse oder Internetadresse ungültig',
+                },
+              ],
+            }),
+            { status: 422 },
+          ),
+      },
+    });
+    await openPage();
+
+    enter({ contact: 'info@hp.com' });
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() =>
+      expect(errorOf(LABELS.contact)).toBe('E-Mail-Adresse oder Internetadresse ungültig'),
+    );
+    expect(document.activeElement).toBe(gpsrInput(LABELS.contact));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('UI-031.success DER-41-04 DER-41-03 saving incomplete details shows "Gespeichert", then UI-043, and names the missing postal code with the chip "GPSR unvollständig"', async () => {
+    const saved = {
+      ...LENOVO,
+      gpsr: { ...LENOVO_GPSR, postalCode: '' },
+      gpsrMissing: ['postalCode'],
+      version: 4,
+    };
+    const { sent } = mockApi({
+      writes: { [PATCH_LENOVO]: () => Response.json({ manufacturer: saved, impact: NO_IMPACT }) },
+    });
+    await openLenovo();
+
+    enter({ ...LENOVO_GPSR, postalCode: '' });
+    fireEvent.click(saveButton());
+
+    await screen.findByRole('dialog', { name: 'Auswirkung der Änderung' });
+    expect(within(impactDialog()).getByText('Keine Kanal-Inhalte betroffen')).toBeTruthy();
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/manufacturers/1',
+        body: { version: 3, gpsr: { ...LENOVO_GPSR, postalCode: '' } },
+      },
+    ]);
+    fireEvent.click(within(impactDialog()).getByRole('button', { name: 'Schließen' }));
+
+    expect(screen.getByText('Gespeichert').closest('[role="status"]')).toBeTruthy();
+    expect(errorOf(LABELS.postalCode)).toBe('Postleitzahl fehlt');
+    expect(errorOf(LABELS.legalName)).toBeUndefined();
+    expect(row('Lenovo').textContent).toBe('LenovoaktivGPSR unvollständig');
+    expect(saveButton().disabled).toBe(true);
+    expectAccessiblePage();
+  });
+
+  it('UI-043.empty DER-41-05 after saving complete details UI-043 shows "Keine Kanal-Inhalte betroffen"; the chip shows "GPSR vollständig"', async () => {
+    const saved = {
+      ...LENOVO,
+      gpsrComplete: true,
+      gpsrMissing: [],
+      gpsr: LENOVO_GPSR,
+      version: 4,
+    };
+    mockApi({
+      writes: { [PATCH_LENOVO]: () => Response.json({ manufacturer: saved, impact: NO_IMPACT }) },
+    });
+    await openLenovo();
+
+    enter(LENOVO_GPSR);
+    fireEvent.click(saveButton());
+
+    const dialog = await screen.findByRole('dialog', { name: 'Auswirkung der Änderung' });
+    expect(within(dialog).getByText('Keine Kanal-Inhalte betroffen')).toBeTruthy();
+    expect(
+      within(dialog)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Schließen']);
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(row('Lenovo').textContent).toBe('LenovoaktivGPSR vollständig');
+    expect(screen.queryByText(/ fehlt$/)).toBeNull();
+  });
+
+  it('UI-031.disabled "Speichern" is enabled by a GPSR change and disabled again when it is taken back', async () => {
+    mockApi();
+    await openPage();
+
+    enter({ city: 'Stuttgart' });
+    expect(saveButton().disabled).toBe(false);
+    enter({ city: 'Böblingen' });
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it('UI-043 does not open after "Deaktivieren"', async () => {
+    mockApi({
+      writes: {
+        [PATCH_LENOVO]: () =>
+          Response.json({
+            manufacturer: { ...LENOVO, active: false, version: 4 },
+            impact: NO_IMPACT,
+          }),
+      },
+    });
+    await openPage();
+
+    fireEvent.click(deactivateButton('Lenovo'));
+
+    expect(await screen.findByText('Gespeichert')).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
 });
 
 describe('UI-031 manufacturers (CU-098)', () => {
@@ -203,6 +516,13 @@ describe('UI-031 manufacturers (CU-098)', () => {
 
     rename('Hewlett-Packard');
 
+    // "Speichern" leads to UI-043 (UI-031 "Aktionen"); "Schließen" leads back.
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Auswirkung der Änderung' })).getByRole(
+        'button',
+        { name: 'Schließen' },
+      ),
+    );
     const banner = await screen.findByText('Gespeichert');
     expect(banner.closest('[role="status"]')).toBeTruthy();
     expect(sent).toEqual([
@@ -246,7 +566,7 @@ describe('UI-031 manufacturers (CU-098)', () => {
   });
 
   it('UI-031.success DER-37-03 AC-REQ-100-01 " Fujitsu " through "Hersteller anlegen" closes UI-008, chooses "Fujitsu" with "GPSR unvollständig" and shows "Gespeichert"', async () => {
-    const fujitsu = { id: 4, name: 'Fujitsu', active: true, gpsrComplete: false, version: 1 };
+    const fujitsu = { id: 4, name: 'Fujitsu', active: true, ...NO_GPSR, version: 1 };
     const { sent } = mockApi({
       writes: {
         'POST /api/manufacturers': () =>

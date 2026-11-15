@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { attributeValuesSchema, type AttributeValueDefinition } from './attribute-values.schema.ts';
+import {
+  attributeValuesSchema,
+  mergeAttributeValues,
+  type AttributeValueDefinition,
+} from './attribute-values.schema.ts';
 
 const attribute = (change: Partial<AttributeValueDefinition>): AttributeValueDefinition => ({
   id: 1,
@@ -389,5 +393,184 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
         attributeValuesSchema([BATTERY, CAPACITY], 'device').safeParse({ 17: 4 }).data,
       ).toEqual({ 17: 4 });
     });
+  });
+
+  describe('values of deactivated attributes: only the structure of the stored format (2.5, FIND-350)', () => {
+    const RAM = { label: 'RAM', dataType: 'integer', minValue: '1', maxValue: '1024' } as const;
+    const codesOf = (result: { error?: { issues: { code: string }[] } }) =>
+      result.error?.issues.map((issue) => issue.code);
+
+    // Both are level "Gerät"; the default device values of a model template are checked
+    // without "Pflicht" (2.4), so the caller passes the definitions with `required: false`.
+    it.each([
+      ['values', true],
+      ['defaultDeviceValues', false],
+    ])(
+      'DER-34-18 RAM 1–1024 deactivated with 2048 in %s: no error; active: the full rule; an object: structural error',
+      (_values, required) => {
+        const ram = (active: boolean) =>
+          attributeValuesSchema(
+            [attribute({ ...RAM, level: 'device', required, active })],
+            'device',
+          );
+        expect(ram(false).safeParse({ 1: 2048 }).data).toEqual({ 1: 2048 });
+        expect(issuesOf(ram(true).safeParse({ 1: 2048 }))).toEqual([
+          { path: '1', message: 'RAM: ganze Zahl von 1 bis 1024' },
+        ]);
+        expect(codesOf(ram(false).safeParse({ 1: { value: 2048 } }))).toEqual(['invalid_type']);
+      },
+    );
+
+    it('DER-34-18 a deactivated attribute is never asked for, whatever its definition', () => {
+      expect(one({ ...RAM, required: true, active: false }, null).data).toEqual({});
+      expect(
+        attributeValuesSchema(
+          [attribute({ ...RAM, required: true, active: false })],
+          'model',
+        ).safeParse({}).data,
+      ).toEqual({});
+    });
+
+    it.each([
+      ['text', {}, 'a'.repeat(200), 'a'.repeat(200)],
+      ['integer', RAM, -3, -3],
+      ['decimal', { minValue: '10', maxValue: '60' }, '61.5', '61.5'],
+      ['boolean', {}, true, true],
+      ['pick', {}, 99, 99],
+      [
+        'ports',
+        {},
+        [{ count: 2, typeId: 41, positionId: null }],
+        [{ count: 2, typeId: 41, positionId: null }],
+      ],
+    ] as const)(
+      'DER-34-18 keeps the stored %s value without its rules',
+      (dataType, definition, value, stored) => {
+        expect(one({ ...definition, dataType, active: false }, value).data).toEqual({ 1: stored });
+      },
+    );
+
+    it('DER-34-18 keeps the stored value of the role battery_capacity', () => {
+      const capacity = {
+        dataType: 'integer',
+        systemRole: 'battery_capacity',
+        active: false,
+      } as const;
+      expect(one(capacity, { percent: 85 }).data).toEqual({ 1: { percent: 85 } });
+      expect(one(capacity, { notDeterminable: true }).data).toEqual({
+        1: { notDeterminable: true },
+      });
+    });
+
+    it.each([
+      ['text', 'a'.repeat(201)],
+      ['text', 7],
+      ['integer', '2048'],
+      ['integer', 1.5],
+      ['integer', 9007199254740992],
+      ['decimal', '14,01'],
+      ['decimal', 14.01],
+      ['decimal', 'schnell'],
+      ['boolean', 'ja'],
+      ['pick', 0],
+      ['pick', '7'],
+      ['ports', [{ count: 0, typeId: 41, positionId: null }]],
+      ['ports', [{ count: '2', typeId: 41, positionId: null }]],
+      ['ports', [{ count: 1, typeId: null, positionId: null }]],
+      ['ports', [{ count: 1, typeId: 41 }]],
+      ['ports', { count: 1, typeId: 41, positionId: null }],
+      // "" is no value only for text and [] only for ports (2.5); else another form.
+      ['text', []],
+      ['integer', ''],
+      ['integer', '  '],
+      ['integer', []],
+      ['decimal', ''],
+      ['decimal', []],
+      ['boolean', ''],
+      ['boolean', []],
+      ['pick', ''],
+      ['pick', []],
+      ['ports', ''],
+    ] as const)(
+      'DER-34-18 rejects the deactivated %s value %j in another form as structural error, never as field error',
+      (dataType, value) => {
+        expect(codesOf(one({ dataType, active: false }, value))).toEqual(['invalid_type']);
+      },
+    );
+
+    it.each([
+      ['text', null],
+      ['text', ''],
+      ['text', '   '],
+      ['integer', null],
+      ['decimal', null],
+      ['boolean', null],
+      ['pick', null],
+      ['ports', null],
+      ['ports', []],
+    ] as const)('DER-34-18 takes the deactivated %s value %j as no value', (dataType, value) => {
+      expect(one({ dataType, active: false }, value).data).toEqual({});
+    });
+
+    it.each([{ percent: 101 }, { percent: '85' }, { notDeterminable: false }, 85, '', [[]]])(
+      'DER-34-18 rejects the deactivated battery capacity %j as structural error',
+      (value) => {
+        const capacity = {
+          dataType: 'integer',
+          systemRole: 'battery_capacity',
+          active: false,
+        } as const;
+        expect(codesOf(one(capacity, value))).toEqual(['invalid_type']);
+      },
+    );
+
+    it('DER-34-18 a valid deactivated value adds no error beside the field error of an active attribute', () => {
+      const schema = attributeValuesSchema(
+        [
+          attribute({ id: 1, ...RAM, active: false }),
+          attribute({ id: 2, label: 'SSD', dataType: 'integer' }),
+        ],
+        'model',
+      );
+      expect(schema.safeParse({ 1: 2048, 2: 'viel' }).error?.issues).toMatchObject([
+        { path: ['2'], code: 'custom', message: 'SSD: ganze Zahl' },
+      ]);
+    });
+  });
+});
+
+describe('mergeAttributeValues (CU-067, Technical Specification 2.5 "Merkmalswerte bei PATCH sind Änderungen")', () => {
+  const stored = { 12: 16, 13: 512, 18: { percent: 85 } };
+
+  it('DER-34-20 a key overwrites the stored value', () => {
+    expect(mergeAttributeValues(stored, { 12: 32, 21: '13.3' })).toEqual({
+      12: 32,
+      13: 512,
+      18: { percent: 85 },
+      21: '13.3',
+    });
+  });
+
+  it('DER-34-20 null removes the stored value', () => {
+    expect(mergeAttributeValues(stored, { 13: null, 99: null })).toEqual({
+      12: 16,
+      18: { percent: 85 },
+    });
+  });
+
+  it('DER-34-20 a missing key leaves the stored value unchanged', () => {
+    expect(mergeAttributeValues(stored, {})).toEqual(stored);
+  });
+
+  it('DER-34-20 without the object all stored values stay', () => {
+    expect(mergeAttributeValues(stored, undefined)).toEqual(stored);
+  });
+
+  it('changes neither the stored values nor the changes', () => {
+    const changes = { 12: 32, 13: null };
+    const before = structuredClone(stored);
+    mergeAttributeValues(stored, changes);
+    expect(stored).toEqual(before);
+    expect(changes).toEqual({ 12: 32, 13: null });
   });
 });
