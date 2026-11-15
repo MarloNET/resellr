@@ -24,17 +24,31 @@ on:
       - 'docs/ux/stitch-log.md'
       - '.paperclip/**'
   pull_request:
+  # Manual run for any branch or tag, always complete (addendum MAR-826). Its check has its own
+  # name, so it never stands in for the required check of a pull request.
+  workflow_dispatch:
+    inputs:
+      e2e_workers:
+        description: 'Playwright workers for the E2E tests (config = value of playwright.config.ts)'
+        type: choice
+        options: [config, '2', '4']
+        default: config
 
 permissions:
   contents: read
 
+# Pull requests: one group per pull request, a newer push cancels the older run. push and
+# workflow_dispatch: one group per run, so every state of main gets its own complete run
+# (Technical Specification 10.2, addendum MAR-826).
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || format('ci-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux:
-    name: Lint, type check, tests (Linux)
+    # `Lint, type check, tests (Linux)` is the required check of the ruleset on main; keep it
+    # unchanged. A manual run reports under its own name (addendum MAR-826).
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Lint, type check, tests (Linux, manual)' || 'Lint, type check, tests (Linux)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
