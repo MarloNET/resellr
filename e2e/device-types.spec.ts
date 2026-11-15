@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import Database from 'better-sqlite3';
 
 import { expect, test } from './fixtures/app-fixture.ts';
@@ -244,6 +244,78 @@ const attributeRow = (page: Page, label: string) =>
     .getByRole('row')
     .filter({ has: page.getByRole('button', { name: label, exact: true }) });
 
+/** Whether the center of the element receives the mouse, i.e. nothing covers it. */
+function hitAtCenter(element: Element) {
+  const rect = element.getBoundingClientRect();
+  return element.contains(
+    document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
+  );
+}
+
+/**
+ * "Fokus vollständig sichtbar" (6.3, addendum MAR-834): after `focus()` without scrolling by
+ * hand, the element with 4 px of focus ring per side lies in the viewport, in the visible part
+ * of its `[data-table-scroll]` and right of a sticky first cell of its row, and its center and
+ * corners (1 px inside its rounded shape) receive the mouse.
+ */
+async function expectFocusFullyVisible(button: Locator) {
+  // Defined start: Chrome scrolls a partly visible element not at all on `focus()`, e.g. "Wieder
+  // aktivieren" after a click on the narrower "Deaktivieren"; the test does not scroll to it.
+  await button.evaluate((element) => {
+    if (document.activeElement === element) element.blur();
+    element.closest('[data-table-scroll]')!.scrollLeft = 0;
+  });
+  await button.focus();
+  await expect(button).toBeFocused();
+  const problems = await button.evaluate((element) => {
+    const found: string[] = [];
+    const rect = element.getBoundingClientRect();
+    const ring = {
+      left: rect.left - 4,
+      right: rect.right + 4,
+      top: rect.top - 4,
+      bottom: rect.bottom + 4,
+    };
+    const outside = (box: { left: number; right: number; top: number; bottom: number }) =>
+      ring.left < box.left ||
+      ring.right > box.right ||
+      ring.top < box.top ||
+      ring.bottom > box.bottom;
+    if (outside({ left: 0, top: 0, right: innerWidth, bottom: innerHeight })) {
+      found.push('outside of the viewport');
+    }
+    const area = element.closest('[data-table-scroll]')!;
+    const areaRect = area.getBoundingClientRect();
+    const left = areaRect.left + area.clientLeft;
+    const top = areaRect.top + area.clientTop;
+    if (outside({ left, top, right: left + area.clientWidth, bottom: top + area.clientHeight })) {
+      found.push('outside of the scroll area');
+    }
+    const firstCell = element.closest('tr')!.firstElementChild!;
+    if (
+      getComputedStyle(firstCell).position === 'sticky' &&
+      ring.left < firstCell.getBoundingClientRect().right
+    ) {
+      found.push('under the first column');
+    }
+    // Corners 1 px inside the rounded shape: Chrome hit-tests `border-radius`.
+    const radius = parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0;
+    const inset = 1 + radius * (1 - Math.SQRT1_2);
+    const points = [
+      [rect.left + rect.width / 2, rect.top + rect.height / 2],
+      [rect.left + inset, rect.top + inset],
+      [rect.right - inset, rect.top + inset],
+      [rect.left + inset, rect.bottom - inset],
+      [rect.right - inset, rect.bottom - inset],
+    ];
+    for (const [x, y] of points) {
+      if (!element.contains(document.elementFromPoint(x!, y!))) found.push(`covered at ${x}, ${y}`);
+    }
+    return found;
+  });
+  expect(problems, await button.innerText()).toEqual([]);
+}
+
 /** Creates an attribute through the API like the user interface (`local-guard` G-2, G-4). */
 async function createAttribute(
   page: Page,
@@ -469,6 +541,146 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
     const [stored] = await attributeList(page, server.baseUrl, deviceType.id);
     expect(stored).toMatchObject({ id: ram.id, active: true, variantForming: true });
   });
+
+  // Bug #372: at 1366 px the open panel left the table a scroll area narrower than its fixed
+  // first column, which covered the row actions and labels at every scroll position. The panel
+  // now overlays the table as sheet where the room beside it is too narrow (2.0.10, MAR-834).
+  for (const { width, height, panel } of [
+    { width: 1920, height: 1080, panel: 'beside' },
+    { width: 1366, height: 768, panel: 'none' },
+    { width: 1366, height: 768, panel: 'sheet' },
+  ] as const) {
+    test(`UI-027.default row actions and labels are operable by mouse with a fully visible focus at ${width} x ${height} with the panel ${panel}`, async ({
+      page,
+      server,
+    }, testInfo) => {
+      // The test sets its own viewports, so one row of the matrix suffices.
+      test.skip(testInfo.project.name !== 'FM-1', 'own viewports');
+      await page.setViewportSize({ width, height });
+      const name = uniqueName('Notebook', `${testInfo.title}`, testInfo.project.name);
+      const deviceType = await createDeviceType(page, server.baseUrl, name);
+      const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+        label: 'RAM',
+        dataType: 'integer',
+        unit: 'GB',
+        required: true,
+      });
+      await createAttribute(page, server.baseUrl, deviceType.id, { label: 'SSD' });
+      await openDeviceType(page, name);
+      const ramRow = attributeRow(page, 'RAM');
+      const ramLabel = ramRow.getByRole('button', { name: 'RAM', exact: true });
+      const deactivate = ramRow.getByRole('button', { name: 'Deaktivieren' });
+      const activate = ramRow.getByRole('button', { name: 'Wieder aktivieren' });
+      const scrollArea = attributes(page).locator('[data-table-scroll]');
+      const firstCellPosition = () =>
+        ramRow
+          .locator('td')
+          .first()
+          .evaluate((cell) => getComputedStyle(cell).position);
+      const sheet = page.getByRole('dialog', { name: 'Merkmal bearbeiten' });
+      const aside = page.getByRole('complementary', { name: 'Merkmal bearbeiten' });
+
+      // Mouse: scrolled into view, the center of every button of the table receives the click.
+      const expectOperableByMouse = async () => {
+        for (const button of await attributes(page).locator('table button:enabled').all()) {
+          await button.scrollIntoViewIfNeeded();
+          expect(await button.evaluate(hitAtCenter), await button.innerText()).toBe(true);
+        }
+        await scrollArea.evaluate((area) => {
+          area.scrollLeft = 0;
+        });
+      };
+      const toggle = async (button: typeof deactivate, active: boolean) => {
+        const answered = page.waitForResponse(
+          (answer) =>
+            answer.request().method() === 'PATCH' &&
+            answer.url().endsWith(`/api/attributes/${ram.id}`),
+        );
+        await button.click();
+        expect((await answered).status()).toBe(200);
+        await expect(
+          ramRow.getByText(active ? 'aktiv' : 'deaktiviert', { exact: true }),
+        ).toBeVisible();
+      };
+      // Both row actions: operable by mouse, the focus on each fully visible (6.3).
+      const expectRowActionsOperable = async () => {
+        await expectOperableByMouse();
+        await expectFocusFullyVisible(deactivate);
+        await toggle(deactivate, false);
+        await expectFocusFullyVisible(activate);
+        await toggle(activate, true);
+      };
+
+      if (panel === 'none') {
+        expect(await firstCellPosition()).toBe('sticky');
+        await expectRowActionsOperable();
+        // Probe of the container query of `Table`: fixed from 24rem on only.
+        await scrollArea.evaluate((area) => {
+          area.style.width = '23.5rem';
+        });
+        expect(await firstCellPosition()).toBe('static');
+        await scrollArea.evaluate((area) => {
+          area.style.width = '24rem';
+        });
+        expect(await firstCellPosition()).toBe('sticky');
+        return;
+      }
+
+      // Taken before the sheet opens: behind it the table is `aria-hidden`.
+      const deactivateBehind = await deactivate.elementHandle();
+      await ramLabel.click();
+      if (panel === 'beside') {
+        await expect(aside).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        expect(await firstCellPosition()).toBe('sticky');
+        await expectRowActionsOperable();
+        await attributeRow(page, 'SSD').getByRole('button', { name: 'SSD', exact: true }).click();
+        await expect(aside.getByRole('textbox', { name: /^Bezeichnung/ })).toHaveValue('SSD');
+        return;
+      }
+
+      // Sheet: the focus stays in it, the table behind it receives no click.
+      await expect(sheet).toBeVisible();
+      await expect(aside).toHaveCount(0);
+      await expect(sheet.getByRole('textbox', { name: /^Bezeichnung/ })).toHaveValue('RAM');
+      for (let step = 0; step < 12; step += 1) {
+        await page.keyboard.press('Tab');
+        expect(await sheet.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(
+          true,
+        );
+      }
+      expect(await deactivateBehind!.evaluate(hitAtCenter)).toBe(false);
+      expect(
+        await deactivateBehind!.evaluate(
+          (button) => getComputedStyle(button.closest('tr')!.firstElementChild!).position,
+        ),
+      ).toBe('sticky');
+
+      // Esc: the focus returns to the label, the row actions are operable again.
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(ramLabel).toBeFocused();
+      await expectRowActionsOperable();
+
+      // "Schließen" likewise.
+      await ramLabel.click();
+      await sheet.getByRole('button', { name: 'Schließen' }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(ramLabel).toBeFocused();
+      await expectRowActionsOperable();
+
+      // DER-34-16 at 1366 px: "Wieder aktivieren" after saving the changed "Pflichtmerkmal".
+      await toggle(deactivate, false);
+      await ramLabel.click();
+      await sheet.getByRole('checkbox', { name: /^Pflichtmerkmal/ }).click();
+      await sheet.getByRole('button', { name: 'Merkmal speichern' }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(ramLabel).toBeFocused();
+      await toggle(activate, true);
+      const [stored] = await attributeList(page, server.baseUrl, deviceType.id);
+      expect(stored).toMatchObject({ id: ram.id, active: true, required: false });
+    });
+  }
 
   test('AC-REQ-006-02 UI-027.default an attribute of the initial device type Notebook is renamed and keeps its new name after reloading', async ({
     page,

@@ -151,6 +151,23 @@ describe('stop command (CU-260)', () => {
     },
   );
 
+  it('DER-104-07 sends POST /api/ops/shutdown directly to the running server after already_running and shows stopped', async () => {
+    const { deps, order } = setup({
+      pipe: phase('already_running', { refNo: REF_NO }),
+      shutdown: { status: 200, body: {}, refNo: null },
+    });
+
+    await expect(runStopCommand(deps)).resolves.toBe(LauncherExitCode.Success);
+
+    expect(order).toEqual([
+      'prepare',
+      `open ${LP_03_URL}`,
+      'pipe stop',
+      'POST shutdown',
+      `stopped ${REQUEST} ${DATA_DIR}`,
+    ]);
+  });
+
   it('stops anyway when LP-03 cannot be opened', async () => {
     const { deps } = setup({ pipe: phase('stopped') });
     deps.chromeOpener.open.mockRejectedValueOnce(new Error('no browser'));
@@ -192,6 +209,22 @@ describe('stop command (CU-260)', () => {
       await expect(runStopCommand(deps)).resolves.toBe(LauncherExitCode.Failed);
 
       expect(deps.waitForFreePipe).not.toHaveBeenCalled();
+    });
+
+    it('DER-104-07 stops the running server directly after already_running, waits for the free pipe and ends with exit code 0', async () => {
+      const { deps, order } = setup({
+        forUpdate: true,
+        pipe: phase('already_running', { refNo: REF_NO }),
+        shutdown: { status: 200, body: {}, refNo: null },
+      });
+
+      await expect(runStopCommand(deps)).resolves.toBe(LauncherExitCode.Success);
+
+      expect(order).toEqual([
+        'pipe stop',
+        'POST shutdown',
+        `wait for free pipe ${FREE_PIPE_TIMEOUT_MS}`,
+      ]);
     });
 
     it('ends with exit code 0 after a direct shutdown with 200', async () => {

@@ -24,8 +24,11 @@ export interface HealthClient {
    * the flow `open`, 5 s for the availability check (CU-265).
    */
   getHealth(timeoutMs?: number): Promise<HealthState | null>;
-  /** Asks the running server to stop; null if no server answers (2.17). */
-  shutdown(): Promise<ShutdownResponse | null>;
+  /**
+   * Asks the running server to stop; null if no server answers (2.17) or `signal` aborts the
+   * request before the answer.
+   */
+  shutdown(signal?: AbortSignal): Promise<ShutdownResponse | null>;
 }
 
 export interface HealthClientOptions {
@@ -56,18 +59,21 @@ export function createHealthClient({ port }: HealthClientOptions): HealthClient 
     }
   };
 
-  const shutdown = async (): Promise<ShutdownResponse | null> => {
+  const shutdown = async (signal?: AbortSignal): Promise<ShutdownResponse | null> => {
     let response: Response;
+    let text: string;
     try {
       response = await fetch(new URL('/api/ops/shutdown', appUrl), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '{}',
+        signal,
       });
+      text = await response.text();
     } catch {
+      // No connection, or aborted before the whole answer arrived.
       return null;
     }
-    const text = await response.text();
     let body: unknown = null;
     try {
       body = JSON.parse(text);

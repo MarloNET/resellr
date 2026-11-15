@@ -24,17 +24,31 @@ on:
       - 'docs/ux/stitch-log.md'
       - '.paperclip/**'
   pull_request:
+  # Manual run for any branch or tag, always complete (addendum MAR-826). Its check has its own
+  # name, so it never stands in for the required check of a pull request.
+  workflow_dispatch:
+    inputs:
+      e2e_workers:
+        description: 'Playwright workers for the E2E tests (config = value of playwright.config.ts)'
+        type: choice
+        options: [config, '2', '4']
+        default: config
 
 permissions:
   contents: read
 
+# Pull requests: one group per pull request, a newer push cancels the older run. push and
+# workflow_dispatch: one group per run, so every state of main gets its own complete run
+# (Technical Specification 10.2, addendum MAR-826).
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || format('ci-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux:
-    name: Lint, type check, tests (Linux)
+    # `Lint, type check, tests (Linux)` is the required check of the ruleset on main; keep it
+    # unchanged. A manual run reports under its own name (addendum MAR-826).
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Lint, type check, tests (Linux, manual)' || 'Lint, type check, tests (Linux)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -44,6 +58,7 @@ jobs:
 
       # A pull request that changes only documentation (list D, Technical Specification 10.2,
       # addendum MAR-787) skips every following step; the check still appears and passes.
+      # push and workflow_dispatch always run completely (addendum MAR-826).
       # Keep the list equal to `on.push.paths-ignore`.
       - name: Detect documentation-only change
         id: changes
@@ -71,6 +86,7 @@ jobs:
           if [ "$docs_only" = true ]; then
             echo "::notice::Only documentation changed; lint, type check and tests are skipped (MAR-787)."
           fi
+          echo "Event $EVENT_NAME: docs_only=$docs_only"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v7
@@ -168,4 +184,13 @@ jobs:
 
       - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7, REQ-079 connections, REQ-106 write paths)
         if: steps.changes.outputs.docs_only != 'true'
-        run: npm run e2e
+        env:
+          E2E_WORKERS: ${{ inputs.e2e_workers }}
+        run: |
+          set -euo pipefail
+          echo "CPUs: $(nproc)"
+          if [ -n "${E2E_WORKERS:-}" ] && [ "$E2E_WORKERS" != config ]; then
+            npm run e2e -- --workers="$E2E_WORKERS"
+          else
+            npm run e2e
+          fi

@@ -211,6 +211,51 @@ describe('launcher log (CU-296, Technical Specification 2.18, 2.19)', () => {
     expect(entriesOf('errors')).toEqual([]);
   });
 
+  it('DER-104-02 writes shutdown_failed with its reference number into the operations log and launcher.shutdown_timeout into the error log', () => {
+    createLauncherLog({ dir, appVersion: '0.1.0', now }).shutdownTimeout({
+      startId: 'start-1',
+      refNo: 'R-ABCD-EFGH',
+    });
+
+    expect(entriesOf('operations')).toEqual([
+      {
+        ts: '2026-11-10T09:30:00.000Z',
+        level: 'warn',
+        event: 'shutdown_failed',
+        refNo: 'R-ABCD-EFGH',
+        appVersion: '0.1.0',
+        startId: 'start-1',
+      },
+    ]);
+    expect(entriesOf('errors')).toEqual([
+      {
+        ts: '2026-11-10T09:30:00.000Z',
+        level: 'error',
+        refNo: 'R-ABCD-EFGH',
+        function: 'launcher.shutdown_timeout',
+        message: 'resellr-server still runs 30 s after the request to stop',
+        stack: null,
+        appVersion: '0.1.0',
+        startId: 'start-1',
+      },
+    ]);
+  });
+
+  it('writes stop_crash with the cause start_limit after the start limit in stop_pending', () => {
+    createLauncherLog({ dir, appVersion: '0.1.0', now }).stopCrash({
+      startId: 'start-1',
+      refNo: 'R-7K3M-Q9TX',
+      exitCode: null,
+      signal: null,
+      cause: 'start_limit',
+    });
+
+    expect(entriesOf('operations')).toEqual([
+      expect.objectContaining({ event: 'stop_crash', refNo: 'R-7K3M-Q9TX', cause: 'start_limit' }),
+    ]);
+    expect(entriesOf('errors')).toEqual([]);
+  });
+
   it('the messages in the error log hold no paths and no field values', () => {
     const log = createLauncherLog({ dir, appVersion: '0.1.0', now });
     log.startAborted({ startId: 's', refNo: 'R-7K3M-Q9TX', cause: 'start_aborted' });
@@ -219,6 +264,7 @@ describe('launcher log (CU-296, Technical Specification 2.18, 2.19)', () => {
     log.gaveUp({ startId: 's', refNo: 'R-7K3M-Q9TX' });
     log.alreadyRunning({ startId: 's', refNo: 'R-7K3M-Q9TX' });
     log.startTimeout({ startId: null, refNo: 'R-7K3M-Q9TX' });
+    log.shutdownTimeout({ startId: 's', refNo: 'R-7K3M-Q9TX' });
 
     for (const { message } of entriesOf('errors')) expect(message).not.toMatch(/[\\/]/);
   });

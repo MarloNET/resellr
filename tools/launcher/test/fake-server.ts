@@ -4,6 +4,12 @@
  *
  * - `ready`: answers `GET /api/ops/health` with `ready` and reports IPC `ready` with its `startId`;
  *   answers `POST /api/ops/shutdown` with 200 and ends with exit code 0, like an orderly shutdown
+ * - `ready-shutdown-500`: like `ready`, but answers `POST /api/ops/shutdown` with
+ *   `500 internal_error` and `FAKE_SHUTDOWN_REF_NO` and runs on, like a failed checkpoint
+ * - `ready-shutdown-hang`: like `ready`, but never answers `POST /api/ops/shutdown` and runs on
+ * - `ready-shutdown-503-exit-<code>`: like `ready`, but answers `POST /api/ops/shutdown` with
+ *   `503 shutting_down`, like a stop that already runs from UI-045, and ends with this code 300 ms
+ *   later
  * - `ready-other-start`: reports IPC `ready` with another `startId`
  * - `exit-<code>`: ends at once with this exit code
  * - `exit-<code>-after-health`: answers `starting` and ends with this code 300 ms after the first
@@ -30,7 +36,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readConfiguredPort } from '@resellr/runtime-shared/configured-port';
 import { writeStartResult } from '@resellr/runtime-shared/runtime-state-files';
 
-import { FAKE_REF_NO } from './fake-programs.ts';
+import { FAKE_REF_NO, FAKE_SHUTDOWN_REF_NO } from './fake-programs.ts';
 
 const dir = process.env.FAKE_SERVER_DIR!;
 const startsFile = join(dir, 'starts.jsonl');
@@ -64,7 +70,7 @@ function serveHealth(state: 'ready' | 'starting', onRequest: () => void = () => 
         join(dir, 'shutdowns.jsonl'),
         `${JSON.stringify({ origin: request.headers.origin ?? null })}\n`,
       );
-      void shutDown(response);
+      void shutDown(response, behaviour);
       return;
     }
     onRequest();
@@ -76,7 +82,19 @@ function serveHealth(state: 'ready' | 'starting', onRequest: () => void = () => 
 }
 
 /** Answers the shutdown once the gate file exists, then ends with exit code 0. */
-async function shutDown(response: ServerResponse) {
+async function shutDown(response: ServerResponse, mode: string) {
+  const answer = (status: number, code: string, refNo?: string) => {
+    response.writeHead(status, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ error: { code, ...(refNo ? { referenceNumber: refNo } : {}) } }));
+  };
+  const stopping = /^ready-shutdown-503-exit-(\d+)$/.exec(mode);
+  if (mode === 'ready-shutdown-500') return answer(500, 'internal_error', FAKE_SHUTDOWN_REF_NO);
+  if (mode === 'ready-shutdown-hang') return;
+  if (stopping) {
+    answer(503, 'shutting_down');
+    setTimeout(() => process.exit(Number(stopping[1])), 300);
+    return;
+  }
   const gate = process.env.FAKE_SERVER_SHUTDOWN_GATE;
   while (gate && !existsSync(gate)) await new Promise((resolve) => setTimeout(resolve, 50));
   response.writeHead(200, { 'content-type': 'application/json' });
@@ -84,7 +102,7 @@ async function shutDown(response: ServerResponse) {
 }
 
 const exitMatch = /^exit-(\d+)(-after-health)?$/.exec(behaviour);
-if (behaviour === 'ready') {
+if (behaviour === 'ready' || behaviour.startsWith('ready-shutdown-')) {
   serveHealth('ready').on('listening', () => process.send?.({ type: 'ready', startId }));
 } else if (behaviour === 'ready-other-start') {
   process.send?.({ type: 'ready', startId: 'another-start' });

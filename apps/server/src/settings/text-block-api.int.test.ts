@@ -33,6 +33,7 @@ const create = (change: Record<string, unknown> = {}) =>
     name: 'Abholung',
     kind: 'pickup_contact',
     body: 'Abholung in Hannover nach Absprache.',
+    ...ALL_SCOPE,
     ...change,
   });
 
@@ -61,6 +62,23 @@ const fieldError = (path: string, message: string) => ({
 const NO_IMPACT = { updated: 0, rerelease: 0, manualReview: 0 };
 const NO_LEGAL_STATUS = { legalStatus: null, legalCheckedOn: null, legalCheckedBy: null };
 
+const ALL_SCOPE = { allDeviceTypes: true, deviceTypeIds: [], allChannels: true, channelIds: [] };
+
+/** The three channels of the initial settings (#150), in the order of `sort_order`. */
+function insertChannels() {
+  const insert = t.database.sqlite.prepare(
+    "INSERT INTO channel (code, name, active, title_max_length, vb_allowed, sort_order, condition_mappings_version, version, created_at, updated_at) VALUES (?, ?, 1, 80, 0, ?, 1, 1, '2026-11-10T08:00:00.000Z', '2026-11-10T08:00:00.000Z')",
+  );
+  const ids = ['Shop', 'Kleinanzeigen', 'eBay'].map(
+    (name, index) => insert.run(name.toLowerCase(), name, index + 1).lastInsertRowid as number,
+  );
+  const [shop, kleinanzeigen, ebay] = ids as [number, number, number];
+  return { shop, kleinanzeigen, ebay };
+}
+
+const insertDeviceType = async (name: string) =>
+  (await write('POST', '/api/device-types', { name, active: true })).json().id as number;
+
 describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
   it('creates an active text block and answers 201 { textBlock, impact }', async () => {
     const response = await create({ name: ' Abholung ' });
@@ -74,6 +92,7 @@ describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
         body: 'Abholung in Hannover nach Absprache.',
         active: true,
         ...NO_LEGAL_STATUS,
+        ...ALL_SCOPE,
         version: 1,
       },
       impact: NO_IMPACT,
@@ -248,6 +267,7 @@ describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
         body: 'Abholung {Händler-Kontakt}',
         active: true,
         ...NO_LEGAL_STATUS,
+        ...ALL_SCOPE,
         version: 2,
       },
       impact: NO_IMPACT,
@@ -282,6 +302,7 @@ describe('text block API (CU-087, CU-082, Technical Specification 2.2)', () => {
           Name: 'Abholung',
           Art: 'Abholung/Kontakt',
           Text: 'Abholung in Hannover nach Absprache.',
+          Geltungsbereich: 'Gerätearten: alle; Kanäle: alle',
           Status: 'aktiv',
         }),
       },
@@ -667,6 +688,7 @@ describe('legal check status of text blocks (CU-082, REQ-054, Technical Specific
         Name: 'Widerruf',
         Art: 'Rechtliches',
         Text: 'Widerrufsbelehrung',
+        Geltungsbereich: 'Gerätearten: alle; Kanäle: alle',
         Status: 'aktiv',
         Prüfstatus: 'rechtlich ungeprüft',
       }),
@@ -710,5 +732,259 @@ describe('legal check status of text blocks (CU-082, REQ-054, Technical Specific
         }),
       },
     ]);
+  });
+});
+
+describe('scope of a text block (#163, Technical Specification 2.2, 3.1)', () => {
+  const scopeRows = () => ({
+    deviceTypes: t.database.sqlite
+      .prepare('SELECT text_block_id, device_type_id FROM text_block_device_type ORDER BY 2')
+      .all(),
+    channels: t.database.sqlite
+      .prepare('SELECT text_block_id, channel_id FROM text_block_channel ORDER BY 2')
+      .all(),
+  });
+
+  it('DER-39-09 a text block for "alle" device types and channels is stored and listed so', async () => {
+    insertChannels();
+
+    const response = await create({ allDeviceTypes: true, allChannels: true });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().textBlock).toMatchObject(ALL_SCOPE);
+    expect(
+      t.database.sqlite.prepare('SELECT all_device_types, all_channels FROM text_block').get(),
+    ).toEqual({ all_device_types: 1, all_channels: 1 });
+    expect(scopeRows()).toEqual({ deviceTypes: [], channels: [] });
+    expect((await list()).json().items).toEqual([
+      expect.objectContaining({
+        name: 'Abholung',
+        kind: 'pickup_contact',
+        active: true,
+        ...ALL_SCOPE,
+      }),
+    ]);
+  });
+
+  it('DER-39-09 a choice of device types and channels is stored and listed with name, kind and status', async () => {
+    const { kleinanzeigen, ebay } = insertChannels();
+    const notebook = await insertDeviceType('Notebook');
+    const smartphone = await insertDeviceType('Smartphone');
+
+    const response = await create({
+      allDeviceTypes: false,
+      deviceTypeIds: [smartphone, notebook],
+      allChannels: false,
+      channelIds: [ebay, kleinanzeigen],
+    });
+
+    const scope = {
+      allDeviceTypes: false,
+      deviceTypeIds: [notebook, smartphone],
+      allChannels: false,
+      channelIds: [kleinanzeigen, ebay],
+    };
+    expect(response.statusCode).toBe(201);
+    const { id } = response.json().textBlock;
+    expect(response.json()).toEqual({
+      textBlock: expect.objectContaining(scope),
+      impact: NO_IMPACT,
+    });
+    expect(
+      t.database.sqlite.prepare('SELECT all_device_types, all_channels FROM text_block').get(),
+    ).toEqual({ all_device_types: 0, all_channels: 0 });
+    expect(scopeRows()).toEqual({
+      deviceTypes: [
+        { text_block_id: id, device_type_id: notebook },
+        { text_block_id: id, device_type_id: smartphone },
+      ],
+      channels: [
+        { text_block_id: id, channel_id: kleinanzeigen },
+        { text_block_id: id, channel_id: ebay },
+      ],
+    });
+    expect((await list()).json().items).toEqual([
+      {
+        id,
+        name: 'Abholung',
+        kind: 'pickup_contact',
+        body: expect.any(String),
+        active: true,
+        ...NO_LEGAL_STATUS,
+        ...scope,
+        version: 1,
+      },
+    ]);
+  });
+
+  it('DER-39-09 a change of the scope replaces the choice, "alle" removes it, and is logged with names', async () => {
+    const { shop, kleinanzeigen } = insertChannels();
+    const notebook = await insertDeviceType('Notebook');
+    const abholung = await createAbholung();
+
+    const chosen = await patch(abholung.id, {
+      version: 1,
+      allDeviceTypes: false,
+      deviceTypeIds: [notebook],
+      allChannels: false,
+      channelIds: [kleinanzeigen, shop],
+    });
+    const kleinanzeigenOnly = await patch(abholung.id, {
+      version: 2,
+      allChannels: false,
+      channelIds: [kleinanzeigen],
+    });
+    const all = await patch(abholung.id, { version: 3, ...ALL_SCOPE });
+
+    expect(chosen.json().textBlock).toMatchObject({
+      allDeviceTypes: false,
+      deviceTypeIds: [notebook],
+      allChannels: false,
+      channelIds: [shop, kleinanzeigen],
+      version: 2,
+    });
+    expect(kleinanzeigenOnly.json().textBlock).toMatchObject({
+      deviceTypeIds: [notebook],
+      channelIds: [kleinanzeigen],
+      version: 3,
+    });
+    expect(all.json().textBlock).toMatchObject({ ...ALL_SCOPE, version: 4 });
+    expect(scopeRows()).toEqual({ deviceTypes: [], channels: [] });
+    expect(auditRows().slice(1)).toEqual([
+      expect.objectContaining({
+        action: 'updated',
+        old_value: JSON.stringify({ Geltungsbereich: 'Gerätearten: alle; Kanäle: alle' }),
+        new_value: JSON.stringify({
+          Geltungsbereich: 'Gerätearten: Notebook; Kanäle: Shop, Kleinanzeigen',
+        }),
+      }),
+      expect.objectContaining({
+        old_value: JSON.stringify({
+          Geltungsbereich: 'Gerätearten: Notebook; Kanäle: Shop, Kleinanzeigen',
+        }),
+        new_value: JSON.stringify({
+          Geltungsbereich: 'Gerätearten: Notebook; Kanäle: Kleinanzeigen',
+        }),
+      }),
+      expect.objectContaining({
+        old_value: JSON.stringify({
+          Geltungsbereich: 'Gerätearten: Notebook; Kanäle: Kleinanzeigen',
+        }),
+        new_value: JSON.stringify({ Geltungsbereich: 'Gerätearten: alle; Kanäle: alle' }),
+      }),
+    ]);
+  });
+
+  it('the same scope sent again keeps the version and writes no audit entry', async () => {
+    const { ebay } = insertChannels();
+    const abholung = (await create({ allChannels: false, channelIds: [ebay] })).json().textBlock;
+
+    const response = await patch(abholung.id, {
+      version: 1,
+      allChannels: false,
+      channelIds: [ebay],
+    });
+
+    expect(response.json()).toEqual({
+      textBlock: abholung,
+      impact: NO_IMPACT,
+      legalStatusReset: false,
+    });
+    expect(auditRows()).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      'device types',
+      { allDeviceTypes: false, deviceTypeIds: [] },
+      'deviceTypeIds',
+      'Gerätearten: mindestens eine wählen oder ‚alle‘',
+    ],
+    [
+      'channels',
+      { allChannels: false, channelIds: [] },
+      'channelIds',
+      'Kanäle: mindestens einen wählen oder ‚alle‘',
+    ],
+  ])(
+    'a choice of %s without an entry is rejected with 422 scope_required and stores nothing',
+    async (_case, change, path, message) => {
+      insertChannels();
+
+      const response = await create(change);
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'validation_failed',
+        fields: [{ path, code: 'scope_required', message }],
+      });
+      expect(countRows()).toBe(0);
+    },
+  );
+
+  it.each([
+    ['"alle" with a list', { allChannels: true, channelIds: [1] }],
+    ['an id twice', { allDeviceTypes: false, deviceTypeIds: [1, 1] }],
+  ])('a scope with %s is rejected with 400 bad_request on POST', async (_case, change) => {
+    insertChannels();
+    await insertDeviceType('Notebook');
+
+    const response = await create(change);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+    expect(countRows()).toBe(0);
+  });
+
+  it.each([
+    ['allChannels without channelIds', { allChannels: true }],
+    ['deviceTypeIds without allDeviceTypes', { deviceTypeIds: [1] }],
+  ])('a PATCH with only %s is rejected with 400 bad_request', async (_case, change) => {
+    insertChannels();
+    const abholung = await createAbholung();
+
+    const response = await patch(abholung.id, { version: 1, ...change });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+    expect((await list()).json().items).toEqual([abholung]);
+  });
+
+  it('an unknown device type or channel is rejected with 400 bad_request and stores nothing', async () => {
+    const { shop } = insertChannels();
+    const abholung = await createAbholung();
+
+    const unknownChannel = await create({
+      name: 'Neu',
+      allChannels: false,
+      channelIds: [shop + 99],
+    });
+    const unknownDeviceType = await patch(abholung.id, {
+      version: 1,
+      allDeviceTypes: false,
+      deviceTypeIds: [99],
+    });
+
+    expect(unknownChannel.statusCode).toBe(400);
+    expect(unknownChannel.json().error.code).toBe('bad_request');
+    expect(unknownDeviceType.statusCode).toBe(400);
+    expect(unknownDeviceType.json().error.code).toBe('bad_request');
+    expect(countRows()).toBe(1);
+    expect((await list()).json().items).toEqual([abholung]);
+  });
+
+  it('DER-39-10 POST and PATCH /api/text-blocks answer impact { updated: 0, rerelease: 0, manualReview: 0 } in S2', async () => {
+    const { kleinanzeigen } = insertChannels();
+
+    const created = await create({ allChannels: false, channelIds: [kleinanzeigen] });
+    const changed = await patch(created.json().textBlock.id, {
+      version: 1,
+      allChannels: true,
+      channelIds: [],
+      body: 'Neu',
+    });
+
+    expect(created.json().impact).toEqual({ updated: 0, rerelease: 0, manualReview: 0 });
+    expect(changed.json().impact).toEqual({ updated: 0, rerelease: 0, manualReview: 0 });
   });
 });

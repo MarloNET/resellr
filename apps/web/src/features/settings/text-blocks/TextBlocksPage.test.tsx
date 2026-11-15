@@ -10,6 +10,27 @@ import { routes } from '../../../app/router.tsx';
 // Component tests of UI-030 with a mocked `fetch` (Technical Specification 6.1, 6.2).
 
 const NO_LEGAL_STATUS = { legalStatus: null, legalCheckedOn: null, legalCheckedBy: null };
+const ALL_SCOPE = { allDeviceTypes: true, deviceTypeIds: [], allChannels: true, channelIds: [] };
+
+const NOTEBOOK = 11;
+const SMARTPHONE = 12;
+const SHOP = 21;
+const KLEINANZEIGEN = 22;
+const EBAY = 23;
+
+/** `GET /api/device-types`: a deactivated device type is offered only when already chosen. */
+const DEVICE_TYPES = [
+  { id: NOTEBOOK, name: 'Notebook', active: true, version: 1, attributeCount: 0 },
+  { id: SMARTPHONE, name: 'Smartphone', active: true, version: 1, attributeCount: 0 },
+  { id: 13, name: 'Tablet alt', active: false, version: 2, attributeCount: 0 },
+];
+
+/** `GET /api/channels`: the three channels of the initial settings. */
+const CHANNELS = [
+  { id: SHOP, code: 'shop', name: 'Shop', active: true, sortOrder: 1 },
+  { id: KLEINANZEIGEN, code: 'kleinanzeigen', name: 'Kleinanzeigen', active: true, sortOrder: 2 },
+  { id: EBAY, code: 'ebay', name: 'eBay', active: true, sortOrder: 3 },
+];
 
 const ABHOLUNG: TextBlock = {
   id: 1,
@@ -18,6 +39,10 @@ const ABHOLUNG: TextBlock = {
   body: 'Abholung nach Absprache.',
   active: true,
   ...NO_LEGAL_STATUS,
+  allDeviceTypes: true,
+  deviceTypeIds: [] as number[],
+  allChannels: false,
+  channelIds: [KLEINANZEIGEN] as number[],
   version: 3,
 };
 const AKKU: TextBlock = {
@@ -29,6 +54,10 @@ const AKKU: TextBlock = {
   legalStatus: 'unchecked',
   legalCheckedOn: null,
   legalCheckedBy: null,
+  allDeviceTypes: false,
+  deviceTypeIds: [NOTEBOOK],
+  allChannels: true,
+  channelIds: [],
   version: 1,
 };
 const ALT: TextBlock = {
@@ -40,6 +69,7 @@ const ALT: TextBlock = {
   legalStatus: 'checked',
   legalCheckedOn: '2026-11-05',
   legalCheckedBy: 'Kanzlei Muster',
+  ...ALL_SCOPE,
   version: 2,
 };
 
@@ -66,8 +96,14 @@ type TextBlockItem = TextBlock;
 function mockApi({
   initial = [ABHOLUNG, AKKU, ALT],
   list,
+  channels,
   writes = {},
-}: { initial?: TextBlockItem[]; list?: Route; writes?: Record<string, Route> } = {}) {
+}: {
+  initial?: TextBlockItem[];
+  list?: Route;
+  channels?: Route;
+  writes?: Record<string, Route>;
+} = {}) {
   const items = [...initial];
   const sent: { method: string; path: string; body: unknown }[] = [];
   const reads: string[] = [];
@@ -75,6 +111,12 @@ function mockApi({
     const path = String(input);
     const method = init?.method ?? 'GET';
     if (path === '/api/ops/status') return Response.json(OPS_STATUS);
+    if (path.startsWith('/api/device-types')) {
+      return Response.json({ items: DEVICE_TYPES, total: DEVICE_TYPES.length });
+    }
+    if (path === '/api/channels') {
+      return channels ? channels(init) : Response.json({ items: CHANNELS, total: CHANNELS.length });
+    }
     if (method === 'GET' && path.startsWith('/api/text-blocks')) {
       reads.push(path);
       return list ? list(init) : Response.json({ items, total: items.length });
@@ -135,6 +177,12 @@ async function openPage() {
   renderTextBlocks();
   await screen.findByRole('button', { name: /^Abholung Hannover/ });
   await vi.waitFor(() => expect(nameInput().value).toBe('Abholung Hannover'));
+}
+
+/** UI-043 after "Speichern"; "Schließen" leads back to UI-030. */
+const impactDialog = () => screen.getByRole('dialog', { name: 'Auswirkung der Änderung' });
+function closeImpactDialog() {
+  fireEvent.click(within(impactDialog()).getByRole('button', { name: 'Schließen' }));
 }
 
 function changeBody(body: string) {
@@ -276,6 +324,7 @@ describe('UI-030 legal check status (CU-101, REQ-054)', () => {
         },
       },
     ]);
+    closeImpactDialog();
     await vi.waitFor(() =>
       expect(row('Akku-Hinweis Notebook').textContent).toContain(
         'rechtlich geprüft am 15.01.2020 durch Kanzlei Muster',
@@ -454,6 +503,7 @@ describe('UI-030 legal check status (CU-101, REQ-054)', () => {
         body: { version: 2, body: 'Neuer Rechtsblock.' },
       },
     ]);
+    closeImpactDialog();
     expect(legalStatusSelect()?.value).toBe('unchecked');
     expect(within(detailForm()).queryByLabelText(/^Prüfdatum/)).toBeNull();
     await vi.waitFor(() =>
@@ -465,8 +515,231 @@ describe('UI-030 legal check status (CU-101, REQ-054)', () => {
   });
 });
 
+describe('UI-030 scope and UI-043 (#163)', () => {
+  const scopeGroup = (name: 'Gerätearten' | 'Kanäle') =>
+    within(detailForm()).getByRole('group', { name });
+  const checkbox = (group: 'Gerätearten' | 'Kanäle', name: string) =>
+    within(scopeGroup(group)).getByRole<HTMLInputElement>('checkbox', { name });
+
+  it('UI-030.default DER-39-09 shows the scope of the open text block: "alle" or the chosen entries', async () => {
+    mockApi();
+    await openPage();
+
+    expect(checkbox('Gerätearten', 'alle Gerätearten').checked).toBe(true);
+    expect(within(scopeGroup('Gerätearten')).getAllByRole('checkbox')).toHaveLength(1);
+    expect(checkbox('Kanäle', 'alle Kanäle').checked).toBe(false);
+    expect(
+      within(scopeGroup('Kanäle'))
+        .getAllByRole<HTMLInputElement>('checkbox')
+        .map((box) => [box.parentElement?.textContent, box.checked]),
+    ).toEqual([
+      ['alle Kanäle', false],
+      ['Shop', false],
+      ['Kleinanzeigen', true],
+      ['eBay', false],
+    ]);
+    expect(
+      screen.getByRole('group', { name: 'Gerätearten' }).closest('fieldset')?.textContent,
+    ).toContain('Geltungsbereich');
+    expectAccessiblePage();
+  });
+
+  it('UI-030.success DER-39-09 a new text block with a choice of device types and channels is saved and listed', async () => {
+    const created = {
+      id: 4,
+      name: 'Widerruf Shop',
+      kind: 'legal',
+      body: 'Widerrufsbelehrung',
+      active: true,
+      legalStatus: 'unchecked',
+      legalCheckedOn: null,
+      legalCheckedBy: null,
+      allDeviceTypes: false,
+      deviceTypeIds: [NOTEBOOK, SMARTPHONE],
+      allChannels: false,
+      channelIds: [SHOP],
+      version: 1,
+    };
+    const { sent } = mockApi({
+      writes: {
+        'POST /api/text-blocks': () =>
+          Response.json({ textBlock: created, impact: NO_IMPACT }, { status: 201 }),
+      },
+    });
+    await openPage();
+
+    fireEvent.click(createButton());
+    fireEvent.change(nameInput(), { target: { value: 'Widerruf Shop' } });
+    fireEvent.change(kindSelect(), { target: { value: 'legal' } });
+    fireEvent.change(bodyInput(), { target: { value: 'Widerrufsbelehrung' } });
+    fireEvent.click(checkbox('Gerätearten', 'alle Gerätearten'));
+    expect(
+      within(scopeGroup('Gerätearten'))
+        .getAllByRole('checkbox')
+        .map((box) => box.parentElement?.textContent),
+    ).toEqual(['alle Gerätearten', 'Notebook', 'Smartphone']);
+    fireEvent.click(checkbox('Gerätearten', 'Notebook'));
+    fireEvent.click(checkbox('Gerätearten', 'Smartphone'));
+    fireEvent.click(checkbox('Kanäle', 'alle Kanäle'));
+    fireEvent.click(checkbox('Kanäle', 'Shop'));
+    fireEvent.click(saveButton());
+
+    await screen.findByRole('dialog', { name: 'Auswirkung der Änderung' });
+    expect(sent).toEqual([
+      {
+        method: 'POST',
+        path: '/api/text-blocks',
+        body: {
+          name: 'Widerruf Shop',
+          kind: 'legal',
+          body: 'Widerrufsbelehrung',
+          allDeviceTypes: false,
+          deviceTypeIds: [NOTEBOOK, SMARTPHONE],
+          allChannels: false,
+          channelIds: [SHOP],
+        },
+      },
+    ]);
+    closeImpactDialog();
+    expect(row('Widerruf Shop').textContent).toBe(
+      'Widerruf ShopRechtlichesNotebook, Smartphone, Shoprechtlich ungeprüftaktiv',
+    );
+  });
+
+  it('UI-030.success DER-39-09 a change of the scope sends only the changed part', async () => {
+    const saved = { ...ABHOLUNG, allChannels: true, channelIds: [], version: 4 };
+    const { sent } = mockApi({
+      writes: { [PATCH_ABHOLUNG]: () => Response.json({ textBlock: saved, impact: NO_IMPACT }) },
+    });
+    await openPage();
+
+    fireEvent.click(checkbox('Kanäle', 'alle Kanäle'));
+    fireEvent.click(saveButton());
+
+    await screen.findByRole('dialog', { name: 'Auswirkung der Änderung' });
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/text-blocks/1',
+        body: { version: 3, allChannels: true, channelIds: [] },
+      },
+    ]);
+    closeImpactDialog();
+    expect(row('Abholung Hannover').textContent).toContain('alle Gerätearten, alle Kanäle');
+  });
+
+  it('UI-030.default a chosen device type deactivated since stays offered and chosen', async () => {
+    mockApi({ initial: [{ ...AKKU, deviceTypeIds: [13] }] });
+    renderTextBlocks();
+    await screen.findByRole('button', { name: /^Akku-Hinweis Notebook/ });
+
+    expect(
+      within(scopeGroup('Gerätearten'))
+        .getAllByRole<HTMLInputElement>('checkbox')
+        .map((box) => [box.parentElement?.textContent, box.checked]),
+    ).toEqual([
+      ['alle Gerätearten', false],
+      ['Notebook', false],
+      ['Smartphone', false],
+      ['Tablet alt', true],
+    ]);
+    expect(row('Akku-Hinweis Notebook').textContent).toContain('Tablet alt, alle Kanäle');
+  });
+
+  it('UI-030.default a deactivated device type that is not chosen is not offered', async () => {
+    mockApi();
+    await openPage();
+
+    fireEvent.click(checkbox('Gerätearten', 'alle Gerätearten'));
+
+    expect(
+      within(scopeGroup('Gerätearten')).queryByRole('checkbox', { name: 'Tablet alt' }),
+    ).toBeNull();
+  });
+
+  it('UI-030.disabled "Speichern" stays disabled while a choice has no entry', async () => {
+    mockApi();
+    await openPage();
+
+    fireEvent.click(checkbox('Kanäle', 'Kleinanzeigen'));
+    expect(saveButton().disabled).toBe(true);
+
+    fireEvent.click(checkbox('Kanäle', 'eBay'));
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it('UI-030.validation shows a scope_required of the server at its list, without UI-043', async () => {
+    const message = 'Kanäle: mindestens einen wählen oder ‚alle‘';
+    mockApi({
+      writes: {
+        [PATCH_ABHOLUNG]: () =>
+          Response.json(
+            errorBody('validation_failed', {
+              fields: [{ path: 'channelIds', code: 'scope_required', message }],
+            }),
+            { status: 422 },
+          ),
+      },
+    });
+    await openPage();
+
+    changeBody('Neu');
+
+    const error = await screen.findByText(message);
+    const channels = screen.getByRole('group', { name: 'Kanäle' });
+    expect(channels.contains(error)).toBe(true);
+    expect(channels.getAttribute('aria-describedby')).toBe(error.id);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('UI-043.empty DER-39-10 after a successful save UI-043 shows "Keine Kanal-Inhalte betroffen" with only "Schließen"', async () => {
+    mockApi({
+      writes: {
+        [PATCH_ABHOLUNG]: () => Response.json({ textBlock: SAVED_ABHOLUNG, impact: NO_IMPACT }),
+      },
+    });
+    await openPage();
+
+    changeBody('Abholung Mo–Fr 9–17 Uhr.');
+
+    const dialog = await screen.findByRole('dialog', { name: 'Auswirkung der Änderung' });
+    expect(within(dialog).getByText('Keine Kanal-Inhalte betroffen')).toBeTruthy();
+    expect(
+      within(dialog)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Schließen']);
+    expect(within(dialog).queryByRole('link')).toBeNull();
+
+    closeImpactDialog();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(bodyInput().value).toBe('Abholung Mo–Fr 9–17 Uhr.');
+  });
+
+  it('UI-043 does not open after "Deaktivieren" or a rejected save', async () => {
+    mockApi({
+      writes: {
+        'PATCH /api/text-blocks/2': () =>
+          Response.json({ textBlock: { ...AKKU, active: false, version: 2 }, impact: NO_IMPACT }),
+        [PATCH_ABHOLUNG]: () =>
+          Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+            status: 500,
+          }),
+      },
+    });
+    await openPage();
+
+    fireEvent.click(deactivateButton('Akku-Hinweis Notebook'));
+    await screen.findByText('Gespeichert');
+    changeBody('Neu');
+    await screen.findByText(/Referenz: R-7K2M-9QX4/);
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
 describe('UI-030 text blocks (CU-101)', () => {
-  it('UI-030.default lists name, kind and status from GET /api/text-blocks and opens the first one', async () => {
+  it('UI-030.default DER-39-09 lists name, kind, scope and status from GET /api/text-blocks and opens the first one', async () => {
     const { reads } = mockApi();
     await openPage();
 
@@ -474,9 +747,9 @@ describe('UI-030 text blocks (CU-101)', () => {
       name: /^(Abholung|Akku|Widerruf)/,
     });
     expect(rows.map((item) => item.textContent)).toEqual([
-      'Abholung HannoverAbholung/Kontaktaktiv',
-      'Akku-Hinweis NotebookAkku-Hinweisrechtlich ungeprüftaktiv',
-      'Widerruf altRechtlichesrechtlich geprüft am 05.11.2026 durch Kanzlei Musterdeaktiviert',
+      'Abholung HannoverAbholung/Kontaktalle Gerätearten, Kleinanzeigenaktiv',
+      'Akku-Hinweis NotebookAkku-HinweisNotebook, alle Kanälerechtlich ungeprüftaktiv',
+      'Widerruf altRechtlichesalle Gerätearten, alle Kanälerechtlich geprüft am 05.11.2026 durch Kanzlei Musterdeaktiviert',
     ]);
     expect(rows[0]?.getAttribute('aria-current')).toBe('true');
     expect(reads[0]).toBe('/api/text-blocks?limit=200');
@@ -543,6 +816,7 @@ describe('UI-030 text blocks (CU-101)', () => {
       body: 'Gerät mit Netzteil',
       active: true,
       ...NO_LEGAL_STATUS,
+      ...ALL_SCOPE,
       version: 1,
     };
     const { sent } = mockApi({
@@ -563,9 +837,15 @@ describe('UI-030 text blocks (CU-101)', () => {
       {
         method: 'POST',
         path: '/api/text-blocks',
-        body: { name: 'Lieferumfang Standard', kind: 'delivery_scope', body: 'Gerät mit Netzteil' },
+        body: {
+          name: 'Lieferumfang Standard',
+          kind: 'delivery_scope',
+          body: 'Gerät mit Netzteil',
+          ...ALL_SCOPE,
+        },
       },
     ]);
+    closeImpactDialog();
     expect(row('Lieferumfang Standard').getAttribute('aria-current')).toBe('true');
     expect(saveButton().disabled).toBe(true);
     expectAccessiblePage();
@@ -590,6 +870,7 @@ describe('UI-030 text blocks (CU-101)', () => {
         body: { version: 3, body: 'Abholung Mo–Fr 9–17 Uhr.' },
       },
     ]);
+    closeImpactDialog();
     expect(bodyInput().value).toBe('Abholung Mo–Fr 9–17 Uhr.');
     expect(saveButton().disabled).toBe(true);
 
@@ -854,6 +1135,39 @@ describe('UI-030 text blocks (CU-101)', () => {
     expect(listRegion()).toBeTruthy();
     expect(screen.queryByText('Noch keine Textbausteine')).toBeNull();
     expectAccessiblePage();
+  });
+
+  it('UI-030.unreachable shows P-06 when the channels of the scope get no answer', async () => {
+    mockApi({
+      channels: () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+    renderTextBlocks();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
+    expect(within(banner).getByRole('button', { name: 'Erneut versuchen' })).toBeTruthy();
+    expectAccessiblePage();
+  });
+
+  it('UI-030.loading stays in "Lade Einstellungen …" until the channels of the scope have arrived', async () => {
+    let answer: (response: Response) => void = () => {};
+    const { reads } = mockApi({
+      channels: () => new Promise<Response>((resolve) => (answer = resolve)),
+    });
+    renderTextBlocks();
+
+    // The text blocks themselves have arrived; only the channels are missing.
+    await vi.waitFor(() => expect(reads).toHaveLength(1));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(screen.getByText('Lade Einstellungen …')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Abholung Hannover/ })).toBeNull();
+    expectAccessiblePage();
+
+    answer(Response.json({ items: CHANNELS, total: CHANNELS.length }));
+    expect(await screen.findByRole('button', { name: /^Abholung Hannover/ })).toBeTruthy();
+    expect(screen.queryByText('Lade Einstellungen …')).toBeNull();
   });
 
   it('UI-030.unreachable DER-39-07 (b) shows P-06 when the list takes longer than 5 s', async () => {
