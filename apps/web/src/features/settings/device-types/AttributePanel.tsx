@@ -15,7 +15,7 @@ import {
   type DatasheetBlock,
 } from '@resellr/domain/schemas/attribute.schema';
 import type { PickList } from '@resellr/domain/schemas/pick-list.schema';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
 import { FormField, useFocusFirstError } from '../../../components/forms/FormField.tsx';
 import { Button } from '../../../components/ui/Button.tsx';
@@ -247,8 +247,9 @@ export function AttributePanel({
   const pointerPressed = useRef(false);
   const cancelDeferredCheck = useRef(() => {});
 
-  // Field errors of the server get the focus like those of the browser (2.0.7 `.validation`).
-  useEffect(() => {
+  // Field errors of the server get the focus like those of the browser (2.0.7 `.validation`), in
+  // the commit that shows them (#388).
+  useLayoutEffect(() => {
     if (errorFocusRequest > 0) focusFirstError();
   }, [errorFocusRequest, focusFirstError]);
 
