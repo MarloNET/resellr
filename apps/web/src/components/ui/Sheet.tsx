@@ -1,11 +1,13 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import type { ComponentProps } from 'react';
+import { useRef, type ComponentProps } from 'react';
 
 import { cn } from './cn.ts';
 
 /**
- * Side panel below the `full` breakpoint (CU-058, Technical Specification 2.0.10, R-1 (3)):
- * a surface over the content with "Schließen"; focus stays in the panel, Esc closes.
+ * Side panel below the `full` breakpoint and where the content beside it would be too narrow
+ * (CU-058, Technical Specification 2.0.10, R-1 (3)): a surface over the content with
+ * "Schließen"; focus stays in the panel, Esc closes. After closing the focus returns to the
+ * element that had it when the panel opened, also without `SheetTrigger` (addendum MAR-834).
  * From `full` on, screens place their panels next to the content as designed.
  */
 export const Sheet = DialogPrimitive.Root;
@@ -24,8 +26,13 @@ export function SheetContent({
   className,
   style,
   children,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: SheetContentProps) {
+  // Radix returns the focus only to a `SheetTrigger`; screens open their panels via `open`.
+  const openerRef = useRef<HTMLElement | null>(null);
+
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 bg-text/40" />
@@ -37,6 +44,18 @@ export function SheetContent({
           className,
         )}
         style={{ width: `min(${width}px, 100vw - 16px)`, ...style }}
+        onOpenAutoFocus={(event) => {
+          openerRef.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          if (event.defaultPrevented) return;
+          event.preventDefault();
+          const opener = openerRef.current;
+          if (opener?.isConnected && !opener.matches(':disabled')) opener.focus();
+        }}
         {...props}
       >
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-2">
