@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -69,11 +70,14 @@ export function FormField({ label, required = false, error, children }: FormFiel
  * Focus on the first faulty field (design chapter 5, Technical Specification 2.0.7
  * `.validation`): the returned function moves the focus to the first control marked invalid in
  * the container after the next render, so the screen can call it right after setting the errors.
+ * The focus moves in the commit that shows the errors (layout effect), not after it: a passive
+ * effect would leave the error on screen without focus for a moment, longer on a slow machine
+ * (#388).
  */
 export function useFocusFirstError(containerRef: RefObject<HTMLElement | null>): () => void {
   const [request, setRequest] = useState(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (request === 0) return;
     containerRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [request, containerRef]);

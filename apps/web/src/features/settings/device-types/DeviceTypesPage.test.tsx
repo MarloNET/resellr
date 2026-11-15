@@ -133,6 +133,28 @@ const PATCH_NOTEBOOK = 'PATCH /api/device-types/1';
 /** A response that never arrives, e.g. a write without time limit (P-08). */
 const pending = () => new Promise<Response>(() => {});
 
+/**
+ * The element with the focus at the moment `text` comes into the page, before React runs its
+ * scheduled effects: a field error of the server moves the focus to its field in the same render
+ * (design chapter 5), not one render later, which a slow machine could otherwise observe (#388).
+ * Start it before the response arrives.
+ */
+function focusWhenShown(text: string): Promise<Element | null> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`"${text}" did not appear`));
+    }, 3000);
+    const observer = new MutationObserver(() => {
+      if (!document.body.textContent?.includes(text)) return;
+      observer.disconnect();
+      clearTimeout(timer);
+      resolve(document.activeElement);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+}
+
 async function openPage() {
   renderDeviceTypes();
   await screen.findByRole('button', { name: /Notebook/ });
@@ -637,12 +659,14 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
 
     fireEvent.change(panelField(/^Einheit/), { target: { value: 'MB' } });
     fireEvent.click(panelSave());
+    const focused = focusWhenShown('Bezeichnung ist für einen festen Platzhalter vergeben: Preis');
 
     expect(
       await within(panel()).findByText(
         'Bezeichnung ist für einen festen Platzhalter vergeben: Preis',
       ),
     ).toBeTruthy();
+    expect(await focused).toBe(panelField(/^Bezeichnung/));
     expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
     expect(panelField(/^Einheit/).value).toBe('MB');
   });
@@ -778,10 +802,12 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
 
     fireEvent.change(panelField(/^Bezeichnung/), { target: { value: 'ram' } });
     fireEvent.click(panelSave());
+    const focused = focusWhenShown('Bezeichnung ist bei dieser Geräteart bereits vergeben');
 
     expect(
       await within(panel()).findByText('Bezeichnung ist bei dieser Geräteart bereits vergeben'),
     ).toBeTruthy();
+    expect(await focused).toBe(panelField(/^Bezeichnung/));
     expect(panelField(/^Bezeichnung/).getAttribute('aria-invalid')).toBe('true');
     expect(document.activeElement).toBe(panelField(/^Bezeichnung/));
   });
@@ -882,8 +908,10 @@ describe('UI-027 attributes (CU-095, REQ-005)', () => {
       const control = () => panelField(new RegExp(`^${label}`));
       fireEvent.change(control(), { target: { value } });
       fireEvent.click(panelSave());
+      const focused = focusWhenShown(message);
 
       expect(await within(panel()).findByText(message)).toBeTruthy();
+      expect(await focused).toBe(control());
       expect(control().getAttribute('aria-invalid')).toBe('true');
       expect(document.activeElement).toBe(control());
       expectAccessiblePanel();
@@ -1325,8 +1353,10 @@ describe('UI-027 device types (CU-095)', () => {
     await openPage();
 
     rename('Laptop');
+    const focused = focusWhenShown('Name: 1 bis 50 Zeichen');
 
     expect(await screen.findByText('Name: 1 bis 50 Zeichen')).toBeTruthy();
+    expect(await focused).toBe(nameInput());
     expect(document.activeElement).toBe(nameInput());
     expect(nameInput().value).toBe('Laptop');
   });
@@ -1372,8 +1402,10 @@ describe('UI-027 device types (CU-095)', () => {
     await openPage();
 
     rename('tablet');
+    const focused = focusWhenShown('Name ist bereits vergeben');
 
     expect(await screen.findByText('Name ist bereits vergeben')).toBeTruthy();
+    expect(await focused).toBe(nameInput());
     expect(document.activeElement).toBe(nameInput());
     expect(screen.queryByText('Geräteart gespeichert')).toBeNull();
   });
