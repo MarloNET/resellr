@@ -479,6 +479,18 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
       ['ports', [{ count: 1, typeId: null, positionId: null }]],
       ['ports', [{ count: 1, typeId: 41 }]],
       ['ports', { count: 1, typeId: 41, positionId: null }],
+      // "" is no value only for text and [] only for ports (2.5); else another form.
+      ['text', []],
+      ['integer', ''],
+      ['integer', '  '],
+      ['integer', []],
+      ['decimal', ''],
+      ['decimal', []],
+      ['boolean', ''],
+      ['boolean', []],
+      ['pick', ''],
+      ['pick', []],
+      ['ports', ''],
     ] as const)(
       'DER-34-18 rejects the deactivated %s value %j in another form as structural error, never as field error',
       (dataType, value) => {
@@ -486,7 +498,21 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
       },
     );
 
-    it.each([{ percent: 101 }, { percent: '85' }, { notDeterminable: false }, 85])(
+    it.each([
+      ['text', null],
+      ['text', ''],
+      ['text', '   '],
+      ['integer', null],
+      ['decimal', null],
+      ['boolean', null],
+      ['pick', null],
+      ['ports', null],
+      ['ports', []],
+    ] as const)('DER-34-18 takes the deactivated %s value %j as no value', (dataType, value) => {
+      expect(one({ dataType, active: false }, value).data).toEqual({});
+    });
+
+    it.each([{ percent: 101 }, { percent: '85' }, { notDeterminable: false }, 85, '', [[]]])(
       'DER-34-18 rejects the deactivated battery capacity %j as structural error',
       (value) => {
         const capacity = {
@@ -498,7 +524,7 @@ describe('attribute values schema (CU-067, Technical Specification 2.5)', () => 
       },
     );
 
-    it('DER-34-18 reports the structural error beside no field error of the deactivated attribute', () => {
+    it('DER-34-18 a valid deactivated value adds no error beside the field error of an active attribute', () => {
       const schema = attributeValuesSchema(
         [
           attribute({ id: 1, ...RAM, active: false }),

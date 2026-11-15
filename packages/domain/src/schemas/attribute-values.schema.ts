@@ -120,17 +120,30 @@ function storedFormat(attribute: AttributeValueDefinition): z.ZodType<AttributeV
 }
 
 /**
+ * Whether the input is no value for the data type of the attribute (2.5): `null` or a missing
+ * key, for text also `""` after trimming, for ports also `[]`. Any other input is a value.
+ */
+function isNoValue({ dataType, systemRole }: AttributeValueDefinition, input: unknown): boolean {
+  if (input === null || input === undefined) return true;
+  if (systemRole === 'battery_capacity') return false;
+  if (dataType === 'text') return typeof input === 'string' && input.trim() === '';
+  if (dataType === 'ports') return Array.isArray(input) && input.length === 0;
+  return false;
+}
+
+/**
  * Schema of the value of a deactivated attribute: only the structure of its stored format (3.4),
  * without required, range and pick list of the current definition (2.5, FIND-350). A value in
- * another form is a structural error (`invalid_type`, 2.0.5 rule (4)) and never a field error,
- * because `web-ui` does not ask for a deactivated attribute. Returns `undefined` for no value.
+ * another form, such as `""` for an integer, is a structural error (`invalid_type`, 2.0.5 rule
+ * (4)) and never a field error, because `web-ui` does not ask for a deactivated attribute.
+ * Returns `undefined` for no value.
  */
 function deactivatedValueSchema(
   attribute: AttributeValueDefinition,
 ): z.ZodType<AttributeValue | undefined> {
   const format = storedFormat(attribute);
   return z.unknown().transform((input, context): AttributeValue | undefined => {
-    if (isEmpty(input)) return undefined;
+    if (isNoValue(attribute, input)) return undefined;
     const result = format.safeParse(input);
     if (result.success) return result.data;
     context.addIssue({
