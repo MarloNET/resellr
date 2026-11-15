@@ -1,10 +1,12 @@
 import { variantsMatch, type VariantSpec } from '@resellr/domain/inventory/compare-variants';
 import type { AttributeValues } from '@resellr/domain/schemas/attribute-values.schema';
 
+import { createCatalogReader } from '../catalog/index.ts';
 import type { DB } from '../db/schema.ts';
 import type { EventHandlers, UnitOfWork } from '../db/unit-of-work.ts';
 import { RuleViolation } from '../shared/domain-error.ts';
 import type { VariantSetChanging } from '../shared/events.ts';
+import { createListingRepository } from './listing-repository.ts';
 
 /** Model listings of one model template that would have the same variant data (2.1). */
 interface MergingGroup {
@@ -20,31 +22,17 @@ const parseValues = (json: string) => JSON.parse(json) as AttributeValues;
  * per model template of the device type, groups the model listings that the comparison rule
  * (CU-119) finds equal with the variant set after the change. The values of a listing are its
  * device-level values, the variant values together with the other ones, so an attribute that
- * got the flag after the listing was created is compared with its value too.
+ * got the flag after the listing was created is compared with its value too. The model templates
+ * come from the catalog reader (CU-108), the listings from CU-125 (Nachtrag MAR-879).
  */
 async function checkVariantSetChanging(
   { deviceTypeId, variantAttributeIds }: VariantSetChanging,
   { db }: UnitOfWork<DB>,
 ): Promise<void> {
-  const rows = await db
-    .selectFrom('listing')
-    .innerJoin('model_template', 'model_template.id', 'listing.model_template_id')
-    .where('model_template.device_type_id', '=', deviceTypeId)
-    .select([
-      'listing.id',
-      'listing.model_template_id',
-      'model_template.model_name',
-      'listing.condition_value_id',
-      'listing.visual_grade',
-      'listing.condition_description',
-      'listing.variant_values',
-      'listing.other_device_values',
-      'listing.display_title',
-      'listing.article_number',
-    ])
-    .orderBy('listing.model_template_id')
-    .orderBy('listing.id')
-    .execute();
+  const templates = await createCatalogReader(db).listModelTemplatesOfDeviceType(deviceTypeId);
+  if (templates.length === 0) return;
+  const modelNames = new Map(templates.map(({ id, modelName }) => [id, modelName]));
+  const rows = await createListingRepository(db).listVariantData(templates.map(({ id }) => id));
 
   // The comparison rule is an equality, so each listing joins the first group it matches.
   const groups: (MergingGroup & { spec: VariantSpec })[] = [];
@@ -68,7 +56,7 @@ async function checkVariantSetChanging(
     if (group === undefined) {
       groups.push({
         modelTemplateId: row.model_template_id,
-        modelName: row.model_name,
+        modelName: modelNames.get(row.model_template_id) ?? '',
         listings: [listing],
         spec,
       });
