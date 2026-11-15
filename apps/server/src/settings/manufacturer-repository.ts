@@ -1,3 +1,4 @@
+import type { Gpsr } from '@resellr/domain/schemas/manufacturer.schema';
 import type { Kysely, Selectable } from 'kysely';
 
 import type { DB, ManufacturerTable } from '../db/schema.ts';
@@ -14,9 +15,27 @@ export interface ManufacturerChange {
   name?: string;
   nameKey?: string;
   active?: boolean;
+  /** GPSR details with `gpsr_complete` derived from them (2.2). */
+  gpsr?: { values: Gpsr; complete: boolean };
   version: number;
   at: string;
 }
+
+/** `''` = not given, stored as `NULL` (3.1). */
+const textOrNull = (value: string) => (value === '' ? null : value);
+
+const gpsrColumns = ({ values, complete }: NonNullable<ManufacturerChange['gpsr']>) => ({
+  gpsr_legal_name: textOrNull(values.legalName),
+  gpsr_street: textOrNull(values.street),
+  gpsr_postal_code: textOrNull(values.postalCode),
+  gpsr_city: textOrNull(values.city),
+  gpsr_country: textOrNull(values.country),
+  gpsr_contact: textOrNull(values.contact),
+  eu_rp_name: textOrNull(values.euRpName),
+  eu_rp_address: textOrNull(values.euRpAddress),
+  eu_rp_contact: textOrNull(values.euRpContact),
+  gpsr_complete: complete ? 1 : 0,
+});
 
 export interface ManufacturerListQuery {
   /** `false`: only the active manufacturers, the choice for new model templates (AC-REQ-101-02). */
@@ -83,13 +102,14 @@ export function createManufacturerRepository(db: Kysely<DB>) {
     },
 
     /** Stores the changed fields with the new version. */
-    async update(id: number, { name, nameKey, active, version, at }: ManufacturerChange) {
+    async update(id: number, { name, nameKey, active, gpsr, version, at }: ManufacturerChange) {
       await db
         .updateTable('manufacturer')
         .set({
           ...(name !== undefined && { name }),
           ...(nameKey !== undefined && { name_key: nameKey }),
           ...(active !== undefined && { active: active ? 1 : 0 }),
+          ...(gpsr !== undefined && gpsrColumns(gpsr)),
           version,
           updated_at: at,
         })

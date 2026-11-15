@@ -1,9 +1,13 @@
-import type {
-  Manufacturer,
-  ManufacturerCreate,
-  ManufacturerList,
-  ManufacturerUpdate,
-  ManufacturerUpdateResult,
+import {
+  GPSR_FIELDS,
+  GPSR_LABELS,
+  gpsrMissingOf,
+  type Gpsr,
+  type Manufacturer,
+  type ManufacturerCreate,
+  type ManufacturerList,
+  type ManufacturerUpdate,
+  type ManufacturerUpdateResult,
 } from '@resellr/domain/schemas/manufacturer.schema';
 import { toKey } from '@resellr/domain/text/normalize-key';
 import type { Kysely } from 'kysely';
@@ -38,15 +42,37 @@ const statusLabel = (active: boolean) => STATUS_LABEL[`${active}`];
 
 const objectLabel = (name: string) => `Hersteller ${name}`;
 
+/** Stored GPSR details, `''` for `NULL` (3.1). */
+function gpsrOf(row: ManufacturerRow): Gpsr {
+  return {
+    legalName: row.gpsr_legal_name ?? '',
+    street: row.gpsr_street ?? '',
+    postalCode: row.gpsr_postal_code ?? '',
+    city: row.gpsr_city ?? '',
+    country: row.gpsr_country ?? '',
+    contact: row.gpsr_contact ?? '',
+    euRpName: row.eu_rp_name ?? '',
+    euRpAddress: row.eu_rp_address ?? '',
+    euRpContact: row.eu_rp_contact ?? '',
+  };
+}
+
 function toManufacturer(row: ManufacturerRow): Manufacturer {
+  const gpsr = gpsrOf(row);
   return {
     id: row.id,
     name: row.name,
     active: row.active === 1,
     gpsrComplete: row.gpsr_complete === 1,
+    gpsrMissing: gpsrMissingOf(gpsr),
+    gpsr,
     version: row.version,
   };
 }
+
+/** Values of the changed GPSR fields under their labels, for the audit entry (3.6). */
+const gpsrAuditValues = (gpsr: Gpsr, changed: readonly (keyof Gpsr)[]) =>
+  Object.fromEntries(changed.map((field) => [GPSR_LABELS[field], gpsr[field]]));
 
 async function readOrThrow(repository: ManufacturerRepository, id: number) {
   const row = await repository.findById(id);
@@ -55,12 +81,13 @@ async function readOrThrow(repository: ManufacturerRepository, id: number) {
 }
 
 /**
- * Manufacturer service (CU-078, REQ-100, REQ-101; Technical Specification 2.2): create (with
- * "already there"), rename, activate and deactivate manufacturers. There is no deletion (2.2);
- * a deactivated manufacturer stays at its model templates. Each action runs in one transaction
- * with its audit entries (2.0.4, 2.0.9). The GPSR details follow with #165; the effect of a
- * rename on the channel content (`SettingsChanged`) with #159, until then `impact` is
- * `{0, 0, 0}` (4.4.0).
+ * Manufacturer service (CU-078, REQ-027, REQ-100, REQ-101; Technical Specification 2.2):
+ * create (with "already there"), rename, activate and deactivate manufacturers and keep their
+ * GPSR details. There is no deletion (2.2); a deactivated manufacturer stays at its model
+ * templates. Each action runs in one transaction with its audit entries (2.0.4, 2.0.9). A change
+ * of the GPSR details reports `SettingsChanged` for all model listings of the manufacturer's
+ * model templates; the effect of a rename follows with #159. Until S5 `impact` is `{0, 0, 0}`
+ * (4.4.0).
  */
 export function createManufacturerService({ db, uow, clock }: ManufacturerServiceDeps) {
   const inAction = (tx: UnitOfWork<DB>) => ({
@@ -113,13 +140,15 @@ export function createManufacturerService({ db, uow, clock }: ManufacturerServic
     },
 
     /**
-     * `PATCH /api/manufacturers/{id}`: rename and/or switch the status; a name another
-     * manufacturer has, active or not, is `name_taken` (DER-37-04); `409 version_conflict` if
-     * the version read differs (2.0.3). One audit entry per change (3.6).
+     * `PATCH /api/manufacturers/{id}`: rename, switch the status and/or save the GPSR details;
+     * a name another manufacturer has, active or not, is `name_taken` (DER-37-04);
+     * `409 version_conflict` if the version read differs (2.0.3). Incomplete GPSR details are
+     * saved, `gpsr_complete` is derived (AC-REQ-027-02). One audit entry `updated` for name and
+     * GPSR details and one for the status (3.6).
      */
     async update(
       id: number,
-      { version, name, active }: ManufacturerUpdate,
+      { version, name, active, gpsr }: ManufacturerUpdate,
     ): Promise<ManufacturerUpdateResult> {
       const { result, report } = await uow.run(async (tx) => {
         const { repository, audit, at } = inAction(tx);
@@ -129,7 +158,12 @@ export function createManufacturerService({ db, uow, clock }: ManufacturerServic
         const renamed = name !== undefined && name !== current.name;
         const wasActive = current.active === 1;
         const switched = active !== undefined && active !== wasActive;
-        if (!renamed && !switched) return toManufacturer(current);
+        const storedGpsr = gpsrOf(current);
+        const gpsrChanged =
+          gpsr === undefined
+            ? []
+            : GPSR_FIELDS.filter((field) => gpsr[field] !== storedGpsr[field]);
+        if (!renamed && !switched && gpsrChanged.length === 0) return toManufacturer(current);
 
         const nameKey = renamed ? toKey(name) : undefined;
         if (nameKey !== undefined) {
@@ -141,19 +175,29 @@ export function createManufacturerService({ db, uow, clock }: ManufacturerServic
         await repository.update(id, {
           ...(renamed && { name, nameKey }),
           ...(switched && { active }),
+          ...(gpsr !== undefined &&
+            gpsrChanged.length > 0 && {
+              gpsr: { values: gpsr, complete: gpsrMissingOf(gpsr).length === 0 },
+            }),
           version: current.version + 1,
           at,
         });
 
         const label = objectLabel(renamed ? name : current.name);
-        if (renamed) {
+        if (renamed || gpsrChanged.length > 0) {
           await audit.write({
             objectType: 'manufacturer',
             objectId: id,
             objectLabel: label,
             action: 'updated',
-            oldValue: { Name: current.name },
-            newValue: { Name: name },
+            oldValue: {
+              ...(renamed && { Name: current.name }),
+              ...gpsrAuditValues(storedGpsr, gpsrChanged),
+            },
+            newValue: {
+              ...(renamed && { Name: name }),
+              ...(gpsr !== undefined && gpsrAuditValues(gpsr, gpsrChanged)),
+            },
           });
         }
         if (switched) {
@@ -165,6 +209,10 @@ export function createManufacturerService({ db, uow, clock }: ManufacturerServic
             oldValue: { Status: statusLabel(wasActive) },
             newValue: { Status: statusLabel(active) },
           });
+        }
+        // All model listings of the manufacturer's model templates (2.2, 2.8.3).
+        if (gpsrChanged.length > 0) {
+          tx.emit({ type: 'SettingsChanged', scope: { kind: 'manufacturer', manufacturerId: id } });
         }
         return toManufacturer(await readOrThrow(repository, id));
       });

@@ -10,7 +10,11 @@ const PAGE = '/einstellungen/hersteller';
 
 const manufacturers = (page: Page) => page.getByRole('region', { name: 'Hersteller' });
 const nameField = (page: Page) =>
-  page.getByRole('form', { name: 'Hersteller' }).getByRole('textbox', { name: /^Name/ });
+  page
+    .getByRole('form', { name: 'Hersteller' })
+    .getByRole('textbox', { name: 'Name', exact: true });
+const gpsrField = (page: Page, label: string) =>
+  page.getByRole('form', { name: 'Hersteller' }).getByRole('textbox', { name: label, exact: true });
 const saveButton = (page: Page) => page.getByRole('button', { name: 'Speichern', exact: true });
 const createButton = (page: Page) =>
   manufacturers(page).getByRole('button', { name: 'Hersteller anlegen' });
@@ -116,6 +120,64 @@ test.describe('UI-031 manufacturers (CU-098) and dialog UI-008 (CU-115)', () => 
     await confirm.click();
     await expect(dialog(page).getByText('Name: 1 bis 50 Zeichen')).toBeVisible();
     await expect(field).toHaveValue('x'.repeat(51));
+  });
+
+  test('UI-031.success DER-41-03 DER-41-04 DER-41-05 incomplete GPSR details are saved, then UI-043.empty, the missing part is named; completing them gives "GPSR vollständig"', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('GPSR', testInfo.title, testInfo.project.name);
+    await createManufacturer(page, server.baseUrl, name);
+    await openManufacturer(page, name);
+    await expect(gpsrField(page, 'Herstellername (rechtlich)')).toHaveAccessibleDescription(
+      'Herstellername fehlt',
+    );
+
+    await gpsrField(page, 'Herstellername (rechtlich)').fill('Lenovo PC HK Limited');
+    await gpsrField(page, 'Straße und Hausnummer').fill('Meitnerstraße 9');
+    await gpsrField(page, 'Ort').fill('Stuttgart');
+    await gpsrField(page, 'Land').fill('Deutschland');
+    await gpsrField(page, 'Elektronische Kontaktadresse').fill('info@lenovo.com');
+    await saveButton(page).click();
+
+    // UI-043 follows the save; in S2 it is always `.empty` (4.4.0) and "Schließen" closes it.
+    const impact = page.getByRole('dialog', { name: 'Auswirkung der Änderung' });
+    await expect(impact).toContainText('Keine Kanal-Inhalte betroffen');
+    await impact.getByRole('button', { name: 'Schließen' }).click();
+    await expect(impact).toBeHidden();
+    await expect(page.getByRole('status').filter({ hasText: 'Gespeichert' })).toBeVisible();
+    await expect(gpsrField(page, 'Postleitzahl')).toHaveAccessibleDescription('Postleitzahl fehlt');
+    await expect(row(page, name)).toContainText('GPSR unvollständig');
+
+    await gpsrField(page, 'Postleitzahl').fill('70563');
+    await saveButton(page).click();
+    await expect(impact).toContainText('Keine Kanal-Inhalte betroffen');
+    await page.keyboard.press('Escape');
+    await expect(row(page, name)).toContainText('GPSR vollständig');
+    await expect(page.getByText(/ fehlt$/)).toHaveCount(0);
+    await expectReachable(page);
+  });
+
+  test('UI-031.validation DER-41-01 DER-41-02 a too long postal code and an invalid contact stand at their fields and nothing is saved', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('GPSR-Fehler', testInfo.title, testInfo.project.name);
+    await createManufacturer(page, server.baseUrl, name);
+    await openManufacturer(page, name);
+
+    await gpsrField(page, 'Postleitzahl').fill('1'.repeat(21));
+    await gpsrField(page, 'Elektronische Kontaktadresse').fill('www.lenovo.com');
+    await saveButton(page).click();
+
+    await expect(gpsrField(page, 'Postleitzahl')).toHaveAccessibleDescription(
+      'Postleitzahl: höchstens 20 Zeichen',
+    );
+    await expect(gpsrField(page, 'Elektronische Kontaktadresse')).toHaveAccessibleDescription(
+      'E-Mail-Adresse oder Internetadresse ungültig',
+    );
+    await expect(gpsrField(page, 'Postleitzahl')).toBeFocused();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   test('UI-031.validation DER-37-04 DER-37-11 a rename shows the hint and a taken name is rejected at the field', async ({

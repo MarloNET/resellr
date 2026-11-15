@@ -1,4 +1,4 @@
-import type { TextBlockSaveResult } from '@resellr/domain/schemas/text-block.schema';
+import type { Impact } from '@resellr/domain/schemas/common.schema';
 
 import { Button } from '../../components/ui/Button.tsx';
 import {
@@ -21,7 +21,7 @@ const TEXTS = {
 const WIDTH = 480;
 
 /** Counts of REQ-053 in a save response (2.8.4). */
-export type Impact = TextBlockSaveResult['impact'];
+export type { Impact };
 
 export interface ImpactDialogProps {
   /** `impact` of the save response; `null` keeps the dialog closed. */
