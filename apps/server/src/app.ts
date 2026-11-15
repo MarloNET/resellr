@@ -10,6 +10,7 @@ import type { Database } from './db/database.ts';
 import type { DB } from './db/schema.ts';
 import { createUnitOfWork } from './db/unit-of-work.ts';
 import { createFrameworkErrorHandler, type HttpCoreDeps, registerHttpCore } from './http/index.ts';
+import { inventoryChecks } from './inventory/index.ts';
 import { createMediaFileIntake, mediaRoutes } from './media/index.ts';
 import {
   createShutdownService,
@@ -45,8 +46,8 @@ export function buildApp(deps: AppDeps) {
   const { writeGate } = registerHttpCore(app, deps);
 
   // One transaction per action for the services (2.0.4). The handler tables of CU-169 and
-  // CU-290 are merged here once they exist; in S1 there are none (Nachtrag MAR-263).
-  const uow = createUnitOfWork(deps.database.db, {});
+  // CU-290 are merged here (Nachtrag MAR-263); CU-169 follows in S5.
+  const uow = createUnitOfWork(deps.database.db, { check: { ...inventoryChecks } });
 
   const shutdownService = createShutdownService({
     lifecycle: deps.lifecycle,

@@ -21,6 +21,7 @@ export const ERROR_CODES = {
   stale_stock: 409,
   unsupported_media_type: 415,
   validation_failed: 422,
+  variant_flag_would_merge_listings: 422,
   version_conflict: 409,
 } as const satisfies Record<string, number>;
 

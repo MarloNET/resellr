@@ -62,6 +62,16 @@ export function createModelTemplateRepository(db: Kysely<DB>) {
       return { rows, total };
     },
 
+    /** `id` and `model_name` of the model templates of a device type, by `id` (for CU-108). */
+    async listByDeviceType(deviceTypeId: number) {
+      return db
+        .selectFrom('model_template')
+        .select(['id', 'model_name'])
+        .where('device_type_id', '=', deviceTypeId)
+        .orderBy('id')
+        .execute();
+    },
+
     async findById(id: number): Promise<ModelTemplateRow | undefined> {
       return db.selectFrom('model_template').selectAll().where('id', '=', id).executeTakeFirst();
     },
