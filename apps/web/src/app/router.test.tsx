@@ -43,8 +43,11 @@ const fetchMock = vi.fn<typeof fetch>();
 describe('router and application frame', () => {
   beforeEach(() => {
     fetchMock.mockReset();
-    fetchMock.mockImplementation(async () =>
-      Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' }),
+    fetchMock.mockImplementation(async (input) =>
+      // Screens with a list (e.g. UI-006 under /modelle) get an empty one.
+      String(input).startsWith('/api/ops/')
+        ? Response.json({ dataDirPath: DATA_DIR_PATH, appVersion: '0.1.0' })
+        : Response.json({ items: [], total: 0 }),
     );
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -147,9 +150,9 @@ describe('router and application frame', () => {
   it('E2 an entry whose screen does not exist yet keeps the frame and the navigation', () => {
     const router = renderAt('/inserate');
 
-    fireEvent.click(screen.getByRole('link', { name: 'Modell-Bibliothek' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Änderungsprotokoll' }));
 
-    expect(router.state.location.pathname).toBe('/modelle');
+    expect(router.state.location.pathname).toBe('/protokoll');
     expect(screen.getByText('resellr')).toBeTruthy();
     expect(screen.getByTestId('content-area').textContent).toBe('');
     fireEvent.click(screen.getByRole('link', { name: 'Inserate' }));

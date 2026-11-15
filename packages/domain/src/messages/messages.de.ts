@@ -93,6 +93,13 @@ export const FIELD_MESSAGES = {
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
+  /**
+   * UI-031 "Elektronische Kontaktadresse", neither an e-mail address nor an address with
+   * `http://` or `https://` (Technical Specification 2.2, DER-41-02).
+   */
+  gpsrContact: 'E-Mail-Adresse oder Internetadresse ungültig',
+  /** UI-031, a part of the GPSR details that `gpsrMissing[]` names (2.2, DER-41-03). */
+  gpsrMissing: (part: string) => `${part} fehlt`,
   /** UI-030 "Prüfdatum" after today (Technical Specification 2.2, DER-40-02). */
   legalCheckedOnFuture: 'Prüfdatum darf nicht in der Zukunft liegen',
   /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
@@ -102,6 +109,8 @@ export const FIELD_MESSAGES = {
    * Technical Specification 8.2 (addendum MAR-487).
    */
   pickListValueLabel: 'Wert: 1 bis 100 Zeichen',
+  /** UI-006 "Suchbegriff" with 1 character (AC-REQ-009-04, Technical Specification 2.4). */
+  searchTermMinLength: 'Mindestens 2 Zeichen',
   /** UI-032 "Name", empty or longer than 100 characters after trimming. */
   supplierName: 'Name: 1 bis 100 Zeichen',
   /**

@@ -265,7 +265,7 @@ Der vollständige Katalog liegt in `packages/domain/src/errors/error-codes.ts` u
 | --- | --- | --- | --- |
 | `name_taken` | 422 | `.device_type`: „Name ist bereits vergeben“; `.attribute`: „Bezeichnung ist bei dieser Geräteart bereits vergeben“; `.supplier`, `.text_block`: „Name ist bereits vergeben“; `.pick_list_value`: „Wert gibt es in dieser Liste bereits“; `.condition_code`: „Diesen Code gibt es für diesen Lieferanten bereits“ | REQ-004, REQ-005, REQ-007, REQ-022, REQ-099; UI-027, UI-028, UI-030, UI-032, UI-033 |
 | `attribute_has_values` | 422 | „Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.“ bzw. „Ebene …“ | REQ-005, UI-027 |
-| `variant_flag_would_merge_listings` | 422 | „Änderung nicht möglich: Modell-Inserate <Liste> würden gleiche Variantenangaben haben“ (`details.groups`); einzige Verwendung `.flag` (Kennzeichen „variantenbildend“ entfernen). Deaktivieren und Wieder-Aktivieren eines Merkmals lösen den Code nie aus (K-03, MAR-176; REQ-005 v0.3.4, Nachtrag MAR-605) | REQ-005, AC-REQ-005-09, UI-027 |
+| `variant_flag_would_merge_listings` | 422 | „Änderung nicht möglich: Modell-Inserate <Liste> würden gleiche Variantenangaben haben“ (`details.groups`); `<Liste>` = je Gruppe `<Modellbezeichnung>: „<Anzeigetitel>“ (<Artikelnummer>), …`, Gruppen mit „; “ getrennt, Modellvorlagen und Modell-Inserate je nach `id` aufsteigend (Nachtrag MAR-879); einzige Verwendung `.flag` (Kennzeichen „variantenbildend“ entfernen). Deaktivieren und Wieder-Aktivieren eines Merkmals lösen den Code nie aus (K-03, MAR-176; REQ-005 v0.3.4, Nachtrag MAR-605) | REQ-005, AC-REQ-005-09, UI-027 |
 | `device_type_in_use` | 422 | „Geräteart kann nicht geändert werden, weil Geräte erfasst sind“ | REQ-010, AC-REQ-010-02 |
 | `manufacturer_deactivated` | 422 | „Hersteller <Name> ist deaktiviert“ | REQ-100 |
 | `wi_nr_taken` | 422 | „WI-Nr bereits vergeben: Gerät <WI-Nr> in <Modell-Inserat>“ (`details.deviceId`, `details.listingId`) | REQ-012, AC-REQ-012-02 |
@@ -368,7 +368,7 @@ Es gibt **keinen** Endpunkt zum Löschen von Gerätearten, Merkmalen oder Listen
 - **Name der Geräteart** 1–50 Zeichen nach Entfernen der Randleerzeichen, eindeutig über `name_key` (Unicode-Kleinschreibung, Baseline 4.4); AC-REQ-004-02.
 - **Merkmal:** Bezeichnung 1–100 Zeichen, eindeutig je Geräteart (auch beim Umbenennen), ohne `{` und `}`, nicht gleich einem festen Platzhalternamen aus Requirements Kap. 9.7 (`Hersteller`, `Modellbezeichnung`, … `Stückzahl`), damit Platzhalter eindeutig bleiben. Verglichen wird wie bei der Eindeutigkeit: nach Entfernen der Randleerzeichen, ohne Groß-/Kleinschreibung (`label_key`); eine Bezeichnung, die mit `Baustein:` beginnt, gilt ebenfalls als fester Platzhaltername (`{Baustein:Name}`). Die 19 festen Namen (Hersteller, Modellbezeichnung, Typbezeichnung, Herstellernummer, Geräteart, Artikelnummer, EAN, Zustand, Optik-Note, Zustandsbeschreibung, Lieferumfang, Preis, Zustandsbezeichnung Kanal, Händlermarke, Händler-Kontakt, Merkmalsliste, WI-Nr, Stückzahl, Akkukapazität) stehen einmal im Platzhalterkatalog CU-068 (Nachtrag MAR-543). Ausgenommen ist das Merkmal mit der Systemrolle `battery_capacity`, dessen Bezeichnung „Akkukapazität“ zugleich der Bestandsplatzhalter ist; für andere feste Namen gilt die Regel auch bei ihm. Texte: Tabelle „Meldungstexte“ in Kap. 8.2 (Schlüssel M-02 bis M-04; M-04 „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ nach K-07). Einheit optional, 0–20 Zeichen (Kap. 3.1 `attribute.unit`; zu lang: „Einheit: höchstens 20 Zeichen“, Tabelle „Meldungstexte“ in Kap. 8.2, Nachtrag MAR-493).
 - **Datentyp und Ebene** sind nach dem ersten gespeicherten Wert gesperrt (`hasValues`, CU-074: Prüfung über `json_extract` in Modellvorlagen, Geräten und Modell-Inseraten; einzige erlaubte direkte Lesestelle fremder Tabellen, Kap. 4.1); AC-REQ-005-04, AC-REQ-005-08.
-- **„variantenbildend“** nur bei Ebene *Gerät*, nie bei Systemrolle `battery_capacity` (AC-REQ-005-07). Die **Menge der Variantenmerkmale** einer Geräteart sind alle Merkmale der Ebene *Gerät* mit `variantForming = true`, **aktive und deaktivierte** (K-03, MAR-176; Requirements Kap. 6.0 vergleicht „den Wert jedes Variantenmerkmals“). Sie ändert sich nur durch das Kennzeichen, nie durch Deaktivieren oder Aktivieren. Wird das Kennzeichen entfernt, meldet `settings` (`settings/variant-flag-guard.ts`, CU-075) das Prüfereignis `VariantSetChanging { deviceTypeId, variantAttributeIds }` (Kap. 2.0.4). Der Handler in `inventory/inventory-checks.ts` (CU-290; eine Einheit `inventory/variant-flag-guard.ts` gibt es nicht, FIND-227) prüft je Modellvorlage der Geräteart mit der Vergleichsregel (CU-119), ob danach zwei Modell-Inserate übereinstimmen würden; dann `variant_flag_would_merge_listings` mit `details.groups[]: { modelTemplateId, listingIds[] }` (REQ-005, AC-REQ-005-09). Bestehende Zuordnungen bleiben unverändert (AC-REQ-005-10). Das Setzen des Kennzeichens fügt nur ein Unterscheidungsmerkmal hinzu und ist immer zulässig.
+- **„variantenbildend“** nur bei Ebene *Gerät*, nie bei Systemrolle `battery_capacity` (AC-REQ-005-07). Die **Menge der Variantenmerkmale** einer Geräteart sind alle Merkmale der Ebene *Gerät* mit `variantForming = true`, **aktive und deaktivierte** (K-03, MAR-176; Requirements Kap. 6.0 vergleicht „den Wert jedes Variantenmerkmals“). Sie ändert sich nur durch das Kennzeichen, nie durch Deaktivieren oder Aktivieren. Wird das Kennzeichen entfernt, meldet `settings` (`settings/variant-flag-guard.ts`, CU-075) das Prüfereignis `VariantSetChanging { deviceTypeId, variantAttributeIds }` (Kap. 2.0.4). Der Handler in `inventory/inventory-checks.ts` (CU-290; eine Einheit `inventory/variant-flag-guard.ts` gibt es nicht, FIND-227) prüft je Modellvorlage der Geräteart mit der Vergleichsregel (CU-119), ob danach zwei Modell-Inserate übereinstimmen würden; dann `variant_flag_would_merge_listings` mit `details.groups[]: { modelTemplateId, listingIds[] }` (REQ-005, AC-REQ-005-09). Die Modellvorlagen der Geräteart mit ihrer Modellbezeichnung liest er über `catalog-reader` (CU-108), die Modell-Inserate dieser Modellvorlagen über `listing-repository` (CU-125), beide mit `tx.db` (Nachtrag MAR-879). Bestehende Zuordnungen bleiben unverändert (AC-REQ-005-10). Das Setzen des Kennzeichens fügt nur ein Unterscheidungsmerkmal hinzu und ist immer zulässig.
 - **Deaktivieren eines Merkmals** (auch eines Variantenmerkmals) wird **nie abgelehnt** (K-03, MAR-176; REQ-005: „nicht mehr abgefragt; vorhandene Werte bleiben gespeichert“). Ein deaktiviertes Variantenmerkmal wird für neue Geräte nicht mehr abgefragt, bleibt aber in der Vergleichsregel (Kap. 2.6). *Beispiel:* Nach „RAM deaktivieren“ hat ein neu erfasstes MacBook keinen RAM-Wert; gegen ein Modell-Inserat mit „16GB“ zeigt UI-005 „RAM: Gerät –, Modell-Inserat 16GB“, und der Nutzer entscheidet („trotzdem zuordnen“, neues Modell-Inserat oder Kennzeichen entfernen nach AC-REQ-005-09, -10).
 - **Wieder aktivieren eines Merkmals (REQ-005 v0.3.4, AC-REQ-005-11, A-38; Nachtrag MAR-605).** `PATCH /api/attributes/{id}` mit `version` und `active: true`. Einen eigenen Endpunkt gibt es nicht; der Weg ist derselbe wie beim Deaktivieren und beim Status von Gerätearten und Listenwerten.
   - **Nie abgelehnt:** An `active: true` hängt keine Fachregel und kein Prüfereignis, auch nicht bei einer deaktivierten Geräteart oder bei Datensätzen ohne Wert für das Merkmal. Möglich sind nur die allgemeinen Antworten jeder Änderung (Kap. 2.0.5): `409 version_conflict` (veralteter Stand, P-05), `404 not_found`, `503 shutting_down` (P-07), `500 internal_error`; `400 bad_request` nur bei einem Programmfehler der Oberfläche. Enthält die Anfrage weitere geänderte Felder, gelten für sie ihre Regeln; eine Ablehnung trifft dann die ganze Anfrage, nie das Aktivieren als solches.
@@ -408,6 +408,7 @@ sequenceDiagram
   participant A as http-api
   participant S as settings
   participant I as inventory
+  participant C as catalog
   participant L as listing-content
   participant D as resellr-db
 
@@ -416,7 +417,10 @@ sequenceDiagram
   A->>S: Merkmal ändern
   S->>D: Transaktion beginnen, Merkmal ändern
   S->>I: Prüfereignis VariantSetChanging (Geräteart)
-  I->>D: Modell-Inserate der Geräteart lesen
+  I->>C: Modellvorlagen der Geräteart (catalog-reader)
+  C->>D: model_template lesen
+  C-->>I: id, Modellbezeichnung
+  I->>D: Modell-Inserate dieser Modellvorlagen lesen (listing-repository)
   I->>I: Vergleich nach neuer Menge der Variantenmerkmale
   alt zwei Modell-Inserate einer Modellvorlage würden übereinstimmen
     S->>D: Rollback
@@ -1063,7 +1067,7 @@ Lesart (RQ-12, FIND-220): Requirements REQ-053 nennt „Änderungsentwürfe“ u
 
 #### 2.8.5 Leistung (REQ-060, REQ-061, AR-03)
 
-Ziel nach Baseline 7.3: auch die Neuberechnung aller 9.000 Kanal-Inhalte (A-12) in unter 5 s auf einem Arbeitsplatzrechner der Mittelklasse. Maßnahmen: Einstellungen einmal je Lauf laden, Modell-Inserate gebündelt lesen, nur geänderte Zeilen schreiben, vorbereitete Anweisungen. Der Lasttest in S5 misst das (Kap. 6.3); verfehlt er das Ziel, gilt der Rückfallweg AR-03 als Architekturänderung.
+Ziel nach Baseline 7.3: auch die Neuberechnung aller 9.000 Kanal-Inhalte (A-12) in unter 5 s auf einem Arbeitsplatzrechner der Mittelklasse. Maßnahmen: Einstellungen einmal je Lauf laden, Modell-Inserate gebündelt lesen, nur geänderte Zeilen schreiben, vorbereitete Anweisungen. Der Lasttest in S5 misst das (Kap. 6.3), in S7 erneut mit Fotos (Nachtrag MAR-875); verfehlt er das Ziel, gilt der Rückfallweg AR-03 als Architekturänderung.
 
 **Ablauf „Textbaustein ändern mit Wirkung auf viele Kanal-Inhalte“** (Baseline Ablauf 3, hier mit Endpunkten, UI-043 und Fehlerfällen)
 
@@ -2841,7 +2845,7 @@ resellr/
 │  ├─ domain/                   gemeinsame Typen, Zod-Schemas, Fehlercodes, Meldungen, content-engine (ohne Ein-/Ausgabe)
 │  ├─ runtime-shared/           Pfade, Exit-Codes, Referenznummer, Protokolldateien, Zustandsdateien
 │  ├─ seed-data/                Startbelegung (REQ-006)
-│  └─ test-data/                synthetische Daten für Demo, Tests, Last
+│  └─ test-data/                synthetische Daten für Demo, Tests, Last; Serverstart für Demo und Lasttests (CU-317)
 ├─ tools/
 │  ├─ demo/                     npm run demo
 │  ├─ launcher/                 resellr-launcher
@@ -2850,11 +2854,13 @@ resellr/
 │  ├─ qa/                       Prüfwerkzeuge der CI (AC-Abdeckung)
 │  └─ loadtest/                 Last- und Antwortzeittests
 ├─ e2e/                         Playwright-Tests
-├─ .github/workflows/           ci.yml, windows.yml, release.yml
+├─ .github/workflows/           ci.yml, windows.yml, release.yml, loadtest.yml (ab S5, CU-318)
 └─ docs/                        Requirements, Baseline, Design, diese Specification, Betriebshandbuch
 ```
 
-**Schichten im Server** (je Komponente): `<komponente>.routes.ts` (HTTP-Abbildung, Zod-Schemas der Anfrage, ruft genau einen Dienst) → `*-service.ts` (Anwendungsfall, Fachregeln, Transaktion, Ereignisse, Protokoll) → `*-repository.ts` (Kysely-Abfragen einer Tabellengruppe). Andere Komponenten lesen nur über die `*-reader.ts` der Komponente und melden Änderungen über Ereignisse (Baseline 2.4). Jede Komponente exportiert über `index.ts` nur ihren Reader, ihre Routen-Registrierung, ihre Ereignistypen und ihre Prüfereignis-Handler. **Ausnahmen (abschließend; FIND-202, FIND-203, FIND-227):** (1) `media` exportiert zusätzlich die Dateidienste CU-090 (Datei prüfen und ablegen), CU-208 (Foto-Übergabe), CU-209 (Foto-ZIP) und CU-307 (Aufräumen verwaister Dateien: `markUnreferenced(referencedHashes)`, `deleteOrphan(hash, isReferenced)`, `deleteUnknownFiles(limit)`); sie arbeiten nur auf Dateien und auf `media_file` und schreiben keine fremde Tabelle. (2) Betriebsaufgaben, die nur `ops` aufruft: `listing-content` exportiert `rebuildAll(uow)` aus CU-164 (alle Kanal-Inhalte neu bilden und fehlende anlegen; Aufrufer nur CU-173), `audit` exportiert die Löschfrist CU-234 (Aufrufer nur der Planer CU-250). Auch sie schreiben nur Tabellen ihrer eigenen Komponente. `ops` schreibt selbst keine Tabelle einer Fachkomponente; es entscheidet und ruft diese Funktionen auf. (3) Technischer Kern für Server-Einstieg und App-Zusammenbau (Nachtrag MAR-240): `http/index.ts` exportiert `registerHttpCore(app, deps)` (Zod-Anbindung, Sicherheitskopfzeilen, `local-guard`, Schreibsperre, Fehlerabbildung, statische Oberfläche; `local-guard` läuft vor der Schreibsperre; gibt die Schreibsperre für das Beenden zurück), `createFrameworkErrorHandler(errorLog)` für die Fastify-Option `frameworkErrors`, die Konstante `LISTEN_HOST` und die Typen `HttpCoreDeps` und `WriteGate`. `ops/index.ts` exportiert zusätzlich `createErrorLog` (CU-036), `createLifecycleState` (CU-038) mit ihren Typen und den Startablauf CU-040. Aufrufer dieser Exporte sind nur `main.ts`, `app.ts` und `apps/server/test`. (4) Protokollschreiber (Nachtrag MAR-285): `audit/index.ts` exportiert zusätzlich `createAuditWriter` (CU-035) mit den Typen `AuditWriter` und `AuditEntryInput`. Aufrufer sind die Dienste aller Komponenten, die eine protokollpflichtige Änderung nach Kap. 3.6 speichern (Kap. 2.0.4), und `apps/server/test`. Der Schreiber schreibt nur `audit_entry` und importiert keine andere Komponente. Die Einheiten von `http` erzeugen kein eigenes Fehlerprotokoll und keinen eigenen Betriebszustand; sie bekommen beide als Parameter und importieren aus `ops/index.ts` nur Typen. Ebenso bekommt das geordnete Beenden in `ops` (F-17) die Schreibsperre als Parameter und importiert aus `http/index.ts` nur den Typ `WriteGate`. `main.ts` darf `app.ts` importieren, nicht umgekehrt. `shared/` und `db/` dürfen alle nutzen. Jeder API-Pfad gehört genau einer Routen-Einheit (Spalte „Verantwortung“ der Routen-Einheiten in Kap. 4.4). `eslint-plugin-boundaries` erzwingt das; `packages/domain/src/content-engine` darf nichts importieren außer `packages/domain`.
+**Schichten im Server** (je Komponente): `<komponente>.routes.ts` (HTTP-Abbildung, Zod-Schemas der Anfrage, ruft genau einen Dienst) → `*-service.ts` (Anwendungsfall, Fachregeln, Transaktion, Ereignisse, Protokoll) → `*-repository.ts` (Kysely-Abfragen einer Tabellengruppe). Andere Komponenten lesen nur über die `*-reader.ts` der Komponente und melden Änderungen über Ereignisse (Baseline 2.4). Das gilt auch für die Handler der Prüfereignisse (CU-290): eigene Tabellen über die Repositories der eigenen Komponente, fremde Tabellen nur über den Reader der besitzenden Komponente, nicht per Join (Nachtrag MAR-879). Jede Komponente exportiert über `index.ts` nur ihren Reader, ihre Routen-Registrierung, ihre Ereignistypen und ihre Prüfereignis-Handler. **Ausnahmen (abschließend; FIND-202, FIND-203, FIND-227):** (1) `media` exportiert zusätzlich die Dateidienste CU-090 (Datei prüfen und ablegen), CU-208 (Foto-Übergabe), CU-209 (Foto-ZIP) und CU-307 (Aufräumen verwaister Dateien: `markUnreferenced(referencedHashes)`, `deleteOrphan(hash, isReferenced)`, `deleteUnknownFiles(limit)`); sie arbeiten nur auf Dateien und auf `media_file` und schreiben keine fremde Tabelle. (2) Betriebsaufgaben, die nur `ops` aufruft: `listing-content` exportiert `rebuildAll(uow)` aus CU-164 (alle Kanal-Inhalte neu bilden und fehlende anlegen; Aufrufer nur CU-173), `audit` exportiert die Löschfrist CU-234 (Aufrufer nur der Planer CU-250). Auch sie schreiben nur Tabellen ihrer eigenen Komponente. `ops` schreibt selbst keine Tabelle einer Fachkomponente; es entscheidet und ruft diese Funktionen auf. (3) Technischer Kern für Server-Einstieg und App-Zusammenbau (Nachtrag MAR-240): `http/index.ts` exportiert `registerHttpCore(app, deps)` (Zod-Anbindung, Sicherheitskopfzeilen, `local-guard`, Schreibsperre, Fehlerabbildung, statische Oberfläche; `local-guard` läuft vor der Schreibsperre; gibt die Schreibsperre für das Beenden zurück), `createFrameworkErrorHandler(errorLog)` für die Fastify-Option `frameworkErrors`, die Konstante `LISTEN_HOST` und die Typen `HttpCoreDeps` und `WriteGate`. `ops/index.ts` exportiert zusätzlich `createErrorLog` (CU-036), `createLifecycleState` (CU-038) mit ihren Typen und den Startablauf CU-040. Aufrufer dieser Exporte sind nur `main.ts`, `app.ts` und `apps/server/test`. (4) Protokollschreiber (Nachtrag MAR-285): `audit/index.ts` exportiert zusätzlich `createAuditWriter` (CU-035) mit den Typen `AuditWriter` und `AuditEntryInput`. Aufrufer sind die Dienste aller Komponenten, die eine protokollpflichtige Änderung nach Kap. 3.6 speichern (Kap. 2.0.4), und `apps/server/test`. Der Schreiber schreibt nur `audit_entry` und importiert keine andere Komponente. Die Einheiten von `http` erzeugen kein eigenes Fehlerprotokoll und keinen eigenen Betriebszustand; sie bekommen beide als Parameter und importieren aus `ops/index.ts` nur Typen. Ebenso bekommt das geordnete Beenden in `ops` (F-17) die Schreibsperre als Parameter und importiert aus `http/index.ts` nur den Typ `WriteGate`. `main.ts` darf `app.ts` importieren, nicht umgekehrt. `shared/` und `db/` dürfen alle nutzen. Jeder API-Pfad gehört genau einer Routen-Einheit (Spalte „Verantwortung“ der Routen-Einheiten in Kap. 4.4). `eslint-plugin-boundaries` erzwingt das; `packages/domain/src/content-engine` darf nichts importieren außer `packages/domain`.
+
+**Werkzeuge und Testdaten (Nachtrag MAR-875):** `tools/*` importieren nur `packages/domain`, `runtime-shared`, `seed-data` und `test-data`, kein anderes Werkzeug und nichts aus `apps/*`. `packages/test-data` importiert `packages/domain`, `seed-data` und `runtime-shared`; `runtime-shared` ist mit CU-317 neu erlaubt. Demo, Lasttests und ihre Testdaten schreiben nur über die HTTP-API des laufenden Servers (Nachtrag MAR-305). Den Server starten sie als eigenen Prozess über CU-317, der `apps/server/src/main.ts` als Dateipfad an Node übergibt, nicht als Import.
 
 ### 4.2 Namenskonventionen
 
@@ -2920,11 +2926,11 @@ Kein Schritt braucht eine Einheit eines späteren Schritts. Wo ein Schritt Daten
 | S2 | S1 | Kanäle stammen aus der Startbelegung (CU-160, CU-161 schon in S2); `GET /api/channels` liefert nur `id, code, name, active, sortOrder` (CU-142, CU-163, CU-176 schon in S2, bis S5; Nachtrag MAR-773); `impact` der Einstellungsantworten ist `{0, 0, 0}`, UI-043 zeigt nach UI-030 und UI-031 `.empty` (bis S5, CU-164; Kap. 2.2, Klärung QH-1); `VariantSetChanging` ohne Handler (bis S4, CU-290); Vorschau-Link in UI-039 deaktiviert, kein Aufruf von `GET /api/datasheets/preview-device` (bis S8, CU-306, CU-224, UI-023; FIND-227) |
 | S3 | S1, S2 | `ModelTemplateDeviceTypeChanging` ohne Handler (bis S4), `ModelTemplateDeleting` ohne Handler (bis S9); UI-007 ohne Zeile „Verwendung“ (bis S4, CU-295) und ohne Hinweis zum Geltungsbereich (bis S5, CU-171) |
 | S4 | S1 bis S3 | `ListingCreated`, `ContentInputsChanged`, `StockChanged` ohne Handler: keine Kanal-Inhalte, `adjustStockChannels` leer (bis S5; beim ersten Start mit S5 legt CU-173 die fehlenden Kanal-Inhalte an); kein Regelpreis (bis S5, CU-127); UI-014 ohne Kanal-Karten (bis S5) und ohne Fotos (bis S7) |
-| S5 | S1 bis S4 | Fotos in `ContentInput` leer (bis S7, CU-287) |
+| S5 | S1 bis S4 | Fotos in `ContentInput` leer (bis S7, CU-287); Lastdaten CU-174 ohne Fotos, AR-03 mit CU-175 ohne Fotos gemessen (bis S7, Nachtrag MAR-875) |
 | S6 | S5 | – |
 | S7 | S5, S6 | – |
 | S8 | S2, S4 | – (aktiviert den Vorschau-Link in UI-039) |
-| S9 | S4 bis S6 | – |
+| S9 | S4 bis S6; CU-244 zusätzlich S7 (Lastdaten mit Fotos) und S8 (Datenblatt für REQ-061) (Nachtrag MAR-875) | – |
 | S10 | S1, S2, S4, S5, S7; F-17 (CU-245, CU-254 bis CU-257, CU-311, CU-312) nur S1 | F-17 darf nach S1 vorgezogen werden (Baseline 12.2). Der Rest von S10 braucht Reader späterer Schritte: CU-247 für Schritt 3 der Startprüfung (Fotodateien, CU-287 aus S7) und den Invariantentest der Bestandsspalten (CU-128, CU-129 aus S4); CU-251 und CU-307 die Verweise aus CU-287 (S7), CU-291 (S5, erweitert in S7) und CU-086 (S2); CU-234 nur die Tabelle aus S1 (FIND-227) |
 | S11 | S4, S5 | – |
 
@@ -2934,10 +2940,10 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 
 | Nr. | Einheit | Ort | Verantwortung | Features |
 | --- | --- | --- | --- | --- |
-| CU-001 | Workspace-Wurzel | `package.json`, `tsconfig.base.json`, `.nvmrc`, `vitest.config.ts` | Workspaces, gemeinsame TypeScript-Optionen (strict), Node-Version, Skripte `build`, `test`, `e2e`, `lint`, `typecheck`, `demo`; Vitest-Projekte je Workspace über `test.projects` (Nachtrag MAR-213) | alle |
-| CU-002 | Lint-Regeln | `eslint.config.mjs`, `.prettierrc` | Codeformat (Prettier, über ESLint geprüft), Importgrenzen zwischen Komponenten (Kap. 4.1) einschließlich `main.ts` → `app.ts` (nur diese Richtung; Nachtrag MAR-240) | alle |
+| CU-001 | Workspace-Wurzel | `package.json`, `tsconfig.base.json`, `.nvmrc`, `vitest.config.ts` | Workspaces, gemeinsame TypeScript-Optionen (strict), Node-Version, Skripte `build`, `test`, `e2e`, `lint`, `typecheck`, `demo`, ab S5 `loadtest` (CU-175, Nachtrag MAR-875); Vitest-Projekte je Workspace über `test.projects` (Nachtrag MAR-213) | alle |
+| CU-002 | Lint-Regeln | `eslint.config.mjs`, `.prettierrc` | Codeformat (Prettier, über ESLint geprüft), Importgrenzen zwischen Komponenten (Kap. 4.1) einschließlich `main.ts` → `app.ts` (nur diese Richtung; Nachtrag MAR-240); `packages/test-data` → `runtime-shared` (für CU-317, Nachtrag MAR-875) | alle |
 | CU-003 | Linux-CI | `.github/workflows/ci.yml` | Lint, Typprüfung, Unit-, Integrations- und E2E-Tests unter Linux mit Google Chrome; `npm audit` in zwei Schritten (Kap. 4.3, TH-07); bei reinen Doku-Änderungen kein Lauf auf `main` und im PR nur die Diff-Prüfung (Nachtrag MAR-787); Abbruch laufender Läufe nur in PRs, manueller Lauf (`workflow_dispatch`) mit Auswahl der Playwright-Worker unter eigenem Check-Namen; der Job-Name `Lint, type check, tests (Linux)` ist der Pflicht-Check des Rulesets auf `main` (Nachtrag MAR-826) | alle |
-| CU-004 | Demo-Start | `tools/demo/run-demo.ts` | `npm run demo`: bauen, temporären Datenordner anlegen, Server auf `127.0.0.1:${PORT:-4310}` starten, nach `ready` Beispieldaten über die HTTP-API einspielen (CU-061), erst danach die Adresse ausgeben (Baseline 11.3, Nachtrag MAR-305); die Startbelegung kommt erst mit S2 über CU-071 (FIND-223) | O5 |
+| CU-004 | Demo-Start | `tools/demo/run-demo.ts` | `npm run demo`: bauen, temporären Datenordner anlegen, Server auf `127.0.0.1:${PORT:-4310}` starten, nach `ready` Beispieldaten über die HTTP-API einspielen (CU-061), erst danach die Adresse ausgeben (Baseline 11.3, Nachtrag MAR-305); die Startbelegung kommt erst mit S2 über CU-071 (FIND-223); geändert in S5: Ordner, Start und Warten auf `ready` über CU-317, eigene Teile bleiben `demoPort`, `buildApp`, das Einspielen und `main` (Nachtrag MAR-875) | O5 |
 | CU-005 | Laufzeitpfade | `packages/runtime-shared/src/paths.ts` | Pfade von Daten-, Protokoll-, Übergabe- und Update-Kopie-Ordner aus Umgebung bzw. `%LOCALAPPDATA%`; einzige Stelle für den Aufbau von `app\…` im Programmordner (Kap. 2.19): `programFolderPaths(programDir)` mit `appDir` (`app`), `serverEntry` (`app/server.mjs`), `launcherEntry` (`app/launcher.mjs`), `webRoot` (`app/web`) und `nativeModulesDir` (`app/node_modules`), gebildet mit `join` aus `node:path`; reicht `IS_BUNDLED` aus CU-313 unverändert weiter (`export { IS_BUNDLED } from './bundled.ts'`), Verwender importieren es weiter von hier. `launcher-pages` bleibt bei CU-310 (Nachtrag MAR-446, MAR-474) | F-19 |
 | CU-006 | Exit-Codes | `packages/runtime-shared/src/exit-codes.ts` | Konstanten 0, 10, 11, 12 und ihre Bedeutung | F-18 |
 | CU-007 | Referenznummer | `packages/runtime-shared/src/reference-number.ts` | Referenznummer erzeugen und prüfen (Kap. 2.0.5, H-11) | REQ-073 |
@@ -3000,7 +3006,7 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-058 | UI-Bausteine | `apps/web/src/components/ui/*` | shadcn/ui-Bausteine (Button, Dialog, Input, Select, Checkbox, RadioGroup, Table, Tabs, Toast, Tooltip, Badge, Sheet), an Tokens angepasst; `Select`, `Checkbox` und `RadioGroup` als native Elemente ohne Radix, je eine Datei `Select.tsx`, `Checkbox.tsx`, `RadioGroup.tsx` (Nachtrag MAR-572); `Dialog` mit Breiten- und Höhenregel, `Table` mit eigenem waagrechten Scrollbereich und fester erster Spalte ab `24rem` Behälterbreite (Nachtrag MAR-831), `Sheet` für Seitenpanels unterhalb von `full` und bei zu schmalem Detailbereich (Kap. 2.0.10), gibt beim Schließen den Fokus an das Element zurück, das ihn beim Öffnen hatte (Nachtrag MAR-834) | DESIGN.md |
 | CU-059 | Design-Tokens | `apps/web/src/styles/tokens.css`, `tailwind.css` | Farben, Typografie, Radien, Abstände aus `DESIGN.md` als CSS-Variablen und Tailwind-Theme; Bruchstelle `full` (1366 px, Kap. 2.0.10) | DESIGN.md |
 | CU-060 | Schriftdateien | `apps/web/src/assets/fonts/` | Inter 4.1 woff2 (Regular, Semibold), lokal gebündelt | REQ-079 |
-| CU-061 | Demo-Daten | `packages/test-data/src/demo-seed.ts` | synthetische, deterministische Beispieldaten für `npm run demo`, erweitert in jedem Schritt (Hotspot); eingespielt nur über die HTTP-API des laufenden Servers: `createDemoApi(baseUrl)` und `seedDemoData(api)`, das die Funktionen `seed<Bereich>(api)` in Schrittreihenfolge aufruft (Nachtrag MAR-305) | O5 |
+| CU-061 | Demo-Daten | `packages/test-data/src/demo-seed.ts` | synthetische, deterministische Beispieldaten für `npm run demo`, erweitert in jedem Schritt (Hotspot); eingespielt nur über die HTTP-API des laufenden Servers: `createDemoApi(baseUrl)` und `seedDemoData(api)`, das die Funktionen `seed<Bereich>(api)` in Schrittreihenfolge aufruft (Nachtrag MAR-305); `createDemoApi` ist der einzige HTTP-Client für Demo- und Lastdaten, auch für CU-174, CU-175 und CU-244; erweitert in S7 um `upload(path, file)` für eine Datei als `multipart/form-data` (Nachtrag MAR-875) | O5 |
 | CU-062 | E2E-Grundlage | `playwright.config.ts`, `e2e/fixtures/app-fixture.ts`, `e2e/fixtures/reachability.ts` | Server je Test-Worker mit eigenem Datenordner starten, in der CI die gemessene Worker-Zahl (Nachtrag MAR-787, MAR-826); ein Playwright-Projekt je Zeile der Fenstergrößen-Matrix FM-1 bis FM-7; Erreichbarkeitsprüfung je Screen; Testdaten `copy-view-few-fields` (9 Felder) und `copy-view-many-fields` (18 Felder) für die Lage des Streifens in UI-019 schmal (Kap. 6.3, FIND-235) | Kap. 6 |
 | CU-284 | AC-Abdeckungsprüfung | `tools/qa/check-ac-coverage.mjs` | prüft in der CI, dass jede AC-REQ-ID der **abgeschlossenen** Schritte (CU-299) in mindestens einem Testtitel steht, und zwar am **Anfang** des Titels (Kap. 6.2, FIND-223, Nachtrag MAR-305) | Kap. 6 |
 | CU-299 | AC-Schrittliste | `tools/qa/ac-steps.json` | Zuordnung jeder AC-REQ-ID zu ihrem Bauschritt und Liste der abgeschlossenen Schritte; jeder Schritt trägt seine AC-REQ-IDs spätestens bei seiner Abnahme ein, bei der Abnahme von S10 enthält die Datei jede AC-REQ-ID nach Kap. 6.2 (Nachtrag MAR-305) | Kap. 6 |
@@ -3068,9 +3074,9 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | --- | --- | --- | --- | --- |
 | CU-104 | Schema Modellvorlage | `packages/domain/src/schemas/model-template.schema.ts` | Felder, Herstellernummer oder „unbekannt“ (Bereinigung, Prüfreihenfolge leer, Länge, Zeichen mit genau einer Meldung; Kap. 2.4, v0.5.2), EAN; `modelTemplateSearchKey()` als einzige Bildung von `search_key` und `modelTemplateReferenceSchema` (`{ id, name }`) für `deviceType` und `manufacturer` in Antworten (Nachtrag MAR-850) | F-04 |
 | CU-105 | Modellvorlagen-Dienst | `apps/server/src/catalog/model-template-service.ts` | anlegen, ändern, Prüfereignis `ModelTemplateDeviceTypeChanging`, Ereignis; Rückfragen erst nach allen ablehnenden Regeln (Prüfreihenfolge Kap. 2.4, v0.5.2); prüft bei `PATCH` die Merkmalswerte am vollständigen Stand nach der Änderung über CU-067 (Kap. 2.5, Nachtrag MAR-605); erweitert in S9 um Löschen mit `ModelTemplateDeleting` | REQ-008, REQ-010, REQ-095 |
-| CU-106 | Modellvorlagen-Repository | `apps/server/src/catalog/model-template-repository.ts` | Abfragen und Suche auf `model_template` | REQ-009 |
+| CU-106 | Modellvorlagen-Repository | `apps/server/src/catalog/model-template-repository.ts` | Abfragen und Suche auf `model_template`; `listByDeviceType(deviceTypeId)` für CU-108 (Nachtrag MAR-879) | REQ-009 |
 | CU-107 | Dubletten-Prüfung | `apps/server/src/catalog/duplicate-check.ts` | mögliche Dublette (REQ-011) und gleiche Herstellernummer (REQ-058, Could; Bedingung und Anlass bei `PATCH` nach Kap. 2.4, v0.5.2) | REQ-011, REQ-058 |
-| CU-108 | Katalog-Reader | `apps/server/src/catalog/catalog-reader.ts` | Leseschnittstelle für Modellvorlagen und Vorbelegung | F-05, F-08, F-13 |
+| CU-108 | Katalog-Reader | `apps/server/src/catalog/catalog-reader.ts` | Leseschnittstelle für Modellvorlagen und Vorbelegung: `createCatalogReader(db)`, zuerst mit `listModelTemplatesOfDeviceType(deviceTypeId)` → `{ id, modelName }[]` für CU-290 (angelegt mit GitHub-Issue #153, Nachtrag MAR-879), erweitert um die Vorbelegungswerte für CU-293 (#188) | F-05, F-08, F-13 |
 | CU-109 | Katalog-Routen | `apps/server/src/catalog/catalog.routes.ts` | `GET/POST /api/model-templates`, `GET/PATCH /api/model-templates/{id}`; erweitert in S9 um `DELETE /api/model-templates/{id}`. Die Unterpfade `…/{id}/listings`, `…/{id}/device-prefill`, `…/{id}/usage` gehören CU-130 | F-04 |
 | CU-110 | Katalog-API (Web) | `apps/web/src/api/catalog.api.ts` | Hooks Modellvorlagen | F-04 |
 | CU-111 | Merkmalsformular | `apps/web/src/components/forms/AttributeFieldsForm.tsx` | Felder einer Geräteart zur Laufzeit aus Definitionen, Reihenfolge, Prüfmarkierung | LP-4, REQ-076 |
@@ -3092,11 +3098,11 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-122 | Geräte-Repository | `apps/server/src/inventory/device-repository.ts` | Abfragen auf `device`, Suche, nicht zugeordnete | REQ-016, REQ-094 |
 | CU-123 | Zuordnungs-Dienst | `apps/server/src/inventory/assignment-service.ts` | einzige Stelle für zuordnen, Modell-Inserat aus Gerät anlegen und umbuchen | REQ-017 bis REQ-020 |
 | CU-124 | Modell-Inserat-Dienst | `apps/server/src/inventory/listing-service.ts` | Inseratswerte ändern mit Abweichungsbestätigung; prüft Variantenangaben und übrige Gerätewerte am vollständigen Stand nach der Änderung über CU-067 (Kap. 2.5, Nachtrag MAR-605) | REQ-005, REQ-088 |
-| CU-125 | Modell-Inserat-Repository | `apps/server/src/inventory/listing-repository.ts` | Abfragen auf `listing`, `listing_delivery_scope`, `listing_price` (FIND-202) | F-07 |
+| CU-125 | Modell-Inserat-Repository | `apps/server/src/inventory/listing-repository.ts` | Abfragen auf `listing`, `listing_delivery_scope`, `listing_price` (FIND-202); zuerst `listVariantData(modelTemplateIds)` für CU-290 (angelegt mit GitHub-Issue #153, Nachtrag MAR-879) | F-07 |
 | CU-126 | Preis-Dienst | `apps/server/src/inventory/price-service.ts` | Preis je Kanal speichern; ruft ab S5 CU-127 | REQ-032 |
 | CU-128 | Bestandsfortschreibung | `apps/server/src/inventory/listing-stock-updater.ts` | `quantity`, `stock_json`, `stock_hash` des Modell-Inserats neu bilden und `StockChanged` melden | REQ-091 |
 | CU-129 | Bestands-Reader | `apps/server/src/inventory/inventory-reader.ts` | Leseschnittstelle für Modell-Inserate, Geräte, Preise | F-08, F-13, F-14 |
-| CU-290 | Bestands-Prüfungen | `apps/server/src/inventory/inventory-checks.ts` | Handler der Prüfereignisse `VariantSetChanging` (mit CU-119) und `ModelTemplateDeviceTypeChanging`; erweitert in S9 um `ModelTemplateDeleting` (FIND-201) mit der Rangfolge der Gründe, Modell-Inserate vor Geräten (Kap. 2.4, v0.5.2) | REQ-005, REQ-010, REQ-095 |
+| CU-290 | Bestands-Prüfungen | `apps/server/src/inventory/inventory-checks.ts` | Handler der Prüfereignisse `VariantSetChanging` (mit CU-119; Modellvorlagen über CU-108, Modell-Inserate über CU-125, Nachtrag MAR-879) und `ModelTemplateDeviceTypeChanging`; liest eigene Tabellen nur über Repositories von `inventory`, fremde nur über Reader (Kap. 4.1); erweitert in S9 um `ModelTemplateDeleting` (FIND-201) mit der Rangfolge der Gründe, Modell-Inserate vor Geräten (Kap. 2.4, v0.5.2) | REQ-005, REQ-010, REQ-095 |
 | CU-292 | Modell-Inserat-Detail | `apps/server/src/inventory/listing-detail-query.ts` | `GET /api/listings/{id}` zusammenstellen; erweitert in S9 um `deleteBlockedReason` (nur Gründe aus `inventory`, Kap. 2.15) (FIND-202) | REQ-088, REQ-095 |
 | CU-293 | Vorbelegungsabfrage | `apps/server/src/inventory/device-prefill-query.ts` | `GET /api/model-templates/{id}/device-prefill`: Vorbelegungswerte über `catalog-reader`, Code-Übersetzung und Merkmalsdefinitionen der Geräteart (mit `active`) über `settings-reader`, Bildung in CU-117 (Nachtrag MAR-605, FIND-351) | REQ-005, REQ-013, REQ-015 |
 | CU-294 | Inserat-Auswahl | `apps/server/src/inventory/listing-choice-query.ts` | `GET /api/model-templates/{id}/listings` mit Abweichungen zum Gerät | REQ-017, REQ-019 |
@@ -3147,8 +3153,10 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-172 | Kanal-Inhalt-Routen | `apps/server/src/listing-content/listing-content.routes.ts` | alle Pfade unter `/api/channel-contents` (einschließlich `…/copy-view`, `…/photo-handover`, `…/photo-zip`), `/api/listings/{id}/channel-contents`, `/api/scope-counts`, `/api/previews/*`; erweitert in S6 (`/api/listings/{id}/channel-comparison`), S7, S9 (`GET /api/listings`) | F-08 bis F-14 |
 | CU-291 | Kanal-Inhalt-Reader | `apps/server/src/listing-content/listing-content-reader.ts` | Leseschnittstelle von `listing-content`: Fotos des freigegebenen Stands (S7), verwiesene Foto-Hashes aus aktuellem und freigegebenem Stand für das Aufräumen (FIND-202) | F-12, F-19 |
 | CU-173 | Engine-Versionsprüfung | `apps/server/src/ops/engine-version-check.ts` | beim Start bei geänderter oder fehlender `ENGINE_VERSION` `rebuildAll(uow)` von CU-164 aufrufen (alles neu bilden, fehlende Kanal-Inhalte anlegen), Wert über CU-285 speichern; schreibt selbst nicht in `channel_content` (FIND-227) | AR-04 |
-| CU-174 | Lastdaten | `packages/test-data/src/load-data-generator.ts` | synthetischer Bestand nach A-12 | REQ-064 |
-| CU-175 | Lasttest Neuberechnung | `tools/loadtest/recompute-load-test.ts` | Zeit der Neuberechnung im ungünstigsten Fall | AR-03 |
+| CU-174 | Lastdaten | `packages/test-data/src/load-data-generator.ts` | synthetischer, deterministischer Bestand nach A-12 mit Mengenfaktor; schreibt nur über die HTTP-API mit `createDemoApi` (CU-061), nie direkt in SQLite; in S5 ohne Fotos; erweitert in S7 um 60.000 Fotos, 20 je Modell-Inserat, kleine, verschiedene Bilddateien (Nachtrag MAR-875) | REQ-064 |
+| CU-175 | Lasttest Neuberechnung | `tools/loadtest/recompute-load-test.ts` und `recompute-load-test.int.test.ts` (kleiner Lauf in `npm test`), `tools/loadtest/package.json` | Zeit der Neuberechnung im ungünstigsten Fall: Server über CU-317 starten, Bestand über CU-174 laden, Textbaustein mit Geltung für alle Kanal-Inhalte ändern, messen, Bericht; in S5 ohne Fotos; erweitert in S7: erneut auf dem Bestand mit Fotos (Nachtrag MAR-875) | AR-03 |
+| CU-317 | Lokaler Serverstart | `packages/test-data/src/local-server.ts` | einzige Stelle, die den Server für Demo und Lasttests als Prozess startet: freien Port suchen, temporären Ordner mit Daten-, Protokoll-, Übergabe- und Update-Kopie-Ordner und `config.json` anlegen, `apps/server/src/main.ts` starten, auf `ready` des eigenen Datenordners warten, beenden und aufräumen; Verwender CU-004, CU-175, ab S9 CU-244 (Nachtrag MAR-875) | O5, AR-03 |
+| CU-318 | Lasttest-Workflow | `.github/workflows/loadtest.yml` | voller Lasttest CU-175 nach jedem Merge auf `main` und manuell, nicht in Pull Requests; kein Pflicht-Check; Bericht als Artefakt; erweitert in S9 um CU-244 (Nachtrag MAR-875) | AR-03, REQ-064 |
 | CU-177 | Zuordnungstabelle | `apps/web/src/components/patterns/MappingTable.tsx` | Muster P-02 | P-02 |
 | CU-178 | Vorlagen-Editor | `apps/web/src/components/patterns/TemplateEditor.tsx` | Muster P-03 mit Platzhalterauswahl und Vorschau | P-03 |
 | CU-179 | Hinweis Geltungsbereich | `apps/web/src/features/settings/ScopeCountHint.tsx` | „gilt für n Kanal-Inhalte im Geltungsbereich“ | Ä-32 |
@@ -3237,7 +3245,7 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-241 | WI-Nr-Dialog | `apps/web/src/features/devices/WiNrDialog.tsx` | UI-013 | REQ-092 |
 | CU-242 | Lösch-Dialog | `apps/web/src/features/common/DeleteDialog.tsx` | UI-041 für Modell-Inserat und Modellvorlage; bei der Modellvorlage Text zum Grund aus `deleteBlockedReason` (M-29 bzw. Gerätetext, v0.5.2) | REQ-095 |
 | CU-243 | Protokoll-Screen | `apps/web/src/features/audit/AuditLogPage.tsx` | UI-024 | REQ-055 |
-| CU-244 | Antwortzeittest | `tools/loadtest/response-time-test.ts` | REQ-060/061 je Aktionstyp ≥ 50 Messungen | REQ-060, REQ-061 |
+| CU-244 | Antwortzeittest | `tools/loadtest/response-time-test.ts` | REQ-060/061 je Aktionstyp ≥ 50 Messungen; Server über CU-317, Bestand über CU-174 mit Fotos, Anfragen über `createDemoApi` (CU-061); läuft im Workflow CU-318 (Nachtrag MAR-875) | REQ-060, REQ-061 |
 
 #### S10 Betrieb – Migration nötig: **nein**
 
@@ -3339,9 +3347,9 @@ Fehlt eine Einheit oder ist eine Verantwortung unklar, fragt der Entwickler den 
 
 | Anforderung | Umsetzung in dieser Specification | Nachweis (Kap. 6) |
 | --- | --- | --- |
-| **REQ-060** (95 % ≤ 2 s, keine > 5 s), **REQ-064** (Volumen A-12) | lokaler Prozess, synchrones `better-sqlite3`, vorbereitete Anweisungen, Indizes nach Kap. 3.7; Kennzeichnungen und Bestandsangaben als Spalten mitgeführt, damit die Übersicht eine einzige Abfrage ist; Listen serverseitig gefiltert, bis 200 Zeilen bzw. Seiten zu 50; Suche ab 2 Zeichen | Antwortzeittest CU-244 auf Lastdaten CU-174 |
+| **REQ-060** (95 % ≤ 2 s, keine > 5 s), **REQ-064** (Volumen A-12) | lokaler Prozess, synchrones `better-sqlite3`, vorbereitete Anweisungen, Indizes nach Kap. 3.7; Kennzeichnungen und Bestandsangaben als Spalten mitgeführt, damit die Übersicht eine einzige Abfrage ist; Listen serverseitig gefiltert, bis 200 Zeilen bzw. Seiten zu 50; Suche ab 2 Zeichen | Antwortzeittest CU-244 auf Lastdaten CU-174 mit Fotos (Nachtrag MAR-875) |
 | **REQ-061** (Kanal-Inhalte ≤ 3 s, Datenblatt ≤ 5 s) | Bildung im Speicher ohne externe Aufrufe; PDF mit `pdfmake` ohne Browser-Prozess, höchstens drei Durchläufe bei Verdichtung | wie oben, je ≥ 50 Messungen |
-| Neuberechnung (AR-03) | gebündeltes Laden, nur geänderte Zeilen schreiben; Ziel < 5 s für 9.000 Kanal-Inhalte | Lasttest CU-175 in S5; verfehlt → Architekturänderung nach AR-03 |
+| Neuberechnung (AR-03) | gebündeltes Laden, nur geänderte Zeilen schreiben; Ziel < 5 s für 9.000 Kanal-Inhalte | Lasttest CU-175 in S5 ohne Fotos, in S7 erneut mit Fotos, im Workflow CU-318 (Nachtrag MAR-875); verfehlt → Architekturänderung nach AR-03 |
 | **REQ-065** (≥ 99 %) | Autostart, Überwachung mit Neustart (3 in 10 min), schneller Neustart nach Beenden, WAL; Messung nach OD-05 (a) mit Tageszusammenfassung (Kap. 2.18) | Unit-Tests der Auswertung, Windows-CI, Monatsbericht im Pilot |
 | **REQ-067** bei OD-02 A, **REQ-001** | nur `127.0.0.1`, keine Anmeldung | AC-REQ-001-05, AC-REQ-001-07 |
 | **REQ-068**, **REQ-069** | keine Felder für Zugangsdaten und Personen; Protokoll ohne Nutzer; Fehlerprotokoll ohne Feldwerte | Schema-Test, Review |
@@ -3367,7 +3375,7 @@ Fehlt eine Einheit oder ist eine Verantwortung unklar, fragt der Entwickler den 
 
 ### 6.1 Testebenen und Werkzeuge
 
-Verfeinert Baseline 11.1. Alle Tests außer den Windows-Tests laufen unter Linux in der CI (CU-003). Ändert ein PR oder Push nur Dokumentation nach der Liste D in Nachtrag MAR-787 (Kap. 10.2), entfallen sie; jede andere Änderung prüft die CI vollständig. Ein manueller Lauf (`workflow_dispatch`) prüft immer vollständig (Nachtrag MAR-826).
+Verfeinert Baseline 11.1. Alle Tests außer den Windows-Tests laufen unter Linux in der CI (CU-003). Ändert ein PR oder Push nur Dokumentation nach der Liste D in Nachtrag MAR-787 (Kap. 10.2), entfallen sie; jede andere Änderung prüft die CI vollständig. Ein manueller Lauf (`workflow_dispatch`) prüft immer vollständig (Nachtrag MAR-826). Der volle Lasttest läuft nicht in CU-003, sondern im eigenen Workflow CU-318; `npm test` enthält davon nur einen kleinen Lauf (Nachtrag MAR-875).
 
 | Ebene | Gegenstand | Werkzeug, Ort |
 | --- | --- | --- |
@@ -3378,7 +3386,7 @@ Verfeinert Baseline 11.1. Alle Tests außer den Windows-Tests laufen unter Linux
 | API | jeder Endpunkt mit Erfolgs- und Fehlerfällen aus Kap. 2, einschließlich `local-guard` (falscher Host, fremder Ursprung, fehlender Ursprung außer bei `shutdown`) | Fastify `inject` |
 | End-to-End | FLOW-01 bis FLOW-06, FLOW-08 bis FLOW-10 in Google Chrome, Zwischenablage (Berechtigung `clipboard-read`/`clipboard-write` im Test), Foto-Übergabe, Datenblatt (PDF-Antwort und Seitenzahl), schmale Ansicht, UI-044 in jedem Rahmen, P-05 bis P-08 durch gezielt beendeten oder gesperrten Server | Playwright, `e2e/*.spec.ts`, je Zeile der Fenstergrößen-Matrix (Kap. 6.3) |
 | Launcher-Seiten | LP-01 bis LP-03 als `file://`-Seiten in Chrome mit wechselnder `launcher-state.js` (Seitenwechsel nach T-5, Schrift nach T-6, Referenznummer nach H-11) | Playwright unter Linux und Windows |
-| Last | Lastdaten nach A-12, Antwortzeiten je Aktionstyp, Neuberechnung im ungünstigsten Fall | CU-174, CU-175, CU-244 |
+| Last | Lastdaten nach A-12, Antwortzeiten je Aktionstyp, Neuberechnung im ungünstigsten Fall | CU-174, CU-175, CU-244; voller Lauf im Workflow CU-318, kleiner Lauf mit Mengenfaktor 0,01 in `npm test` (Nachtrag MAR-875) |
 | Windows | Installer als Standardbenutzer, Autostart-Eintrag, kein Konsolenfenster, eine Überwachung, Neustart-Regel, Exit-Codes, Kopplung, native Module, Beenden für Update, Deinstallation bei laufendem resellr (Nachtrag MAR-471) | `.github/workflows/windows.yml` (CU-278), Runner `windows-2025` |
 
 ### 6.2 Regeln für die Testabdeckung
@@ -3413,10 +3421,10 @@ Verfeinert Baseline 11.1. Alle Tests außer den Windows-Tests laufen unter Linux
 
 | Anforderung | Messung | Bestanden, wenn |
 | --- | --- | --- |
-| REQ-060 | CU-244: je Aktionstyp (Speichern, Suchen, Öffnen, Zuordnen) ≥ 50 Messungen auf Lastdaten A-12, Zeit bis zur vollständigen Antwort | 95 % ≤ 2 s, Maximum ≤ 5 s |
+| REQ-060 | CU-244: je Aktionstyp (Speichern, Suchen, Öffnen, Zuordnen) ≥ 50 Messungen auf Lastdaten A-12, Zeit bis zur vollständigen Antwort. „Suchen“ umfasst die Suche der Inserat-Übersicht `GET /api/listings?q=` (UI-002, CU-229) und die Gerätesuche `GET /api/devices?wiNr=` (UI-009), „Öffnen“ `GET /api/listings/{id}` (UI-014) und `GET /api/devices/{id}` (UI-010) (Nachtrag MAR-875) | 95 % ≤ 2 s, Maximum ≤ 5 s |
 | REQ-061 | CU-244: Kanal-Inhalte eines Modell-Inserats für 3 Kanäle bilden; Datenblatt erzeugen | je 95 % ≤ 3 s bzw. ≤ 5 s |
-| AR-03 | CU-175: Textbaustein mit Geltung für alle Kanal-Inhalte ändern | < 5 s auf dem Referenzrechner der CI; Ergebnis im Bericht |
-| REQ-064 | Lastdaten CU-174 vollständig geladen | REQ-060 und REQ-061 erfüllt |
+| AR-03 | CU-175: Textbaustein mit Geltung für alle Kanal-Inhalte ändern, 5 Messungen, Zeit von `PATCH /api/text-blocks/{id}` bis zur vollständigen Antwort; Bestand CU-174 mit Mengenfaktor 1, in S5 ohne Fotos, ab S7 mit 60.000 Fotos; Workflow CU-318 (Nachtrag MAR-875) | jede Messung < 5 s auf dem Referenzrechner der CI (Runner `ubuntu-24.04`) und `impact.updated` = Zahl der Kanal-Inhalte (9.000); Ergebnis im Bericht |
+| REQ-064 | Lastdaten CU-174 vollständig über die HTTP-API geladen: 2.000 Modellvorlagen, 10.000 Geräte, 3.000 Modell-Inserate, ab S7 60.000 Fotos; gezählt werden Anzahlen, die Bytemenge der Fotos (Baseline 7) wird nicht nachgebildet (Nachtrag MAR-875) | Anzahlen im Bericht erreicht, REQ-060 und REQ-061 erfüllt |
 | REQ-081 | 5 Testgeräte je Geräteart, bis 40 befüllte Merkmale | `pageCount = 1` |
 | REQ-076 | E2E „Monitor“ mit 6 Merkmalen bis zur Freigabe je Kanal und Datenblatt | keine Migration, Prüfsumme des Schemas unverändert |
 | REQ-077 | E2E aller Flows und Erreichbarkeitsprüfung jedes Screens in jeder Zeile der Fenstergrößen-Matrix (unten) | kein Inhalt und keine Aktion unerreichbar; keine waagrechte Scrollleiste der Seite und der Navigationsspalte; Kopf „resellr“ sichtbar; keine Schrift unter 12 CSS-px |
@@ -4863,9 +4871,156 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
 - **`search_key` (Kap. 2.4 „Suche“, Kap. 3.3; Hinweis aus MAR-775):** Kap. 3.3 sagte nur „normalisiert“. Festgelegt, wie PR #368 es umsetzt: `modelTemplateSearchKey({ modelName, typeDesignation, mpn })` in CU-104 ist die einzige Bildung; je Feld `toKey` (CU-015), leere Felder weggelassen, eine Zeile je Feld. CU-105 ruft sie bei `POST` (#177) und bei jedem `PATCH` auf, das `modelName`, `typeDesignation`, `mpn` oder `mpnUnknown` ändert (#181), CU-281 beim Anlegen in S11. Testhilfen, die Modellvorlagen direkt in die Datenbank schreiben, nutzen dieselbe Funktion. *Beispiel:* „MacBook Pro 13“, ohne Typbezeichnung, „MHGT3D/A“ → `macbook pro 13\nmhgt3d/a`; die Suche „mhgt3“ trifft, „13 mhg“ nicht.
 - **Keine Owner-Freigabe nötig (Kap. 4.7):** Sichtbares Verhalten, Suche und Texte bleiben wie freigegeben. Die beiden Festlegungen präzisieren eine Schnittstelle und eine Verantwortung innerhalb von `catalog`; keine Einheit, Komponentengrenze, Migration oder Zustand kommt hinzu. Die Demo-Daten bleiben nach Baseline 11.3 und Nachtrag MAR-305; nur der Task, der sie liefert, ist festgelegt.
 
+**Code-Struktur-Nachtrag 15.11.2026 (MAR-875, Neuzuschnitt von GitHub-Issue #144 in #144 und #393; Rückfrage [MAR-861](/MAR/issues/MAR-861), Info [MAR-869](/MAR/issues/MAR-869)):** zwei neue Einheiten (CU-317, CU-318), CU-001, CU-002, CU-004, CU-061, CU-174, CU-175 und CU-244 geändert oder präzisiert, keine Komponentengrenze des Servers berührt, keine Migration, kein Diagramm, kein neuer Text.
+
+- **Ausgangslage:**
+  - CU-174 und CU-175 nannten nur Ort und Zweck. Offen waren der Ladeweg, die 60.000 Fotos vor S7, der Start des Servers und die Ausführung in der CI.
+  - Der Product Owner hat #144 geteilt: #144 (Task A, S5) lädt den Bestand ohne Fotos und misst die Neuberechnung. #393 (Task B, S7) lädt die Fotos und misst erneut.
+- **(1) Ladeweg nur über die HTTP-API (CU-174):**
+  1. CU-174 schreibt jeden Datensatz über die öffentlichen Endpunkte (Kap. 2.2 bis 2.6, ab S7 Kap. 2.11) mit `createDemoApi` aus CU-061. Es gibt keinen zweiten HTTP-Client. Direktes Schreiben in SQLite ist ausgeschlossen, auch über ein Werkzeug in `apps/server`.
+  2. **Gründe:** Die Importgrenzen (Kap. 4.1, CU-002) gelten wie bei den Demo-Daten (Nachtrag MAR-305). AR-03 misst nur dann etwas Belastbares, wenn die Kanal-Inhalte wie im Betrieb entstanden sind: über `ListingCreated` und `StockChanged`, die Engine, den aktuellen Stand und die Prüfsummen. Nachgebaute Tabellenzustände wären eine zweite Kopie der Logik aus CU-164 bis CU-169, die unbemerkt abweichen kann.
+  3. **Folge für den Backlog:** Die Schreibwege #177, #185, #197 und #194 sind Voraussetzung von #144, ebenso die Schreibwege aus S2 (Hersteller, Textbausteine mit Geltungsbereich #163).
+- **(2) Bestand und Mengenfaktor (CU-174, S5):**
+  1. **Exporte:** `LOAD_VOLUME` = `{ modelTemplates: 2000, devices: 10000, listings: 3000, photosPerListing: 20 }` (A-12), `loadVolume(scale)` und `loadBaseData(api, { scale })`. `scale` liegt in (0, 1]. Jede Anzahl ist `max(1, round(Anzahl × scale))`; die Fotos bleiben immer 20 je Modell-Inserat. Mit `scale = 1` entstehen genau die Anzahlen aus A-12.
+  2. **Deterministisch:** Zufall nur mit festem Startwert, wie bei CU-061. Gleicher `scale` ergibt den gleichen Bestand.
+  3. **Verteilung (fest):**
+     - Modell-Inserat *k* (0 bis 2.999) gehört zur Modellvorlage *k* mod 2.000. Die Modellvorlagen 0 bis 999 haben also zwei Modell-Inserate, die sich in einer Variantenangabe unterscheiden (z. B. `visualGrade`), die übrigen eins.
+     - Gerät *i* (0 bis 9.999) gehört zum Modell-Inserat *i* mod 3.000. Die ersten 3.000 Geräte legen ihr Modell-Inserat an (`POST /api/listings` mit `fromDeviceId`). Die übrigen 7.000 werden ohne Abweichung zugeordnet (`POST /api/devices/{id}/assignment`). Jedes Modell-Inserat hat damit 3 oder 4 Geräte.
+     - Jedes Gerät wird mit allen Werten erfasst, sodass `captureStatus = checked` ist. Kein Gerät ist verkauft. Freigaben erzeugt CU-174 nicht.
+  4. **Ungünstigster Fall:** CU-174 legt einen Textbaustein mit Geltung für alle Gerätearten und alle Kanäle an, der in der Beschreibung jedes Kanal-Inhalts vorkommt. Ob dafür die Startbelegung der Beschreibungsvorlagen genügt oder CU-174 die Vorlage je Kanal über ihren Endpunkt (Kap. 2.3) anpasst, entscheidet die Umsetzung. Maßgeblich ist die Prüfung in (6) 3. Braucht CU-174 dafür einen Endpunkt der Beschreibungsvorlagen, ist dessen Issue eine weitere Voraussetzung von #144.
+  5. **Rückgabe:** IDs des Textbausteins und der Modell-Inserate, erreichte Anzahlen, Ladezeit je Art in ms.
+  6. **Nacheinander senden:** Der Server arbeitet synchron mit `better-sqlite3`; parallele Anfragen verkürzen nichts und erschweren die Fehlersuche. In S5 sind es etwa 22.000 Anfragen.
+- **(3) Fotos ab S7 (CU-174 erweitert in S7, #393):**
+  1. In S5 lädt CU-174 keine Fotos. `POST /api/listings/{id}/photos` entsteht erst in S7 (CU-091, CU-204). Fotodateien und Zeilen in `media_file`/`listing_photo` direkt anzulegen würde `media` umgehen (CU-090, Sperre des Hashes CU-088) und widerspräche (1).
+  2. Ab S7 lädt `loadPhotos(api, listingIds)` je Modell-Inserat 20 Fotos über den Upload-Endpunkt, eine Datei je Anfrage (T-2). 3.000 × 20 = 60.000; jedes Modell-Inserat steht damit an der Grenze `photo_limit_reached`.
+  3. Jedes Foto ist ein kleines, gültiges PNG (z. B. 16 × 16 Pixel), das CU-174 ohne neue Abhängigkeit mit `node:zlib` erzeugt. Die Pixel ergeben sich aus Startwert und laufender Nummer. So hat jede Datei andere Bytes, und es entstehen 60.000 verschiedene Hashes und Dateien. Gleiche Bytes würden auf eine Datei zusammenfallen (Kap. 2.11).
+  4. **Die Bytemenge wird nicht nachgebildet:** A-12 und REQ-064 nennen Anzahlen. Speichern, Suchen, Öffnen und Zuordnen hängen von der Zahl der Zeilen und Dateien ab, nicht von deren Größe. 180 bis 300 GB (Baseline 7) passen nicht auf den Runner. Braucht CU-244 für eine einzelne gemessene Aktion ein Foto in echter Größe, lädt es dieses selbst.
+  5. Ab S7 gehören die Fotos zum ungünstigsten Fall der Neuberechnung, denn CU-166 lädt sie über CU-287 mit (Kap. 4.4.0). #393 lässt CU-175 deshalb auf dem Bestand mit Fotos erneut bestehen. Das Laden der Fotos allein belegt AR-03 nicht.
+- **(4) Multipart in CU-061 (S7, #393):**
+  1. `DemoApi` bekommt `upload<T>(path, file: { name: string; type: 'image/jpeg' | 'image/png'; bytes: Uint8Array }): Promise<T>`. Die Methode sendet `POST` mit `FormData`: ein Feld `file` als `Blob` mit `type` und dem Dateinamen `name`. Sie setzt `Origin` wie `request`. Den `Content-Type` mit `boundary` setzt `fetch`, nicht der Aufrufer.
+  2. Fehlerbehandlung wie bei `request`: Jede Antwort außer `2xx` wirft einen Fehler mit Methode, Pfad, Status und Fehlercode.
+  3. CU-174 (S7) und CU-244 nutzen `upload`. Einen eigenen Client baut keine der beiden Einheiten. Ab S7 können damit auch die Demo-Daten Fotos bekommen (Hotspot Kap. 4.5).
+- **(5) Gemeinsamer Serverstart, neue Einheit CU-317 `packages/test-data/src/local-server.ts`:**
+  1. **Problem:** CU-175 muss den Server so starten wie `startDemo` in CU-004. `tools/loadtest` darf `tools/demo` aber nicht importieren. Zwei Kopien des Startablaufs wären genau die Dubletten, die die Karte verhindern soll.
+  2. **Exporte:**
+     - `findFreePort(): Promise<number>`: Port 0 auf `127.0.0.1` binden, den vergebenen Port lesen, schließen.
+     - `startLocalServer({ port, tempPrefix, stdio? }): Promise<LocalServer>` mit `LocalServer = { baseUrl, root, paths, exited, stop() }`.
+  3. **Ablauf und Fehlerverhalten** wie bisher in `startDemo`:
+     - `mkdtemp(<tmpdir>/<tempPrefix>)`, darin die Ordner nach `RuntimePaths` und `config.json` mit `port` (`CONFIG_FILE_NAME` aus CU-309).
+     - `node apps/server/src/main.ts` mit `RESELLR_DATA_DIR`, `RESELLR_LOG_DIR`, `RESELLR_HANDOVER_DIR` und `RESELLR_UPDATE_COPY_DIR` starten.
+     - Warten, bis `GET /api/ops/health` `ready` meldet und `GET /api/ops/status` den eigenen Datenordner nennt; Zeitgrenze 30 s.
+     - Endet der Prozess vor `ready` oder läuft die Zeitgrenze ab, beendet CU-317 den Server und wirft einen Fehler mit dem Pfad des temporären Ordners. Der Ordner bleibt für die Protokolle.
+     - `stop()` sendet `SIGTERM`, wartet auf das Prozessende und löscht den Ordner.
+     - `stdio` ist `'inherit'` (Vorgabe, Demo) oder `'ignore'`.
+  4. CU-317 baut nicht. `npm run build` bleibt in CU-004, weil nur die Demo die Oberfläche braucht. Der Server startet auch ohne `apps/web/dist`.
+  5. **Ort `packages/test-data`:** `tools/*` dürfen das Paket importieren (Kap. 4.1). Der Server wird über seinen Dateipfad gestartet, nicht importiert. CU-002 erlaubt dafür neu `test-data` → `runtime-shared` (`CONFIG_FILE_NAME`, `RuntimePaths`). `runtime-shared` importiert nichts aus `test-data`, es entsteht also kein Kreis.
+  6. **CU-004:** behält `demoPort`, `buildApp`, `main` und `startDemo`. `startDemo` ruft `startLocalServer({ port, tempPrefix: 'resellr-demo-', stdio: 'inherit' })` und danach `seedDemoData` auf. Scheitert das Einspielen, beendet es den Server, und die Meldung nennt den Ordner, wie bisher. `RunningDemo` bleibt als Typ (gleich `LocalServer`). Die Tests von CU-004 bleiben unverändert grün; ihr `freePort` darf `findFreePort` nutzen.
+  7. **Nicht betroffen:** CU-062 (`e2e/fixtures/app-fixture.ts`) startet den Server weiter selbst, weil es Testuhr, Neustart, Verbindungsprüfung und `strace` braucht. Eine Zusammenführung mit CU-317 geht nur über einen Nachtrag. Der Launcher ist nicht betroffen.
+- **(6) Messung CU-175 (S5, #144; erweitert in S7, #393):**
+  1. **Aufruf:** `npm run loadtest -- [--scale=<0..1>] [--report=<Pfad>]`; das Skript in CU-001 ist `node tools/loadtest/recompute-load-test.ts`. Vorgabe: `scale = 1`, Bericht `loadtest-report.json` im aktuellen Ordner. `tools/loadtest/package.json` legt den Workspace `@resellr/loadtest` an, mit den Abhängigkeiten `@resellr/test-data` und `@resellr/runtime-shared`.
+  2. **Ablauf:**
+     - `findFreePort`, dann `startLocalServer` mit `tempPrefix: 'resellr-load-'` und `stdio: 'ignore'`.
+     - `loadBaseData`, ab S7 danach `loadPhotos`.
+     - 5 Messungen mit `PATCH /api/text-blocks/{id}` und neuem Text, abwechselnd zwei Texte, damit jede Messung jeden Kanal-Inhalt ändert. Gemessen wird mit `performance.now()` die Zeit vom Senden bis zur vollständigen Antwort.
+  3. **Prüfung je Messung:** `impact.updated` ist gleich der Zahl der Kanal-Inhalte (Modell-Inserate × Kanäle der Startbelegung, bei `scale = 1` also 9.000). Sonst endet CU-175 mit Exit-Code 1, weil nicht der ungünstigste Fall gemessen wurde.
+  4. **Bestanden (AR-03, Kap. 6.3)** nur bei `scale = 1`, wenn jede der 5 Messungen unter 5.000 ms liegt; sonst Exit-Code 1. Bei `scale < 1` gibt es keine Zeitgrenze, nur die Prüfung aus 3.
+  5. **Bericht (JSON):**
+     - Commit (`GITHUB_SHA`, lokal `git rev-parse HEAD`), `scale`, mit oder ohne Fotos;
+     - erreichte Anzahlen und Ladezeit je Art;
+     - die 5 Messwerte mit Maximum und Median, `impact` je Messung;
+     - Node-Version, Zahl der CPUs, Ergebnis.
+     - Ist `GITHUB_STEP_SUMMARY` gesetzt, schreibt CU-175 zusätzlich eine kurze Markdown-Tabelle dorthin.
+  6. **Ende:** `stop()`. Bei einem Fehler bleibt der temporäre Ordner; sein Pfad steht in der Ausgabe.
+  7. **Kleiner Lauf in `npm test`:**
+     - `recompute-load-test.int.test.ts` ruft denselben Ablauf mit `scale = 0.01` auf: 20 Modellvorlagen, 100 Geräte, 30 Modell-Inserate, 90 Kanal-Inhalte, ab S7 600 Fotos.
+     - Der Test prüft die Anzahlen, `impact.updated` = 90 und den Bericht, ohne Zeitgrenze.
+     - So veraltet der Generator nicht, wenn sich Endpunkte ändern. Scheitert der Lauf an neuen Pflichtangaben mit `422`, ergänzt das Issue, das die Pflicht einführt, auch CU-174 (wie Nachtrag MAR-850 für die Demo-Daten).
+  8. **AR-03 verfehlt:** Verfehlt der volle Lauf AR-03, gilt Kap. 5: Architekturänderung nach AR-03, Meldung an den CEOrchestrator. Die Zeitgrenze wird nicht angehoben.
+- **(7) CI-Job, neue Einheit CU-318 `.github/workflows/loadtest.yml`:**
+  1. **Auslöser:** `push` auf `main` mit demselben `paths-ignore` wie CU-003 (Liste D, Nachtrag MAR-787; Kommentar „gleich halten mit ci.yml“) und `workflow_dispatch` mit der Eingabe `scale` (`type: choice`, Optionen `'1'`, `'0.1'`, `'0.01'`, Vorgabe `'1'`). Kein `pull_request`.
+  2. **Rechte und Concurrency:** `permissions: contents: read`. `concurrency` mit `group: loadtest-${{ github.ref }}` und `cancel-in-progress: false`. Je Ref läuft höchstens ein Lauf, und höchstens einer wartet; ein neuer wartender Lauf ersetzt den älteren wartenden (Nachtrag MAR-826, Festlegung (a) 4). Das ist hier gewollt: Gemessen wird der neueste Stand, und ein übersprungener Stand lässt sich manuell nachholen. Ein laufender Lauf wird nie abgebrochen.
+  3. **Job:**
+     - ein Job `recompute` mit dem Namen `Load test (AR-03, REQ-064)`;
+     - `runs-on: ubuntu-24.04`, also derselbe Runner wie bei CU-003 („Referenzrechner der CI“), `timeout-minutes: 60`;
+     - Steps: `actions/checkout@v7`; `actions/setup-node@v7` mit `.nvmrc` und `cache: npm`; `npm ci`; Ausgabe `CPUs: $(nproc)`; `npm run loadtest -- --scale="$SCALE" --report="$RUNNER_TEMP/loadtest-report.json"` mit `env: SCALE: ${{ inputs.scale || '1' }}` (die Eingabe kommt nur über `env` ins Skript); `actions/upload-artifact@v7` mit dem Namen `loadtest-report` und `if: always()`.
+  4. **Kein Pflicht-Check:** Das Ruleset auf `main` bleibt unverändert (Nachtrag MAR-826). Ein roter Lauf auf `main` ist ein Befund: Developer oder QA melden ihn mit Lauf-ID an den CEOrchestrator.
+  5. CU-003 bleibt unverändert. Der kleine Lauf aus (6) 7 läuft dort über `npm test`.
+  6. **Laufzeit:** Geschätzt, nicht gemessen: in S5 wenige Minuten für etwa 22.000 Anfragen, in S7 deutlich mehr für 60.000 Uploads mit Vorschaubild. Die Grenze von 60 min gilt für beide. **Rückfall:** Dauert das Laden laut Bericht länger als 15 min, wird der einmal über die API geladene Datenordner im CI-Cache abgelegt (Schlüssel: Prüfsumme der Migrationen und Version von CU-174). Das geht nur über einen weiteren Nachtrag, nicht als eigene Wahl in der Umsetzung.
+  7. **Erweitert in S9:** Mit CU-244 (#145) bekommt der Workflow einen zweiten Step für den Antwortzeittest auf demselben Bestand. Die Einzelheiten von CU-244 legt dieser Nachtrag nicht fest.
+- **(8) REQ-060 „Suchen“ und „Öffnen“ (Kap. 6.3, 4.4.0; Hinweis des Product Owners in [MAR-859](/MAR/issues/MAR-859)):**
+  1. CU-244 steht in S9, nicht in S10 (Karte Kap. 4.4). Die Inserat-Übersicht (CU-229) gehört zum selben Schritt.
+  2. „Suchen“ umfasst die Suche der Übersicht und die Gerätesuche, „Öffnen“ das Modell-Inserat und das Gerät (Kap. 6.3). Kap. 5 nennt die Übersicht schon als Maßnahme für REQ-060.
+  3. CU-244 braucht zusätzlich S7 (Bestand mit Fotos, #393) und S8 (Datenblatt für REQ-061). Kap. 4.4.0, Zeile S9, ist entsprechend ergänzt.
+  4. **Für den Backlog:** #145 braucht als Voraussetzung auch die Issues der Übersicht (CU-229) und des Datenblatts. Das prüft der Product Owner.
+- **Kap. 6.3 präzisiert:** AR-03 verlangt jetzt ausdrücklich, dass **jede** der 5 Messungen unter 5 s liegt und `impact.updated` die Zahl der Kanal-Inhalte erreicht. REQ-064 nennt die Anzahlen und schließt die Bytemenge der Fotos aus. Die Schwellenwerte selbst sind unverändert.
+- **Verworfen:**
+  - (a) Direkt in SQLite schreiben, mit SQL/Kysely im Werkzeug oder über ein Ladewerkzeug in `apps/server`: siehe (1) 2.
+  - (b) Fotos in S5 als Dateien und Zeilen anlegen: siehe (3) 1.
+  - (c) Fotos in echter Größe: siehe (3) 4.
+  - (d) Startablauf in `runtime-shared`: Das Paket wird ausgeliefert und enthält nur Regeln, die Server und Launcher gleich behandeln (Kap. 4.1). Ein Start aus dem Quellbaum gehört nicht dorthin.
+  - (e) Eigenes Paket `packages/test-server` oder ein Werkzeug, das andere Werkzeuge importieren dürfen: eine neue Elementart und eine neue Lint-Regel für eine einzige Datei. `test-data` hat schon den HTTP-Client und dieselben Verwender.
+  - (f) Den Startablauf in CU-175 kopieren: eine Dublette von CU-004.
+  - (g) Lasttest als zweiter Job in `ci.yml`: Jeder manuelle Lauf von CU-003 würde auch Lint, Tests und E2E starten, und der Lasttest bräuchte dort eigene Bedingungen gegen PR-Läufe. Der eigene Workflow verdoppelt nur Checkout, Node und `npm ci`, keine Prüfung (anders als der verworfene Mess-Workflow in Nachtrag MAR-826, Verworfen (g)). Dafür steht Liste D an einer dritten Stelle; der Kommentar hält sie gleich.
+  - (h) Voller Lasttest in jedem PR: Er verlängert jeden PR-Lauf um Minuten, ab S7 um deutlich mehr, ohne Nutzen für die meisten Änderungen. Brüche im Generator fängt der kleine Lauf in `npm test`.
+  - (i) Parallele Anfragen beim Laden: siehe (2) 6.
+- **Umfang je Issue:**
+  - **#144 (S5):** CU-317 neu; CU-004 auf CU-317 umgestellt; CU-002 (eine Regel); CU-001 (Skript `loadtest`); CU-174 ohne Fotos; CU-175 mit kleinem Lauf; CU-318; `tools/loadtest/package.json`.
+  - **#393 (S7):** `upload` in CU-061, `loadPhotos` in CU-174, CU-175 mit Fotos.
+  - **#145 (S9):** CU-244 nach (7) 7 und (8).
+  - Keine neue Abhängigkeit (Kap. 4.3): PNG mit `node:zlib`, Multipart mit `fetch`, `FormData` und `Blob` aus Node.
+- **Prüfkriterien Code Review:**
+  - (R1) `packages/test-data` und `tools/loadtest` importieren nichts aus `apps/*`. CU-174, CU-175 und CU-317 nutzen weder `better-sqlite3` noch Kysely.
+  - (R2) In `tools/` und `packages/` startet nur CU-317 den Server; `run-demo.ts` startet keinen Prozess mehr selbst.
+  - (R3) CU-174 und CU-175 senden nur über `createDemoApi`, ohne eigenes `fetch`.
+  - (R4) Die Änderung an `eslint.config.mjs` ist genau die Regel `test-data` → `runtime-shared`.
+  - (R5) `loadtest.yml`: `paths-ignore` zeichengleich mit `ci.yml`, kein `pull_request`, die Eingabe nur über `env`.
+- **Prüfkriterien QA:**
+  - (Q1) `npm test` enthält den kleinen Lauf und ist grün.
+  - (Q2) Vor dem Merge von #144 führt der Developer `npm run loadtest` mit `scale = 1` lokal aus und hängt den Bericht an den PR. Ein manueller Lauf des neuen Workflows auf dem Branch ist vor dem Merge nicht möglich, weil GitHub `workflow_dispatch` nur für Workflows auf der Default-Branch annimmt (Nachtrag MAR-826, Festlegung (c) 7).
+  - (Q3) Nach dem Merge belegt der erste Lauf von CU-318 auf `main` AR-03: Der Bericht nennt 2.000, 10.000 und 3.000 (mit #393 zusätzlich 60.000 Fotos), `impact.updated` = 9.000 und 5 Messwerte unter 5.000 ms. Ist er rot, gilt (6) 8.
+  - (Q4) `npm run demo` verhält sich wie vorher: Die Adresse erscheint erst nach dem Einspielen; bei einem Fehler endet es mit Exit-Code ≠ 0 und nennt den Ordnerpfad.
+- **Keine Owner-Freigabe nötig (Kap. 4.7):**
+  - Komponenten, Schnittstellen und Messziele bleiben unverändert. AR-03 (unter 5 s für 9.000 Kanal-Inhalte) und A-12 gelten wie freigegeben.
+  - Neu sind zwei Einheiten außerhalb der ausgelieferten Software, ein Testwerkzeug und ein CI-Workflow, sowie eine Lint-Regel, die einem nicht ausgelieferten Paket einen Import erlaubt.
+  - Der Nutzer sieht nichts davon: kein Text, kein Zustand, keine Migration.
+  - **Kein Baseline-Delta:** Baseline 7.3 und 11 („Lasttest früh“, AR-03) bleiben; die zweite Messung in S7 erfüllt sie genauer. **Keine Auswirkung auf das Design.**
+
+**Spezifikations- und Code-Struktur-Nachtrag 15.11.2026 (MAR-879, Befunde FIND-399 und FIND-400 aus dem Code Review MAR-871 von PR #394, GitHub-Issue #153):** keine neue Einheit, Verantwortung von CU-106, CU-108, CU-125 und CU-290 präzisiert, Format von `<Liste>` bei `variant_flag_would_merge_listings` festgelegt, keine Komponentengrenze geändert, keine Migration, ein Diagramm geändert (Sequenz „Kennzeichen variantenbildend ändern“, Kap. 2.1), kein neuer Text.
+
+- **Ausgangslage (FIND-399):** Der Handler `VariantSetChanging` in CU-290 verband `listing` per Join mit `model_template`, einer Tabelle von `catalog`, um nach Geräteart zu filtern und die Modellbezeichnung zu lesen. Kap. 4.1 lässt fremde Komponenten nur über ihren Reader lesen. CU-108 gab es auf `main` noch nicht; GitHub-Issue #188 nannte ihn als „neu“. `eslint-plugin-boundaries` erkennt Tabellenzugriffe nicht.
+- **(1) Lesewege von CU-290 (Kap. 4.1, 2.1):** Prüf-Handler lesen eigene Tabellen über die Repositories von `inventory` und fremde nur über den Reader der besitzenden Komponente, nie per Join. Alle Aufrufe bekommen `tx.db`, damit die Prüfung den Stand der laufenden Transaktion sieht. Ablauf von `VariantSetChanging`:
+  1. `createCatalogReader(tx.db).listModelTemplatesOfDeviceType(deviceTypeId)` liefert `{ id, modelName }[]`. Ist die Liste leer, ist die Prüfung bestanden.
+  2. `createListingRepository(tx.db).listVariantData(ids)` liefert die Modell-Inserate dieser Modellvorlagen.
+  3. Gruppieren mit CU-119 und Ablehnen wie bisher; die Modellbezeichnung kommt aus der Liste von Schritt 1.
+- **(2) CU-108 entsteht mit #153, nicht mit #188:** CU-108 steht in S3 (Kap. 4.4). Die erste Task, die ihn braucht, legt ihn an (so schon der Kommentar in `catalog/index.ts` aus PR #368). Festgelegt:
+  - CU-106 bekommt `listByDeviceType(deviceTypeId)`: `id` und `model_name` aller Modellvorlagen der Geräteart, nach `id` aufsteigend.
+  - CU-108 `createCatalogReader(db: Kysely<DB>)` mit `listModelTemplatesOfDeviceType(deviceTypeId): Promise<{ id: number; modelName: string }[]>` über CU-106, Typ `CatalogReader`. Aufbau wie CU-161: der Reader ruft das Repository und bildet die Antwortform.
+  - `catalog/index.ts` exportiert zusätzlich `createCatalogReader` und `type CatalogReader`. CU-290 importiert nur aus `../catalog/index.ts`.
+  - #188 erweitert CU-108 um die Vorbelegungswerte für CU-293; Name und Fabrik bleiben.
+- **(3) CU-125 entsteht mit #153 (Frage zu `listing` ohne Repository):** Auch innerhalb der eigenen Komponente gehören Kysely-Abfragen in das Repository der Tabellengruppe (Kap. 4.1). Sonst stünde neben CU-125 eine zweite Abfrage auf `listing`, die #197, #198, #206 und #209 bei Spaltenänderungen übersehen können. Festgelegt: `createListingRepository(db)` mit `listVariantData(modelTemplateIds: readonly number[])`. Die Methode liefert `id, model_template_id, condition_value_id, visual_grade, condition_description, variant_values, other_device_values, display_title, article_number`, nach `model_template_id` und `id` aufsteigend. Bei leerer Eingabe gibt sie `[]` zurück, ohne Abfrage, weil `in ()` in SQLite ungültig ist. #197 erweitert CU-125, statt es anzulegen.
+- **(4) Format von `<Liste>` (Kap. 2.0.6; FIND-400):** wie in PR #394 umgesetzt: je Gruppe `<Modellbezeichnung>: „<Anzeigetitel>“ (<Artikelnummer>), …`, Gruppen mit „; “ getrennt, Modellvorlagen und Modell-Inserate je nach `id` aufsteigend. Die Artikelnummer ist eindeutig (`article_number_taken`, Kap. 2.0.6), deshalb ist jedes genannte Modell-Inserat auch bei gleichnamigen Modellvorlagen eindeutig erkennbar. Die Modellbezeichnung erfüllt „nennt MV-A“ (AC-REQ-005-09). Ein Herstellerzusatz wäre eine Änderung am gestalteten Text von UI-027 und ginge über den Product Owner; technisch käme dann nur `manufacturerName` aus CU-108 hinzu. *Beispiel:* „Änderung nicht möglich: Modell-Inserate MacBook Air M2: „MacBook Air M2 16GB“ (626198), „MacBook Air M2 8GB“ (626199) würden gleiche Variantenangaben haben“.
+- **Verworfen:**
+  - (a) #153 nach #188: #188 ist eine große Task in UI-003 mit eigenen Abhängigkeiten in S3. #153 hätte deswegen auf einen Reader gewartet, von dem es nur eine Methode braucht.
+  - (b) CU-290 als zweite direkte Lesestelle fremder Tabellen neben CU-074: CU-074 ist die Ausnahme, weil `hasValues` JSON-Spalten in drei Komponenten durchsucht. Hier reicht eine Reader-Methode. Eine Ausnahme würde unbemerkt die Tabellenstruktur von `catalog` an `inventory` binden, und Lint fände das nicht.
+  - (c) CU-108 ohne CU-106, mit einer eigenen Abfrage auf `model_template`: eine zweite Abfragestelle neben CU-106, anders als der Aufbau von CU-161.
+- **Folge für den Backlog (Product Owner):**
+  - #153 hängt technisch von #180 ab: PR #368 legt CU-106 und `catalog/index.ts` an. PR #394 wird nach dessen Merge auf `main` gebracht.
+  - #153 Code-Einheiten: neu CU-108 und CU-125, erweitert CU-106.
+  - #188: CU-108 „erweitert“ statt „neu“.
+  - #197: CU-125 „erweitert“ statt „neu“.
+  - #182: CU-290 „erweitert“ statt „neu“, weil #153 die Einheit mit `VariantSetChanging` anlegt.
+- **Prüfkriterien Code Review:**
+  - (R1) Keine Datei in `apps/server/src/inventory` nennt `model_template` oder eine andere Tabelle außerhalb von `inventory`.
+  - (R2) In CU-290 steht keine Kysely-Abfrage. Abfragen auf `listing` stehen nur in CU-125.
+  - (R3) CU-108 importiert nur CU-106 aus `catalog`; `catalog/index.ts` exportiert Reader und Routen.
+  - (R4) Integrationstests: CU-108 liefert nur Modellvorlagen der genannten Geräteart, nach `id`; `listVariantData([])` ist `[]`. Die Tests von #153 (AC-REQ-005-09, AC-REQ-005-10, DER-34-11) bleiben unverändert grün.
+- **Keine Owner-Freigabe nötig (Kap. 4.7):** Verhalten, Fehlercode, Text und Zustände bleiben wie freigegeben. Festgelegt sind Methoden innerhalb vorhandener Einheiten und die Bauweise einer bestehenden Regel aus Kap. 4.1. Keine Komponentengrenze und keine Abhängigkeitsrichtung ändern sich; `inventory` → `catalog` über den Reader ist in Kap. 2.5 (CU-293) schon vorgesehen. **Keine Auswirkung auf das Design.**
+
 Weitere Code-Struktur-Nachträge (Kap. 4.7) werden hier mit Datum, Einheit und Grund ergänzt.
 
 ### 10.3 Mermaid-Prüfung
+
+Mermaid-Prüfung Nachtrag MAR-879: **25/25 Diagramme gültig** (`validate-mermaid.mjs` aus dem Skill `architecture-diagrams`, mermaid 11.17.2, ausgeführt am 15.11.2026). Geändert ist nur die Sequenz „Kennzeichen variantenbildend ändern“ (Kap. 2.1): `inventory` liest die Modellvorlagen der Geräteart über `catalog` (CU-108) und danach die Modell-Inserate über CU-125.
 
 Mermaid-Prüfung v0.5.3: **25/25 Diagramme gültig** (`validate-mermaid.mjs` aus dem Skill `architecture-diagrams`, mermaid 11.17.2, ausgeführt am 12.11.2026 auf Fassung 0.5.3). Neu ist das Sequenzdiagramm „Merkmal wieder aktivieren“ (Kap. 2.1), in Teil B um die Zustände der Oberfläche nach Design v0.6.4 ergänzt; kein bestehendes Diagramm ist geändert. Die Prüfung am Stand nach der Änderung (Kap. 2.5) ändert keinen gezeichneten Ablauf: In „Gerät einbuchen“ (Kap. 2.5) und „Modellvorlage anlegen mit Dubletten-Hinweis“ (Kap. 2.4) steht `validation_failed` schon vor jeder Rückfrage. Nach der Korrektur von FIND-350 bis FIND-353 erneut ausgeführt: 25/25 gültig; die Korrektur ändert kein Diagramm.
 
