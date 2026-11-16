@@ -7,6 +7,7 @@ import {
   SettingsLayout,
 } from '../features/settings/SettingsLayout.tsx';
 import { ConditionCodesPage } from '../features/settings/condition-codes/ConditionCodesPage.tsx';
+import { DatasheetLayoutPage } from '../features/settings/datasheet-layout/DatasheetLayoutPage.tsx';
 import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
 import { ManufacturersPage } from '../features/settings/manufacturers/ManufacturersPage.tsx';
 import { MerchantProfilePage } from '../features/settings/merchant/MerchantProfilePage.tsx';
@@ -70,7 +71,7 @@ export const routes: RouteObject[] = [
           { path: 'merkmalszuordnung', element: null },
           { path: 'beschreibungsvorlagen', element: null },
           { path: 'kanaele', element: null },
-          { path: 'datenblatt-layout', element: null },
+          { path: 'datenblatt-layout', element: <DatasheetLayoutPage /> },
         ],
       },
       { path: '*', element: null },

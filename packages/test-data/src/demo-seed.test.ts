@@ -6,6 +6,7 @@ import {
   createDemoApi,
   type DemoApi,
   SEED_AREAS,
+  seedDatasheetLayout,
   seedDeviceTypes,
   seedDemoData,
   seedManufacturers,
@@ -115,13 +116,14 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile and text blocks', () => {
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout', () => {
     expect(SEED_AREAS).toEqual([
       seedDeviceTypes,
       seedSuppliers,
       seedManufacturers,
       seedMerchantProfile,
       seedTextBlocks,
+      seedDatasheetLayout,
     ]);
   });
 
@@ -206,6 +208,53 @@ describe('seedDemoData', () => {
           version: 1,
           brandName: 'Demo-Händler',
           contactText: 'Demo-Händler GmbH\nMusterstraße 1\n12345 Musterstadt\nTel. 0000 000000',
+        },
+      ],
+    ]);
+  });
+
+  it('saves the demo datasheet layout through PUT /api/datasheet-layout on the state read, with "Anschlüsse" before "Technik"', async () => {
+    const requests: unknown[][] = [];
+    const read = {
+      version: 1,
+      headerLabels: ['Shop:', 'eBay:', 'Kleinanzeigen:'],
+      blockOrder: [
+        'identification',
+        'condition',
+        'delivery_scope',
+        'technical',
+        'ports',
+        'software',
+      ],
+      attributeOrder: { '1': [3, 4] },
+    };
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (...args: unknown[]) => {
+        requests.push(args);
+        return read as never;
+      },
+    };
+
+    await seedDatasheetLayout(recording);
+
+    expect(requests).toEqual([
+      ['GET', '/api/datasheet-layout'],
+      [
+        'PUT',
+        '/api/datasheet-layout',
+        {
+          version: 1,
+          headerLabels: ['Shop:', 'eBay:', 'Kleinanzeigen:'],
+          blockOrder: [
+            'identification',
+            'condition',
+            'delivery_scope',
+            'ports',
+            'technical',
+            'software',
+          ],
+          attributeOrder: { '1': [3, 4] },
         },
       ],
     ]);

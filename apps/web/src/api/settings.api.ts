@@ -12,6 +12,10 @@ import type {
   ConditionCodeUpdate,
 } from '@resellr/domain/schemas/condition-code.schema';
 import type {
+  DatasheetLayout,
+  DatasheetLayoutUpdate,
+} from '@resellr/domain/schemas/datasheet-layout.schema';
+import type {
   DeviceType,
   DeviceTypeCreate,
   DeviceTypeList,
@@ -187,6 +191,23 @@ export function useSaveMerchantProfileMutation() {
   return useMutation<MerchantProfile, ApiError, MerchantProfileUpdate>({
     mutationFn: (body) => apiClient.put<MerchantProfile>('/api/merchant-profile', body),
     onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
+  });
+}
+
+/** Datasheet layout of UI-039 (`GET /api/datasheet-layout`). */
+export function useDatasheetLayoutQuery() {
+  return useQuery<DatasheetLayout, ApiError>({
+    queryKey: queryKeys.settings.datasheetLayout(),
+    queryFn: ({ signal }) => apiClient.get<DatasheetLayout>('/api/datasheet-layout', { signal }),
+  });
+}
+
+/** "Speichern" of UI-039 (`PUT /api/datasheet-layout`); the answer is the saved layout. */
+export function useSaveDatasheetLayoutMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DatasheetLayout, ApiError, DatasheetLayoutUpdate>({
+    mutationFn: (body) => apiClient.put<DatasheetLayout>('/api/datasheet-layout', body),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.datasheetLayout(), saved),
   });
 }
 

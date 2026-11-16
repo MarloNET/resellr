@@ -16,6 +16,7 @@ export const queryKeys = {
     suppliers: () => ['settings', 'suppliers'] as const,
     textBlocks: () => ['settings', 'text-blocks'] as const,
     merchantProfile: () => ['settings', 'merchant-profile'] as const,
+    datasheetLayout: () => ['settings', 'datasheet-layout'] as const,
     conditionCodes: () => ['settings', 'condition-codes'] as const,
     pickLists: () => ['settings', 'pick-lists'] as const,
     pickListValues: (pickListId: number) => ['settings', 'pick-list-values', pickListId] as const,

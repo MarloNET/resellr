@@ -14,6 +14,10 @@ import {
   conditionCodeUpdateSchema,
 } from '@resellr/domain/schemas/condition-code.schema';
 import {
+  datasheetLayoutSchema,
+  datasheetLayoutUpdateSchema,
+} from '@resellr/domain/schemas/datasheet-layout.schema';
+import {
   deviceTypeCreateSchema,
   deviceTypeListSchema,
   deviceTypeSchema,
@@ -62,6 +66,7 @@ import type { MediaFileIntake } from '../media/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { BadRequestError } from '../shared/domain-error.ts';
 import { createConditionCodeService } from './condition-code-service.ts';
+import { createDatasheetLayoutService } from './datasheet-layout-service.ts';
 import { createDeviceTypeService } from './device-type-service.ts';
 import { createManufacturerService } from './manufacturer-service.ts';
 import { createMerchantProfileService, LOGO_MAX_BYTES } from './merchant-profile-service.ts';
@@ -114,8 +119,8 @@ const resolveQuery = z.strictObject({
 
 /**
  * Settings routes (CU-087, Technical Specification 2.1, 2.2): all paths under
- * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, `/api/merchant-profile`, … Each
- * route calls one service.
+ * `/api/device-types`, `/api/attributes`, `/api/pick-lists`, `/api/merchant-profile`,
+ * `/api/datasheet-layout`, … Each route calls one service.
  * There is no DELETE route for device types or attributes (REQ-004, REQ-005, DER-33-09),
  * manufacturers (2.2), suppliers (2.2, DER-36-08) or text blocks (2.2, DER-39-13). There is no
  * route to create or delete a pick list and none to delete a value (RQ-07, DER-35-09). Entries
@@ -132,6 +137,7 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
   const merchantProfile = createMerchantProfileService({ db, uow, clock, mediaFiles });
   const conditionCodes = createConditionCodeService({ db, uow, clock });
   const textBlocks = createTextBlockService({ db, uow, clock });
+  const datasheetLayout = createDatasheetLayoutService({ db, uow, clock });
 
   app.get(
     '/api/device-types',
@@ -373,6 +379,18 @@ export const settingsRoutes: FastifyPluginAsyncZod<SettingsRoutesOptions> = asyn
     '/api/merchant-profile/logo',
     { schema: { querystring: versionQuery, response: { 200: merchantProfileSchema } } },
     async (request) => merchantProfile.removeLogo(request.query.version),
+  );
+
+  app.get(
+    '/api/datasheet-layout',
+    { schema: { response: { 200: datasheetLayoutSchema } } },
+    async () => datasheetLayout.get(),
+  );
+
+  app.put(
+    '/api/datasheet-layout',
+    { schema: { body: datasheetLayoutUpdateSchema, response: { 200: datasheetLayoutSchema } } },
+    async (request) => datasheetLayout.update(request.body),
   );
 
   app.get(

@@ -180,6 +180,10 @@ describe('message catalog (E1)', () => {
     expect(FIELD_MESSAGES.supplierName).toBe('Name: 1 bis 100 Zeichen');
   });
 
+  it('has the field text of the datasheet layout (UI-039)', () => {
+    expect(FIELD_MESSAGES.headerLabel).toBe('Kopfzeilentext: höchstens 50 Zeichen');
+  });
+
   it('has the field texts of the merchant profile (UI-026)', () => {
     expect(FIELD_MESSAGES.brandName).toBe('Name: 1 bis 100 Zeichen');
     expect(FIELD_MESSAGES.contactText).toBe('Kontaktangaben: höchstens 500 Zeichen');

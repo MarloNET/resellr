@@ -4,6 +4,22 @@ import type { DB, MerchantProfileTable } from '../db/schema.ts';
 
 export type MerchantProfileRow = Selectable<MerchantProfileTable>;
 
+/** The datasheet layout with its JSON columns read (3.4). */
+export interface DatasheetLayoutState {
+  headerLabels: string[];
+  blockOrder: string[];
+  attributeOrder: Record<string, number[]>;
+  version: number;
+}
+
+export interface DatasheetLayoutChange {
+  headerLabels: readonly string[];
+  blockOrder: readonly string[];
+  attributeOrder: Readonly<Record<string, readonly number[]>>;
+  version: number;
+  at: string;
+}
+
 export interface MerchantProfileChange {
   brandName: string;
   contactText: string;
@@ -20,6 +36,9 @@ export interface MerchantLogoChange {
 
 /** The single row of `merchant_profile` (3.1: `id` is always 1). */
 const MERCHANT_PROFILE_ID = 1;
+
+/** The single row of `datasheet_layout` (3.1: `id` is always 1). */
+const DATASHEET_LAYOUT_ID = 1;
 
 /**
  * Queries on the single-row tables `merchant_profile` and `datasheet_layout` (CU-288, FIND-202).
@@ -59,6 +78,47 @@ export function createProfileRepository(db: Kysely<DB>) {
             updated_at: at,
           }),
         )
+        .execute();
+    },
+
+    /** The datasheet layout; `undefined` while the row of the seed (#150, 3.8) is missing. */
+    async findDatasheetLayout(): Promise<DatasheetLayoutState | undefined> {
+      const row = await db
+        .selectFrom('datasheet_layout')
+        .selectAll()
+        .where('id', '=', DATASHEET_LAYOUT_ID)
+        .executeTakeFirst();
+      if (row === undefined) return undefined;
+      return {
+        headerLabels: JSON.parse(row.header_labels) as string[],
+        blockOrder: JSON.parse(row.block_order) as string[],
+        attributeOrder: JSON.parse(row.attribute_order) as Record<string, number[]>,
+        version: row.version,
+      };
+    },
+
+    /**
+     * Stores the whole layout with the new version. Without the row it is inserted, so saving
+     * works the same before and after the seed migration (#150).
+     */
+    async saveDatasheetLayout({
+      headerLabels,
+      blockOrder,
+      attributeOrder,
+      version,
+      at,
+    }: DatasheetLayoutChange) {
+      const columns = {
+        header_labels: JSON.stringify(headerLabels),
+        block_order: JSON.stringify(blockOrder),
+        attribute_order: JSON.stringify(attributeOrder),
+        version,
+        updated_at: at,
+      };
+      await db
+        .insertInto('datasheet_layout')
+        .values({ id: DATASHEET_LAYOUT_ID, ...columns })
+        .onConflict((conflict) => conflict.column('id').doUpdateSet(columns))
         .execute();
     },
 
