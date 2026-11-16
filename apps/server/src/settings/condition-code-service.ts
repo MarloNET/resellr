@@ -12,7 +12,12 @@ import { createAuditWriter, type AuditEntryInput } from '../audit/index.ts';
 import type { DB } from '../db/schema.ts';
 import type { UnitOfWork, UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
-import { ConflictError, NotFoundError, RuleViolation } from '../shared/domain-error.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  RuleViolation,
+} from '../shared/domain-error.ts';
 import {
   createConditionCodeRepository,
   type ConditionCodeListQuery,
@@ -20,6 +25,8 @@ import {
   type ConditionCodeRow,
   type ConditionCodeValues,
 } from './condition-code-repository.ts';
+import { createPickListRepository } from './pick-list-repository.ts';
+import { createSupplierRepository } from './supplier-repository.ts';
 
 export interface ConditionCodeServiceDeps {
   /** Outer database, only for reads outside of an action (2.0.4). */
@@ -86,10 +93,59 @@ async function assertKeyFree(
   }
 }
 
+/** Supplier and condition suggestion the request sets anew; `null` = not checked. */
+interface NewReferences {
+  supplierId: number | null;
+  suggestedConditionValueId: number | null;
+}
+
 /**
- * Readable values of an entry for the audit entries (labels instead of ids, 3.4). A supplier
- * or condition value that does not exist (deleted in another window, or a wrong id) answers
- * `404 not_found` (M-15) instead of breaking the foreign key.
+ * Supplier and condition suggestion of a new or changed entry (2.0.11, Nachtrag MAR-904): each
+ * must exist, the suggestion in the list `condition`, otherwise the user interface sent a wrong
+ * id (`400 bad_request`; neither is ever deleted); then each must be active, the supplier first.
+ * Reads through the own repositories CU-300 and CU-077 with `tx.db`, so the check sees the state
+ * of the writing transaction. Runs after `not_found` and `version_conflict` and before every
+ * other rule of the service.
+ */
+async function checkReferences(
+  db: Kysely<DB>,
+  { supplierId, suggestedConditionValueId }: NewReferences,
+): Promise<void> {
+  const supplier =
+    supplierId === null ? undefined : await createSupplierRepository(db).findById(supplierId);
+  const [condition] = await createPickListRepository(db).findValuesByIds(
+    suggestedConditionValueId === null ? [] : [suggestedConditionValueId],
+  );
+  if (supplierId !== null && supplier === undefined) {
+    throw new BadRequestError('supplierId unknown_id');
+  }
+  if (suggestedConditionValueId !== null && condition?.pick_list_key !== 'condition') {
+    throw new BadRequestError('suggestedConditionValueId unknown_id');
+  }
+  if (supplier !== undefined && supplier.active !== 1) {
+    throw new RuleViolation('supplier_deactivated', {
+      usage: 'condition_code',
+      messageArgs: [supplier.name],
+      details: { path: 'supplierId', id: supplier.id },
+    });
+  }
+  if (condition !== undefined && condition.active !== 1) {
+    throw new RuleViolation('pick_list_value_deactivated', {
+      usage: 'condition',
+      messageArgs: [condition.label],
+      details: { path: 'suggestedConditionValueId', id: condition.id },
+    });
+  }
+}
+
+/** A value of `after` that differs from the stored one, else `null` (2.0.11 "nur ein neuer Wert"). */
+const changedId = (before: number | null, after: number | null) =>
+  after === before ? null : after;
+
+/**
+ * Readable values of an entry for the audit entries (labels instead of ids, 3.4). New ids are
+ * checked before (`checkReferences`) and stored ones exist by their foreign key, so `not_found`
+ * here only guards against a broken state.
  */
 async function readableOf(repository: ConditionCodeRepository, values: ConditionCodeValues) {
   let supplier: string | null = null;
@@ -182,6 +238,7 @@ export function createConditionCodeService({ db, uow, clock }: ConditionCodeServ
       };
       const { result } = await uow.run(async (tx) => {
         const { repository, audit, at } = inAction(tx);
+        await checkReferences(tx.db, values);
         const readable = await readableOf(repository, values);
         await assertKeyFree(repository, values);
         const id = await repository.insert(values, at);
@@ -224,6 +281,13 @@ export function createConditionCodeService({ db, uow, clock }: ConditionCodeServ
               ? before.suggestedVisualGrade
               : changes.suggestedVisualGrade,
         };
+        await checkReferences(tx.db, {
+          supplierId: changedId(before.supplierId, after.supplierId),
+          suggestedConditionValueId: changedId(
+            before.suggestedConditionValueId,
+            after.suggestedConditionValueId,
+          ),
+        });
         const oldReadable = await readableOf(repository, before);
         const newReadable = await readableOf(repository, after);
         const { oldValue, newValue } = changedFields(oldReadable.fields, newReadable.fields);

@@ -86,6 +86,26 @@ export function createPickListRepository(db: Kysely<DB>) {
       return db.selectFrom('pick_list_value').selectAll().where('id', '=', id).executeTakeFirst();
     },
 
+    /**
+     * Values by id with the key of their list, for the check of new entries (2.0.11); unknown
+     * ids are missing from the result. No ids: `[]` without a query.
+     */
+    async findValuesByIds(ids: readonly number[]) {
+      if (ids.length === 0) return [];
+      return db
+        .selectFrom('pick_list_value')
+        .innerJoin('pick_list', 'pick_list.id', 'pick_list_value.pick_list_id')
+        .select([
+          'pick_list_value.id',
+          'pick_list_value.pick_list_id',
+          'pick_list.key as pick_list_key',
+          'pick_list_value.label',
+          'pick_list_value.active',
+        ])
+        .where('pick_list_value.id', 'in', ids)
+        .execute();
+    },
+
     /** The value of the list that already has this label key, if any (AC-REQ-007-02). */
     async findValueIdByLabelKey(pickListId: number, labelKey: string) {
       const row = await db

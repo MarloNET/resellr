@@ -64,7 +64,20 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
-type Entry = typeof DGS | typeof DGS_L1;
+/** An entry whose supplier L2 and suggestion "Defekt" were deactivated after saving it. */
+const A1_L2 = {
+  id: 3,
+  code: 'A1',
+  supplierId: 2,
+  plainText: 'neuwertig',
+  suggestedConditionValueId: 12,
+  suggestedVisualGrade: null,
+  version: 4,
+};
+
+type Entry = typeof DGS | typeof DGS_L1 | typeof A1_L2;
+type SupplierOfTest = typeof L1;
+type ConditionOfTest = typeof USED;
 
 /**
  * `fetch` of the page: `GET /api/ops/status` for the frame (UI-044), the entries, the suppliers,
@@ -76,7 +89,15 @@ function mockApi({
   initial = [DGS, DGS_L1],
   list,
   writes = {},
-}: { initial?: Entry[]; list?: Route; writes?: Record<string, Route> } = {}) {
+  suppliers = () => [L1, L2],
+  conditions = () => [USED, DEFECT],
+}: {
+  initial?: Entry[];
+  list?: Route;
+  writes?: Record<string, Route>;
+  suppliers?: () => SupplierOfTest[];
+  conditions?: () => ConditionOfTest[];
+} = {}) {
   let items: Entry[] = [...initial];
   const sent: { method: string; path: string; body: unknown }[] = [];
   const reads: string[] = [];
@@ -89,9 +110,11 @@ function mockApi({
       if (path.startsWith('/api/condition-codes')) {
         return list ? list(init) : Response.json({ items, total: items.length });
       }
-      if (path.startsWith('/api/suppliers')) return Response.json({ items: [L1, L2], total: 2 });
+      if (path.startsWith('/api/suppliers')) {
+        return Response.json({ items: suppliers(), total: suppliers().length });
+      }
       if (path.startsWith('/api/pick-lists/1/values')) {
-        return Response.json({ items: [USED, DEFECT], total: 2 });
+        return Response.json({ items: conditions(), total: conditions().length });
       }
       if (path.startsWith('/api/pick-lists')) {
         return Response.json({ items: [CONDITION_LIST], total: 1 });
@@ -168,7 +191,13 @@ function changePlainText(plainText: string) {
 function expectAccessibleForm() {
   expect(codeInput().getAttribute('aria-required')).toBe('true');
   expect(plainTextInput().getAttribute('aria-required')).toBe('true');
-  for (const control of [codeInput(), plainTextInput(), gradeSelect()]) {
+  for (const control of [
+    codeInput(),
+    supplierSelect(),
+    plainTextInput(),
+    conditionSelect(),
+    gradeSelect(),
+  ]) {
     if (control.getAttribute('aria-invalid') === 'true') {
       const describedBy = control.getAttribute('aria-describedby');
       expect(describedBy && document.getElementById(describedBy)?.textContent).toBeTruthy();
@@ -519,6 +548,115 @@ describe('UI-033 condition codes (CU-100)', () => {
     expect(codeInput().getAttribute('aria-invalid')).toBe('true');
     expect(screen.queryByText('Gespeichert')).toBeNull();
     expectAccessibleForm();
+  });
+
+  describe('DER-38-11 only active suppliers and condition suggestions (2.0.11, Nachtrag MAR-904)', () => {
+    const labels = (select: HTMLSelectElement) =>
+      Array.from(select.options).map((option) => option.textContent);
+    const readsOf = (reads: string[], prefix: string) =>
+      reads.filter((path) => path.startsWith(prefix)).length;
+
+    it('UI-033.default shows a stored, deactivated supplier and suggestion as chosen without a mark, until another one is chosen', async () => {
+      mockApi({ initial: [DGS, A1_L2] });
+      await openPage();
+
+      fireEvent.click(within(listRegion()).getByRole('button', { name: /^A1/ }));
+
+      expect(supplierSelect().value).toBe('2');
+      expect(labels(supplierSelect())).toEqual(['alle', 'L1', 'L2']);
+      expect(conditionSelect().value).toBe('12');
+      expect(labels(conditionSelect())).toEqual(['–', 'Gebraucht', 'Defekt']);
+
+      fireEvent.change(supplierSelect(), { target: { value: '1' } });
+      fireEvent.change(conditionSelect(), { target: { value: '11' } });
+
+      expect(labels(supplierSelect())).toEqual(['alle', 'L1']);
+      expect(labels(conditionSelect())).toEqual(['–', 'Gebraucht']);
+    });
+
+    it('UI-033.validation a change of the plain text of an entry with a deactivated supplier sends the stored supplier and suggestion', async () => {
+      const { sent } = mockApi({
+        initial: [DGS, A1_L2],
+        writes: {
+          'PATCH /api/condition-codes/3': () =>
+            Response.json({ ...A1_L2, plainText: 'wie neu', version: 5 }),
+        },
+      });
+      await openPage();
+      fireEvent.click(within(listRegion()).getByRole('button', { name: /^A1/ }));
+
+      changePlainText('wie neu');
+
+      expect(await screen.findByText('Gespeichert')).toBeTruthy();
+      expect(sent[0]?.body).toMatchObject({ supplierId: 2, suggestedConditionValueId: 12 });
+    });
+
+    it('UI-033.validation shows supplier_deactivated at "Lieferant" with the focus there, reloads both choices and keeps the inputs', async () => {
+      let l1 = L1;
+      const { reads } = mockApi({
+        suppliers: () => [l1, L2],
+        writes: {
+          'POST /api/condition-codes': () => {
+            l1 = { ...L1, active: false, version: 2 };
+            return Response.json(
+              errorBody('supplier_deactivated', {
+                message: 'Lieferant L1 ist deaktiviert',
+                details: { path: 'supplierId', id: 1 },
+              }),
+              { status: 422 },
+            );
+          },
+        },
+      });
+      await openPage();
+      const supplierReads = readsOf(reads, '/api/suppliers');
+      const conditionReads = readsOf(reads, '/api/pick-lists/1/values');
+      fireEvent.click(createButton());
+      fireEvent.change(codeInput(), { target: { value: 'NEU' } });
+      fireEvent.change(supplierSelect(), { target: { value: '1' } });
+      changePlainText('neuer Text');
+
+      expect(await screen.findByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
+      expect(document.activeElement).toBe(supplierSelect());
+      expect(supplierSelect().getAttribute('aria-invalid')).toBe('true');
+      await vi.waitFor(() => {
+        expect(readsOf(reads, '/api/suppliers')).toBeGreaterThan(supplierReads);
+        expect(readsOf(reads, '/api/pick-lists/1/values')).toBeGreaterThan(conditionReads);
+      });
+      expect(codeInput().value).toBe('NEU');
+      expect(plainTextInput().value).toBe('neuer Text');
+      expect(supplierSelect().value).toBe('1');
+      expect(screen.queryByText('Gespeichert')).toBeNull();
+      expectAccessibleForm();
+    });
+
+    it('UI-033.validation shows pick_list_value_deactivated at "Vorschlag Zustand" with the focus there and reloads the choices', async () => {
+      const { reads } = mockApi({
+        writes: {
+          [PATCH_DGS]: () =>
+            Response.json(
+              errorBody('pick_list_value_deactivated', {
+                message: 'Zustand Gebraucht ist deaktiviert',
+                details: { path: 'suggestedConditionValueId', id: 11 },
+              }),
+              { status: 422 },
+            ),
+        },
+      });
+      await openPage();
+      const conditionReads = readsOf(reads, '/api/pick-lists/1/values');
+      fireEvent.change(conditionSelect(), { target: { value: '11' } });
+      fireEvent.click(saveButton());
+
+      expect(await screen.findByText('Zustand Gebraucht ist deaktiviert')).toBeTruthy();
+      expect(document.activeElement).toBe(conditionSelect());
+      expect(conditionSelect().getAttribute('aria-invalid')).toBe('true');
+      await vi.waitFor(() =>
+        expect(readsOf(reads, '/api/pick-lists/1/values')).toBeGreaterThan(conditionReads),
+      );
+      expect(conditionSelect().value).toBe('11');
+      expectAccessibleForm();
+    });
   });
 
   it('UI-033.error DER-38-04 shows the error banner with the reference number and keeps the inputs', async () => {

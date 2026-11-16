@@ -105,6 +105,47 @@ test.describe('UI-033 condition codes (CU-100)', () => {
     await expect(codeField(page)).toBeFocused();
   });
 
+  test('UI-033.validation DER-38-11 a supplier deactivated in another window is rejected at the field "Lieferant" and the choice is reloaded', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const code = uniqueCode('DEA', testInfo.title, testInfo.project.name);
+    const supplierName = `Lieferant ${code}`;
+    const supplier = await page.request.post(`${server.baseUrl}/api/suppliers`, {
+      headers: { origin: server.baseUrl },
+      data: { name: supplierName, active: true },
+    });
+    expect(supplier.status()).toBe(201);
+    const { id, version } = (await supplier.json()) as { id: number; version: number };
+    await page.goto(PAGE);
+    await createButton(page).first().click();
+    await codeField(page).fill(code);
+    await plainTextField(page).fill('Gebrauchsspuren');
+    const supplierField = page.getByRole('combobox', { name: 'Lieferant' });
+    await supplierField.selectOption({ label: supplierName });
+    // The other window deactivates the supplier after this page has offered it.
+    const deactivated = await page.request.patch(`${server.baseUrl}/api/suppliers/${id}`, {
+      headers: { origin: server.baseUrl },
+      data: { version, active: false },
+    });
+    expect(deactivated.status()).toBe(200);
+
+    const reloaded = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/suppliers') && response.request().method() === 'GET',
+    );
+    await saveButton(page).click();
+
+    await expect(page.getByText(`Lieferant ${supplierName} ist deaktiviert`)).toBeVisible();
+    await expect(supplierField).toBeFocused();
+    await reloaded;
+    await expect(codeField(page)).toHaveValue(code);
+    await expect(plainTextField(page)).toHaveValue('Gebrauchsspuren');
+    await expect(entries(page).getByRole('button', { name: new RegExp(`^${code}`) })).toHaveCount(
+      0,
+    );
+  });
+
   test('UI-033.success DER-38-08 an entry is deleted only after the confirmation P-04', async ({
     page,
     server,

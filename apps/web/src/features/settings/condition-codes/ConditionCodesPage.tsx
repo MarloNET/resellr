@@ -92,11 +92,24 @@ interface Draft extends Values {
 /** Field errors by the path of the request (2.0.5). */
 interface FieldErrors {
   code?: string;
+  supplierId?: string;
   plainText?: string;
+  suggestedConditionValueId?: string;
   suggestedVisualGrade?: string;
 }
 
 const FIELD_PATHS = ['code', 'plainText', 'suggestedVisualGrade'] as const;
+
+/** Fields of a deactivated choice, at `details.path` of the rejection (2.0.11). */
+const CHOICE_PATHS = ['supplierId', 'suggestedConditionValueId'] as const;
+const isChoicePath = (path: unknown): path is (typeof CHOICE_PATHS)[number] =>
+  (CHOICE_PATHS as readonly unknown[]).includes(path);
+
+/** Rejections of a supplier or condition suggestion deactivated meanwhile (2.0.11). */
+const DEACTIVATED_CODES: ReadonlySet<string> = new Set([
+  'supplier_deactivated',
+  'pick_list_value_deactivated',
+]);
 
 /** `null` while a new entry is entered. */
 type Selection = { id: number | null };
@@ -129,7 +142,8 @@ const checkPlainText = (plainText: string) => firstMessage(conditionCodePlainTex
 
 /**
  * Options of a choice: the active entries and the one already chosen, even if deactivated, so an
- * entry keeps its supplier or suggestion (REQ-022 "Auswahl aus den aktiven Lieferanten").
+ * entry keeps its supplier or suggestion (REQ-022 "Auswahl aus den aktiven Lieferanten"). A
+ * stored, deactivated entry stays without a mark until another one is chosen (2.0.11).
  */
 function choicesOf<T extends { id: number; active: boolean }>(items: readonly T[], chosen: string) {
   return items.filter((item) => item.active || optionOf(item.id) === chosen);
@@ -243,6 +257,19 @@ export function ConditionCodesPage() {
     // at the code, the field of the combination with the supplier (AC-REQ-022-02).
     if (error.kind === 'rejected' && error.error?.code === 'name_taken') {
       showFieldErrors({ code: error.error.message });
+      return;
+    }
+    // A supplier or condition deactivated in another window: the text stands at the field of
+    // `details.path`, and both choices are read again without it; the inputs stay (2.0.11).
+    const path = error.error?.details.path;
+    if (
+      error.kind === 'rejected' &&
+      DEACTIVATED_CODES.has(error.error?.code ?? '') &&
+      isChoicePath(path)
+    ) {
+      showFieldErrors({ [path]: error.error?.message });
+      void suppliersQuery.refetch();
+      void conditionsQuery.refetch();
       return;
     }
     setNotice(noticeOf(error));
@@ -408,7 +435,7 @@ export function ConditionCodesPage() {
               </FormField>
             </div>
             <div className="full:w-64">
-              <FormField label={TEXTS.supplier}>
+              <FormField label={TEXTS.supplier} error={errors.supplierId}>
                 {(control) => (
                   <Select
                     {...control}
@@ -445,7 +472,7 @@ export function ConditionCodesPage() {
           </FormField>
           <div className="flex flex-col gap-4 full:flex-row full:flex-wrap full:items-start">
             <div className="full:w-64">
-              <FormField label={TEXTS.condition}>
+              <FormField label={TEXTS.condition} error={errors.suggestedConditionValueId}>
                 {(control) => (
                   <Select
                     {...control}
