@@ -144,6 +144,19 @@ test.describe('UI-033 condition codes (CU-100)', () => {
     await expect(entries(page).getByRole('button', { name: new RegExp(`^${code}`) })).toHaveCount(
       0,
     );
+
+    // DER-38-12: "Bitte wählen" instead of "alle"; the rejected supplier is not offered again.
+    await expect(supplierField.locator('option:checked')).toHaveText('Bitte wählen');
+    await expect(supplierField.getByRole('option', { name: supplierName })).toHaveCount(0);
+    await saveButton(page).click();
+    await expect(page.getByText('Lieferant: Lieferanten oder „alle“ wählen')).toBeVisible();
+    await expect(supplierField).toBeFocused();
+    await supplierField.selectOption({ label: 'alle' });
+    await saveButton(page).click();
+    await expect(page.getByText('Gespeichert')).toBeVisible();
+    await expect(entries(page).getByRole('button', { name: new RegExp(`^${code}`) })).toHaveCount(
+      1,
+    );
   });
 
   test('UI-033.success DER-38-08 an entry is deleted only after the confirmation P-04', async ({

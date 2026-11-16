@@ -1,3 +1,4 @@
+import { ERROR_MESSAGES, FIELD_MESSAGES } from '@resellr/domain/messages/messages.de';
 import {
   conditionCodePlainTextSchema,
   conditionCodeSchema,
@@ -23,6 +24,12 @@ import {
   useDeferredBlurCheck,
   useFocusFirstError,
 } from '../../../components/forms/FormField.tsx';
+import {
+  choiceOptions,
+  findMissingChoices,
+  type ChoiceField,
+  type ChoiceItem,
+} from '../../../components/forms/deactivated-choice.ts';
 import { ConfirmDialog } from '../../../components/patterns/ConfirmDialog.tsx';
 import { MaintenanceTable } from '../../../components/patterns/MaintenanceTable.tsx';
 import { OutcomeUnknownBanner } from '../../../components/patterns/OutcomeUnknownBanner.tsx';
@@ -38,7 +45,7 @@ import { Button } from '../../../components/ui/Button.tsx';
 import { Input } from '../../../components/ui/Input.tsx';
 import { Select } from '../../../components/ui/Select.tsx';
 
-// Texts of UI-033 `screen.md` and of the patterns P-01 and P-04 (UI/UX design v0.6.2).
+// Texts of UI-033 `screen.md` and of the patterns P-01 and P-04 (UI/UX design v0.6.2, v0.6.8).
 const TEXTS = {
   title: 'Code-Übersetzung',
   list: 'Code-Übersetzungen',
@@ -54,6 +61,8 @@ const TEXTS = {
   code: 'Zustandscode',
   supplier: 'Lieferant',
   allSuppliers: 'alle',
+  /** "Lieferant" after a rejection for deactivation, instead of "alle" (design v0.6.8). */
+  notChosen: 'Bitte wählen',
   plainText: 'Klartext',
   condition: 'Vorschlag Zustand',
   visualGrade: 'Vorschlag Optik-Note',
@@ -69,6 +78,13 @@ const TEXTS = {
 
 /** Grades of the choice "Vorschlag Optik-Note" (REQ-022, 1–5). */
 const GRADES = ['1', '2', '3', '4', '5'] as const;
+
+/**
+ * Option value of "Lieferant" while nothing is chosen after a rejection for deactivation: a
+ * state of the browser only, besides `''` = "alle" and an id; it is never sent (2.0.11,
+ * Nachtrag MAR-929).
+ */
+const NOT_CHOSEN = 'not-chosen';
 
 /** Inputs of the form; selections as option values, `''` = all suppliers or no suggestion. */
 interface Values {
@@ -102,8 +118,25 @@ const FIELD_PATHS = ['code', 'plainText', 'suggestedVisualGrade'] as const;
 
 /** Fields of a deactivated choice, at `details.path` of the rejection (2.0.11). */
 const CHOICE_PATHS = ['supplierId', 'suggestedConditionValueId'] as const;
-const isChoicePath = (path: unknown): path is (typeof CHOICE_PATHS)[number] =>
+type ChoicePath = (typeof CHOICE_PATHS)[number];
+const isChoicePath = (path: unknown): path is ChoicePath =>
   (CHOICE_PATHS as readonly unknown[]).includes(path);
+
+/** Draft field of each choice. */
+const DRAFT_KEYS = {
+  supplierId: 'supplierId',
+  suggestedConditionValueId: 'conditionValueId',
+} as const;
+
+/** Value of a choice after its entry was rejected or is no longer offered (2.0.11, design v0.6.8). */
+const EMPTIED: Record<ChoicePath, string> = {
+  supplierId: NOT_CHOSEN,
+  suggestedConditionValueId: '',
+};
+
+/** Ids rejected while the form is open; they are never offered or sent again (2.0.11). */
+type RejectedIds = Record<ChoicePath, readonly number[]>;
+const NO_REJECTED: RejectedIds = { supplierId: [], suggestedConditionValueId: [] };
 
 /** Rejections of a supplier or condition suggestion deactivated meanwhile (2.0.11). */
 const DEACTIVATED_CODES: ReadonlySet<string> = new Set([
@@ -115,7 +148,7 @@ const DEACTIVATED_CODES: ReadonlySet<string> = new Set([
 type Selection = { id: number | null };
 
 const optionOf = (id: number | null) => (id === null ? '' : String(id));
-const idOf = (option: string) => (option === '' ? null : Number(option));
+const idOf = (option: string) => (option === '' || option === NOT_CHOSEN ? null : Number(option));
 
 function draftOf(entry: ConditionCodeEntry | undefined): Draft {
   const base: Values = {
@@ -141,13 +174,26 @@ const checkCode = (code: string) => firstMessage(conditionCodeSchema, code);
 const checkPlainText = (plainText: string) => firstMessage(conditionCodePlainTextSchema, plainText);
 
 /**
- * Options of a choice: the active entries and the one already chosen, even if deactivated, so an
- * entry keeps its supplier or suggestion (REQ-022 "Auswahl aus den aktiven Lieferanten"). A
- * stored, deactivated entry stays without a mark until another one is chosen (2.0.11).
+ * Options of a choice (CU-319): the active entries and the stored one, even if deactivated, with
+ * "(deaktiviert)", so an entry keeps its supplier or suggestion (REQ-022 "Auswahl aus den aktiven
+ * Lieferanten"); it stays offered while the form is open. Rejected ids are left out (2.0.11).
  */
-function choicesOf<T extends { id: number; active: boolean }>(items: readonly T[], chosen: string) {
-  return items.filter((item) => item.active || optionOf(item.id) === chosen);
-}
+const optionsOf = (items: readonly ChoiceItem[], stored: string, rejected: readonly number[]) =>
+  choiceOptions(
+    items.filter((item) => !rejected.includes(item.id)),
+    { storedId: idOf(stored), markDeactivated: true },
+  );
+
+const supplierItems = (suppliers: readonly Supplier[]): ChoiceItem[] =>
+  suppliers.map(({ id, name, active }) => ({ id, label: name, active }));
+const conditionItems = (values: readonly PickListValue[]): ChoiceItem[] =>
+  values.map(({ id, label, active }) => ({ id, label, active }));
+
+/** Text of each choice for an entry no longer offered after the reload (CU-012, 2.0.6). */
+const MISSING_TEXT: Record<ChoicePath, (name: string) => string> = {
+  supplierId: ERROR_MESSAGES['supplier_deactivated.condition_code'],
+  suggestedConditionValueId: ERROR_MESSAGES['pick_list_value_deactivated.condition_suggestion'],
+};
 
 /**
  * Condition codes of UI-033 (CU-100, REQ-022, REQ-015; Technical Specification 2.2): maintenance
@@ -175,6 +221,10 @@ export function ConditionCodesPage() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [draft, setDraft] = useState<Draft>(draftOf(undefined));
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [rejected, setRejected] = useState<RejectedIds>(NO_REJECTED);
+  // The draft after an awaited reload of the choices, which the user may have changed meanwhile.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // After "Neu laden" (P-05) the inputs stay until the reloaded data has arrived (T-1).
@@ -213,6 +263,7 @@ export function ConditionCodesPage() {
     setSelection(current ? { id: current.id } : null);
     setDraft(draftOf(current));
     setErrors({});
+    setRejected(NO_REJECTED);
   }, [takeReloaded, query.isFetching, selected, firstItem]);
 
   function open(next: Selection | null, entry?: ConditionCodeEntry) {
@@ -220,6 +271,7 @@ export function ConditionCodesPage() {
     setSelection(next);
     setDraft(draftOf(entry));
     setErrors({});
+    setRejected(NO_REJECTED);
     if (notice?.kind !== 'success') setNotice(null);
   }
 
@@ -238,6 +290,7 @@ export function ConditionCodesPage() {
     setSelection({ id: saved.id });
     setDraft(draftOf(saved));
     setErrors({});
+    setRejected(NO_REJECTED);
     setNotice({ kind: 'success' });
   }
 
@@ -259,20 +312,72 @@ export function ConditionCodesPage() {
       showFieldErrors({ code: error.error.message });
       return;
     }
-    // A supplier or condition deactivated in another window: the text stands at the field of
-    // `details.path`, and both choices are read again without it; the inputs stay (2.0.11).
     const path = error.error?.details.path;
+    const id = error.error?.details.id;
     if (
       error.kind === 'rejected' &&
       DEACTIVATED_CODES.has(error.error?.code ?? '') &&
-      isChoicePath(path)
+      isChoicePath(path) &&
+      typeof id === 'number'
     ) {
-      showFieldErrors({ [path]: error.error?.message });
-      void suppliersQuery.refetch();
-      void conditionsQuery.refetch();
+      void rejectDeactivated(path, id, error.error?.message ?? '');
       return;
     }
     setNotice(noticeOf(error));
+  }
+
+  /**
+   * A supplier or condition suggestion deactivated in another window (2.0.11, design v0.6.8):
+   * the text stands at the field of `details.path`, which is emptied ("Bitte wählen" at
+   * "Lieferant"), and the rejected id is never offered or sent again. Both choices are read
+   * again; a second choice with a new value no longer offered is emptied with its own text. The
+   * other inputs stay.
+   */
+  async function rejectDeactivated(path: ChoicePath, id: number, message: string) {
+    const before = {
+      supplierId: supplierItems(suppliers),
+      suggestedConditionValueId: conditionItems(conditions),
+    };
+    setRejected((current) => ({ ...current, [path]: [...current[path], id] }));
+    setDraft((current) => ({ ...current, [DRAFT_KEYS[path]]: EMPTIED[path] }));
+    showFieldErrors({ [path]: message });
+
+    const [suppliersRead, conditionsRead] = await Promise.all([
+      suppliersQuery.refetch(),
+      conditionsQuery.refetch(),
+    ]);
+    const current = draftRef.current;
+    const fields: ChoiceField[] = CHOICE_PATHS.filter((each) => each !== path).map((each) => ({
+      path: each,
+      id: idOf(current[DRAFT_KEYS[each]]),
+      storedId: idOf(current.base[DRAFT_KEYS[each]]),
+      before: before[each],
+      message: MISSING_TEXT[each],
+    }));
+    const missing = findMissingChoices(fields, {
+      supplierId: suppliersRead.isSuccess ? supplierItems(suppliersRead.data.items) : undefined,
+      suggestedConditionValueId: conditionsRead.isSuccess
+        ? conditionItems(conditionsRead.data.items)
+        : undefined,
+    });
+    if (missing.length === 0) return;
+    const missingPaths = missing.map((each) => each.path as ChoicePath);
+    setDraft((draftNow) => {
+      const next = { ...draftNow };
+      for (const each of missingPaths) next[DRAFT_KEYS[each]] = EMPTIED[each];
+      return next;
+    });
+    setErrors((errorsNow) => ({
+      ...errorsNow,
+      ...Object.fromEntries(missing.map((each) => [each.path, each.message])),
+    }));
+    focusFirstError();
+  }
+
+  /** A choice in a field ends its rejection text (2.0.11 "bis zur nächsten Wahl"). */
+  function choose(path: ChoicePath, option: string) {
+    setDraft({ ...draft, [DRAFT_KEYS[path]]: option });
+    setErrors((current) => ({ ...current, [path]: undefined }));
   }
 
   function save() {
@@ -281,9 +386,11 @@ export function ConditionCodesPage() {
     if (!changed(draft)) return;
     const found: FieldErrors = {
       code: checkCode(draft.code),
+      supplierId:
+        draft.supplierId === NOT_CHOSEN ? FIELD_MESSAGES.conditionCodeSupplierNotChosen : undefined,
       plainText: checkPlainText(draft.plainText),
     };
-    if (found.code !== undefined || found.plainText !== undefined) {
+    if (Object.values(found).some((message) => message !== undefined)) {
       showFieldErrors(found);
       return;
     }
@@ -441,12 +548,21 @@ export function ConditionCodesPage() {
                     {...control}
                     value={draft.supplierId}
                     disabled={formLocked}
-                    onChange={(event) => setDraft({ ...draft, supplierId: event.target.value })}
+                    onChange={(event) => choose('supplierId', event.target.value)}
                   >
+                    {draft.supplierId === NOT_CHOSEN && (
+                      <option value={NOT_CHOSEN} disabled>
+                        {TEXTS.notChosen}
+                      </option>
+                    )}
                     <option value="">{TEXTS.allSuppliers}</option>
-                    {choicesOf(suppliers, draft.supplierId).map((supplier) => (
+                    {optionsOf(
+                      supplierItems(suppliers),
+                      draft.base.supplierId,
+                      rejected.supplierId,
+                    ).map((supplier) => (
                       <option key={supplier.id} value={optionOf(supplier.id)}>
-                        {supplier.name}
+                        {supplier.label}
                       </option>
                     ))}
                   </Select>
@@ -478,12 +594,14 @@ export function ConditionCodesPage() {
                     {...control}
                     value={draft.conditionValueId}
                     disabled={formLocked}
-                    onChange={(event) =>
-                      setDraft({ ...draft, conditionValueId: event.target.value })
-                    }
+                    onChange={(event) => choose('suggestedConditionValueId', event.target.value)}
                   >
                     <option value="">{TEXTS.noSuggestion}</option>
-                    {choicesOf(conditions, draft.conditionValueId).map((value) => (
+                    {optionsOf(
+                      conditionItems(conditions),
+                      draft.base.conditionValueId,
+                      rejected.suggestedConditionValueId,
+                    ).map((value) => (
                       <option key={value.id} value={optionOf(value.id)}>
                         {value.label}
                       </option>

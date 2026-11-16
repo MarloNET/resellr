@@ -131,7 +131,7 @@ async function checkReferences(
   }
   if (condition !== undefined && condition.active !== 1) {
     throw new RuleViolation('pick_list_value_deactivated', {
-      usage: 'condition',
+      usage: 'condition_suggestion',
       messageArgs: [condition.label],
       details: { path: 'suggestedConditionValueId', id: condition.id },
     });

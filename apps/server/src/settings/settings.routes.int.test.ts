@@ -2112,7 +2112,7 @@ describe('condition code API (CU-087, Technical Specification 2.2)', () => {
       expect(response.json()).toEqual({
         error: {
           code: 'pick_list_value_deactivated',
-          message: 'Zustand Stark gebraucht ist deaktiviert',
+          message: 'Vorschlag Zustand Stark gebraucht ist deaktiviert',
           fields: [],
           details: { path: 'suggestedConditionValueId', id: worn.id },
           referenceNumber: null,
@@ -2215,7 +2215,7 @@ describe('condition code API (CU-087, Technical Specification 2.2)', () => {
       expect(response.statusCode).toBe(422);
       expect(response.json().error).toMatchObject({
         code: 'pick_list_value_deactivated',
-        message: 'Zustand Stark gebraucht ist deaktiviert',
+        message: 'Vorschlag Zustand Stark gebraucht ist deaktiviert',
         details: { path: 'suggestedConditionValueId', id: worn.id },
       });
       expect((await listCodes()).json().items).toEqual([entry]);
