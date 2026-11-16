@@ -145,6 +145,13 @@ describe('seedDemoData', () => {
           { id: 13, name: 'Fujitsu' },
         ],
       },
+      '/api/device-types/1/attributes': {
+        items: [
+          { id: 101, label: 'Prozessor' },
+          { id: 102, label: 'Displaygröße' },
+        ],
+      },
+      '/api/device-types/2/attributes': { items: [{ id: 201, label: 'Prozessor' }] },
     };
     const recording: DemoApi = {
       baseUrl: 'http://127.0.0.1:4310',
@@ -159,6 +166,7 @@ describe('seedDemoData', () => {
     expect(requests).toEqual([
       ['GET', '/api/device-types?limit=200'],
       ['GET', '/api/manufacturers?limit=200'],
+      ['GET', '/api/device-types/1/attributes'],
       [
         'POST',
         '/api/model-templates',
@@ -170,8 +178,11 @@ describe('seedDemoData', () => {
           mpn: '20TD002MGE',
           mpnUnknown: false,
           originalEan: '',
+          modelValues: { 101: 'Intel Core i5-1135G7', 102: '15,6' },
+          defaultDeviceValues: {},
         },
       ],
+      ['GET', '/api/device-types/1/attributes'],
       [
         'POST',
         '/api/model-templates',
@@ -183,8 +194,11 @@ describe('seedDemoData', () => {
           mpn: '20W000T9GE',
           mpnUnknown: false,
           originalEan: '2000000177007',
+          modelValues: { 101: 'Intel Core i5-1145G7', 102: '14' },
+          defaultDeviceValues: {},
         },
       ],
+      ['GET', '/api/device-types/1/attributes'],
       [
         'POST',
         '/api/model-templates',
@@ -196,8 +210,11 @@ describe('seedDemoData', () => {
           mpn: '6FY52AV',
           mpnUnknown: false,
           originalEan: '',
+          modelValues: { 101: 'Intel Core i5-1135G7', 102: '14' },
+          defaultDeviceValues: {},
         },
       ],
+      ['GET', '/api/device-types/2/attributes'],
       [
         'POST',
         '/api/model-templates',
@@ -209,6 +226,8 @@ describe('seedDemoData', () => {
           mpn: null,
           mpnUnknown: true,
           originalEan: '',
+          modelValues: { 201: 'Intel Core i5-7500T' },
+          defaultDeviceValues: {},
         },
       ],
     ]);

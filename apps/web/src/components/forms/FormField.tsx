@@ -24,24 +24,29 @@ export interface FormFieldProps {
   required?: boolean;
   /** Error text of the field (`fields[].message` or the Zod check in the browser). */
   error?: string;
+  /** Shown at the end of the label line, e.g. the review mark of a prefilled value (CU-111). */
+  aside?: ReactNode;
   children: (control: FormFieldControlProps) => ReactNode;
 }
 
 /**
  * Form field (CU-057, design chapter 5 "Validierung", DESIGN.md "Formulare"): label above the
- * control, "*" for required fields, the error text below the control in error with a symbol,
+ * control with an optional element at the end of its line, "*" for required fields, the error text below the control in error with a symbol,
  * linked to the control with `aria-describedby`.
  */
-export function FormField({ label, required = false, error, children }: FormFieldProps) {
+export function FormField({ label, required = false, error, aside, children }: FormFieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
 
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-label font-semibold text-text">
-        {label}
-        {required && <span aria-hidden="true">*</span>}
-      </label>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <label htmlFor={id} className="text-label font-semibold text-text">
+          {label}
+          {required && <span aria-hidden="true">*</span>}
+        </label>
+        {aside}
+      </div>
       {children({
         id,
         ...(required && { 'aria-required': true }),

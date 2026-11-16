@@ -182,6 +182,9 @@ export const ERROR_MESSAGES = {
   'name_taken.supplier': 'Name ist bereits vergeben',
   'name_taken.text_block': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
+  /** UI-007, UI-003, UI-010, UI-014 at the field of the attribute (2.0.6, Nachtrag MAR-904). */
+  'pick_list_value_deactivated.attribute': (label: string, value: string) =>
+    `${label}: ${value} ist deaktiviert`,
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,

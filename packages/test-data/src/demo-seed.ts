@@ -205,7 +205,10 @@ export const seedDatasheetLayout: SeedArea = async (api) => {
  * Model templates (S3, UI-006, UI-007): a few notebooks and a mini PC of the demo manufacturers
  * on the initial device types, one with MPN "unbekannt" and one with an original EAN from the
  * GS1 range for internal use (prefix 200), so it belongs to no real product. Device types and
- * manufacturers are looked up by name, as the user chooses them in UI-007.
+ * manufacturers are looked up by name, as the user chooses them in UI-007. `modelValues` holds
+ * the values of the attributes of the level model by label, at least those of the required ones
+ * (Prozessor, Displaygröße; 2.4, AC-REQ-008-05), entered as in the form; the device defaults stay
+ * empty.
  */
 export const DEMO_MODEL_TEMPLATES = [
   {
@@ -215,6 +218,7 @@ export const DEMO_MODEL_TEMPLATES = [
     typeDesignation: '20TD',
     mpn: '20TD002MGE',
     originalEan: '',
+    modelValues: { Prozessor: 'Intel Core i5-1135G7', Displaygröße: '15,6' },
   },
   {
     deviceType: 'Notebook',
@@ -223,6 +227,7 @@ export const DEMO_MODEL_TEMPLATES = [
     typeDesignation: '20W0',
     mpn: '20W000T9GE',
     originalEan: '2000000177007',
+    modelValues: { Prozessor: 'Intel Core i5-1145G7', Displaygröße: '14' },
   },
   {
     deviceType: 'Notebook',
@@ -231,6 +236,7 @@ export const DEMO_MODEL_TEMPLATES = [
     typeDesignation: '',
     mpn: '6FY52AV',
     originalEan: '',
+    modelValues: { Prozessor: 'Intel Core i5-1135G7', Displaygröße: '14' },
   },
   {
     deviceType: 'PC/Mini-PC',
@@ -239,6 +245,7 @@ export const DEMO_MODEL_TEMPLATES = [
     typeDesignation: '',
     mpn: null,
     originalEan: '',
+    modelValues: { Prozessor: 'Intel Core i5-7500T' },
   },
 ] as const;
 
@@ -254,16 +261,31 @@ function idOf(ids: Map<string, number>, name: string): number {
   return id;
 }
 
+/** Attribute ids by label of a device type (`GET /api/device-types/{id}/attributes`). */
+async function attributeIdsByLabel(api: DemoApi, deviceTypeId: number) {
+  const { items } = await api.request<{ items: { id: number; label: string }[] }>(
+    'GET',
+    `/api/device-types/${deviceTypeId}/attributes`,
+  );
+  return new Map(items.map(({ id, label }) => [label, id]));
+}
+
 export const seedModelTemplates: SeedArea = async (api) => {
   const deviceTypes = await idsByName(api, '/api/device-types?limit=200');
   const manufacturers = await idsByName(api, '/api/manufacturers?limit=200');
-  for (const { deviceType, manufacturer, mpn, ...template } of DEMO_MODEL_TEMPLATES) {
+  for (const { deviceType, manufacturer, mpn, modelValues, ...template } of DEMO_MODEL_TEMPLATES) {
+    const deviceTypeId = idOf(deviceTypes, deviceType);
+    const attributes = await attributeIdsByLabel(api, deviceTypeId);
     await api.request('POST', '/api/model-templates', {
-      deviceTypeId: idOf(deviceTypes, deviceType),
+      deviceTypeId,
       manufacturerId: idOf(manufacturers, manufacturer),
       ...template,
       mpn,
       mpnUnknown: mpn === null,
+      modelValues: Object.fromEntries(
+        Object.entries(modelValues).map(([label, value]) => [idOf(attributes, label), value]),
+      ),
+      defaultDeviceValues: {},
     });
   }
 };
