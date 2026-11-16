@@ -33,6 +33,8 @@ const MESSAGE_TABLE: [string, string][] = [
   ['M-21', 'Zeile: höchstens 1.000 Zeichen'],
   ['M-22', 'Excel-Datei: höchstens 10 MB'],
   ['M-24', 'Prüfdatum und prüfende Stelle erforderlich'],
+  ['M-25', 'Herstellernummer: höchstens 40 Zeichen'],
+  ['M-26', 'Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt'],
   ['M-30', 'Name: 1 bis 100 Zeichen'],
   ['M-31', 'Prüfende Stelle: höchstens 100 Zeichen'],
 ];
@@ -40,6 +42,8 @@ const MESSAGE_TABLE: [string, string][] = [
 const EXPECTED_KEYS = [
   ...Array.from({ length: 22 }, (_, i) => `M-${String(i + 1).padStart(2, '0')}`),
   'M-24',
+  'M-25',
+  'M-26',
   'M-30',
   'M-31',
 ];
@@ -55,7 +59,7 @@ describe('message catalog (E1)', () => {
     );
   });
 
-  it('has exactly the keys M-01 to M-22, M-24, M-30 and M-31', () => {
+  it('has exactly the keys M-01 to M-22, M-24 to M-26, M-30 and M-31', () => {
     expect(Object.keys(MESSAGES)).toEqual(EXPECTED_KEYS);
   });
 

@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
-import { FIELD_MESSAGES } from '../messages/messages.de.ts';
+import { FIELD_MESSAGES, MESSAGES } from '../messages/messages.de.ts';
 import { toKey } from '../text/normalize-key.ts';
+import { isValidEan } from '../validation/ean.ts';
 import { idSchema, listResponseSchema, timestampSchema, versionSchema } from './common.schema.ts';
 
 // Model template (REQ-008 to REQ-010; Technical Specification 2.4, 3.3). The field rules for
-// creating and changing follow with #177 and #181.
+// changing follow with #181, the attribute values of the level model and the device defaults
+// with #178.
 
 /** Shortest search term of UI-006 after trimming (REQ-009, AC-REQ-009-04). */
 export const MODEL_TEMPLATE_SEARCH_MIN = 2;
@@ -83,3 +85,101 @@ export const modelTemplateSchema = z.object({
   updatedAt: timestampSchema,
 });
 export type ModelTemplate = z.infer<typeof modelTemplateSchema>;
+
+/** Longest model name after trimming (3.3, REQ-008). */
+export const MODEL_NAME_MAX = 100;
+/** Longest type designation after trimming (3.3, REQ-008). */
+export const TYPE_DESIGNATION_MAX = 50;
+/** Longest MPN in Unicode code points after trimming (2.4 "Herstellernummer"). */
+export const MPN_MAX = 40;
+/** Allowed characters of an MPN (2.4, RQ-19). */
+const MPN_PATTERN = /^[A-Za-z0-9./-]+$/;
+
+/** Model name: 1–100 characters after trimming. */
+export const modelNameSchema = z
+  .string()
+  .trim()
+  .min(1, FIELD_MESSAGES.modelName)
+  .max(MODEL_NAME_MAX, FIELD_MESSAGES.modelName);
+
+/** Type designation: 0–50 characters after trimming; empty is stored as `null` (3.3). */
+export const typeDesignationSchema = z
+  .string()
+  .trim()
+  .max(TYPE_DESIGNATION_MAX, FIELD_MESSAGES.typeDesignation)
+  .transform((value) => (value === '' ? null : value));
+
+/**
+ * MPN without "unbekannt" (2.4 "Herstellernummer", DER-50-17): trimmed, then one refinement in
+ * the order empty (`mpn_required`), more than 40 code points (`mpn_too_long`, M-25), a character
+ * outside `^[A-Za-z0-9./-]+$` (`mpn_invalid_chars`, M-26), so the field gets exactly one
+ * message (2.0.5). The trimmed value is stored; case stays as entered.
+ */
+export const mpnSchema = z
+  .string()
+  .trim()
+  .superRefine((mpn, context) => {
+    if (mpn === '') {
+      context.addIssue({
+        code: 'custom',
+        message: FIELD_MESSAGES.mpnRequired,
+        params: { code: 'mpn_required' },
+      });
+    } else if ([...mpn].length > MPN_MAX) {
+      context.addIssue({
+        code: 'custom',
+        message: MESSAGES['M-25'],
+        params: { code: 'mpn_too_long' },
+      });
+    } else if (!MPN_PATTERN.test(mpn)) {
+      context.addIssue({
+        code: 'custom',
+        message: MESSAGES['M-26'],
+        params: { code: 'mpn_invalid_chars' },
+      });
+    }
+  });
+
+/**
+ * Original EAN: optional, otherwise 8 or 13 digits with a valid GS1 check digit (CU-016,
+ * AC-REQ-008-04); empty is stored as `null`.
+ */
+export const originalEanSchema = z
+  .string()
+  .trim()
+  .refine((value) => value === '' || isValidEan(value), FIELD_MESSAGES.originalEan)
+  .transform((value) => (value === '' ? null : value));
+
+/**
+ * `POST /api/model-templates` (2.4): the model template without `id`. `web-ui` sends every
+ * field, an empty input as `''` and no manufacturer as `null` (2.0.5 rule (2)). With
+ * "unbekannt" it sends `mpn: null`; a value together with `mpnUnknown: true`, or `null` without
+ * it, is a program error of the user interface and fails without a field path, i.e.
+ * `400 bad_request` (2.0.5 rule (4)). The check runs although other fields failed, so the
+ * field errors of a request never hide it, but not on a wrong type.
+ */
+export const modelTemplateCreateSchema = z
+  .strictObject({
+    deviceTypeId: idSchema,
+    manufacturerId: idSchema
+      .nullable()
+      .refine((id): id is number => id !== null, FIELD_MESSAGES.manufacturerMissing),
+    modelName: modelNameSchema,
+    typeDesignation: typeDesignationSchema,
+    mpn: mpnSchema.nullable(),
+    mpnUnknown: z.boolean(),
+    originalEan: originalEanSchema,
+  })
+  .superRefine(
+    ({ mpn, mpnUnknown }, context) => {
+      if (mpnUnknown === (mpn === null)) return;
+      context.addIssue({
+        code: 'custom',
+        message: 'mpn must be null exactly with mpnUnknown',
+        path: [],
+      });
+    },
+    { when: ({ issues }) => issues.every((issue) => issue.code !== 'invalid_type') },
+  );
+export type ModelTemplateCreateInput = z.input<typeof modelTemplateCreateSchema>;
+export type ModelTemplateCreate = z.output<typeof modelTemplateCreateSchema>;

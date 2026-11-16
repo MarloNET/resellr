@@ -8,6 +8,7 @@ import {
   DEMO_DEVICE_TYPES,
   DEMO_MANUFACTURERS,
   DEMO_MERCHANT_PROFILE,
+  DEMO_MODEL_TEMPLATES,
   DEMO_SUPPLIERS,
   DEMO_TEXT_BLOCKS,
   type SeedArea,
@@ -100,7 +101,8 @@ describe('startDemo (CU-004)', () => {
       );
       // The initial settings of the seed migration CU-071 and the demo data written through the
       // API on top of them (CU-061): the device types, suppliers, manufacturers, the merchant
-      // profile, the text blocks and the datasheet layout of S2 with their audit entries.
+      // profile, the text blocks and the datasheet layout of S2 and the model templates of S3 with
+      // their audit entries.
       expect(filled.sort()).toEqual([
         'attribute',
         'attribute_mapping',
@@ -111,6 +113,7 @@ describe('startDemo (CU-004)', () => {
         'device_type',
         'manufacturer',
         'merchant_profile',
+        'model_template',
         'pick_list',
         'pick_list_value',
         'supplier',
@@ -146,6 +149,15 @@ describe('startDemo (CU-004)', () => {
       expect(db.prepare('SELECT block_order FROM datasheet_layout').pluck().all()).toEqual([
         JSON.stringify(DEMO_DATASHEET_BLOCK_ORDER),
       ]);
+      expect(
+        db.prepare('SELECT model_name, mpn, mpn_unknown FROM model_template ORDER BY id').all(),
+      ).toEqual(
+        DEMO_MODEL_TEMPLATES.map(({ modelName, mpn }) => ({
+          model_name: modelName,
+          mpn,
+          mpn_unknown: mpn === null ? 1 : 0,
+        })),
+      );
     } finally {
       db.close();
     }

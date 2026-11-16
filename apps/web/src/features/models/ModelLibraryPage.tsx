@@ -1,6 +1,6 @@
 import { modelTemplateSearchTermSchema } from '@resellr/domain/schemas/model-template.schema';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import { useModelTemplatesQuery } from '../../api/catalog.api.ts';
 import { useDeviceTypesQuery } from '../../api/settings.api.ts';
@@ -10,6 +10,7 @@ import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.t
 import { buttonClassName } from '../../components/ui/Button.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
+import type { SavedNoticeState } from './ModelTemplatePage.tsx';
 import {
   Table,
   TableBody,
@@ -65,10 +66,19 @@ function searchHint(input: string): string | undefined {
  * type filter, hit list with counter, row click or arrow keys and Enter open UI-007,
  * "Modellvorlage anlegen" opens UI-007 for a new model template. States: default (latest 50,
  * focus in the search field), loading, empty (Treffer), empty (Bibliothek), error, validation
- * and P-06.
+ * and P-06; after saving in UI-007 the banner of UI-007 (DER-50-02).
  */
 export function ModelLibraryPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // The success banner of UI-007 after "Modellvorlage speichern" (DER-50-02). It is taken from
+  // the history entry once, so reloading or going back does not show it again.
+  const [savedNotice, setSavedNotice] = useState(
+    () => (location.state as SavedNoticeState | null)?.savedNotice ?? null,
+  );
+  useEffect(() => {
+    if (location.state !== null) void navigate('.', { replace: true, state: null });
+  }, [location.state, navigate]);
   const [input, setInput] = useState('');
   const [searchTerm, setSearchTerm] = useState<string | undefined>(undefined);
   const [deviceTypeId, setDeviceTypeId] = useState<number | undefined>(undefined);
@@ -131,6 +141,11 @@ export function ModelLibraryPage() {
     <div className="flex flex-col gap-4 p-6">
       <h1 className="m-0 text-page-title font-semibold">{TEXTS.title}</h1>
 
+      {savedNotice !== null && (
+        <PageBanner variant="success" onClose={() => setSavedNotice(null)}>
+          {savedNotice}
+        </PageBanner>
+      )}
       {unreachable && <UnreachableBanner />}
       {failed && failed.kind !== 'unreachable' && (
         <PageBanner variant="error" error={failed}>

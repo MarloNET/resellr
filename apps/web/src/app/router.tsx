@@ -2,6 +2,7 @@ import { createBrowserRouter, Link, Navigate, type RouteObject } from 'react-rou
 
 import { buttonClassName } from '../components/ui/Button.tsx';
 import { ModelLibraryPage } from '../features/models/ModelLibraryPage.tsx';
+import { ModelTemplatePage } from '../features/models/ModelTemplatePage.tsx';
 import {
   LastSettingsSectionRedirect,
   SettingsLayout,
@@ -51,6 +52,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <Navigate to="/inserate" replace /> },
       { path: 'inserate', element: <ListingOverviewPlaceholder /> },
       { path: 'modelle', element: <ModelLibraryPage /> },
+      { path: 'modelle/neu', element: <ModelTemplatePage /> },
       {
         // UI-025 (CU-093) with its 14 sections; a section without its own screen keeps an
         // empty content area until the task that builds its screen sets `element`.
