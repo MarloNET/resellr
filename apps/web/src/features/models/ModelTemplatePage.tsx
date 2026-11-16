@@ -1,3 +1,4 @@
+import { ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
 import {
   type ModelTemplateCreateInput,
   modelTemplateCreateSchema,
@@ -82,8 +83,15 @@ type FieldErrors = Partial<Record<Field, string>>;
 
 const isField = (path: string): path is Field => (FIELDS as readonly string[]).includes(path);
 
-/** The choices whose entry the server can reject as deactivated (2.0.11). */
-type ChoiceField = 'deviceTypeId' | 'manufacturerId';
+/** The choices whose entry the server can reject as deactivated (2.0.11), in form order. */
+const CHOICE_FIELDS = ['deviceTypeId', 'manufacturerId'] as const;
+type ChoiceField = (typeof CHOICE_FIELDS)[number];
+
+/** Texts of a deactivated entry at its choice in UI-007 (CU-012, `.model_template`). */
+const DEACTIVATED_TEXTS: Readonly<Record<ChoiceField, (name: string) => string>> = {
+  deviceTypeId: ERROR_MESSAGES['device_type_deactivated.model_template'],
+  manufacturerId: ERROR_MESSAGES['manufacturer_deactivated.model_template'],
+};
 
 /** Rejections of a deactivated choice and the field of their `details.path` (2.0.11). */
 const DEACTIVATED_CODES: Readonly<Record<string, ChoiceField>> = {
@@ -144,6 +152,9 @@ export function ModelTemplatePage() {
   );
 
   const [draft, setDraft] = useState<Draft | null>(null);
+  // The current inputs for the check after reloading the choices.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   // Choices that show the text of a rejection; it stays until the next choice (Design v0.6.7).
@@ -218,7 +229,7 @@ export function ModelTemplatePage() {
     if (error.kind === 'rejected' && field !== undefined && path === field) {
       showFieldErrors({ [field]: error.error?.message });
       setRejectionShown({ [field]: true });
-      if (typeof id === 'number') void reloadAfterRejection(field, id);
+      if (typeof id === 'number' && draft !== null) void reloadAfterRejection(field, id, draft);
       return;
     }
     setNotice(noticeOf(error));
@@ -227,19 +238,45 @@ export function ModelTemplatePage() {
   /**
    * Reads both choices again. If the rejected entry is missing then, or the read fails, the choice
    * is emptied, so the rejected id is never sent again (2.4 "Auswahl nach der Ablehnung",
-   * Nachtrag MAR-925).
+   * Nachtrag MAR-925). The server names only the first deactivated entry, so the other choice is
+   * checked against its new list as well and emptied with its own text when its entry is missing
+   * there; if its read fails, it keeps its entry (2.4 "Beide Felder prüfen", Nachtrag MAR-952).
    */
-  async function reloadAfterRejection(field: ChoiceField, id: number) {
+  async function reloadAfterRejection(rejected: ChoiceField, id: number, sent: Draft) {
     setReloading(true);
+    const before = { deviceTypeId: deviceTypes.data, manufacturerId: manufacturers.data };
     const [types, makers] = await Promise.all([deviceTypes.refetch(), manufacturers.refetch()]);
-    const result = field === 'deviceTypeId' ? types : makers;
-    const activeAgain =
-      !result.isError && result.data?.items.some((entry) => entry.id === id && entry.active);
-    if (!activeAgain) {
-      if (result.isError) setDropped((previous) => ({ ...previous, [field]: id }));
-      setDraft((previous) =>
-        previous?.[field] === id ? { ...previous, [field]: null } : previous,
-      );
+    const reloaded = { deviceTypeId: types, manufacturerId: makers };
+
+    const emptied: Partial<Record<ChoiceField, null>> = {};
+    const texts: FieldErrors = {};
+    for (const field of CHOICE_FIELDS) {
+      const value = field === rejected ? id : sent[field];
+      // A choice made while the lists load is the user's new choice and stays.
+      if (value === null || draftRef.current?.[field] !== value) continue;
+      const result = reloaded[field];
+      const missing = result.isError
+        ? field === rejected
+        : !result.data?.items.some((entry) => entry.id === value && entry.active);
+      if (!missing) continue;
+      emptied[field] = null;
+      if (field === rejected) {
+        if (result.isError) setDropped((previous) => ({ ...previous, [field]: id }));
+      } else {
+        const name = before[field]?.items.find((entry) => entry.id === value)?.name ?? '';
+        texts[field] = DEACTIVATED_TEXTS[field](name);
+      }
+    }
+
+    setDraft((previous) => (previous === null ? previous : { ...previous, ...emptied }));
+    if (hasErrors(texts)) {
+      setErrors((previous) => ({ ...previous, ...texts }));
+      setRejectionShown((previous) => ({
+        ...previous,
+        ...Object.fromEntries(Object.keys(texts).map((field) => [field, true])),
+      }));
+      // Device type comes before manufacturer in the form, so it gets the focus first.
+      focusFirstError();
     }
     setReloading(false);
   }

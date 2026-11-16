@@ -651,6 +651,116 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
       expect(select('Geräteart').value).toBe('1');
       expect(shownText(select('Geräteart'))).toBe('Notebook');
     });
+
+    it.each([
+      ['T5g', 'device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1],
+      ['T5h', 'manufacturer_deactivated', FUJITSU_DEACTIVATED, 'manufacturerId', 13],
+    ] as const)(
+      'AC-REQ-004-03 AC-REQ-101-02 DER-50-18 %s empties and marks both fields when both entries are deactivated, %s, focus on "Geräteart" (Nachtrag MAR-952)',
+      async (_test, code, message, path, id) => {
+        const { sent } = mockApi({
+          deviceTypes: firstThen([NOTEBOOK, TABLET], [{ ...NOTEBOOK, active: false }, TABLET]),
+          manufacturers: firstThen([LENOVO, FUJITSU], [LENOVO]),
+          create: rejectOnce(code, message, path, id),
+        });
+        await openPage();
+        fill({ manufacturerId: '13' });
+
+        fireEvent.click(saveButton());
+
+        await vi.waitFor(() => expect(select('Hersteller').value).toBe(''));
+        // Each field shows what it would send: nothing, never another entry (FIND-946-01).
+        expect(select('Geräteart').value).toBe('');
+        expect(shownText(select('Geräteart'))).toBe(PLACEHOLDER);
+        expect(shownText(select('Hersteller'))).toBe(PLACEHOLDER);
+        expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED);
+        expect(errorOf(select('Hersteller'))).toBe(FUJITSU_DEACTIVATED);
+        await vi.waitFor(() => expect(document.activeElement).toBe(select('Geräteart')));
+        expectAccessiblePage();
+
+        fireEvent.click(saveButton());
+        await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe('Geräteart fehlt'));
+        expect(errorOf(select('Hersteller'))).toBe('Hersteller fehlt');
+        expect(sent).toHaveLength(1);
+
+        fireEvent.change(select('Geräteart'), { target: { value: '3' } });
+        fireEvent.change(select('Hersteller'), { target: { value: '11' } });
+        fireEvent.click(saveButton());
+        await vi.waitFor(() => expect(sent).toHaveLength(2));
+        expect(sent[1]).toMatchObject({ deviceTypeId: 3, manufacturerId: 11 });
+      },
+    );
+
+    it.each([
+      [
+        'Geräteart',
+        'Hersteller',
+        'device_type_deactivated',
+        NOTEBOOK_DEACTIVATED,
+        'deviceTypeId',
+        1,
+      ],
+      [
+        'Hersteller',
+        'Geräteart',
+        'manufacturer_deactivated',
+        FUJITSU_DEACTIVATED,
+        'manufacturerId',
+        13,
+      ],
+    ] as const)(
+      'DER-50-18 T5i empties only the rejected "%s" when reloading fails, "%s" shows exactly the entry it sends (Nachtrag MAR-952)',
+      async (rejected, other, code, message, path, id) => {
+        const { sent } = mockApi({
+          deviceTypes: firstThenFail([NOTEBOOK, TABLET]),
+          manufacturers: firstThenFail([LENOVO, FUJITSU]),
+          create: rejectOnce(code, message, path, id),
+        });
+        await openPage();
+        fill({ manufacturerId: '13' });
+
+        fireEvent.click(saveButton());
+
+        await vi.waitFor(() => expect(select(rejected).value).toBe(''));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const kept = { Geräteart: ['1', 'Notebook'], Hersteller: ['13', 'Fujitsu'] }[other];
+        expect([select(other).value, shownText(select(other))]).toEqual(kept);
+        expect(errorOf(select(other))).toBeNull();
+
+        fireEvent.change(select(rejected), {
+          target: { value: rejected === 'Geräteart' ? '3' : '11' },
+        });
+        fireEvent.click(saveButton());
+        await vi.waitFor(() => expect(sent).toHaveLength(2));
+        const otherPath = other === 'Geräteart' ? 'deviceTypeId' : 'manufacturerId';
+        expect((sent[1] as Record<string, unknown>)[otherPath]).toBe(Number(kept[0]));
+      },
+    );
+
+    it('DER-50-18 locks the save while the choices are read again after a rejection (FIND-397-06)', async () => {
+      let deviceTypeCalls = 0;
+      const { sent } = mockApi({
+        deviceTypes: () => {
+          deviceTypeCalls += 1;
+          return deviceTypeCalls === 1
+            ? Response.json({ items: [NOTEBOOK, TABLET], total: 2 })
+            : pending();
+        },
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
+      });
+      await openPage();
+      fill();
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED));
+      await vi.waitFor(() => expect(deviceTypeCalls).toBe(2));
+      expect(saveButton().disabled).toBe(true);
+      fireEvent.click(saveButton());
+      fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(sent).toHaveLength(1);
+    });
   });
 
   it('saves with Ctrl+S like the primary button', async () => {
