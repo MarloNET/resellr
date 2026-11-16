@@ -20,7 +20,7 @@
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung (Wortlaut) |
 |---|---|---|---|---|
-| WI-Nr | Text | ja | 1–20 Zeichen, nur Buchstaben und Ziffern; eindeutig über verfügbare/verkaufte Geräte | „WI-Nr bereits vergeben: Gerät <WI-Nr> in <Modell-Inserat>“ (mit Link); „WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)“ |
+| WI-Nr | Text | ja | 1–20 Zeichen, nur Buchstaben und Ziffern; eindeutig über verfügbare/verkaufte Geräte | „WI-Nr bereits vergeben: Gerät <WI-Nr> in <Anzeigetitel>“ bzw. „… Gerät <WI-Nr> (nicht zugeordnet)“, mit Link auf das Gerät (siehe „Meldung „WI-Nr bereits vergeben““ unten); „WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)“ |
 | Lieferant | Auswahl | nein | aktive Lieferanten (REQ-099) | – |
 | Zustandscode | Text | nein | max. 20 Zeichen; wirkt nach Verlassen: Klartext in Zustandsbeschreibung, ggf. Vorschlag Zustand/Optik-Note mit Prüfmarkierung | Hinweis „Zustandscode unbekannt“ |
 | Modellvorlage | Suche mit Trefferliste (≥ 2 Zeichen) | ja | aktive Modellvorlage | „Bitte eine Modellvorlage wählen“ |
@@ -30,6 +30,13 @@
 | Tastaturlayout, Netzteil, Akku | Auswahl | ja, wenn Geräteart das Merkmal hat | | „<Feld> fehlt“ |
 | Akkukapazität | Ganzzahl 0–100 oder „nicht ermittelbar“ | ja, wenn Akku-Wert „Akku vorhanden“ trägt | Feld erscheint/entfällt abhängig vom Akku-Wert | „Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar““ |
 | weitere Merkmale | je Datentyp | je Merkmalsdefinition | keine Typumwandlung (Zahl bleibt Zahl, kein Datum) | „<Merkmal>: <Regel>“; **fehlt der Wert eines Pflichtmerkmals (v0.6.4, AC-REQ-005-12 b, M-32): „<Merkmal> fehlt“** (z. B. „RAM fehlt“), Muster wie „<Feld> fehlt“ oben. Beim Ändern eines bereits gespeicherten Geräts (UI-010 öffnet dasselbe Formular) auch dann, wenn die Änderung ein anderes Feld betrifft; Fokus auf das erste markierte Feld, nichts gespeichert |
+
+## Meldung „WI-Nr bereits vergeben“ (v0.6.9, MAR-970)
+Klärung des Wortlauts der Meldung `wi_nr_taken`; sie gilt auch in UI-013.
+- **Gerät ohne Modell-Inserat** (`details.listingId` fehlt): „WI-Nr bereits vergeben: Gerät <WI-Nr> (nicht zugeordnet)“, z. B. „WI-Nr bereits vergeben: Gerät 626198 (nicht zugeordnet)“. „nicht zugeordnet“ wie in UI-009/UI-010.
+- **Gerät mit Modell-Inserat:** „WI-Nr bereits vergeben: Gerät <WI-Nr> in <Anzeigetitel>“; <Modell-Inserat> ist der Anzeigetitel des Modell-Inserats (`display_title`, wie „Modell-Inserat (Titel)“ in UI-009).
+- **<WI-Nr>** ist die WI-Nr des vorhandenen Geräts in der gespeicherten Schreibweise (die Prüfung ignoriert Groß-/Kleinschreibung), nicht die Eingabe.
+- **Link:** „Gerät <WI-Nr>“ ist ein Link auf das vorhandene Gerät (UI-010, `/geraete/{deviceId}`, `details.deviceId` ist immer vorhanden). Das Modell-Inserat ist nur genannt, nicht verlinkt (UI-010 zeigt es im Kopf mit Link). Der Link öffnet im selben Fenster; die Eingaben im Formular gehen dabei verloren, das Formular wird nicht gesperrt.
 
 ## Auswahl nach Ablehnung wegen Deaktivierung (v0.6.8, MAR-927, DG-19)
 Es gilt die Regel von UI-007 („Auswahl nach Ablehnung und vor der ersten Wahl“, v0.6.7) unverändert, mit diesen Ergänzungen für dieses Formular. Betroffen sind Lieferant (`supplier_deactivated`) und alle Auswahlfelder mit Auswahllistenwerten (Zustand, Tastaturlayout, Netzteil, Akku, weitere Auswahlmerkmale; `pick_list_value_deactivated`). Die Modellvorlage ist keine Auswahlliste dieser Art und nicht betroffen.
