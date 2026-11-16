@@ -22,8 +22,11 @@ export interface FormFieldProps {
   label: string;
   /** Required field: "*" after the label (DESIGN.md "Formulare"). */
   required?: boolean;
-  /** Error text of the field (`fields[].message` or the Zod check in the browser). */
-  error?: string;
+  /**
+   * Error text of the field (`fields[].message` or the Zod check in the browser); a node where
+   * the text holds a link, e.g. to the device of `wi_nr_taken` in UI-003.
+   */
+  error?: ReactNode;
   children: (control: FormFieldControlProps) => ReactNode;
 }
 
@@ -35,6 +38,7 @@ export interface FormFieldProps {
 export function FormField({ label, required = false, error, children }: FormFieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
+  const hasError = error !== undefined && error !== null && error !== '' && error !== false;
 
   return (
     <div className="flex flex-col gap-1">
@@ -45,9 +49,9 @@ export function FormField({ label, required = false, error, children }: FormFiel
       {children({
         id,
         ...(required && { 'aria-required': true }),
-        ...(error && { 'aria-invalid': true, 'aria-describedby': errorId }),
+        ...(hasError && { 'aria-invalid': true, 'aria-describedby': errorId }),
       })}
-      {error && (
+      {hasError && (
         <p className="flex items-start gap-1 text-label text-error">
           <svg
             aria-hidden="true"

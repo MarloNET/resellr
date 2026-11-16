@@ -1,6 +1,7 @@
 import { createBrowserRouter, Link, Navigate, type RouteObject } from 'react-router';
 
 import { buttonClassName } from '../components/ui/Button.tsx';
+import { DeviceIntakePage } from '../features/devices/DeviceIntakePage.tsx';
 import { ModelLibraryPage } from '../features/models/ModelLibraryPage.tsx';
 import { ModelTemplatePage } from '../features/models/ModelTemplatePage.tsx';
 import {
@@ -53,6 +54,7 @@ export const routes: RouteObject[] = [
       { path: 'inserate', element: <ListingOverviewPlaceholder /> },
       { path: 'modelle', element: <ModelLibraryPage /> },
       { path: 'modelle/neu', element: <ModelTemplatePage /> },
+      { path: 'geraete/neu', element: <DeviceIntakePage /> },
       {
         // UI-025 (CU-093) with its 14 sections; a section without its own screen keeps an
         // empty content area until the task that builds its screen sets `element`.

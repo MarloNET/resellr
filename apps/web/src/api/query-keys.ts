@@ -31,6 +31,11 @@ export const queryKeys = {
     modelTemplateLists: () => ['catalog', 'model-templates'] as const,
     modelTemplates: (filter: { q?: string; deviceTypeId?: number }) =>
       ['catalog', 'model-templates', filter] as const,
+    modelTemplate: (id: number) => ['catalog', 'model-template', id] as const,
+  },
+  inventory: {
+    all: ['inventory'] as const,
+    device: (id: number) => ['inventory', 'device', id] as const,
   },
 } as const;
 
