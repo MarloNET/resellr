@@ -427,44 +427,54 @@ export function DeviceIntakePage() {
     // summary, the suppliers are read again without it (2.0.11, design v0.6.8).
     const { path, id } = error.error?.details ?? {};
     if (error.kind === 'rejected' && code === 'supplier_deactivated' && path === 'supplierId') {
-      showServerErrors({ supplierId: error.error?.message });
+      const text = error.error?.message;
+      showServerErrors({ supplierId: text });
       setSupplierRejected(true);
-      if (typeof id === 'number') void reloadAfterRejection(id);
+      if (typeof id === 'number') void reloadAfterRejection(id, text);
       return;
     }
     setNotice(noticeOf(error));
   }
 
   /**
-   * Reads the suppliers again. If the rejected supplier is missing then, the choice is emptied
-   * (optional field: the empty choice, value `null`), so its id is never sent again; if the read
-   * fails, only the rejected id counts as missing (2.0.11 "Erkennen nach dem Neuladen", DER-54-16).
-   * The condition and the attributes are checked the same way with #190.
+   * Reads the suppliers again and checks the supplier of the form at the end of the reload, also a
+   * choice made meanwhile (2.0.11 "Erkennen nach dem Neuladen", 2.4 "Wahl während des Neuladens",
+   * addendum MAR-963, DER-54-16). A choice the new list no longer offers is emptied (optional
+   * field: the empty choice, value `null`) and carries the text of its usage with the name before
+   * the reload, so its id is never sent; an empty field is not checked. If the read fails, only
+   * the rejected id counts as missing, and it leaves the choice. The condition and the attributes
+   * are checked the same way with #190.
    */
-  async function reloadAfterRejection(rejectedId: number) {
+  async function reloadAfterRejection(rejectedId: number, rejectedText: ReactNode) {
     setReloading(true);
     const toItems = (list: typeof suppliers.data): ChoiceItem[] | undefined =>
       list?.items.map(({ id, name, active }) => ({ id, label: name, active }));
     const before = toItems(suppliers.data) ?? [];
     const reloaded = await suppliers.refetch();
-    // A choice made while the list loads is the user's new choice and stays.
-    if (draftRef.current.supplierId === rejectedId) {
-      const missing = reloaded.isError
-        ? [rejectedId]
-        : findMissingChoices(
-            [
-              {
-                path: 'supplierId',
-                id: rejectedId,
-                storedId: null,
-                before,
-                message: ERROR_MESSAGES['supplier_deactivated.device'],
-              },
-            ],
-            { supplierId: toItems(reloaded.data) },
-          ).map(({ id }) => id);
-      if (missing.includes(rejectedId)) change({ supplierId: null });
-      if (reloaded.isError) setDroppedSupplier(rejectedId);
+    const chosen = draftRef.current.supplierId;
+    if (reloaded.isError) setDroppedSupplier(rejectedId);
+    const missing = reloaded.isError
+      ? chosen === rejectedId
+        ? [{ path: 'supplierId', message: rejectedText }]
+        : []
+      : findMissingChoices(
+          [
+            {
+              path: 'supplierId',
+              id: chosen,
+              storedId: null,
+              before,
+              message: ERROR_MESSAGES['supplier_deactivated.device'],
+            },
+          ],
+          { supplierId: toItems(reloaded.data) },
+        );
+    const [supplierMissing] = missing;
+    if (supplierMissing !== undefined) {
+      change({ supplierId: null });
+      setError('supplierId', supplierMissing.message);
+      setSupplierRejected(true);
+      focusFirstError();
     }
     setReloading(false);
   }

@@ -652,6 +652,111 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
       fireEvent.keyDown(window, { key: 's', ctrlKey: true });
       expect(sent).toHaveLength(1);
     });
+
+    describe('a choice while the suppliers are read again (2.4, addendum MAR-963, pattern T5j)', () => {
+      const NORD = supplier(7, 'Lieferant Nord');
+      const NORD_DEACTIVATED = 'Lieferant Lieferant Nord ist deaktiviert';
+
+      /** The first read answers at once, the reload only when the test answers it. */
+      function delayedReload() {
+        let calls = 0;
+        let answer: (response: Response) => void = () => {};
+        const reload = new Promise<Response>((resolve) => {
+          answer = resolve;
+        });
+        const route = () => {
+          calls += 1;
+          return calls === 1 ? list([OST, WEST, NORD]) : reload;
+        };
+        return { route, answer: (response: Response) => answer(response) };
+      }
+
+      async function rejectWest(route: Route) {
+        const api = mockApi({ create: supplierDeactivated, suppliers: route });
+        await openPage();
+        await fillValid({ supplierId: '5' });
+        fireEvent.click(saveButton());
+        await vi.waitFor(() => expect(errorOf(select('Lieferant'))).toBe(WEST_DEACTIVATED));
+        await vi.waitFor(() => expect(api.reads.suppliers).toBe(2));
+        return api;
+      }
+
+      it('DER-54-16 (i) another supplier chosen meanwhile and missing in the new list is emptied with its text, focus there only after the reload, never sent', async () => {
+        const reload = delayedReload();
+        const { sent } = await rejectWest(reload.route);
+        fireEvent.change(select('Lieferant'), { target: { value: '7' } });
+        textbox('WI-Nr').focus();
+        expect(errorOf(select('Lieferant'))).toBeNull();
+        expect(document.activeElement).toBe(textbox('WI-Nr'));
+
+        reload.answer(list([OST, { ...WEST, active: false }, { ...NORD, active: false }]));
+
+        await vi.waitFor(() => expect(errorOf(select('Lieferant'))).toBe(NORD_DEACTIVATED));
+        expect(select('Lieferant').value).toBe('');
+        expect(document.activeElement).toBe(select('Lieferant'));
+        expect(summaryItems()).toEqual([NORD_DEACTIVATED]);
+        fireEvent.blur(select('Lieferant'));
+        expect(errorOf(select('Lieferant'))).toBe(NORD_DEACTIVATED);
+
+        fireEvent.click(saveButton());
+
+        await vi.waitFor(() => expect(sent).toHaveLength(2));
+        expect(sent[1]).toMatchObject({ supplierId: null });
+        expect(sent.filter(({ supplierId }) => supplierId === NORD.id)).toHaveLength(0);
+      });
+
+      it('DER-54-16 (ii) a supplier chosen meanwhile that is active in the new list stays chosen, without text', async () => {
+        const reload = delayedReload();
+        await rejectWest(reload.route);
+        fireEvent.change(select('Lieferant'), { target: { value: '4' } });
+
+        reload.answer(list([OST, { ...WEST, active: false }, NORD]));
+
+        await vi.waitFor(() =>
+          expect(optionTexts(select('Lieferant'))).toEqual(['', 'Lieferant Ost', 'Lieferant Nord']),
+        );
+        expect(select('Lieferant').value).toBe('4');
+        expect(errorOf(select('Lieferant'))).toBeNull();
+        expect(summaryItems()).toEqual([]);
+      });
+
+      it('DER-54-16 (iii) the rejected supplier chosen again meanwhile is emptied with the text and the name before the reload, and never sent again', async () => {
+        const reload = delayedReload();
+        const { sent } = await rejectWest(reload.route);
+        fireEvent.change(select('Lieferant'), { target: { value: '' } });
+        fireEvent.change(select('Lieferant'), { target: { value: '5' } });
+
+        reload.answer(list([OST, { ...WEST, name: 'Lieferant West neu', active: false }, NORD]));
+
+        await vi.waitFor(() => expect(errorOf(select('Lieferant'))).toBe(WEST_DEACTIVATED));
+        expect(select('Lieferant').value).toBe('');
+        expect(document.activeElement).toBe(select('Lieferant'));
+
+        fireEvent.click(saveButton());
+
+        await vi.waitFor(() => expect(sent).toHaveLength(2));
+        expect(sent[1]).toMatchObject({ supplierId: null });
+        expect(sent.filter(({ supplierId }) => supplierId === WEST.id)).toHaveLength(1);
+      });
+
+      it('DER-54-16 (iv) when the reload fails, another supplier chosen meanwhile stays and the rejected one leaves the list', async () => {
+        const reload = delayedReload();
+        await rejectWest(reload.route);
+        fireEvent.change(select('Lieferant'), { target: { value: '7' } });
+
+        reload.answer(
+          Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+            status: 500,
+          }),
+        );
+
+        await vi.waitFor(() =>
+          expect(optionTexts(select('Lieferant'))).toEqual(['', 'Lieferant Ost', 'Lieferant Nord']),
+        );
+        expect(select('Lieferant').value).toBe('7');
+        expect(errorOf(select('Lieferant'))).toBeNull();
+      });
+    });
   });
 
   it('UI-003.conflict DER-54-12 (a) shows P-05 with "Neu laden" on 409 version_conflict, saves nothing and keeps the inputs', async () => {
@@ -696,8 +801,9 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
     fireEvent.change(searchBox(), { target: { value: 'T14' } });
-
-    await act(() => vi.advanceTimersByTimeAsync(5400));
+    // First the wait after the last keystroke, which starts the search, then its time limit.
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    await act(() => vi.advanceTimersByTimeAsync(5000));
 
     const banner = await screen.findByRole('alert');
     expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
