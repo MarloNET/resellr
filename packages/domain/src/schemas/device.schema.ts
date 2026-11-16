@@ -23,7 +23,11 @@ const VISUAL_GRADE_INPUT = /^[0-9]+$/;
  */
 export const wiNrSchema = z.string().superRefine((wiNr, context) => {
   if (WI_NR_PATTERN.test(wiNr)) return;
-  context.addIssue({ code: 'custom', message: FIELD_MESSAGES.wiNr, params: { code: 'wi_nr_format' } });
+  context.addIssue({
+    code: 'custom',
+    message: FIELD_MESSAGES.wiNr,
+    params: { code: 'wi_nr_format' },
+  });
 });
 
 /** `device.wi_nr_key` (3.3): the WI-Nr in lower case, unique without regard to case. */
@@ -133,3 +137,12 @@ export const deviceSchema = z.object({
   updatedAt: timestampSchema,
 });
 export type Device = z.infer<typeof deviceSchema>;
+
+/**
+ * `GET /api/devices/{id}` (2.5): the device with its model listing (display title) or `null` for
+ * "nicht zugeordnet". Model data, sale and cancellation follow with UI-010 (#187) and S9.
+ */
+export const deviceDetailSchema = deviceSchema.extend({
+  listing: z.object({ id: idSchema, title: z.string() }).nullable(),
+});
+export type DeviceDetail = z.infer<typeof deviceDetailSchema>;

@@ -104,4 +104,30 @@ describe('listing repository (CU-125, Technical Specification 2.1, Nachtrag MAR-
       article_number: '626198',
     });
   });
+
+  it('listTitles([]) is [] without a query', async () => {
+    await expect(createListingRepository(database.db).listTitles([])).resolves.toEqual([]);
+  });
+
+  it('listTitles lists the display titles of the given model listings by id', async () => {
+    const { sqlite } = database;
+    const notebook = insertDeviceType(sqlite, 'Notebook');
+    const apple = insertManufacturer(sqlite, 'Apple');
+    const air = insertModelTemplate(sqlite, {
+      deviceTypeId: notebook,
+      manufacturerId: apple,
+      modelName: 'MacBook Air M2',
+      mpn: null,
+    });
+    const first = insertListing(air, '626198');
+    insertListing(air, '626199');
+    const third = insertListing(air, '626200');
+
+    await expect(
+      createListingRepository(database.db).listTitles([third, first, 999]),
+    ).resolves.toEqual([
+      { id: first, display_title: 'Listing 626198' },
+      { id: third, display_title: 'Listing 626200' },
+    ]);
+  });
 });

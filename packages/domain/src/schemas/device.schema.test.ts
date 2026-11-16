@@ -101,12 +101,10 @@ describe('device schema (CU-116, Technical Specification 2.5)', () => {
   });
 
   it('DER-54-05 reports the WI-Nr "62-61" and the battery capacity 101 together, each at its field', () => {
-    expect(fieldErrors(body({ wiNr: '62-61', values: { 18: 41, 19: { percent: 101 } } }))).toEqual(
-      [
-        { path: 'wiNr', message: WI_NR_RULE },
-        { path: 'values.19', message: BATTERY_CAPACITY_RULE },
-      ],
-    );
+    expect(fieldErrors(body({ wiNr: '62-61', values: { 18: 41, 19: { percent: 101 } } }))).toEqual([
+      { path: 'wiNr', message: WI_NR_RULE },
+      { path: 'values.19', message: BATTERY_CAPACITY_RULE },
+    ]);
   });
 
   it('rejects a device without condition with "Zustand fehlt"', () => {
@@ -130,8 +128,9 @@ describe('device schema (CU-116, Technical Specification 2.5)', () => {
   });
 
   it('accepts a condition description of 1,000 characters and rejects a longer one', () => {
-    expect(schema.parse(body({ conditionDescription: 'x'.repeat(1000) })).conditionDescription)
-      .toHaveLength(1000);
+    expect(
+      schema.parse(body({ conditionDescription: 'x'.repeat(1000) })).conditionDescription,
+    ).toHaveLength(1000);
     expect(fieldErrors(body({ conditionDescription: 'x'.repeat(1001) }))).toEqual([
       { path: 'conditionDescription', message: 'Zustandsbeschreibung: höchstens 1.000 Zeichen' },
     ]);
@@ -144,7 +143,9 @@ describe('device schema (CU-116, Technical Specification 2.5)', () => {
   });
 
   it('checks the values only by the attributes of the level device', () => {
-    expect(fieldErrors(body({ values: {} }))).toEqual([{ path: 'values.18', message: 'Akku fehlt' }]);
+    expect(fieldErrors(body({ values: {} }))).toEqual([
+      { path: 'values.18', message: 'Akku fehlt' },
+    ]);
     expect(schema.safeParse(body({ values: { 3: 'i5', 18: 42 } })).error?.issues[0]).toMatchObject({
       code: 'unrecognized_keys',
     });

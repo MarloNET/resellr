@@ -33,6 +33,20 @@ export function createListingRepository(db: Kysely<DB>) {
         .orderBy('id')
         .execute();
     },
+
+    /**
+     * The display titles of the given model listings by `id` (2.5 `wi_nr_taken`, Nachtrag
+     * MAR-965); unknown ids are left out. Without ids there is no query.
+     */
+    async listTitles(listingIds: readonly number[]) {
+      if (listingIds.length === 0) return [];
+      return db
+        .selectFrom('listing')
+        .select(['id', 'display_title'])
+        .where('id', 'in', listingIds)
+        .orderBy('id')
+        .execute();
+    },
   };
 }
 

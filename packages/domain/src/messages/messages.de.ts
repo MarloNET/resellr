@@ -201,6 +201,15 @@ export const ERROR_MESSAGES = {
   /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   'variant_flag_would_merge_listings.flag': (listings: string) =>
     `Änderung nicht möglich: Modell-Inserate ${listings} würden gleiche Variantenangaben haben`,
+  /**
+   * UI-003 "WI-Nr" (and UI-013), the WI-Nr belongs to an available or sold device: its stored
+   * WI-Nr and the display title of its model listing, or "nicht zugeordnet" without one (2.0.6,
+   * design v0.6.9, MAR-970).
+   */
+  'wi_nr_taken.listing': (wiNr: string, listingTitle: string) =>
+    `WI-Nr bereits vergeben: Gerät ${wiNr} in ${listingTitle}`,
+  'wi_nr_taken.unassigned': (wiNr: string) =>
+    `WI-Nr bereits vergeben: Gerät ${wiNr} (nicht zugeordnet)`,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
 /**

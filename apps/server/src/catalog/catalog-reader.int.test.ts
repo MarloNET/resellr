@@ -73,4 +73,24 @@ describe('catalog reader (CU-108, Technical Specification 2.1, Nachtrag MAR-879)
       createCatalogReader(database.db).listModelTemplatesOfDeviceType(tablet),
     ).resolves.toEqual([]);
   });
+
+  it('finds a model template with its device type; undefined for an unknown id', async () => {
+    const { sqlite } = database;
+    const notebook = insertDeviceType(sqlite, 'Notebook');
+    const apple = insertManufacturer(sqlite, 'Apple');
+    const air = insertModelTemplate(sqlite, {
+      deviceTypeId: notebook,
+      manufacturerId: apple,
+      modelName: 'MacBook Air M2',
+      mpn: null,
+    });
+    const reader = createCatalogReader(database.db);
+
+    await expect(reader.findModelTemplate(air)).resolves.toEqual({
+      id: air,
+      deviceTypeId: notebook,
+      modelName: 'MacBook Air M2',
+    });
+    await expect(reader.findModelTemplate(999)).resolves.toBeUndefined();
+  });
 });
