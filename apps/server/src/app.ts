@@ -72,7 +72,7 @@ export function buildApp(deps: AppDeps) {
   app.register(settingsRoutes, { db: deps.database.db, uow, clock: deps.clock, mediaFiles });
   app.register(mediaRoutes, { db: deps.database.db, mediaDir });
   app.register(channelsRoutes, { db: deps.database.db });
-  app.register(catalogRoutes, { db: deps.database.db });
+  app.register(catalogRoutes, { db: deps.database.db, uow, clock: deps.clock });
 
   return { app, writeGate, uow };
 }

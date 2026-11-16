@@ -5,7 +5,7 @@ import {
   insertManufacturer,
   insertModelTemplate,
 } from '../../test/model-templates.ts';
-import { createTestApp, HOST } from '../../test/test-app.ts';
+import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import { runMigrations } from '../db/migrator.ts';
 
@@ -182,6 +182,350 @@ describe('GET /api/model-templates/{id} (CU-109, Technical Specification 2.4)', 
     expect(response.json().error).toMatchObject({
       code: 'not_found',
       message: 'Dieser Eintrag ist nicht mehr vorhanden.',
+    });
+  });
+});
+
+describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4)', () => {
+  const NEW = () => ({
+    deviceTypeId: ids.notebook,
+    manufacturerId: ids.lenovo,
+    modelName: 'ThinkPad E15 Gen 2',
+    typeDesignation: '20TD',
+    mpn: '20TD002MGE',
+    mpnUnknown: false,
+    originalEan: '',
+  });
+
+  const post = (body: unknown) =>
+    t.app.inject({
+      method: 'POST',
+      url: '/api/model-templates',
+      headers: SAME_ORIGIN_WRITE,
+      payload: JSON.stringify(body),
+    });
+
+  const count = () =>
+    t.database.sqlite.prepare('SELECT COUNT(*) FROM model_template').pluck().get() as number;
+
+  /** The `fields[]` of a `422 validation_failed` answer, after checking status and format. */
+  const fieldsOf = (response: Awaited<ReturnType<typeof post>>) => {
+    expect(response.statusCode).toBe(422);
+    const { error } = response.json();
+    expect(error).toMatchObject({ code: 'validation_failed', message: '', referenceNumber: null });
+    return error.fields as { path: string; code: string; message: string }[];
+  };
+
+  const MPN_TOO_LONG = 'Herstellernummer: höchstens 40 Zeichen';
+  const MPN_INVALID = 'Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt';
+
+  it('AC-REQ-008-01 stores a model template with all required data, findable through GET /api/model-templates', async () => {
+    const response = await post(NEW());
+
+    expect(response.statusCode).toBe(201);
+    const created = response.json();
+    expect(created).toMatchObject({
+      deviceTypeId: ids.notebook,
+      manufacturerId: ids.lenovo,
+      modelName: 'ThinkPad E15 Gen 2',
+      typeDesignation: '20TD',
+      mpn: '20TD002MGE',
+      mpnUnknown: false,
+      originalEan: null,
+      modelValues: {},
+      defaultDeviceValues: {},
+      version: 1,
+    });
+    const hits = (await search('q=e15%20gen')).json();
+    expect(hits.items).toEqual([
+      {
+        id: created.id,
+        deviceType: { id: ids.notebook, name: 'Notebook' },
+        manufacturer: { id: ids.lenovo, name: 'Lenovo' },
+        modelName: 'ThinkPad E15 Gen 2',
+        typeDesignation: '20TD',
+        mpn: '20TD002MGE',
+        mpnUnknown: false,
+      },
+    ]);
+    expect((await get(`/api/model-templates/${created.id}`)).json()).toEqual(created);
+  });
+
+  it('AC-REQ-008-01 writes the audit entry "created" in the same transaction', async () => {
+    const created = (await post({ ...NEW(), originalEan: '4006381333931' })).json();
+
+    const entries = t.database.sqlite
+      .prepare(
+        "SELECT object_category, object_id, object_label, action, old_value, new_value FROM audit_entry WHERE object_type = 'model_template'",
+      )
+      .all();
+    expect(entries).toEqual([
+      {
+        object_category: 'model_template',
+        object_id: created.id,
+        object_label: 'Modellvorlage ThinkPad E15 Gen 2',
+        action: 'created',
+        old_value: null,
+        new_value: JSON.stringify({
+          Geräteart: 'Notebook',
+          Hersteller: 'Lenovo',
+          Modellbezeichnung: 'ThinkPad E15 Gen 2',
+          Typbezeichnung: '20TD',
+          Herstellernummer: '20TD002MGE',
+          'Original-EAN': '4006381333931',
+        }),
+      },
+    ]);
+  });
+
+  it('stores nothing when the audit entry fails (2.0.4)', async () => {
+    t.database.sqlite.exec(
+      "CREATE TRIGGER fail_audit BEFORE INSERT ON audit_entry BEGIN SELECT RAISE(ABORT, 'audit'); END",
+    );
+    const before = count();
+
+    const response = await post(NEW());
+
+    expect(response.statusCode).toBe(500);
+    expect(count()).toBe(before);
+  });
+
+  it('builds model_name_key and search_key when creating (3.3, 2.4)', async () => {
+    const { id } = (await post({ ...NEW(), modelName: 'ThinkPad  E15 Gen 2' })).json();
+
+    expect(
+      t.database.sqlite
+        .prepare('SELECT model_name_key, search_key FROM model_template WHERE id = ?')
+        .get(id),
+    ).toEqual({
+      model_name_key: 'thinkpade15gen2',
+      search_key: 'thinkpad  e15 gen 2\n20td\n20td002mge',
+    });
+  });
+
+  it('AC-REQ-008-02 rejects an empty MPN without "unbekannt" with "Herstellernummer: Wert eingeben oder ‚unbekannt‘ wählen"', async () => {
+    const before = count();
+
+    const fields = fieldsOf(await post({ ...NEW(), mpn: '' }));
+
+    expect(fields).toEqual([
+      {
+        path: 'mpn',
+        code: 'mpn_required',
+        message: 'Herstellernummer: Wert eingeben oder ‚unbekannt‘ wählen',
+      },
+    ]);
+    expect(count()).toBe(before);
+  });
+
+  it('AC-REQ-008-03 stores a model template with MPN "unbekannt" and returns it as "unbekannt"', async () => {
+    const response = await post({ ...NEW(), mpn: null, mpnUnknown: true });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ mpn: null, mpnUnknown: true });
+    const hits = (await search('q=e15')).json();
+    expect(hits.items[0]).toMatchObject({ mpn: null, mpnUnknown: true });
+  });
+
+  it('AC-REQ-008-04 rejects the original EAN "0194252146836" at the field with "EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer"', async () => {
+    const fields = fieldsOf(await post({ ...NEW(), originalEan: '0194252146836' }));
+
+    expect(fields).toEqual([
+      expect.objectContaining({
+        path: 'originalEan',
+        message: 'EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer',
+      }),
+    ]);
+  });
+
+  it('DER-50-17 rejects 41 characters with mpn_too_long (M-25)', async () => {
+    expect(fieldsOf(await post({ ...NEW(), mpn: 'A'.repeat(41) }))).toEqual([
+      { path: 'mpn', code: 'mpn_too_long', message: MPN_TOO_LONG },
+    ]);
+  });
+
+  it.each(['ABC#123', '6FY52AV#ABD', 'ÄB-12', '20TD 002MGE'])(
+    'DER-50-17 rejects "%s" with mpn_invalid_chars (M-26)',
+    async (mpn) => {
+      expect(fieldsOf(await post({ ...NEW(), mpn }))).toEqual([
+        { path: 'mpn', code: 'mpn_invalid_chars', message: MPN_INVALID },
+      ]);
+    },
+  );
+
+  it('DER-50-17 gives only mpn_too_long for 45 characters with "#", and mpn_invalid_chars once cut to 40', async () => {
+    const value = `${'A'.repeat(20)}#${'B'.repeat(24)}`;
+
+    expect(fieldsOf(await post({ ...NEW(), mpn: value }))).toEqual([
+      { path: 'mpn', code: 'mpn_too_long', message: MPN_TOO_LONG },
+    ]);
+    expect(fieldsOf(await post({ ...NEW(), mpn: value.slice(0, 40) }))).toEqual([
+      { path: 'mpn', code: 'mpn_invalid_chars', message: MPN_INVALID },
+    ]);
+  });
+
+  it('DER-50-17 stores 40 allowed characters and " 20TD002MGE " as "20TD002MGE"', async () => {
+    const forty = await post({ ...NEW(), mpn: 'A'.repeat(40) });
+    expect(forty.statusCode).toBe(201);
+
+    const trimmed = await post({ ...NEW(), modelName: 'ThinkPad V15', mpn: ' 20TD002MGE ' });
+    expect(trimmed.statusCode).toBe(201);
+    expect(trimmed.json().mpn).toBe('20TD002MGE');
+  });
+
+  it('rejects "unbekannt" together with a value in mpn with 400 bad_request', async () => {
+    const before = count();
+
+    const response = await post({ ...NEW(), mpnUnknown: true });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
+    expect(response.json().error.fields).toEqual([]);
+    expect(count()).toBe(before);
+  });
+
+  it('rejects "unbekannt" with a value as bad_request even if another field fails as well', async () => {
+    const response = await post({ ...NEW(), modelName: '', mpnUnknown: true });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('DER-50-04 DER-50-05 DER-50-13 reports every faulty field with one message each', async () => {
+    const fields = fieldsOf(
+      await post({
+        ...NEW(),
+        deviceTypeId: null,
+        manufacturerId: null,
+        modelName: ' ',
+        typeDesignation: 'T'.repeat(51),
+        mpn: 'A'.repeat(45),
+        originalEan: '1234567',
+      }),
+    );
+
+    expect(fields.map(({ path, message }) => ({ path, message }))).toEqual([
+      { path: 'deviceTypeId', message: 'Geräteart fehlt' },
+      { path: 'manufacturerId', message: 'Hersteller fehlt' },
+      { path: 'modelName', message: 'Modellbezeichnung: 1 bis 100 Zeichen' },
+      { path: 'typeDesignation', message: 'Typbezeichnung: höchstens 50 Zeichen' },
+      { path: 'mpn', message: MPN_TOO_LONG },
+      { path: 'originalEan', message: 'EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer' },
+    ]);
+  });
+
+  it('T8 rejects deviceTypeId null with 422 validation_failed "Geräteart fehlt", not 400 (Nachtrag MAR-925)', async () => {
+    const before = count();
+
+    const fields = fieldsOf(await post({ ...NEW(), deviceTypeId: null }));
+
+    expect(fields).toEqual([
+      expect.objectContaining({ path: 'deviceTypeId', message: 'Geräteart fehlt' }),
+    ]);
+    expect(count()).toBe(before);
+  });
+
+  it('T8 rejects a request without deviceTypeId as bad_request (2.0.5)', async () => {
+    const withoutDeviceType: Partial<ReturnType<typeof NEW>> = NEW();
+    delete withoutDeviceType.deviceTypeId;
+
+    const response = await post(withoutDeviceType);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
+  });
+
+  it('rejects an id in the request as bad_request (2.4: without id)', async () => {
+    expect((await post({ ...NEW(), id: 99 })).statusCode).toBe(400);
+  });
+
+  describe('active device type and manufacturer (2.4, 2.0.11, Nachtrag MAR-904)', () => {
+    const deactivate = (table: 'device_type' | 'manufacturer', id: number) =>
+      t.database.sqlite.prepare(`UPDATE ${table} SET active = 0 WHERE id = ?`).run(id);
+
+    const auditCount = () =>
+      t.database.sqlite
+        .prepare("SELECT COUNT(*) FROM audit_entry WHERE object_type = 'model_template'")
+        .pluck()
+        .get() as number;
+
+    it('AC-REQ-004-03 DER-50-18 T1 rejects a deactivated device type with 422 device_type_deactivated at deviceTypeId, stores and logs nothing', async () => {
+      deactivate('device_type', ids.monitor);
+
+      const response = await post({ ...NEW(), deviceTypeId: ids.monitor });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'device_type_deactivated',
+        message: 'Geräteart Monitor ist deaktiviert',
+        fields: [],
+        details: { path: 'deviceTypeId', id: ids.monitor },
+        referenceNumber: null,
+      });
+      expect(count()).toBe(1);
+      expect(auditCount()).toBe(0);
+    });
+
+    it('AC-REQ-101-02 DER-50-18 T1 rejects a deactivated manufacturer with 422 manufacturer_deactivated at manufacturerId, stores and logs nothing', async () => {
+      deactivate('manufacturer', ids.lenovo);
+
+      const response = await post(NEW());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'manufacturer_deactivated',
+        message: 'Hersteller Lenovo ist deaktiviert',
+        fields: [],
+        details: { path: 'manufacturerId', id: ids.lenovo },
+        referenceNumber: null,
+      });
+      expect(count()).toBe(1);
+      expect(auditCount()).toBe(0);
+    });
+
+    it('DER-50-18 T1 reports only device_type_deactivated if device type and manufacturer are deactivated', async () => {
+      deactivate('device_type', ids.notebook);
+      deactivate('manufacturer', ids.lenovo);
+
+      const response = await post(NEW());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'device_type_deactivated',
+        details: { path: 'deviceTypeId', id: ids.notebook },
+      });
+      expect(count()).toBe(1);
+      expect(auditCount()).toBe(0);
+    });
+
+    it.each([
+      ['deviceTypeId', { deviceTypeId: 999 }],
+      ['manufacturerId', { manufacturerId: 999 }],
+    ])(
+      'DER-50-19 T2 rejects an unknown %s with 400 bad_request, never 500',
+      async (_field, change) => {
+        const response = await post({ ...NEW(), ...change });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
+        expect(count()).toBe(1);
+      },
+    );
+
+    it('DER-50-19 T2 rejects an unknown device type before a deactivated manufacturer (existing ids before active entries)', async () => {
+      deactivate('manufacturer', ids.lenovo);
+
+      const response = await post({ ...NEW(), deviceTypeId: 999 });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('DER-50-19 T3 a field rule wins over a deactivated manufacturer: wrong EAN check digit gives validation_failed', async () => {
+      deactivate('manufacturer', ids.lenovo);
+
+      const fields = fieldsOf(await post({ ...NEW(), originalEan: '4006381333932' }));
+
+      expect(fields.map(({ path }) => path)).toEqual(['originalEan']);
+      expect(count()).toBe(1);
     });
   });
 });

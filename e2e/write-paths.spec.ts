@@ -218,10 +218,16 @@ const READ_PATHS: Record<string, string> = {
 };
 
 /**
+ * Collections whose list answer leaves out fields of its entries, so every entry is also read in
+ * full with `GET {path}/{id}`: the model-template list carries no original EAN (2.4).
+ */
+const DETAIL_PATHS = new Set(['/api/model-templates']);
+
+/**
  * What the user sees of the seeded data: the answer of `GET` on every collection the demo data
  * created entries in and on every single resource it saved (`PUT`, e.g. the merchant profile). A
  * seed area that writes to a path without `GET` fails here and has to name how its data is read
- * (`READ_PATHS`).
+ * (`READ_PATHS`, `DETAIL_PATHS`).
  */
 async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<unknown> {
   const api = createDemoApi(baseUrl);
@@ -230,7 +236,13 @@ async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<un
   ];
   const state: Record<string, unknown> = {};
   for (const path of collections.sort()) {
-    state[path] = await api.request('GET', READ_PATHS[path] ?? path);
+    const list = await api.request<{ items: { id: number }[] }>('GET', READ_PATHS[path] ?? path);
+    state[path] = list;
+    if (DETAIL_PATHS.has(path)) {
+      for (const { id } of list.items) {
+        state[`${path}/${id}`] = await api.request('GET', `${path}/${id}`);
+      }
+    }
   }
   return state;
 }
