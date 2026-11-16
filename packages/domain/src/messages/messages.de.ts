@@ -95,6 +95,8 @@ export const FIELD_MESSAGES = {
   conditionCodePlainText: 'Klartext: 1 bis 500 Zeichen',
   /** UI-026 "Kontaktangaben", longer than 500 characters. */
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
+  /** UI-007 "Geräteart" without a choice (Design v0.6.7, Nachtrag MAR-925). */
+  deviceTypeMissing: 'Geräteart fehlt',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
   /**

@@ -152,7 +152,8 @@ export const originalEanSchema = z
 
 /**
  * `POST /api/model-templates` (2.4): the model template without `id`. `web-ui` sends every
- * field, an empty input as `''` and no manufacturer as `null` (2.0.5 rule (2)). With
+ * field, an empty input as `''` and no device type or manufacturer as `null` (2.0.5 rule (2));
+ * `null` is a field error ("Geräteart und Hersteller Pflicht", Nachtrag MAR-925). With
  * "unbekannt" it sends `mpn: null`; a value together with `mpnUnknown: true`, or `null` without
  * it, is a program error of the user interface and fails without a field path, i.e.
  * `400 bad_request` (2.0.5 rule (4)). The check runs although other fields failed, so the
@@ -160,7 +161,9 @@ export const originalEanSchema = z
  */
 export const modelTemplateCreateSchema = z
   .strictObject({
-    deviceTypeId: idSchema,
+    deviceTypeId: idSchema
+      .nullable()
+      .refine((id): id is number => id !== null, FIELD_MESSAGES.deviceTypeMissing),
     manufacturerId: idSchema
       .nullable()
       .refine((id): id is number => id !== null, FIELD_MESSAGES.manufacturerMissing),

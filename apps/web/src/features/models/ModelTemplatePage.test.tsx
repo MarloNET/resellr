@@ -121,6 +121,11 @@ function errorOf(control: HTMLElement): string | null {
 
 const pending = () => new Promise<Response>(() => {});
 
+const PLACEHOLDER = 'Bitte wählen';
+const optionTexts = (control: HTMLSelectElement) => Array.from(control.options, ({ text }) => text);
+/** The text the field shows: the selected option. */
+const shownText = (control: HTMLSelectElement) => control.selectedOptions[0]?.text ?? null;
+
 async function openPage() {
   const router = renderPage();
   await screen.findByRole('form', { name: 'Modellvorlage anlegen' });
@@ -128,12 +133,14 @@ async function openPage() {
 }
 
 function fill({
+  deviceTypeId = '1',
   manufacturerId = '11',
   modelName = 'ThinkPad E15 Gen 2',
   typeDesignation = '',
   mpn = '20TD002MGE',
   originalEan = '',
 } = {}) {
+  fireEvent.change(select('Geräteart'), { target: { value: deviceTypeId } });
   fireEvent.change(select('Hersteller'), { target: { value: manufacturerId } });
   fireEvent.change(textbox('Modellbezeichnung'), { target: { value: modelName } });
   fireEvent.change(textbox('Typbezeichnung'), { target: { value: typeDesignation } });
@@ -173,22 +180,19 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     expect(saveButton().disabled).toBe(true);
   });
 
-  it('UI-007.default shows the empty form with the active device types and manufacturers, required marks and both actions', async () => {
+  it('UI-007.default T5a shows the empty form with "Bitte wählen" in device type and manufacturer, the active entries, required marks and both actions', async () => {
     mockApi();
     await openPage();
 
     expect(screen.getByRole('link', { name: /Zurück zur Modell-Bibliothek/ })).toBeTruthy();
     expect(within(form()).getByRole('heading', { level: 2, name: 'Modelldaten' })).toBeTruthy();
-    expect(Array.from(select('Geräteart').options, (option) => option.text)).toEqual([
-      'Notebook',
-      'Tablet',
-    ]);
-    expect(select('Geräteart').value).toBe('1');
-    expect(Array.from(select('Hersteller').options, (option) => option.text)).toEqual([
-      '',
-      'Lenovo',
-    ]);
+    expect(optionTexts(select('Geräteart'))).toEqual([PLACEHOLDER, 'Notebook', 'Tablet']);
+    expect(optionTexts(select('Hersteller'))).toEqual([PLACEHOLDER, 'Lenovo']);
     for (const name of ['Geräteart', 'Hersteller']) {
+      // Nothing is chosen in advance, and the placeholder cannot be chosen (Design v0.6.7).
+      expect(select(name).value).toBe('');
+      expect(shownText(select(name))).toBe(PLACEHOLDER);
+      expect(select(name).options[0]?.disabled).toBe(true);
       expect(select(name).getAttribute('aria-required')).toBe('true');
     }
     for (const name of ['Modellbezeichnung', 'Herstellernummer']) {
@@ -334,6 +338,20 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     expect(sent).toEqual([]);
   });
 
+  it('UI-007.validation shows "Geräteart fehlt" without a chosen device type, with the focus there, and sends nothing (Nachtrag MAR-925)', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    fill({ deviceTypeId: '', manufacturerId: '' });
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe('Geräteart fehlt'));
+    expect(errorOf(select('Hersteller'))).toBe('Hersteller fehlt');
+    expect(document.activeElement).toBe(select('Geräteart'));
+    expect(sent).toEqual([]);
+    expectAccessiblePage();
+  });
+
   it('UI-007.validation DER-50-13 shows "Typbezeichnung: höchstens 50 Zeichen" for more than 50 characters', async () => {
     const { sent } = mockApi();
     await openPage();
@@ -432,7 +450,7 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  describe('UI-007.validation deactivated device type or manufacturer (2.4, 2.0.11, Nachtrag MAR-904)', () => {
+  describe('UI-007.validation deactivated device type or manufacturer (2.4, 2.0.11, Nachträge MAR-904, MAR-925)', () => {
     /** A list answer: the first call with `before`, every later one with `after`. */
     const firstThen = (before: unknown[], after: unknown[]) => {
       let calls = 0;
@@ -443,7 +461,34 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
       };
     };
 
-    it('T5 AC-REQ-004-03 shows device_type_deactivated at "Geräteart" with the focus there and reloads the choice without it', async () => {
+    /** A list answer: the first call with `items`, every later one fails with 500. */
+    const firstThenFail = (items: unknown[]) => {
+      let calls = 0;
+      return () => {
+        calls += 1;
+        return calls === 1
+          ? Response.json({ items, total: items.length })
+          : Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX6' }), {
+              status: 500,
+            });
+      };
+    };
+
+    const rejectOnce = (code: string, message: string, path: string, id: number) => {
+      let calls = 0;
+      return () => {
+        calls += 1;
+        return calls === 1
+          ? Response.json(errorBody(code, { message, details: { path, id } }), { status: 422 })
+          : Response.json(CREATED, { status: 201 });
+      };
+    };
+
+    const NOTEBOOK_DEACTIVATED = 'Geräteart Notebook ist deaktiviert';
+    const FUJITSU = manufacturer(13, 'Fujitsu');
+    const FUJITSU_DEACTIVATED = 'Hersteller Fujitsu ist deaktiviert';
+
+    it('AC-REQ-004-03 DER-50-18 T5 T5b shows device_type_deactivated at "Geräteart" with the focus there, reloads the choice without it and shows "Bitte wählen"', async () => {
       const deviceTypes = vi.fn(
         firstThen([NOTEBOOK, TABLET], [{ ...NOTEBOOK, active: false }, TABLET]),
       );
@@ -451,73 +496,160 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
       const { sent } = mockApi({
         deviceTypes,
         manufacturers,
-        create: () =>
-          Response.json(
-            errorBody('device_type_deactivated', {
-              message: 'Geräteart Notebook ist deaktiviert',
-              details: { path: 'deviceTypeId', id: 1 },
-            }),
-            { status: 422 },
-          ),
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
       });
       await openPage();
       fill();
 
       fireEvent.click(saveButton());
 
-      await vi.waitFor(() =>
-        expect(errorOf(select('Geräteart'))).toBe('Geräteart Notebook ist deaktiviert'),
-      );
+      await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED));
       expect(document.activeElement).toBe(select('Geräteart'));
       await vi.waitFor(() =>
-        expect(Array.from(select('Geräteart').options, (option) => option.text)).toEqual([
-          'Tablet',
-        ]),
+        expect(optionTexts(select('Geräteart'))).toEqual([PLACEHOLDER, 'Tablet']),
       );
       expect(manufacturers).toHaveBeenCalledTimes(2);
-      expect(sent).toHaveLength(1);
-      expect(textbox('Modellbezeichnung').value).toBe('ThinkPad E15 Gen 2');
+      // The field shows what it would send: nothing (FIND-397-04).
+      expect(select('Geräteart').value).toBe('');
+      expect(shownText(select('Geräteart'))).toBe(PLACEHOLDER);
       expect(screen.queryByRole('alert')).toBeNull();
       expectAccessiblePage();
+
+      // The text stays when the field is left without a choice.
+      fireEvent.blur(select('Geräteart'));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED);
+
+      // Saving without a choice sends nothing and shows the required rule instead.
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe('Geräteart fehlt'));
+      expect(document.activeElement).toBe(select('Geräteart'));
+      expect(sent).toHaveLength(1);
+
+      // Choosing an active entry removes the text; the save sends the new id, never the rejected.
+      fireEvent.change(select('Geräteart'), { target: { value: '3' } });
+      expect(errorOf(select('Geräteart'))).toBeNull();
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(sent).toHaveLength(2));
+      expect(sent.map((body) => (body as { deviceTypeId: unknown }).deviceTypeId)).toEqual([1, 3]);
     });
 
-    it('T5 AC-REQ-101-02 shows manufacturer_deactivated at "Hersteller" with the focus there and reloads the choice without it', async () => {
-      const deviceTypes = vi.fn(firstThen([NOTEBOOK], [NOTEBOOK]));
-      const manufacturers = vi.fn(
-        firstThen(
-          [LENOVO, manufacturer(13, 'Fujitsu')],
-          [LENOVO, manufacturer(13, 'Fujitsu', false)],
-        ),
-      );
-      mockApi({
-        deviceTypes,
-        manufacturers,
-        create: () =>
-          Response.json(
-            errorBody('manufacturer_deactivated', {
-              message: 'Hersteller Fujitsu ist deaktiviert',
-              details: { path: 'manufacturerId', id: 13 },
-            }),
-            { status: 422 },
-          ),
+    it('DER-50-18 T5d keeps manufacturer, model name, type designation, MPN "unbekannt" and original EAN after device_type_deactivated', async () => {
+      const { sent } = mockApi({
+        deviceTypes: firstThen([NOTEBOOK, TABLET], [TABLET]),
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
       });
       await openPage();
-      fill({ manufacturerId: '13' });
+      fill({ typeDesignation: '20TD', originalEan: '2000000177007' });
+      fireEvent.click(unknownBox());
 
       fireEvent.click(saveButton());
 
-      await vi.waitFor(() =>
-        expect(errorOf(select('Hersteller'))).toBe('Hersteller Fujitsu ist deaktiviert'),
+      await vi.waitFor(() => expect(select('Geräteart').value).toBe(''));
+      expect(select('Hersteller').value).toBe('11');
+      expect(textbox('Modellbezeichnung').value).toBe('ThinkPad E15 Gen 2');
+      expect(textbox('Typbezeichnung').value).toBe('20TD');
+      expect(unknownBox().checked).toBe(true);
+      expect(textbox('Original-EAN').value).toBe('2000000177007');
+
+      fireEvent.change(select('Geräteart'), { target: { value: '3' } });
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(sent).toHaveLength(2));
+      expect(sent[1]).toEqual({
+        deviceTypeId: 3,
+        manufacturerId: 11,
+        modelName: 'ThinkPad E15 Gen 2',
+        typeDesignation: '20TD',
+        mpn: null,
+        mpnUnknown: true,
+        originalEan: '2000000177007',
+      });
+    });
+
+    it('AC-REQ-101-02 DER-50-18 T5 T5c shows manufacturer_deactivated at "Hersteller" with the focus there, reloads the choice without it and shows "Bitte wählen"', async () => {
+      const deviceTypes = vi.fn(firstThen([NOTEBOOK], [NOTEBOOK]));
+      const manufacturers = vi.fn(
+        firstThen([LENOVO, FUJITSU], [LENOVO, manufacturer(13, 'Fujitsu', false)]),
       );
+      const { sent } = mockApi({
+        deviceTypes,
+        manufacturers,
+        create: rejectOnce('manufacturer_deactivated', FUJITSU_DEACTIVATED, 'manufacturerId', 13),
+      });
+      await openPage();
+      fill({ manufacturerId: '13', typeDesignation: '20TD', originalEan: '2000000177007' });
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(errorOf(select('Hersteller'))).toBe(FUJITSU_DEACTIVATED));
       expect(document.activeElement).toBe(select('Hersteller'));
       await vi.waitFor(() =>
-        expect(Array.from(select('Hersteller').options, (option) => option.text)).toEqual([
-          '',
-          'Lenovo',
-        ]),
+        expect(optionTexts(select('Hersteller'))).toEqual([PLACEHOLDER, 'Lenovo']),
       );
       expect(deviceTypes).toHaveBeenCalledTimes(2);
+      expect(select('Hersteller').value).toBe('');
+      expect(shownText(select('Hersteller'))).toBe(PLACEHOLDER);
       expect(screen.queryByRole('alert')).toBeNull();
+      expect(select('Geräteart').value).toBe('1');
+      expect(textbox('Modellbezeichnung').value).toBe('ThinkPad E15 Gen 2');
+      expect(textbox('Typbezeichnung').value).toBe('20TD');
+      expect(textbox('Herstellernummer').value).toBe('20TD002MGE');
+      expect(textbox('Original-EAN').value).toBe('2000000177007');
+
+      fireEvent.blur(select('Hersteller'));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(errorOf(select('Hersteller'))).toBe(FUJITSU_DEACTIVATED);
+
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(errorOf(select('Hersteller'))).toBe('Hersteller fehlt'));
+      expect(sent).toHaveLength(1);
+
+      fireEvent.change(select('Hersteller'), { target: { value: '11' } });
+      expect(errorOf(select('Hersteller'))).toBeNull();
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(sent).toHaveLength(2));
+      expect(sent[1]).toMatchObject({ deviceTypeId: 1, manufacturerId: 11 });
+    });
+
+    it.each([
+      ['Geräteart', 'device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1],
+      ['Hersteller', 'manufacturer_deactivated', FUJITSU_DEACTIVATED, 'manufacturerId', 13],
+    ] as const)(
+      'DER-50-18 T5e empties "%s" and drops the rejected entry from the choice when reloading fails',
+      async (field, code, message, path, id) => {
+        const { sent } = mockApi({
+          deviceTypes: firstThenFail([NOTEBOOK, TABLET]),
+          manufacturers: firstThenFail([LENOVO, FUJITSU]),
+          create: rejectOnce(code, message, path, id),
+        });
+        await openPage();
+        fill({ manufacturerId: '13' });
+
+        fireEvent.click(saveButton());
+
+        await vi.waitFor(() => expect(select(field).value).toBe(''));
+        expect(errorOf(select(field))).toBe(message);
+        expect(Array.from(select(field).options, ({ value }) => value)).not.toContain(String(id));
+        fireEvent.click(saveButton());
+        await vi.waitFor(() => expect(errorOf(select(field))).toMatch(/ fehlt$/));
+        expect(sent).toHaveLength(1);
+      },
+    );
+
+    it('DER-50-18 keeps the entry chosen when it is active again after reloading (Nachtrag MAR-925, verworfen (b))', async () => {
+      mockApi({
+        deviceTypes: firstThen([NOTEBOOK, TABLET], [NOTEBOOK, TABLET]),
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
+      });
+      await openPage();
+      fill();
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(select('Geräteart').value).toBe('1');
+      expect(shownText(select('Geräteart'))).toBe('Notebook');
     });
   });
 

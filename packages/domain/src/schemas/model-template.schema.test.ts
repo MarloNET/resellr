@@ -205,6 +205,21 @@ describe('model template create schema (CU-104, 2.4)', () => {
     ]);
   });
 
+  it('T7 rejects a missing device type with "Geräteart fehlt" at deviceTypeId (Nachtrag MAR-925)', () => {
+    expect(issuesOf({ ...MV_A_CREATE, deviceTypeId: null })).toEqual([
+      expect.objectContaining({ path: 'deviceTypeId', message: 'Geräteart fehlt' }),
+    ]);
+  });
+
+  it('T7 rejects a request without deviceTypeId as a structural error', () => {
+    const withoutDeviceType: Partial<typeof MV_A_CREATE> = { ...MV_A_CREATE };
+    delete withoutDeviceType.deviceTypeId;
+
+    expect(issuesOf(withoutDeviceType)).toEqual([
+      expect.objectContaining({ path: 'deviceTypeId', code: 'invalid_type' }),
+    ]);
+  });
+
   it('DER-50-13 rejects a type designation over 50 characters', () => {
     expect(issuesOf({ ...MV_A_CREATE, typeDesignation: 'T'.repeat(51) })).toEqual([
       expect.objectContaining({
@@ -232,16 +247,17 @@ describe('model template create schema (CU-104, 2.4)', () => {
     expect(issuesOf({ ...MV_A_CREATE, originalEan: '96385074' })).toEqual([]);
   });
 
-  it('reports every faulty field with one message each in one check', () => {
+  it('T7 reports every faulty field with one message each in schema order, device type first', () => {
     expect(
       issuesOf({
         ...MV_A_CREATE,
+        deviceTypeId: null,
         manufacturerId: null,
         modelName: '',
         mpn: 'A'.repeat(45),
         originalEan: '123',
       }).map((issue) => issue.path),
-    ).toEqual(['manufacturerId', 'modelName', 'mpn', 'originalEan']);
+    ).toEqual(['deviceTypeId', 'manufacturerId', 'modelName', 'mpn', 'originalEan']);
   });
 
   it('rejects an unknown field and an id as a structural error', () => {

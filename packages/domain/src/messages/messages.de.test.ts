@@ -95,6 +95,10 @@ describe('message catalog (E1)', () => {
     expect(ERROR_MESSAGES['name_taken.device_type']).toBe('Name ist bereits vergeben');
   });
 
+  it('has the field text of a missing device type (UI-007, Nachtrag MAR-925)', () => {
+    expect(FIELD_MESSAGES.deviceTypeMissing).toBe('Geräteart fehlt');
+  });
+
   it('has the field text of the device type name (UI-027)', () => {
     expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
   });

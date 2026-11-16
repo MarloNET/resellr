@@ -27,12 +27,14 @@ import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
 
-// Texts of UI-007 `screen.md` and its mockup (UI/UX design v0.6.2, v0.6.3 for the empty MPN).
+// Texts of UI-007 `screen.md` and its mockup (UI/UX design v0.6.2, v0.6.3 for the empty MPN,
+// v0.6.7 for the placeholder).
 const TEXTS = {
   back: 'Zurück zur Modell-Bibliothek',
   title: 'Modellvorlage anlegen',
   loading: 'Lade Modellvorlage …',
   modelData: 'Modelldaten',
+  choose: 'Bitte wählen',
   deviceType: 'Geräteart',
   manufacturer: 'Hersteller',
   modelName: 'Modellbezeichnung',
@@ -80,16 +82,18 @@ type FieldErrors = Partial<Record<Field, string>>;
 
 const isField = (path: string): path is Field => (FIELDS as readonly string[]).includes(path);
 
-/** Rejections of a deactivated choice, shown at the field of `details.path` (2.0.11). */
-const DEACTIVATED_CODES: ReadonlySet<string> = new Set([
-  'device_type_deactivated',
-  'manufacturer_deactivated',
-]);
+/** The choices whose entry the server can reject as deactivated (2.0.11). */
+type ChoiceField = 'deviceTypeId' | 'manufacturerId';
+
+/** Rejections of a deactivated choice and the field of their `details.path` (2.0.11). */
+const DEACTIVATED_CODES: Readonly<Record<string, ChoiceField>> = {
+  device_type_deactivated: 'deviceTypeId',
+  manufacturer_deactivated: 'manufacturerId',
+};
 
 /** Request body of `POST /api/model-templates`: every field, "unbekannt" with `mpn: null`. */
-const bodyOf = ({ deviceTypeId, mpn, mpnUnknown, ...draft }: Draft): ModelTemplateCreateInput => ({
+const bodyOf = ({ mpn, mpnUnknown, ...draft }: Draft): ModelTemplateCreateInput => ({
   ...draft,
-  deviceTypeId: deviceTypeId ?? 0,
   mpn: mpnUnknown ? null : mpn,
   mpnUnknown,
 });
@@ -115,7 +119,8 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
 /**
  * Model template UI-007 for a new model template (CU-114, REQ-008; Technical Specification
  * 2.4): device type, manufacturer, model name, type designation, MPN or "unbekannt" and original
- * EAN, "Modellvorlage speichern" (also Ctrl+S) and "Abbrechen". States: default, loading,
+ * EAN, "Modellvorlage speichern" (also Ctrl+S) and "Abbrechen". Device type and manufacturer open
+ * with the placeholder "Bitte wählen" (Design v0.6.7). States: default, loading,
  * validation (focus on the first error), speichert and ausgang-unbekannt (P-08), success (banner
  * on the calling page), error, unreachable (P-06) for the reads and wird-beendet (P-07) for the
  * save. The attribute fields (#178), the dialog UI-008 (#179), the duplicate hint (#184) and
@@ -128,12 +133,22 @@ export function ModelTemplatePage() {
   const createMutation = useCreateModelTemplateMutation();
   const writesLocked = useWritesLocked();
 
-  const activeDeviceTypes = deviceTypes.data?.items.filter(({ active }) => active);
-  const activeManufacturers = manufacturers.data?.items.filter(({ active }) => active);
+  // A rejected entry whose list could not be read again counts as missing (2.4, Nachtrag
+  // MAR-925): it is no longer offered.
+  const [dropped, setDropped] = useState<Partial<Record<ChoiceField, number>>>({});
+  const activeDeviceTypes = deviceTypes.data?.items.filter(
+    ({ id, active }) => active && id !== dropped.deviceTypeId,
+  );
+  const activeManufacturers = manufacturers.data?.items.filter(
+    ({ id, active }) => active && id !== dropped.manufacturerId,
+  );
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
+  // Choices that show the text of a rejection; it stays until the next choice (Design v0.6.7).
+  const [rejectionShown, setRejectionShown] = useState<Partial<Record<Field, boolean>>>({});
+  const [reloading, setReloading] = useState(false);
 
   const formId = useId();
   const modelDataId = useId();
@@ -141,13 +156,12 @@ export function ModelTemplatePage() {
   const focusFirstError = useFocusFirstError(formRef);
   const blurCheck = useDeferredBlurCheck();
 
-  // The form opens once the choices have arrived, with the first active device type chosen.
-  const firstDeviceTypeId = activeDeviceTypes?.[0]?.id ?? null;
+  // The form opens once the choices have arrived, with nothing chosen (Design v0.6.7).
   const choicesLoaded = activeDeviceTypes !== undefined && activeManufacturers !== undefined;
   useEffect(() => {
     if (draft !== null || !choicesLoaded) return;
     setDraft({
-      deviceTypeId: firstDeviceTypeId,
+      deviceTypeId: null,
       manufacturerId: null,
       modelName: '',
       typeDesignation: '',
@@ -155,17 +169,26 @@ export function ModelTemplatePage() {
       mpnUnknown: false,
       originalEan: '',
     });
-  }, [draft, choicesLoaded, firstDeviceTypeId]);
+  }, [draft, choicesLoaded]);
 
   const saving = createMutation.isPending;
-  const canSave = draft !== null && draft.deviceTypeId !== null && !saving && !writesLocked;
+  // Until the choices are read again after a rejection, a save could send the rejected id.
+  const canSave = draft !== null && !saving && !writesLocked && !reloading;
 
   function change(next: Partial<Draft>) {
     if (draft !== null) setDraft({ ...draft, ...next });
   }
 
+  /** A choice from the list: any entry offered is valid, so the text of the field goes. */
+  function choose(field: ChoiceField, value: string) {
+    change({ [field]: idOf(value) });
+    setErrors((previous) => ({ ...previous, [field]: undefined }));
+    setRejectionShown((previous) => ({ ...previous, [field]: false }));
+  }
+
   function checkOnBlur(field: Field) {
     if (draft === null) return;
+    if (rejectionShown[field]) return;
     const current = draft;
     blurCheck.checkOnBlur(() =>
       setErrors((previous) => ({ ...previous, [field]: checkAll(current)[field] })),
@@ -190,19 +213,35 @@ export function ModelTemplatePage() {
     }
     // A device type or manufacturer deactivated in another window: the text stands at the field
     // of `details.path`, and both choices are read again without it (2.4, 2.0.11).
-    const path = error.error?.details.path;
-    if (
-      error.kind === 'rejected' &&
-      DEACTIVATED_CODES.has(error.error?.code ?? '') &&
-      typeof path === 'string' &&
-      isField(path)
-    ) {
-      showFieldErrors({ [path]: error.error?.message });
-      void deviceTypes.refetch();
-      void manufacturers.refetch();
+    const field = DEACTIVATED_CODES[error.error?.code ?? ''];
+    const { path, id } = error.error?.details ?? {};
+    if (error.kind === 'rejected' && field !== undefined && path === field) {
+      showFieldErrors({ [field]: error.error?.message });
+      setRejectionShown({ [field]: true });
+      if (typeof id === 'number') void reloadAfterRejection(field, id);
       return;
     }
     setNotice(noticeOf(error));
+  }
+
+  /**
+   * Reads both choices again. If the rejected entry is missing then, or the read fails, the choice
+   * is emptied, so the rejected id is never sent again (2.4 "Auswahl nach der Ablehnung",
+   * Nachtrag MAR-925).
+   */
+  async function reloadAfterRejection(field: ChoiceField, id: number) {
+    setReloading(true);
+    const [types, makers] = await Promise.all([deviceTypes.refetch(), manufacturers.refetch()]);
+    const result = field === 'deviceTypeId' ? types : makers;
+    const activeAgain =
+      !result.isError && result.data?.items.some((entry) => entry.id === id && entry.active);
+    if (!activeAgain) {
+      if (result.isError) setDropped((previous) => ({ ...previous, [field]: id }));
+      setDraft((previous) =>
+        previous?.[field] === id ? { ...previous, [field]: null } : previous,
+      );
+    }
+    setReloading(false);
   }
 
   function save() {
@@ -210,6 +249,7 @@ export function ModelTemplatePage() {
     blurCheck.cancel();
     if (draft === null || !canSave) return;
     const found = checkAll(draft);
+    setRejectionShown({});
     if (hasErrors(found)) {
       showFieldErrors(found);
       return;
@@ -301,8 +341,12 @@ export function ModelTemplatePage() {
                     {...control}
                     value={optionValue(draft.deviceTypeId)}
                     disabled={saving}
-                    onChange={(event) => change({ deviceTypeId: idOf(event.target.value) })}
+                    onChange={(event) => choose('deviceTypeId', event.target.value)}
+                    onBlur={() => checkOnBlur('deviceTypeId')}
                   >
+                    <option value="" disabled>
+                      {TEXTS.choose}
+                    </option>
                     {(activeDeviceTypes ?? []).map(({ id, name }) => (
                       <option key={id} value={id}>
                         {name}
@@ -318,10 +362,12 @@ export function ModelTemplatePage() {
                     {...control}
                     value={optionValue(draft.manufacturerId)}
                     disabled={saving}
-                    onChange={(event) => change({ manufacturerId: idOf(event.target.value) })}
+                    onChange={(event) => choose('manufacturerId', event.target.value)}
                     onBlur={() => checkOnBlur('manufacturerId')}
                   >
-                    <option value="" />
+                    <option value="" disabled>
+                      {TEXTS.choose}
+                    </option>
                     {(activeManufacturers ?? []).map(({ id, name }) => (
                       <option key={id} value={id}>
                         {name}

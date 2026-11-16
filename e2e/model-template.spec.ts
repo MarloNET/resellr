@@ -81,6 +81,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await createManufacturer(page, server.baseUrl, manufacturer);
     await page.goto('/modelle/neu');
 
+    await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
     await field(page, 'Hersteller').selectOption({ label: manufacturer });
     await field(page, 'Modellbezeichnung').fill('Esprimo Q957');
     await form(page).getByRole('checkbox', { name: 'unbekannt' }).check();
@@ -98,13 +99,21 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     ).toHaveText('unbekannt');
   });
 
-  test('UI-007.validation AC-REQ-101-02 a manufacturer deactivated in another window is rejected at the field "Hersteller" and leaves the choice (2.4, Nachtrag MAR-904)', async ({
+  test('UI-007.validation AC-REQ-101-02 DER-50-18 a manufacturer deactivated in another window is rejected at the field "Hersteller", leaves the choice and is never sent again (2.4, Nachträge MAR-904, MAR-925)', async ({
     page,
     server,
   }, testInfo) => {
     const manufacturer = uniqueName('Fujitsu', testInfo.title, testInfo.project.name);
     const { id, version } = await createManufacturer(page, server.baseUrl, manufacturer);
+    const sent: unknown[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (request.method() === 'POST' && url.pathname === '/api/model-templates') {
+        sent.push(request.postDataJSON());
+      }
+    });
     await page.goto('/modelle/neu');
+    await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
     await field(page, 'Hersteller').selectOption({ label: manufacturer });
     await field(page, 'Modellbezeichnung').fill('Lifebook E5510');
     await field(page, 'Herstellernummer').fill('E5510MP5');
@@ -122,9 +131,17 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await expect(field(page, 'Hersteller').getByRole('option', { name: manufacturer })).toHaveCount(
       0,
     );
+    // The field shows what it sends: nothing (FIND-397-04, Design v0.6.7).
+    await expect(field(page, 'Hersteller')).toHaveValue('');
+    await expect(field(page, 'Hersteller').locator('option:checked')).toHaveText('Bitte wählen');
     await expect(field(page, 'Modellbezeichnung')).toHaveValue('Lifebook E5510');
     await expect(page).toHaveURL(/\/modelle\/neu$/);
     await expectReachable(page);
+
+    await saveButton(page).click();
+    await expect(form(page).getByText('Hersteller fehlt')).toBeVisible();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ manufacturerId: id });
   });
 
   test('UI-007.validation DER-50-17 AC-REQ-008-02 the browser shows one message per field and focuses the first error', async ({
@@ -136,7 +153,8 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await field(page, 'Original-EAN').fill('0194252146836');
     await saveButton(page).click();
 
-    await expect(field(page, 'Hersteller')).toBeFocused();
+    await expect(field(page, 'Geräteart')).toBeFocused();
+    await expect(form(page).getByText('Geräteart fehlt')).toBeVisible();
     await expect(form(page).getByText('Hersteller fehlt')).toBeVisible();
     await expect(form(page).getByText('Modellbezeichnung: 1 bis 100 Zeichen')).toBeVisible();
     await expect(form(page).getByText('Herstellernummer: höchstens 40 Zeichen')).toBeVisible();
@@ -164,7 +182,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     expect(sectionBox?.width).toBeCloseTo(formBox?.width ?? 0, 0);
     await expectReachable(page);
     await saveButton(page).click();
-    await expect(field(page, 'Hersteller')).toBeFocused();
+    await expect(field(page, 'Geräteart')).toBeFocused();
     await expectReachable(page);
   });
 });

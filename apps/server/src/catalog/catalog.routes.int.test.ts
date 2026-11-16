@@ -394,6 +394,7 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
     const fields = fieldsOf(
       await post({
         ...NEW(),
+        deviceTypeId: null,
         manufacturerId: null,
         modelName: ' ',
         typeDesignation: 'T'.repeat(51),
@@ -403,12 +404,34 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
     );
 
     expect(fields.map(({ path, message }) => ({ path, message }))).toEqual([
+      { path: 'deviceTypeId', message: 'Geräteart fehlt' },
       { path: 'manufacturerId', message: 'Hersteller fehlt' },
       { path: 'modelName', message: 'Modellbezeichnung: 1 bis 100 Zeichen' },
       { path: 'typeDesignation', message: 'Typbezeichnung: höchstens 50 Zeichen' },
       { path: 'mpn', message: MPN_TOO_LONG },
       { path: 'originalEan', message: 'EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer' },
     ]);
+  });
+
+  it('T8 rejects deviceTypeId null with 422 validation_failed "Geräteart fehlt", not 400 (Nachtrag MAR-925)', async () => {
+    const before = count();
+
+    const fields = fieldsOf(await post({ ...NEW(), deviceTypeId: null }));
+
+    expect(fields).toEqual([
+      expect.objectContaining({ path: 'deviceTypeId', message: 'Geräteart fehlt' }),
+    ]);
+    expect(count()).toBe(before);
+  });
+
+  it('T8 rejects a request without deviceTypeId as bad_request (2.0.5)', async () => {
+    const withoutDeviceType: Partial<ReturnType<typeof NEW>> = NEW();
+    delete withoutDeviceType.deviceTypeId;
+
+    const response = await post(withoutDeviceType);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
   });
 
   it('rejects an id in the request as bad_request (2.4: without id)', async () => {
@@ -425,7 +448,7 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
         .pluck()
         .get() as number;
 
-    it('T1 AC-REQ-004-03 rejects a deactivated device type with 422 device_type_deactivated at deviceTypeId, stores and logs nothing', async () => {
+    it('AC-REQ-004-03 DER-50-18 T1 rejects a deactivated device type with 422 device_type_deactivated at deviceTypeId, stores and logs nothing', async () => {
       deactivate('device_type', ids.monitor);
 
       const response = await post({ ...NEW(), deviceTypeId: ids.monitor });
@@ -442,7 +465,7 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
       expect(auditCount()).toBe(0);
     });
 
-    it('T1 AC-REQ-101-02 rejects a deactivated manufacturer with 422 manufacturer_deactivated at manufacturerId, stores and logs nothing', async () => {
+    it('AC-REQ-101-02 DER-50-18 T1 rejects a deactivated manufacturer with 422 manufacturer_deactivated at manufacturerId, stores and logs nothing', async () => {
       deactivate('manufacturer', ids.lenovo);
 
       const response = await post(NEW());
@@ -459,7 +482,7 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
       expect(auditCount()).toBe(0);
     });
 
-    it('T1 reports only device_type_deactivated if device type and manufacturer are deactivated', async () => {
+    it('DER-50-18 T1 reports only device_type_deactivated if device type and manufacturer are deactivated', async () => {
       deactivate('device_type', ids.notebook);
       deactivate('manufacturer', ids.lenovo);
 
@@ -477,15 +500,18 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
     it.each([
       ['deviceTypeId', { deviceTypeId: 999 }],
       ['manufacturerId', { manufacturerId: 999 }],
-    ])('T2 rejects an unknown %s with 400 bad_request, never 500', async (_field, change) => {
-      const response = await post({ ...NEW(), ...change });
+    ])(
+      'DER-50-19 T2 rejects an unknown %s with 400 bad_request, never 500',
+      async (_field, change) => {
+        const response = await post({ ...NEW(), ...change });
 
-      expect(response.statusCode).toBe(400);
-      expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
-      expect(count()).toBe(1);
-    });
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
+        expect(count()).toBe(1);
+      },
+    );
 
-    it('T2 rejects an unknown device type before a deactivated manufacturer (existing ids before active entries)', async () => {
+    it('DER-50-19 T2 rejects an unknown device type before a deactivated manufacturer (existing ids before active entries)', async () => {
       deactivate('manufacturer', ids.lenovo);
 
       const response = await post({ ...NEW(), deviceTypeId: 999 });
@@ -493,7 +519,7 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
       expect(response.statusCode).toBe(400);
     });
 
-    it('T3 a field rule wins over a deactivated manufacturer: wrong EAN check digit gives validation_failed', async () => {
+    it('DER-50-19 T3 a field rule wins over a deactivated manufacturer: wrong EAN check digit gives validation_failed', async () => {
       deactivate('manufacturer', ids.lenovo);
 
       const fields = fieldsOf(await post({ ...NEW(), originalEan: '4006381333932' }));
