@@ -34,9 +34,6 @@ export interface AttributeEntry extends AttributeValueDefinition {
   pickListId: number | null;
 }
 
-/** The nine pick lists of the initial settings; there are never more (RQ-07). */
-const ALL_PICK_LISTS = { limit: 9, offset: 0 };
-
 const toEntry = (row: { id: number; name: string; active: number }): SettingsEntry => ({
   id: row.id,
   name: row.name,
@@ -45,10 +42,11 @@ const toEntry = (row: { id: number; name: string; active: number }): SettingsEnt
 
 /**
  * Read interface of the settings for other components (CU-086; Technical Specification 4.1,
- * 2.0.11, Nachtrag MAR-904): first device type and manufacturer for the model template service
- * (CU-105), the supplier, the attributes of a device type, pick list values and the values of
- * the list battery for the device service (CU-121); each further method follows with the first
- * task that calls it. Inside an action pass `tx.db`, so the check sees the state of the writing transaction.
+ * 2.0.11, Nachtrag MAR-904): device type and manufacturer for the model template service
+ * (CU-105), with #178 the attribute definitions of a device type and the pick list values, with
+ * #185 the supplier and the values of the list battery for the device service (CU-121); each
+ * further method follows with the first task that calls it. Inside an action pass `tx.db`, so
+ * the check sees the state of the writing transaction.
  */
 export function createSettingsReader(db: Kysely<DB>) {
   const deviceTypes = createDeviceTypeRepository(db);
@@ -100,21 +98,14 @@ export function createSettingsReader(db: Kysely<DB>) {
      */
     async findPickListValues(ids: readonly number[]): Promise<PickListValueEntry[]> {
       if (ids.length === 0) return [];
-      const { rows: lists } = await pickLists.listPickLists(ALL_PICK_LISTS);
-      const entries: PickListValueEntry[] = [];
-      for (const id of new Set(ids)) {
-        const value = await pickLists.findValue(id);
-        const list = lists.find((candidate) => candidate.id === value?.pick_list_id);
-        if (value === undefined || list === undefined) continue;
-        entries.push({
-          id: value.id,
-          pickListId: value.pick_list_id,
-          pickListKey: list.key as PickListKey,
-          label: value.label,
-          active: value.active === 1,
-        });
-      }
-      return entries;
+      const rows = await pickLists.findValuesWithList([...new Set(ids)]);
+      return rows.map((row) => ({
+        id: row.id,
+        pickListId: row.pick_list_id,
+        pickListKey: row.pick_list_key as PickListKey,
+        label: row.label,
+        active: row.active === 1,
+      }));
     },
 
     /**

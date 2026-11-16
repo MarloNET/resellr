@@ -86,6 +86,17 @@ export function createPickListRepository(db: Kysely<DB>) {
       return db.selectFrom('pick_list_value').selectAll().where('id', '=', id).executeTakeFirst();
     },
 
+    /** The values with these ids and the key of their list, by id; unknown ids are left out. */
+    async findValuesWithList(ids: readonly number[]) {
+      return db
+        .selectFrom('pick_list_value as v')
+        .innerJoin('pick_list as l', 'l.id', 'v.pick_list_id')
+        .select(['v.id', 'v.pick_list_id', 'l.key as pick_list_key', 'v.label', 'v.active'])
+        .where('v.id', 'in', ids)
+        .orderBy('v.id')
+        .execute();
+    },
+
     /** The value of the list that already has this label key, if any (AC-REQ-007-02). */
     async findValueIdByLabelKey(pickListId: number, labelKey: string) {
       const row = await db
