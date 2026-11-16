@@ -601,6 +601,49 @@ describe('UI-033 condition codes (CU-100)', () => {
       expect(labels(conditionSelect())).toEqual(['–', 'Gebraucht']);
     });
 
+    it('UI-033.validation FIND-403-03 a newly chosen supplier and suggestion deactivated in another window stay shown as chosen after the focus refetch and are the values sent', async () => {
+      let l1 = L1;
+      let used = USED;
+      const { reads, sent } = mockApi({
+        suppliers: () => [l1, L2],
+        conditions: () => [used, DEFECT],
+        writes: { 'POST /api/condition-codes': (init) => created(JSON.parse(String(init?.body))) },
+      });
+      await openPage();
+      fireEvent.click(createButton());
+      fireEvent.change(codeInput(), { target: { value: 'NEU' } });
+      fireEvent.change(supplierSelect(), { target: { value: '1' } });
+      fireEvent.change(conditionSelect(), { target: { value: '11' } });
+
+      // Both are deactivated in another window; the window gets the focus again and the
+      // choices are loaded in the background.
+      l1 = { ...L1, active: false, version: 2 };
+      used = { ...USED, active: false, version: 2 };
+      const suppliersBefore = readsOf(reads, '/api/suppliers');
+      const conditionsBefore = readsOf(reads, '/api/pick-lists/1/values');
+      fireEvent(window, new Event('visibilitychange'));
+      await vi.waitFor(() => {
+        expect(readsOf(reads, '/api/suppliers')).toBeGreaterThan(suppliersBefore);
+        expect(readsOf(reads, '/api/pick-lists/1/values')).toBeGreaterThan(conditionsBefore);
+      });
+      await vi.waitFor(() =>
+        expect(labels(supplierSelect())).toEqual(['alle', 'L1 (deaktiviert)']),
+      );
+      await vi.waitFor(() =>
+        expect(labels(conditionSelect())).toEqual(['–', 'Gebraucht (deaktiviert)']),
+      );
+
+      expect(supplierSelect().value).toBe('1');
+      expect(shown(supplierSelect())).toBe('L1 (deaktiviert)');
+      expect(conditionSelect().value).toBe('11');
+      expect(shown(conditionSelect())).toBe('Gebraucht (deaktiviert)');
+
+      changePlainText('neuer Text');
+
+      expect(await screen.findByText('Gespeichert')).toBeTruthy();
+      expect(sent[0]?.body).toMatchObject({ supplierId: 1, suggestedConditionValueId: 11 });
+    });
+
     it('UI-033.validation a change of the plain text of an entry with a deactivated supplier sends the stored supplier and suggestion', async () => {
       const { sent } = mockApi({
         initial: [DGS, A1_L2],

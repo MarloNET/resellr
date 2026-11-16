@@ -176,13 +176,27 @@ const checkPlainText = (plainText: string) => firstMessage(conditionCodePlainTex
 /**
  * Options of a choice (CU-319): the active entries and the stored one, even if deactivated, with
  * "(deaktiviert)", so an entry keeps its supplier or suggestion (REQ-022 "Auswahl aus den aktiven
- * Lieferanten"); it stays offered while the form is open. Rejected ids are left out (2.0.11).
+ * Lieferanten"); it stays offered while the form is open. The chosen entry stays offered as well,
+ * also when it is deactivated in another window before the save, so the field shows the value
+ * that is sent until the server rejects it (2.0.11, Nachtrag MAR-929 (a)). Rejected ids are left
+ * out (2.0.11).
  */
-const optionsOf = (items: readonly ChoiceItem[], stored: string, rejected: readonly number[]) =>
-  choiceOptions(
-    items.filter((item) => !rejected.includes(item.id)),
-    { storedId: idOf(stored), markDeactivated: true },
-  );
+function optionsOf(
+  items: readonly ChoiceItem[],
+  stored: string,
+  chosen: string,
+  rejected: readonly number[],
+) {
+  const kept = [idOf(stored), idOf(chosen)];
+  return items
+    .filter((item) => !rejected.includes(item.id))
+    .flatMap((item) =>
+      choiceOptions([item], {
+        storedId: kept.includes(item.id) ? item.id : null,
+        markDeactivated: true,
+      }),
+    );
+}
 
 const supplierItems = (suppliers: readonly Supplier[]): ChoiceItem[] =>
   suppliers.map(({ id, name, active }) => ({ id, label: name, active }));
@@ -559,6 +573,7 @@ export function ConditionCodesPage() {
                     {optionsOf(
                       supplierItems(suppliers),
                       draft.base.supplierId,
+                      draft.supplierId,
                       rejected.supplierId,
                     ).map((supplier) => (
                       <option key={supplier.id} value={optionOf(supplier.id)}>
@@ -600,6 +615,7 @@ export function ConditionCodesPage() {
                     {optionsOf(
                       conditionItems(conditions),
                       draft.base.conditionValueId,
+                      draft.conditionValueId,
                       rejected.suggestedConditionValueId,
                     ).map((value) => (
                       <option key={value.id} value={optionOf(value.id)}>

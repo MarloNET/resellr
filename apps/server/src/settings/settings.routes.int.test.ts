@@ -2236,6 +2236,19 @@ describe('condition code API (CU-087, Technical Specification 2.2)', () => {
       expect((await patchCode(entry.id, { version: 1, supplierId: 99 })).statusCode).toBe(400);
       expect((await listCodes()).json().items).toEqual([entry]);
     });
+
+    it('PATCH to an unknown condition id or a value of another list answers 400 bad_request and changes nothing', async () => {
+      const keyboard = (await createValue(KEYBOARD, { label: 'DE', active: true })).json();
+      const entry = (await createCode(DGS)).json();
+
+      for (const suggestedConditionValueId of [9999, keyboard.id]) {
+        const response = await patchCode(entry.id, { version: 1, suggestedConditionValueId });
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error.code).toBe('bad_request');
+      }
+      expect((await listCodes()).json().items).toEqual([entry]);
+      expect(auditRows()).toHaveLength(1);
+    });
   });
 
   it('changes an entry, keeps the omitted fields and removes a suggestion with null', async () => {
