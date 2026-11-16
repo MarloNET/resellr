@@ -8,7 +8,9 @@ import { toModelNameKey } from '@resellr/domain/text/normalize-key';
 import { createAuditWriter } from '../audit/index.ts';
 import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
+import { createSettingsReader, type SettingsReader } from '../settings/index.ts';
 import type { Clock } from '../shared/clock.ts';
+import { BadRequestError, RuleViolation } from '../shared/domain-error.ts';
 import {
   createModelTemplateRepository,
   type ModelTemplateRow,
@@ -44,10 +46,41 @@ export function toModelTemplate(row: ModelTemplateRow): ModelTemplate {
 }
 
 /**
+ * Device type and manufacturer of a new model template (2.4 "Aktive Geräteart und aktiver
+ * Hersteller", 2.0.11, Nachtrag MAR-904): both must exist, otherwise the user interface sent a
+ * wrong id (`400 bad_request`; neither is ever deleted); then both must be active, the device
+ * type first. Runs after the schema and before every other rule of the service.
+ */
+async function checkActiveEntries(
+  settings: SettingsReader,
+  { deviceTypeId, manufacturerId }: Pick<ModelTemplateCreate, 'deviceTypeId' | 'manufacturerId'>,
+): Promise<void> {
+  const deviceType = await settings.findDeviceType(deviceTypeId);
+  const manufacturer = await settings.findManufacturer(manufacturerId);
+  if (deviceType === undefined) throw new BadRequestError('deviceTypeId unknown');
+  if (manufacturer === undefined) throw new BadRequestError('manufacturerId unknown');
+  if (!deviceType.active) {
+    throw new RuleViolation('device_type_deactivated', {
+      usage: 'model_template',
+      messageArgs: [deviceType.name],
+      details: { path: 'deviceTypeId', id: deviceTypeId },
+    });
+  }
+  if (!manufacturer.active) {
+    throw new RuleViolation('manufacturer_deactivated', {
+      usage: 'model_template',
+      messageArgs: [manufacturer.name],
+      details: { path: 'manufacturerId', id: manufacturerId },
+    });
+  }
+}
+
+/**
  * Model template service (CU-105, REQ-008; Technical Specification 2.4): creates a model
  * template together with its audit entry in one transaction (2.0.4); without the entry nothing
  * is stored. The field rules are checked before by the schema of CU-104 (route), so the service
- * stores the trimmed values. Changing (#181), the attribute values (#178) and the duplicate hint
+ * stores the trimmed values; device type and manufacturer it checks through `settings-reader`
+ * (CU-086) with `tx.db`, so the check sees the state of the writing transaction. Changing (#181), the attribute values (#178) and the duplicate hint
  * (#184) follow.
  */
 export function createModelTemplateService({ uow, clock }: ModelTemplateServiceDeps) {
@@ -55,6 +88,7 @@ export function createModelTemplateService({ uow, clock }: ModelTemplateServiceD
     /** `POST /api/model-templates`: the new model template with version 1. */
     async create(input: ModelTemplateCreate): Promise<ModelTemplate> {
       const { result } = await uow.run(async (tx) => {
+        await checkActiveEntries(createSettingsReader(tx.db), input);
         const repository = createModelTemplateRepository(tx.db);
         const audit = createAuditWriter({ db: tx.db, clock });
         const id = await repository.insert({

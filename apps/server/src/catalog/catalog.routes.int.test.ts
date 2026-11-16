@@ -414,4 +414,92 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
   it('rejects an id in the request as bad_request (2.4: without id)', async () => {
     expect((await post({ ...NEW(), id: 99 })).statusCode).toBe(400);
   });
+
+  describe('active device type and manufacturer (2.4, 2.0.11, Nachtrag MAR-904)', () => {
+    const deactivate = (table: 'device_type' | 'manufacturer', id: number) =>
+      t.database.sqlite.prepare(`UPDATE ${table} SET active = 0 WHERE id = ?`).run(id);
+
+    const auditCount = () =>
+      t.database.sqlite
+        .prepare("SELECT COUNT(*) FROM audit_entry WHERE object_type = 'model_template'")
+        .pluck()
+        .get() as number;
+
+    it('T1 AC-REQ-004-03 rejects a deactivated device type with 422 device_type_deactivated at deviceTypeId, stores and logs nothing', async () => {
+      deactivate('device_type', ids.monitor);
+
+      const response = await post({ ...NEW(), deviceTypeId: ids.monitor });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'device_type_deactivated',
+        message: 'Geräteart Monitor ist deaktiviert',
+        fields: [],
+        details: { path: 'deviceTypeId', id: ids.monitor },
+        referenceNumber: null,
+      });
+      expect(count()).toBe(1);
+      expect(auditCount()).toBe(0);
+    });
+
+    it('T1 AC-REQ-101-02 rejects a deactivated manufacturer with 422 manufacturer_deactivated at manufacturerId, stores and logs nothing', async () => {
+      deactivate('manufacturer', ids.lenovo);
+
+      const response = await post(NEW());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'manufacturer_deactivated',
+        message: 'Hersteller Lenovo ist deaktiviert',
+        fields: [],
+        details: { path: 'manufacturerId', id: ids.lenovo },
+        referenceNumber: null,
+      });
+      expect(count()).toBe(1);
+      expect(auditCount()).toBe(0);
+    });
+
+    it('T1 reports only device_type_deactivated if device type and manufacturer are deactivated', async () => {
+      deactivate('device_type', ids.notebook);
+      deactivate('manufacturer', ids.lenovo);
+
+      const response = await post(NEW());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'device_type_deactivated',
+        details: { path: 'deviceTypeId', id: ids.notebook },
+      });
+      expect(count()).toBe(1);
+      expect(auditCount()).toBe(0);
+    });
+
+    it.each([
+      ['deviceTypeId', { deviceTypeId: 999 }],
+      ['manufacturerId', { manufacturerId: 999 }],
+    ])('T2 rejects an unknown %s with 400 bad_request, never 500', async (_field, change) => {
+      const response = await post({ ...NEW(), ...change });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
+      expect(count()).toBe(1);
+    });
+
+    it('T2 rejects an unknown device type before a deactivated manufacturer (existing ids before active entries)', async () => {
+      deactivate('manufacturer', ids.lenovo);
+
+      const response = await post({ ...NEW(), deviceTypeId: 999 });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('T3 a field rule wins over a deactivated manufacturer: wrong EAN check digit gives validation_failed', async () => {
+      deactivate('manufacturer', ids.lenovo);
+
+      const fields = fieldsOf(await post({ ...NEW(), originalEan: '4006381333932' }));
+
+      expect(fields.map(({ path }) => path)).toEqual(['originalEan']);
+      expect(count()).toBe(1);
+    });
+  });
 });

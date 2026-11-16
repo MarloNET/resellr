@@ -27,6 +27,7 @@ async function createManufacturer(page: Page, baseUrl: string, name: string) {
     data: { name },
   });
   expect(response.status()).toBe(201);
+  return (await response.json()) as { id: number; version: number };
 }
 
 test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
@@ -95,6 +96,35 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
         .getByRole('cell')
         .last(),
     ).toHaveText('unbekannt');
+  });
+
+  test('UI-007.validation AC-REQ-101-02 a manufacturer deactivated in another window is rejected at the field "Hersteller" and leaves the choice (2.4, Nachtrag MAR-904)', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const manufacturer = uniqueName('Fujitsu', testInfo.title, testInfo.project.name);
+    const { id, version } = await createManufacturer(page, server.baseUrl, manufacturer);
+    await page.goto('/modelle/neu');
+    await field(page, 'Hersteller').selectOption({ label: manufacturer });
+    await field(page, 'Modellbezeichnung').fill('Lifebook E5510');
+    await field(page, 'Herstellernummer').fill('E5510MP5');
+
+    // "Another window" deactivates the manufacturer after UI-007 has read the choices.
+    const deactivated = await page.request.patch(`${server.baseUrl}/api/manufacturers/${id}`, {
+      headers: { origin: server.baseUrl },
+      data: { version, active: false },
+    });
+    expect(deactivated.status()).toBe(200);
+    await saveButton(page).click();
+
+    await expect(form(page).getByText(`Hersteller ${manufacturer} ist deaktiviert`)).toBeVisible();
+    await expect(field(page, 'Hersteller')).toBeFocused();
+    await expect(field(page, 'Hersteller').getByRole('option', { name: manufacturer })).toHaveCount(
+      0,
+    );
+    await expect(field(page, 'Modellbezeichnung')).toHaveValue('Lifebook E5510');
+    await expect(page).toHaveURL(/\/modelle\/neu$/);
+    await expectReachable(page);
   });
 
   test('UI-007.validation DER-50-17 AC-REQ-008-02 the browser shows one message per field and focuses the first error', async ({

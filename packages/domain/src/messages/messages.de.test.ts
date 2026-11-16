@@ -109,6 +109,15 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('names the deactivated device type and manufacturer of a model template (2.0.6, 2.0.11, UI-007)', () => {
+    expect(ERROR_MESSAGES['device_type_deactivated.model_template']('Monitor')).toBe(
+      'Geräteart Monitor ist deaktiviert',
+    );
+    expect(ERROR_MESSAGES['manufacturer_deactivated.model_template']('Fujitsu')).toBe(
+      'Hersteller Fujitsu ist deaktiviert',
+    );
+  });
+
   it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
     expect(FIELD_MESSAGES.manufacturerName).toBe('Name: 1 bis 50 Zeichen');
   });

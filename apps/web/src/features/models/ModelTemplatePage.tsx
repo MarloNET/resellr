@@ -80,6 +80,12 @@ type FieldErrors = Partial<Record<Field, string>>;
 
 const isField = (path: string): path is Field => (FIELDS as readonly string[]).includes(path);
 
+/** Rejections of a deactivated choice, shown at the field of `details.path` (2.0.11). */
+const DEACTIVATED_CODES: ReadonlySet<string> = new Set([
+  'device_type_deactivated',
+  'manufacturer_deactivated',
+]);
+
 /** Request body of `POST /api/model-templates`: every field, "unbekannt" with `mpn: null`. */
 const bodyOf = ({ deviceTypeId, mpn, mpnUnknown, ...draft }: Draft): ModelTemplateCreateInput => ({
   ...draft,
@@ -181,6 +187,20 @@ export function ModelTemplatePage() {
         showFieldErrors(next);
         return;
       }
+    }
+    // A device type or manufacturer deactivated in another window: the text stands at the field
+    // of `details.path`, and both choices are read again without it (2.4, 2.0.11).
+    const path = error.error?.details.path;
+    if (
+      error.kind === 'rejected' &&
+      DEACTIVATED_CODES.has(error.error?.code ?? '') &&
+      typeof path === 'string' &&
+      isField(path)
+    ) {
+      showFieldErrors({ [path]: error.error?.message });
+      void deviceTypes.refetch();
+      void manufacturers.refetch();
+      return;
     }
     setNotice(noticeOf(error));
   }

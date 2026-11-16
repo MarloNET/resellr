@@ -166,8 +166,12 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
+  'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
+  /** UI-007 "Hersteller", same text as in UI-008 (2.0.11, Nachtrag MAR-904). */
+  'manufacturer_deactivated.model_template': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.condition_code': 'Diesen Code gibt es für diesen Lieferanten bereits',
   'name_taken.device_type': 'Name ist bereits vergeben',

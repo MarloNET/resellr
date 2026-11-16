@@ -67,7 +67,8 @@ type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 function mockApi({
   create = () => Response.json(CREATED, { status: 201 }),
   deviceTypes = () => Response.json({ items: [NOTEBOOK, DRUCKER, TABLET], total: 3 }),
-}: { create?: Route; deviceTypes?: Route } = {}) {
+  manufacturers = () => Response.json({ items: [LENOVO, TOSHIBA], total: 2 }),
+}: { create?: Route; deviceTypes?: Route; manufacturers?: Route } = {}) {
   const sent: unknown[] = [];
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://127.0.0.1');
@@ -75,9 +76,7 @@ function mockApi({
     if (url.pathname === '/api/ops/status') return Response.json(OPS_STATUS);
     if (url.pathname === '/api/ops/health') return Response.json({ state: 'ready' });
     if (url.pathname === '/api/device-types') return deviceTypes(init);
-    if (url.pathname === '/api/manufacturers') {
-      return Response.json({ items: [LENOVO, TOSHIBA], total: 2 });
-    }
+    if (url.pathname === '/api/manufacturers') return manufacturers(init);
     if (method === 'GET' && url.pathname === '/api/model-templates') {
       return Response.json({ items: [], total: 0 });
     }
@@ -431,6 +430,95 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     expect(errorOf(textbox('Original-EAN'))).toBe(EAN_RULE);
     expect(document.activeElement).toBe(textbox('Herstellernummer'));
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  describe('UI-007.validation deactivated device type or manufacturer (2.4, 2.0.11, Nachtrag MAR-904)', () => {
+    /** A list answer: the first call with `before`, every later one with `after`. */
+    const firstThen = (before: unknown[], after: unknown[]) => {
+      let calls = 0;
+      return () => {
+        calls += 1;
+        const items = calls === 1 ? before : after;
+        return Response.json({ items, total: items.length });
+      };
+    };
+
+    it('T5 AC-REQ-004-03 shows device_type_deactivated at "Geräteart" with the focus there and reloads the choice without it', async () => {
+      const deviceTypes = vi.fn(
+        firstThen([NOTEBOOK, TABLET], [{ ...NOTEBOOK, active: false }, TABLET]),
+      );
+      const manufacturers = vi.fn(firstThen([LENOVO], [LENOVO]));
+      const { sent } = mockApi({
+        deviceTypes,
+        manufacturers,
+        create: () =>
+          Response.json(
+            errorBody('device_type_deactivated', {
+              message: 'Geräteart Notebook ist deaktiviert',
+              details: { path: 'deviceTypeId', id: 1 },
+            }),
+            { status: 422 },
+          ),
+      });
+      await openPage();
+      fill();
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() =>
+        expect(errorOf(select('Geräteart'))).toBe('Geräteart Notebook ist deaktiviert'),
+      );
+      expect(document.activeElement).toBe(select('Geräteart'));
+      await vi.waitFor(() =>
+        expect(Array.from(select('Geräteart').options, (option) => option.text)).toEqual([
+          'Tablet',
+        ]),
+      );
+      expect(manufacturers).toHaveBeenCalledTimes(2);
+      expect(sent).toHaveLength(1);
+      expect(textbox('Modellbezeichnung').value).toBe('ThinkPad E15 Gen 2');
+      expect(screen.queryByRole('alert')).toBeNull();
+      expectAccessiblePage();
+    });
+
+    it('T5 AC-REQ-101-02 shows manufacturer_deactivated at "Hersteller" with the focus there and reloads the choice without it', async () => {
+      const deviceTypes = vi.fn(firstThen([NOTEBOOK], [NOTEBOOK]));
+      const manufacturers = vi.fn(
+        firstThen(
+          [LENOVO, manufacturer(13, 'Fujitsu')],
+          [LENOVO, manufacturer(13, 'Fujitsu', false)],
+        ),
+      );
+      mockApi({
+        deviceTypes,
+        manufacturers,
+        create: () =>
+          Response.json(
+            errorBody('manufacturer_deactivated', {
+              message: 'Hersteller Fujitsu ist deaktiviert',
+              details: { path: 'manufacturerId', id: 13 },
+            }),
+            { status: 422 },
+          ),
+      });
+      await openPage();
+      fill({ manufacturerId: '13' });
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() =>
+        expect(errorOf(select('Hersteller'))).toBe('Hersteller Fujitsu ist deaktiviert'),
+      );
+      expect(document.activeElement).toBe(select('Hersteller'));
+      await vi.waitFor(() =>
+        expect(Array.from(select('Hersteller').options, (option) => option.text)).toEqual([
+          '',
+          'Lenovo',
+        ]),
+      );
+      expect(deviceTypes).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 
   it('saves with Ctrl+S like the primary button', async () => {
