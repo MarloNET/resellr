@@ -1,7 +1,7 @@
 import { idSchema, pageQuerySchema } from '@resellr/domain/schemas/common.schema';
 import {
-  type ModelTemplate,
   type ModelTemplateListItem,
+  modelTemplateCreateSchema,
   modelTemplateListSchema,
   modelTemplateSchema,
   modelTemplateSearchTermSchema,
@@ -11,15 +11,19 @@ import type { Kysely } from 'kysely';
 import { z } from 'zod';
 
 import type { DB } from '../db/schema.ts';
+import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
+import type { Clock } from '../shared/clock.ts';
 import { NotFoundError, ValidationError } from '../shared/domain-error.ts';
 import {
   createModelTemplateRepository,
   type ModelTemplateRepository,
-  type ModelTemplateRow,
 } from './model-template-repository.ts';
+import { createModelTemplateService, toModelTemplate } from './model-template-service.ts';
 
 export interface CatalogRoutesOptions {
   db: Kysely<DB>;
+  uow: UnitOfWorkRunner<DB>;
+  clock: Clock;
 }
 
 const idParams = z.strictObject({ id: z.coerce.number().pipe(idSchema) });
@@ -59,32 +63,19 @@ function toListItem(row: ListRow): ModelTemplateListItem {
   };
 }
 
-function toModelTemplate(row: ModelTemplateRow): ModelTemplate {
-  return {
-    id: row.id,
-    deviceTypeId: row.device_type_id,
-    manufacturerId: row.manufacturer_id,
-    modelName: row.model_name,
-    typeDesignation: row.type_designation,
-    mpn: row.mpn,
-    mpnUnknown: row.mpn_unknown === 1,
-    originalEan: row.original_ean,
-    modelValues: JSON.parse(row.model_values) as Record<string, unknown>,
-    defaultDeviceValues: JSON.parse(row.default_device_values) as Record<string, unknown>,
-    version: row.version,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
 /**
- * Catalog routes (CU-109, Technical Specification 2.4): `GET /api/model-templates` and
- * `GET /api/model-templates/{id}`; creating and changing follow with #177 and #181. The paths
- * `…/{id}/listings`, `…/{id}/device-prefill` and `…/{id}/usage` belong to CU-130. Both routes
- * only read, so they read through the repository CU-106 with the outer `db` (2.0.4).
+ * Catalog routes (CU-109, Technical Specification 2.4): `GET /api/model-templates`,
+ * `GET /api/model-templates/{id}` and `POST /api/model-templates`; changing follows with #181.
+ * The paths `…/{id}/listings`, `…/{id}/device-prefill` and `…/{id}/usage` belong to CU-130. The
+ * reading routes read through the repository CU-106 with the outer `db`, the writing one goes
+ * through the service CU-105 and its unit of work (2.0.4).
  */
-export const catalogRoutes: FastifyPluginAsyncZod<CatalogRoutesOptions> = async (app, { db }) => {
+export const catalogRoutes: FastifyPluginAsyncZod<CatalogRoutesOptions> = async (
+  app,
+  { db, uow, clock },
+) => {
   const modelTemplates = createModelTemplateRepository(db);
+  const modelTemplateService = createModelTemplateService({ uow, clock });
 
   app.get(
     '/api/model-templates',
@@ -104,5 +95,13 @@ export const catalogRoutes: FastifyPluginAsyncZod<CatalogRoutesOptions> = async 
       if (row === undefined) throw new NotFoundError();
       return toModelTemplate(row);
     },
+  );
+
+  // `201` with the new model template (2.0.1); the field rules of CU-104 give
+  // `422 validation_failed`, "unbekannt" with a value `400 bad_request` (2.4).
+  app.post(
+    '/api/model-templates',
+    { schema: { body: modelTemplateCreateSchema, response: { 201: modelTemplateSchema } } },
+    async (request, reply) => reply.code(201).send(await modelTemplateService.create(request.body)),
   );
 };

@@ -27,6 +27,8 @@ export const queryKeys = {
   },
   catalog: {
     all: ['catalog'] as const,
+    /** Prefix of all lists of `modelTemplates`, to reload them after a write. */
+    modelTemplateLists: () => ['catalog', 'model-templates'] as const,
     modelTemplates: (filter: { q?: string; deviceTypeId?: number }) =>
       ['catalog', 'model-templates', filter] as const,
   },

@@ -1,5 +1,9 @@
-import type { ModelTemplateList } from '@resellr/domain/schemas/model-template.schema';
-import { useQuery } from '@tanstack/react-query';
+import type {
+  ModelTemplate,
+  ModelTemplateCreateInput,
+  ModelTemplateList,
+} from '@resellr/domain/schemas/model-template.schema';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
@@ -27,5 +31,19 @@ export function useModelTemplatesQuery(filter: ModelTemplateFilter) {
       const query = params.size > 0 ? `?${params.toString()}` : '';
       return apiClient.get<ModelTemplateList>(`/api/model-templates${query}`, { signal });
     },
+  });
+}
+
+/**
+ * "Modellvorlage speichern" of UI-007 for a new model template (`POST /api/model-templates`,
+ * 2.4). The lists of UI-006 load again in the background (2.0.7 "Wartezustand bei
+ * Folgeanfragen").
+ */
+export function useCreateModelTemplateMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ModelTemplate, ApiError, ModelTemplateCreateInput>({
+    mutationFn: (body) => apiClient.post<ModelTemplate>('/api/model-templates', body),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: queryKeys.catalog.modelTemplateLists() }),
   });
 }

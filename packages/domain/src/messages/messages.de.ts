@@ -28,6 +28,10 @@ export const MESSAGES = {
   'M-21': 'Zeile: höchstens 1.000 Zeichen',
   'M-22': 'Excel-Datei: höchstens 10 MB',
   'M-24': 'Prüfdatum und prüfende Stelle erforderlich',
+  /** UI-007 "Herstellernummer" longer than 40 characters, also with an invalid character. */
+  'M-25': 'Herstellernummer: höchstens 40 Zeichen',
+  /** UI-007 "Herstellernummer" with a character other than A–Z, a–z, 0–9, `-`, `/`, `.`. */
+  'M-26': 'Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt',
   /** UI-030 "Name" of a text block, empty or longer than 100 characters after trimming. */
   'M-30': 'Name: 1 bis 100 Zeichen',
   /** UI-030 "Prüfende Stelle", longer than 100 characters after trimming; missing is M-24. */
@@ -96,6 +100,8 @@ export const FIELD_MESSAGES = {
   conditionCodeSupplierNotChosen: 'Lieferant: Lieferanten oder „alle“ wählen',
   /** UI-026 "Kontaktangaben", longer than 500 characters. */
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
+  /** UI-007 "Geräteart" without a choice (Design v0.6.7, Nachtrag MAR-925). */
+  deviceTypeMissing: 'Geräteart fehlt',
   /** UI-027 "Geräteart: Name", empty or longer than 50 characters after trimming. */
   deviceTypeName: 'Name: 1 bis 50 Zeichen',
   /**
@@ -109,8 +115,22 @@ export const FIELD_MESSAGES = {
   headerLabel: 'Kopfzeilentext: höchstens 50 Zeichen',
   /** UI-030 "Prüfdatum" after today (Technical Specification 2.2, DER-40-02). */
   legalCheckedOnFuture: 'Prüfdatum darf nicht in der Zukunft liegen',
+  /** UI-007 "Hersteller" without a choice (DER-50-05). */
+  manufacturerMissing: 'Hersteller fehlt',
   /** UI-008 and UI-031 "Name", empty or longer than 50 characters after trimming (REQ-100). */
   manufacturerName: 'Name: 1 bis 50 Zeichen',
+  /** UI-007 "Modellbezeichnung", empty or longer than 100 characters after trimming. */
+  modelName: 'Modellbezeichnung: 1 bis 100 Zeichen',
+  /**
+   * UI-007 "Herstellernummer" empty and not "unbekannt" (`mpn_required`): the wording of
+   * AC-REQ-008-02 (DG-17, Technical Specification 2.4, 8.2).
+   */
+  mpnRequired: 'Herstellernummer: Wert eingeben oder ‚unbekannt‘ wählen',
+  /**
+   * UI-007 "Original-EAN", not 8 or 13 digits or a wrong GS1 check digit (design text, Q-1;
+   * AC-REQ-008-04).
+   */
+  originalEan: 'EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer',
   /**
    * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
    * Technical Specification 8.2 (addendum MAR-487).
@@ -132,6 +152,8 @@ export const FIELD_MESSAGES = {
    */
   textBlockDeviceTypesRequired: 'Gerätearten: mindestens eine wählen oder ‚alle‘',
   textBlockChannelsRequired: 'Kanäle: mindestens einen wählen oder ‚alle‘',
+  /** UI-007 "Typbezeichnung", longer than 50 characters after trimming (DER-50-13). */
+  typeDesignation: 'Typbezeichnung: höchstens 50 Zeichen',
   /** UI-033 "Vorschlag Optik-Note", not a whole number from 1 to 5 (REQ-022). */
   visualGrade: 'Optik-Note: ganze Zahl von 1 bis 5',
 } as const;
@@ -151,8 +173,12 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
+  'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
+  /** UI-007 "Hersteller", same text as in UI-008 (2.0.11, Nachtrag MAR-904). */
+  'manufacturer_deactivated.model_template': (name: string) => `Hersteller ${name} ist deaktiviert`,
   'name_taken.attribute': 'Bezeichnung ist bei dieser Geräteart bereits vergeben',
   'name_taken.condition_code': 'Diesen Code gibt es für diesen Lieferanten bereits',
   'name_taken.device_type': 'Name ist bereits vergeben',

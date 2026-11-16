@@ -7,6 +7,7 @@ export const ERROR_CODES = {
   attribute_has_values: 422,
   bad_request: 400,
   confirmation_required: 422,
+  device_type_deactivated: 422,
   file_too_large: 413,
   forbidden_host: 403,
   forbidden_origin: 403,
