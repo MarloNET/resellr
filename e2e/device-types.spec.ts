@@ -259,11 +259,14 @@ function hitAtCenter(element: Element) {
  * corners (1 px inside its rounded shape) receive the mouse.
  */
 async function expectFocusFullyVisible(button: Locator) {
-  // Defined start: Chrome scrolls a partly visible element not at all on `focus()`, e.g. "Wieder
-  // aktivieren" after a click on the narrower "Deaktivieren"; the test does not scroll to it.
+  // Defined start: every scroll container of the element at its start. On `focus()` Chrome
+  // scrolls a partly visible element not at all or only flush with the edge, so its focus ring
+  // sticks out, e.g. "Wieder aktivieren" after a click on the narrower "Deaktivieren", or a row
+  // partly above the top of `main` after a click into a long list (#401). The test does not
+  // scroll to the element.
   await button.evaluate((element) => {
     if (document.activeElement === element) element.blur();
-    element.closest('[data-table-scroll]')!.scrollLeft = 0;
+    for (let box = element.parentElement; box; box = box.parentElement) box.scrollTo(0, 0);
   });
   await button.focus();
   await expect(button).toBeFocused();
@@ -614,6 +617,18 @@ test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
       if (panel === 'none') {
         expect(await firstCellPosition()).toBe('sticky');
         await expectRowActionsOperable();
+        // Bug #401: with a long list of device types, the click on one leaves `main` scrolled, at
+        // times with the row partly above its top edge. The check still starts at its defined start.
+        await deactivate.evaluate((button) => {
+          const main = button.closest('main')!;
+          main.style.paddingBottom = '100vh';
+          main.scrollTop +=
+            button.getBoundingClientRect().top - main.getBoundingClientRect().top + 20;
+        });
+        await expectFocusFullyVisible(deactivate);
+        await deactivate.evaluate((button) => {
+          button.closest('main')!.style.paddingBottom = '';
+        });
         // Probe of the container query of `Table`: fixed from 24rem on only.
         await scrollArea.evaluate((area) => {
           area.style.width = '23.5rem';

@@ -14,6 +14,13 @@ Tabelle: Zustandscode, Lieferant (oder „alle“), Klartext, Vorschlag Zustand,
 | Vorschlag Zustand, Vorschlag Optik-Note | Auswahl, 1–5 | nein | | „Optik-Note: ganze Zahl von 1 bis 5“ |
 | Kombination | – | – | Code + Lieferant eindeutig | „Diesen Code gibt es für diesen Lieferanten bereits“ |
 
+**Auswahl nach Ablehnung wegen Deaktivierung (v0.6.8, MAR-927, DG-19).** Betroffen ist Lieferant (`supplier_deactivated`, wenn der Lieferant nach dem Öffnen deaktiviert wurde); Vorschlag Zustand ist ebenfalls eine Auswahl (`pick_list_value_deactivated`) und folgt derselben Regel. Es gilt die Regel von UI-007 (v0.6.7) mit einer begründeten Abweichung beim Lieferanten:
+- **Lieferant (optional, leer = „alle“).** Nach der Ablehnung und dem Neuladen der Liste zeigt das Feld **nicht** die leere Wahl „alle“, sondern den Platzhalter „Bitte wählen“; kein Eintrag vorausgewählt, die abgelehnte ID wird nie erneut gesendet. Grund: „alle“ würde die Reichweite der Übersetzung stillschweigend von einem Lieferanten auf alle ausweiten. Der Nutzer wählt aktiv einen Lieferanten oder „alle“ (beides bleibt zulässig, keine neue Anforderung); „Speichern“ ohne diese Wahl nach einer Ablehnung: „Lieferant: Lieferanten oder „alle“ wählen“.
+- **Vorschlag Zustand (optional).** leer statt „Bitte wählen“ (leere Wahl bleibt zulässig, ändert keine Reichweite).
+- **Meldung.** „Lieferant <Name> ist deaktiviert“ bzw. „Vorschlag Zustand <Name> ist deaktiviert“ am Feld bis zur nächsten Wahl; Fokus auf das Feld, nichts gespeichert.
+- **Abhängige Eingaben.** Zustandscode, Klartext, Vorschlag Optik-Note bleiben erhalten; es gibt keine abhängigen Werte, die verworfen würden.
+- **Ändern.** Kein Rückfall auf den gespeicherten Wert; der gespeicherte, ggf. deaktivierte Lieferant bleibt wählbar („(deaktiviert)“) und wird unverändert ohne Ablehnung gespeichert. Zuordnungsfelder gibt es in UI-033 nicht.
+
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
 |---|---|---|---|---|---|
