@@ -21,14 +21,12 @@ export function createCatalogReader(db: Kysely<DB>) {
     },
 
     /**
-     * A model template with its device type and model name, `undefined` if unknown (2.5: the
-     * device service checks the values of a new device by the attributes of this device type).
+     * A model template with its device type, `undefined` if unknown (2.5: the device service
+     * checks the values of a new device by the attributes of this device type; Nachtrag MAR-973).
      */
-    async findModelTemplate(
-      id: number,
-    ): Promise<{ id: number; deviceTypeId: number; modelName: string } | undefined> {
+    async findModelTemplate(id: number): Promise<{ id: number; deviceTypeId: number } | undefined> {
       const row = await repository.findById(id);
-      return row && { id: row.id, deviceTypeId: row.device_type_id, modelName: row.model_name };
+      return row && { id: row.id, deviceTypeId: row.device_type_id };
     },
   };
 }

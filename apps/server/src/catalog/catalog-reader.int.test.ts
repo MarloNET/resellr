@@ -89,7 +89,6 @@ describe('catalog reader (CU-108, Technical Specification 2.1, Nachtrag MAR-879)
     await expect(reader.findModelTemplate(air)).resolves.toEqual({
       id: air,
       deviceTypeId: notebook,
-      modelName: 'MacBook Air M2',
     });
     await expect(reader.findModelTemplate(999)).resolves.toBeUndefined();
   });

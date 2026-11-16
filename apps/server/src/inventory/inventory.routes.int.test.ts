@@ -88,7 +88,7 @@ const body = (change: Record<string, unknown> = {}) => ({
   ...change,
 });
 
-const post = (payload: unknown) =>
+const post = (payload: Record<string, unknown>) =>
   t.app.inject({ method: 'POST', url: '/api/devices', headers: SAME_ORIGIN_WRITE, payload });
 const get = (url: string) => t.app.inject({ method: 'GET', url, headers: { host: HOST } });
 
@@ -265,6 +265,21 @@ describe('POST /api/devices (CU-121, Technical Specification 2.5)', () => {
         code: 'value_missing',
         message: 'Betriebssystem fehlt',
       },
+      {
+        path: `values.${ids.batteryCapacity}`,
+        code: 'value_missing',
+        message: 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“',
+      },
+    ]);
+  });
+
+  it('a battery value with "Akku vorhanden" requires the battery capacity (2.5, FIND-353, Nachtrag MAR-973 R2)', async () => {
+    const response = await post(
+      body({ values: { [ids.operatingSystem]: ids.ios, [ids.battery]: ids.withBattery } }),
+    );
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
       {
         path: `values.${ids.batteryCapacity}`,
         code: 'value_missing',

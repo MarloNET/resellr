@@ -249,6 +249,9 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
               : [[attribute.label, readable(attribute, value, label)]];
           }),
         );
+        const modelName = (
+          await createCatalogReader(tx.db).listModelTemplatesOfDeviceType(template.deviceTypeId)
+        ).find((candidate) => candidate.id === template.id)?.modelName;
         await createAuditWriter({ db: tx.db, clock }).write({
           objectType: 'device',
           objectId: id,
@@ -257,7 +260,7 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           oldValue: null,
           newValue: {
             'WI-Nr': device.wiNr,
-            Modellvorlage: template.modelName,
+            Modellvorlage: modelName ?? String(template.id),
             ...(supplier !== undefined && { Lieferant: supplier.name }),
             Zustand: label(device.conditionValueId),
             'Optik-Note': device.visualGrade,

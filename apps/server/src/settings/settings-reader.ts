@@ -122,11 +122,7 @@ export function createSettingsReader(db: Kysely<DB>) {
      * the rule of the battery capacity (2.5, FIND-353).
      */
     async listBatteryValues(): Promise<BatteryValueFlag[]> {
-      const { rows } = await pickLists.listPickLists(ALL_PICK_LISTS);
-      const battery = rows.find((list) => list.is_battery_list === 1);
-      if (battery === undefined) return [];
-      const values = await pickLists.allValues(battery.id);
-      return values.map((value) => ({ id: value.id, batteryPresent: value.battery_present === 1 }));
+      return pickLists.listBatteryValues();
     },
   };
 }
