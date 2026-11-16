@@ -3181,10 +3181,10 @@ Zwei Entwickler können ab S2 parallel arbeiten, wenn sie Schritte ohne gegensei
 | CU-120 | Bestandsangaben | `packages/domain/src/content-engine/stock.ts` | Stückzahl, WI-Nrn, Akkukapazität nach A-16, `stockHash` | REQ-091 |
 | CU-156 | Preisregel-Graph | `packages/domain/src/pricing/price-rule-graph.ts` | Kreisprüfung und topologische Reihenfolge der Preisregeln, einzige Umsetzung (FIND-201, FIND-203) | REQ-085, REQ-033 |
 | CU-121 | Geräte-Dienst | `apps/server/src/inventory/device-service.ts` | Gerät anlegen, Werte ändern, Prüfmarkierungen; entscheidet die Folge in Kontext B und übergibt `new_listing` und `rebook` an CU-123 (FIND-203); prüft bei `PATCH` die Merkmalswerte am vollständigen Stand nach der Änderung über CU-067 (Kap. 2.5, Nachtrag MAR-605); übergibt CU-117 beim Neuaufbau der Vorbelegung die Merkmalsdefinitionen der Geräteart (mit `active`) aus `settings-reader` (FIND-351) und die deaktivierten Listenwerte der Vorbelegung; prüft Lieferant, Zustand und Listenwerte auf vorhanden (`400`) und, wenn neu oder geändert, aktiv (`supplier_deactivated`, `pick_list_value_deactivated`) über CU-086 (Kap. 2.0.11, Nachtrag MAR-904) | REQ-005, REQ-007, REQ-012 bis REQ-014, REQ-099 |
-| CU-122 | Geräte-Repository | `apps/server/src/inventory/device-repository.ts` | Abfragen auf `device`, Suche, nicht zugeordnete | REQ-016, REQ-094 |
+| CU-122 | Geräte-Repository | `apps/server/src/inventory/device-repository.ts` | Abfragen auf `device`, Suche, nicht zugeordnete; angelegt mit GitHub-Issue #185 mit `insert`, `findById` und `findTakenByWiNrKey` für CU-121, erweitert mit #187 um die Suche und mit #258 um die nicht zugeordneten; kein Join auf `listing` (Titel über CU-125, Nachtrag MAR-965) | REQ-012, REQ-016, REQ-094 |
 | CU-123 | Zuordnungs-Dienst | `apps/server/src/inventory/assignment-service.ts` | einzige Stelle für zuordnen, Modell-Inserat aus Gerät anlegen und umbuchen | REQ-017 bis REQ-020 |
 | CU-124 | Modell-Inserat-Dienst | `apps/server/src/inventory/listing-service.ts` | Inseratswerte ändern mit Abweichungsbestätigung; prüft Variantenangaben und übrige Gerätewerte am vollständigen Stand nach der Änderung über CU-067 (Kap. 2.5, Nachtrag MAR-605); Zustand und Listenwerte vorhanden (`400`) und, wenn geändert, aktiv (`pick_list_value_deactivated`) über CU-086 (Kap. 2.0.11, Nachtrag MAR-904) | REQ-005, REQ-007, REQ-088 |
-| CU-125 | Modell-Inserat-Repository | `apps/server/src/inventory/listing-repository.ts` | Abfragen auf `listing`, `listing_delivery_scope`, `listing_price` (FIND-202); zuerst `listVariantData(modelTemplateIds)` für CU-290 (angelegt mit GitHub-Issue #153, Nachtrag MAR-879) | F-07 |
+| CU-125 | Modell-Inserat-Repository | `apps/server/src/inventory/listing-repository.ts` | Abfragen auf `listing`, `listing_delivery_scope`, `listing_price` (FIND-202); zuerst `listVariantData(modelTemplateIds)` für CU-290 (angelegt mit GitHub-Issue #153, Nachtrag MAR-879); `listTitles(listingIds)` für die Titel der Modell-Inserate von Geräten (erweitert mit #185, Nachtrag MAR-965) | F-07 |
 | CU-126 | Preis-Dienst | `apps/server/src/inventory/price-service.ts` | Preis je Kanal speichern; ruft ab S5 CU-127 | REQ-032 |
 | CU-128 | Bestandsfortschreibung | `apps/server/src/inventory/listing-stock-updater.ts` | `quantity`, `stock_json`, `stock_hash` des Modell-Inserats neu bilden und `StockChanged` melden | REQ-091 |
 | CU-129 | Bestands-Reader | `apps/server/src/inventory/inventory-reader.ts` | Leseschnittstelle für Modell-Inserate, Geräte, Preise | F-08, F-13, F-14 |
@@ -5289,6 +5289,27 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
 - **Keine Owner-Freigabe und kein Architecture Review nötig (Kap. 4.7):** Klarstellung innerhalb von CU-114 und CU-319 nach Design v0.6.7/v0.6.8 und den bestehenden Regeln aus Kap. 2.0.11 und 2.4. Keine Komponentengrenze, keine Schnittstelle, kein Endpunkt und kein Text ändern sich; die Signatur von CU-319 bleibt.
 
   **Auswirkung auf das Design:** keine.
+
+**Code-Struktur-Nachtrag 16.11.2026 (MAR-965, Rückfrage aus der Umsetzung von GitHub-Issue #185, MAR-961):** keine neue Einheit, Verantwortung von CU-122 und CU-125 präzisiert, keine Komponentengrenze berührt, keine Migration, kein Diagramm, kein neuer Text.
+
+- **Ausgangslage:** #185 baut CU-121 und die Routen `POST /api/devices` und `GET /api/devices/{id}` (CU-130). Nach Kap. 4.1 (Routen → Dienst → Repository) braucht CU-121 drei Abfragen auf `device`: vergebene WI-Nr prüfen, Gerät einfügen, Gerät per ID lesen. Sie gehören zu CU-122. Die Liste der Code-Einheiten von #185 nennt CU-122 aber nicht, nur #187 („neu“). #187 ist von #185 blockiert und wird also später gemergt. Für den Text von `wi_nr_taken` braucht CU-121 außerdem den Titel des Modell-Inserats des vorhandenen Geräts.
+- **(1) CU-122 entsteht mit #185:** `createDeviceRepository(db: Kysely<DB>)`, Typ `DeviceRepository`, Aufbau wie CU-125. In der Aktion mit `tx.db` (Nachtrag MAR-263). Methoden:
+  - `findTakenByWiNrKey(wiNrKey: string)`: das Gerät mit diesem `wi_nr_key` im Status *verfügbar* oder *verkauft*, als `{ id, wi_nr, listing_id }` oder `undefined`. Mehr als eines kann es nicht geben (Index `ux_device_wi_nr_key`, Migration `0001`). CU-121 bildet daraus `wi_nr_taken` mit `details.deviceId`, `details.listingId` und dem Text mit der WI-Nr des vorhandenen Geräts.
+  - `insert(row)`: fügt das Gerät ein und gibt die neue `id` zurück.
+  - `findById(id)`: alle Spalten von `device` (Kap. 3.4) oder `undefined`; daraus antworten `POST` (`201`) und `GET /api/devices/{id}` (`not_found`).
+  - #187 erweitert CU-122 um die Suche (`GET /api/devices?wiNr=`), #258 um die nicht zugeordneten Geräte, die WI-Nr-Korrektur (CU-231) bei Bedarf `findTakenByWiNrKey` um ein ausgenommenes Gerät. Namen und Fabrik bleiben.
+- **(2) Titel des Modell-Inserats über CU-125, nicht per Join:** CU-125 bekommt `listTitles(listingIds: readonly number[])`: `{ id, display_title }[]` nach `id` aufsteigend; bei leerer Eingabe `[]` ohne Abfrage, wie `listVariantData`. CU-121 ruft sie nur, wenn `listing_id` gesetzt ist. Dieselbe Methode nutzen #187 für `listing: { id, title }` der Trefferliste (eine Abfrage für alle Treffer einer Seite) und `GET /api/devices/{id}` für das Modell-Inserat.
+- **Verworfen:** Join von `device` auf `listing` in CU-122 (Vorschlag aus MAR-965). `listing` gehört zwar zu `inventory`. Nachtrag MAR-879 (3) und Prüfkriterium R2 legen aber fest, dass Abfragen auf `listing` nur in CU-125 stehen, damit #197, #198, #206 und #209 bei Spaltenänderungen keine zweite Abfragestelle übersehen. `display_title` ist abgeleitet und kann sich mit diesen Tasks ändern.
+- **Offen, nicht Teil dieses Nachtrags:** Wortlaut und Link von `wi_nr_taken`, wenn das vorhandene Gerät nicht zugeordnet ist (`listing_id` leer). Das ist eine Frage an den Product Owner ([MAR-970](/MAR/issues/MAR-970)). Die Methoden oben gelten für beide Antworten: `details.listingId` ist dann `null`, und CU-121 ruft `listTitles` nicht.
+- **Folge für den Backlog (Product Owner):**
+  - #185 Code-Einheiten: neu CU-122 (`insert`, `findById`, `findTakenByWiNrKey`), erweitert CU-125 (`listTitles`).
+  - #187: CU-122 „erweitert“ statt „neu“ (Suche); CU-125 „genutzt“ (`listTitles`).
+  - #258: unverändert (erweitert CU-122).
+  - CU-111 und CU-112 in #185 hat der Product Owner mit MAR-964 schon geklärt (angelegt von #178, in #185 genutzt). Aus Sicht der Code-Struktur ist das richtig; nichts zu ändern.
+- **Prüfkriterien Code Review:**
+  - (R1) In `apps/server/src/inventory` stehen Kysely-Abfragen auf `device` nur in CU-122 und auf `listing` nur in CU-125. CU-121 und CU-130 enthalten keine Abfrage.
+  - (R2) Integrationstests CU-122: `findTakenByWiNrKey` findet ein Gerät im Status *verfügbar* und *verkauft*, nicht im Status *storniert* (AC-REQ-012-05); `listTitles([])` ist `[]`.
+- **Keine Owner-Freigabe nötig (Kap. 4.7):** Verhalten, Endpunkte, Fehlercodes und Texte bleiben wie freigegeben. Festgelegt sind nur Methoden vorhandener Einheiten und welche Task CU-122 anlegt. **Keine Auswirkung auf das Design.**
 
 Weitere Code-Struktur-Nachträge (Kap. 4.7) werden hier mit Datum, Einheit und Grund ergänzt.
 
