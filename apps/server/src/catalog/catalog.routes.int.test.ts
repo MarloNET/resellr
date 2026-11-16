@@ -344,7 +344,7 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
     ]);
   });
 
-  it.each(['ABC#123', '6FY52AV#ABD'])(
+  it.each(['ABC#123', '6FY52AV#ABD', 'ÄB-12', '20TD 002MGE'])(
     'DER-50-17 rejects "%s" with mpn_invalid_chars (M-26)',
     async (mpn) => {
       expect(fieldsOf(await post({ ...NEW(), mpn }))).toEqual([
