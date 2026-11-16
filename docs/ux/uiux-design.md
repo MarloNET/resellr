@@ -387,3 +387,4 @@ Geprüft wurde mechanisch (Skript) und durch Sichtprüfung der neun neuen und zw
 | Traceability | REQ → FLOW → UI vorhanden. |
 | Decision integrity | Bestätigte Annahmen als „Design-Annahme, keine Anforderung“ gekennzeichnet (UI-003, 006, 014, 019, 024). Stand v0.5.3: V-1 bis V-3 und OD-02 (Variante A) erledigt, offen nur X-8 (Betriebsstatus-Warnungen, kein REQ). Status approved (Owner-Freigabe 07.11.2026, `a9356c1`). |
 | Repository state | Alle in `screen.md` genannten PNG existieren (Skriptprüfung). Keine Secrets. |
+| v0.6.6 | 16.11.2026 | MAR-902 (Info aus Code Review PR #397, Issue #177, CR-R1-03), Minimal, nur Text, keine Verhaltensänderung der Anforderung: UI-007 neuer Zustand `UI-007.ladefehler` mit eigenem Text bei fehlgeschlagenem Laden von Gerätearten oder Herstellern („Gerätearten und Hersteller konnten nicht geladen werden. Bitte Seite neu laden. Referenz: <Nr>“); Speichern gesperrt. Kein Mockup, Stitch unverändert. |

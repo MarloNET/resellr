@@ -45,6 +45,7 @@ Beide Dialoge sind modal, Muster P-04 (Breite 480 px, bei schmalerem Fenster Fen
 | empty | n/a | – | – |
 | `UI-007.speichert` (wird gespeichert) | Speicherknopf und alle Eingaben gesperrt bis zur Antwort, Anzeige „Speichern …“, **kein festes Timeout** (Muster P-08); bei Verbindungsverlust „Ausgang unbekannt, bitte neu laden“ | nur Text | „Speichern …“ |
 | error | Banner | nur Text | „Modellvorlage konnte nicht gespeichert werden. Referenz: <Nr>“ |
+| `UI-007.ladefehler` (Gerätearten oder Hersteller konnten beim Öffnen nicht geladen werden) | Banner oben im Formular, nur Text; das Formular bleibt leer und „Speichern“ gesperrt, „Abbrechen“ bedienbar; kein Neuladen-Knopf, Neuladen der Seite genügt (wie UI-002, UI-017) | nur Text | „Gerätearten und Hersteller konnten nicht geladen werden. Bitte Seite neu laden. Referenz: <Nr>“ (Muster „… konnte nicht geladen werden. Referenz: <Nr>“ wie UI-010, UI-024; zeigt nie den Text der Speicheraktion, weil nichts gespeichert wurde) |
 | validation | Feldfehler | nur Text | siehe oben |
 | success | Banner | nur Text | |
 | disabled | Geräteart gesperrt | nur Text | |
