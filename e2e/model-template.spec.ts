@@ -20,6 +20,15 @@ function uniqueName(base: string, title: string, project: string) {
   return `${base} ${hash.toString(36)}`;
 }
 
+/**
+ * Fills the required attributes of the level model of a notebook (initial settings,
+ * Requirements 9.3: Prozessor, Displaygröße; AC-REQ-008-05).
+ */
+async function fillNotebookAttributes(page: Page) {
+  await field(page, 'Prozessor').fill('Intel Core i5-1135G7');
+  await field(page, 'Displaygröße').fill('15,6');
+}
+
 /** Creates a manufacturer through the API like the user interface (`local-guard` G-2, G-4). */
 async function createManufacturer(page: Page, baseUrl: string, name: string) {
   const response = await page.request.post(`${baseUrl}/api/manufacturers`, {
@@ -50,6 +59,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     ).toBeVisible();
     await expectReachable(page);
     await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+    await fillNotebookAttributes(page);
     await field(page, 'Hersteller').selectOption({ label: manufacturer });
     await field(page, 'Modellbezeichnung').fill('ThinkPad E15 Gen 2');
     await field(page, 'Typbezeichnung').fill('20TD');
@@ -82,6 +92,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await page.goto('/modelle/neu');
 
     await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+    await fillNotebookAttributes(page);
     await field(page, 'Hersteller').selectOption({ label: manufacturer });
     await field(page, 'Modellbezeichnung').fill('Esprimo Q957');
     await form(page).getByRole('checkbox', { name: 'unbekannt' }).check();
@@ -114,6 +125,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     });
     await page.goto('/modelle/neu');
     await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+    await fillNotebookAttributes(page);
     await field(page, 'Hersteller').selectOption({ label: manufacturer });
     await field(page, 'Modellbezeichnung').fill('Lifebook E5510');
     await field(page, 'Herstellernummer').fill('E5510MP5');
@@ -142,6 +154,99 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await expect(form(page).getByText('Hersteller fehlt')).toBeVisible();
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ manufacturerId: id });
+  });
+
+  test('UI-007.default UI-007.validation AC-REQ-008-05 DER-50-11 the fields of the device type appear after choosing it, and a missing required attribute is named at its field', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const manufacturer = uniqueName('HP', testInfo.title, testInfo.project.name);
+    await createManufacturer(page, server.baseUrl, manufacturer);
+    await page.goto('/modelle/neu');
+    await expect(
+      form(page).getByText('Geräteart wählen, dann erscheinen die Merkmale'),
+    ).toHaveCount(2);
+
+    await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+    const modelAttributes = form(page).getByRole('group', { name: 'Merkmale Ebene Modell' });
+    await expect(modelAttributes.getByText('Prozessor*', { exact: true })).toBeVisible();
+    await expect(
+      form(page).getByRole('group', { name: 'Vorbelegungswerte für Geräte' }).getByLabel(/^RAM$/),
+    ).toBeVisible();
+    // Prozessor stays the only missing required field, so it is the first error.
+    await field(page, 'Hersteller').selectOption({ label: manufacturer });
+    await field(page, 'Modellbezeichnung').fill('ProBook 450 G8');
+    await form(page).getByRole('checkbox', { name: 'unbekannt' }).check();
+    await field(page, 'Displaygröße').fill('15,6');
+    await saveButton(page).click();
+
+    await expect(form(page).getByText('Prozessor fehlt')).toBeVisible();
+    await expect(field(page, 'Prozessor')).toBeFocused();
+    await expectReachable(page);
+  });
+
+  test('UI-007.validation DER-50-20 a pick list value deactivated in another window is rejected at the field of its attribute, emptied and no longer offered (2.0.11, Nachtrag MAR-904)', async ({
+    page,
+    server,
+  }, testInfo) => {
+    // Two saves with a reachability check each.
+    test.slow();
+    const manufacturer = uniqueName('Dell', testInfo.title, testInfo.project.name);
+    const surface = uniqueName('satiniert', testInfo.title, testInfo.project.name);
+    await createManufacturer(page, server.baseUrl, manufacturer);
+    const headers = { origin: server.baseUrl };
+    const lists = (await (
+      await page.request.get(`${server.baseUrl}/api/pick-lists?limit=200`)
+    ).json()) as {
+      items: { id: number; key: string }[];
+    };
+    const listId = lists.items.find(({ key }) => key === 'display_surface')?.id;
+    const created = await page.request.post(`${server.baseUrl}/api/pick-lists/${listId}/values`, {
+      headers,
+      data: { label: surface, active: true },
+    });
+    expect(created.status()).toBe(201);
+    const value = (await created.json()) as { id: number; version: number };
+    const sent: Record<string, unknown>[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (request.method() === 'POST' && url.pathname === '/api/model-templates') {
+        sent.push(request.postDataJSON() as Record<string, unknown>);
+      }
+    });
+    await page.goto('/modelle/neu');
+    await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+    await fillNotebookAttributes(page);
+    await field(page, 'Display-Oberfläche').selectOption({ label: surface });
+    await field(page, 'Hersteller').selectOption({ label: manufacturer });
+    await field(page, 'Modellbezeichnung').fill('Latitude 5520');
+    await form(page).getByRole('checkbox', { name: 'unbekannt' }).check();
+
+    // "Another window" deactivates the value after UI-007 has read the choices.
+    const deactivated = await page.request.patch(
+      `${server.baseUrl}/api/pick-list-values/${value.id}`,
+      { headers, data: { version: value.version, active: false } },
+    );
+    expect(deactivated.status()).toBe(200);
+    await saveButton(page).click();
+
+    await expect(
+      form(page).getByText(`Display-Oberfläche: ${surface} ist deaktiviert`),
+    ).toBeVisible();
+    await expect(field(page, 'Display-Oberfläche')).toBeFocused();
+    await expect(field(page, 'Display-Oberfläche')).toHaveValue('');
+    await expect(
+      field(page, 'Display-Oberfläche').getByRole('option', { name: surface }),
+    ).toHaveCount(0);
+    await expect(field(page, 'Prozessor')).toHaveValue('Intel Core i5-1135G7');
+    expect(sent).toHaveLength(1);
+    expect(Object.values(sent[0]?.modelValues as Record<string, unknown>)).toContain(value.id);
+    await expectReachable(page);
+
+    // The attribute is optional: saving without a choice stores the model template.
+    await saveButton(page).click();
+    await expect(page.getByText('Modellvorlage gespeichert')).toBeVisible();
+    expect(Object.values(sent[1]?.modelValues as Record<string, unknown>)).not.toContain(value.id);
   });
 
   test('UI-007.validation DER-50-17 AC-REQ-008-02 the browser shows one message per field and focuses the first error', async ({
