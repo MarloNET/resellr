@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
+  CONFIRMATION_TITLES,
   ERROR_MESSAGES,
   type ErrorMessageUsage,
   FIELD_MESSAGES,
@@ -238,6 +239,15 @@ describe('message catalog (E1)', () => {
       '{Baustein:Name} ist im Textbaustein nicht zulässig',
     );
     expect(FIELD_MESSAGES.textBlockBody).toBe('Text: 1 bis 5.000 Zeichen');
+  });
+
+  it('has title and text of M-27 under confirmation_required.possible_duplicate (8.2)', () => {
+    expect(CONFIRMATION_TITLES['confirmation_required.possible_duplicate']).toBe(
+      'Mögliche Dublette',
+    );
+    expect(ERROR_MESSAGES['confirmation_required.possible_duplicate']).toBe(
+      'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+    );
   });
 
   it('derives the usages of a code from the catalog keys', () => {

@@ -2,12 +2,13 @@ import { ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
 import {
   type ModelTemplateCreateInput,
   modelTemplateCreateSchema,
+  type ModelTemplateMatch,
 } from '@resellr/domain/schemas/model-template.schema';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
-import { useCreateModelTemplateMutation } from '../../api/catalog.api.ts';
+import { possibleDuplicatesOf, useCreateModelTemplateMutation } from '../../api/catalog.api.ts';
 import { useDeviceTypesQuery, useManufacturersQuery } from '../../api/settings.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
 import {
@@ -27,6 +28,7 @@ import { Button } from '../../components/ui/Button.tsx';
 import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
+import { DuplicateDialog } from './DuplicateDialog.tsx';
 
 // Texts of UI-007 `screen.md` and its mockup (UI/UX design v0.6.2, v0.6.3 for the empty MPN,
 // v0.6.7 for the placeholder).
@@ -53,6 +55,8 @@ const TEXTS = {
 
 /** The calling page; UI-007 is opened from UI-006 (the call from UI-003 follows with S4). */
 const CALLER_PATH = '/modelle';
+/** UI-007 for changing a model template, as UI-006 opens it. */
+const templatePath = (id: number) => `${CALLER_PATH}/${id}`;
 
 /** State a calling page takes over after the save: the success banner of UI-007 (DER-50-02). */
 export interface SavedNoticeState {
@@ -130,9 +134,9 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
  * EAN, "Modellvorlage speichern" (also Ctrl+S) and "Abbrechen". Device type and manufacturer open
  * with the placeholder "Bitte wählen" (Design v0.6.7). States: default, loading,
  * validation (focus on the first error), speichert and ausgang-unbekannt (P-08), success (banner
- * on the calling page), error, unreachable (P-06) for the reads and wird-beendet (P-07) for the
- * save. The attribute fields (#178), the dialog UI-008 (#179), the duplicate hint (#184) and
- * changing (#181) follow.
+ * on the calling page), error, unreachable (P-06) for the reads, wird-beendet (P-07) for the
+ * save and the dialog dublette for a possible duplicate (REQ-011). The attribute fields (#178),
+ * the dialog UI-008 (#179) and changing (#181) follow.
  */
 export function ModelTemplatePage() {
   const navigate = useNavigate();
@@ -160,6 +164,8 @@ export function ModelTemplatePage() {
   // Choices that show the text of a rejection; it stays until the next choice (Design v0.6.7).
   const [rejectionShown, setRejectionShown] = useState<Partial<Record<Field, boolean>>>({});
   const [reloading, setReloading] = useState(false);
+  // Hits of a possible duplicate; the dialog UI-007.dublette is open while they are set.
+  const [duplicates, setDuplicates] = useState<ModelTemplateMatch[] | null>(null);
 
   const formId = useId();
   const modelDataId = useId();
@@ -184,7 +190,8 @@ export function ModelTemplatePage() {
 
   const saving = createMutation.isPending;
   // Until the choices are read again after a rejection, a save could send the rejected id.
-  const canSave = draft !== null && !saving && !writesLocked && !reloading;
+  // While the dialog of a possible duplicate is open, only its choices save (Ctrl+S does not).
+  const canSave = draft !== null && !saving && !writesLocked && !reloading && duplicates === null;
 
   function change(next: Partial<Draft>) {
     if (draft !== null) setDraft({ ...draft, ...next });
@@ -230,6 +237,12 @@ export function ModelTemplatePage() {
       showFieldErrors({ [field]: error.error?.message });
       setRejectionShown({ [field]: true });
       if (typeof id === 'number' && draft !== null) void reloadAfterRejection(field, id, draft);
+      return;
+    }
+    // The question comes only if the save would succeed otherwise (2.4 "Prüfreihenfolge").
+    const matches = possibleDuplicatesOf(error);
+    if (matches !== null) {
+      setDuplicates(matches);
       return;
     }
     setNotice(noticeOf(error));
@@ -293,13 +306,32 @@ export function ModelTemplatePage() {
     }
     setErrors({});
     setNotice(null);
-    createMutation.mutate(bodyOf(draft), {
+    send(bodyOf(draft));
+  }
+
+  function send(body: ModelTemplateCreateInput) {
+    createMutation.mutate(body, {
       onSuccess: () => {
         const state: SavedNoticeState = { savedNotice: TEXTS.saved };
         void navigate(CALLER_PATH, { state });
       },
       onError: onFailed,
     });
+  }
+
+  /** "Trotzdem anlegen": the same model template again, with the confirmation (DER-53-03). */
+  function createAnyway() {
+    setDuplicates(null);
+    if (draft !== null && !writesLocked) send({ ...bodyOf(draft), confirmDuplicate: true });
+  }
+
+  /**
+   * "Vorhandene verwenden": the inputs are discarded and the chosen model template opens in
+   * UI-007 for changing (DER-53-02). The return to UI-003 follows with #186 (DER-54-14).
+   */
+  function chooseExisting(id: number) {
+    setDuplicates(null);
+    void navigate(templatePath(id));
   }
 
   // Ctrl+S saves like the primary button (UI-007 "Aktionen").
@@ -488,6 +520,14 @@ export function ModelTemplatePage() {
           {saving ? TEXTS.saving : TEXTS.save}
         </Button>
       </div>
+
+      <DuplicateDialog
+        matches={duplicates}
+        onUseExisting={chooseExisting}
+        onCreateAnyway={createAnyway}
+        onClose={() => setDuplicates(null)}
+        createDisabled={writesLocked}
+      />
     </div>
   );
 }
