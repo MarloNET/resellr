@@ -91,12 +91,15 @@ function mockApi({
   writes = {},
   suppliers = () => [L1, L2],
   conditions = () => [USED, DEFECT],
+  holdSuppliers,
 }: {
   initial?: Entry[];
   list?: Route;
   writes?: Record<string, Route>;
   suppliers?: () => SupplierOfTest[];
   conditions?: () => ConditionOfTest[];
+  /** A read of the suppliers waits for the returned promise, e.g. to choose during a reload. */
+  holdSuppliers?: () => Promise<void> | undefined;
 } = {}) {
   let items: Entry[] = [...initial];
   const sent: { method: string; path: string; body: unknown }[] = [];
@@ -111,6 +114,7 @@ function mockApi({
         return list ? list(init) : Response.json({ items, total: items.length });
       }
       if (path.startsWith('/api/suppliers')) {
+        await holdSuppliers?.();
         return Response.json({ items: suppliers(), total: suppliers().length });
       }
       if (path.startsWith('/api/pick-lists/1/values')) {
@@ -684,7 +688,7 @@ describe('UI-033 condition codes (CU-100)', () => {
       enterNew({ supplier: '1', condition: '11' });
 
       expect(await screen.findByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
-      expect(document.activeElement).toBe(supplierSelect());
+      await vi.waitFor(() => expect(document.activeElement).toBe(supplierSelect()));
       expect(supplierSelect().getAttribute('aria-invalid')).toBe('true');
       await vi.waitFor(() => {
         expect(readsOf(reads, '/api/suppliers')).toBeGreaterThan(supplierReads);
@@ -700,6 +704,72 @@ describe('UI-033 condition codes (CU-100)', () => {
       expect(sent).toHaveLength(1);
       expect(screen.queryByText('Gespeichert')).toBeNull();
       expectAccessibleForm();
+    });
+
+    /**
+     * `supplier_deactivated` for L1; the reload of the suppliers waits until `release`, so that
+     * "Lieferant" L3 is chosen during it from the list before the reload (Nachtrag MAR-963).
+     */
+    async function chooseDuringReload({ l3ActiveAfter }: { l3ActiveAfter: boolean }) {
+      let l1 = L1;
+      let l3 = L3;
+      let hold: Promise<void> | undefined;
+      let release = () => {};
+      const api = mockApi({
+        suppliers: () => [l1, L2, l3],
+        holdSuppliers: () => hold,
+        writes: {
+          'POST /api/condition-codes': () => {
+            l1 = { ...L1, active: false, version: 2 };
+            if (!l3ActiveAfter) l3 = { ...L3, active: false, version: 2 };
+            hold = new Promise((resolve) => (release = resolve));
+            return rejection(
+              'supplier_deactivated',
+              'Lieferant L1 ist deaktiviert',
+              'supplierId',
+              1,
+            );
+          },
+        },
+      });
+      await openPage();
+      enterNew({ supplier: '1' });
+      expect(await screen.findByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(hold).toBeDefined());
+
+      fireEvent.change(supplierSelect(), { target: { value: '3' } });
+      expect(supplierSelect().value).toBe('3');
+      expect(document.activeElement).not.toBe(supplierSelect());
+      release();
+      return api;
+    }
+
+    it('UI-033.validation T5j a supplier chosen during the reload and missing in the new list is emptied with its own text; the focus comes after the reload; "Speichern" sends nothing', async () => {
+      const { sent } = await chooseDuringReload({ l3ActiveAfter: false });
+
+      expect(await screen.findByText('Lieferant L3 ist deaktiviert')).toBeTruthy();
+      expect(shown(supplierSelect())).toBe('Bitte wählen');
+      expect(supplierSelect().value).toBe('not-chosen');
+      expect(labels(supplierSelect())).toEqual(['Bitte wählen', 'alle']);
+      await vi.waitFor(() => expect(document.activeElement).toBe(supplierSelect()));
+
+      fireEvent.blur(supplierSelect());
+      expect(screen.getByText('Lieferant L3 ist deaktiviert')).toBeTruthy();
+      fireEvent.click(saveButton());
+
+      expect(await screen.findByText('Lieferant: Lieferanten oder „alle“ wählen')).toBeTruthy();
+      expect(sent).toHaveLength(1);
+      expectAccessibleForm();
+    });
+
+    it('UI-033.validation T5k a supplier chosen during the reload and active in the new list stays chosen without a text', async () => {
+      await chooseDuringReload({ l3ActiveAfter: true });
+
+      await vi.waitFor(() => expect(labels(supplierSelect())).toEqual(['alle', 'L3']));
+      expect(supplierSelect().value).toBe('3');
+      expect(shown(supplierSelect())).toBe('L3');
+      expect(screen.queryByText(/ist deaktiviert/)).toBeNull();
+      expect(supplierSelect().getAttribute('aria-invalid')).not.toBe('true');
     });
 
     it('UI-033.validation "Speichern" without a supplier chosen after the rejection shows "Lieferant: Lieferanten oder „alle“ wählen" and sends nothing; "alle" sends supplierId null', async () => {

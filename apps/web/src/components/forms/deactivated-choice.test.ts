@@ -99,4 +99,19 @@ describe('findMissingChoices (CU-319, T9)', () => {
   it('does not report a field whose list was not reloaded', () => {
     expect(findMissingChoices([field({})], {})).toEqual([]);
   });
+
+  it('reports the field of details.path with another missing value chosen during the reload, but not with null (Nachtrag MAR-963)', () => {
+    // Supplier "West" was rejected; during the reload "Ost" was chosen, now deactivated too.
+    const reloaded = {
+      supplierId: [
+        { ...WEST, active: false },
+        { ...OST, active: false },
+      ],
+    };
+
+    expect(findMissingChoices([field({ id: 2 })], reloaded)).toEqual([
+      { path: 'supplierId', id: 2, message: 'Lieferant Lieferant Ost ist deaktiviert' },
+    ]);
+    expect(findMissingChoices([field({ id: null })], reloaded)).toEqual([]);
+  });
 });

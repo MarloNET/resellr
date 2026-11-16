@@ -344,7 +344,9 @@ export function ConditionCodesPage() {
    * A supplier or condition suggestion deactivated in another window (2.0.11, design v0.6.8):
    * the text stands at the field of `details.path`, which is emptied ("Bitte wählen" at
    * "Lieferant"), and the rejected id is never offered or sent again. Both choices are read
-   * again; a second choice with a new value no longer offered is emptied with its own text. The
+   * again; each choice whose value at the end of the reload is new and no longer offered, also
+   * one made in the field of `details.path` during the reload, is emptied with the text of its
+   * usage (Nachtrag MAR-963). The focus goes to the first marked field after the reload. The
    * other inputs stay.
    */
   async function rejectDeactivated(path: ChoicePath, id: number, message: string) {
@@ -354,14 +356,14 @@ export function ConditionCodesPage() {
     };
     setRejected((current) => ({ ...current, [path]: [...current[path], id] }));
     setDraft((current) => ({ ...current, [DRAFT_KEYS[path]]: EMPTIED[path] }));
-    showFieldErrors({ [path]: message });
+    setErrors({ [path]: message });
 
     const [suppliersRead, conditionsRead] = await Promise.all([
       suppliersQuery.refetch(),
       conditionsQuery.refetch(),
     ]);
     const current = draftRef.current;
-    const fields: ChoiceField[] = CHOICE_PATHS.filter((each) => each !== path).map((each) => ({
+    const fields: ChoiceField[] = CHOICE_PATHS.map((each) => ({
       path: each,
       id: idOf(current[DRAFT_KEYS[each]]),
       storedId: idOf(current.base[DRAFT_KEYS[each]]),
@@ -374,7 +376,10 @@ export function ConditionCodesPage() {
         ? conditionItems(conditionsRead.data.items)
         : undefined,
     });
-    if (missing.length === 0) return;
+    if (missing.length === 0) {
+      focusFirstError();
+      return;
+    }
     const missingPaths = missing.map((each) => each.path as ChoicePath);
     setDraft((draftNow) => {
       const next = { ...draftNow };
