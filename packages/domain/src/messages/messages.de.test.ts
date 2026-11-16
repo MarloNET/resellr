@@ -122,6 +122,19 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('DER-54-15 names the deactivated supplier of a new device (2.0.6, 8.2, UI-003)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.device']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+  });
+
+  it('has the field texts of the WI-Nr and the model template of a new device (2.5, UI-003)', () => {
+    expect(FIELD_MESSAGES.wiNr).toBe(
+      'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)',
+    );
+    expect(FIELD_MESSAGES.modelTemplateMissing).toBe('Bitte eine Modellvorlage wählen');
+  });
+
   it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
     expect(FIELD_MESSAGES.manufacturerName).toBe('Name: 1 bis 50 Zeichen');
   });

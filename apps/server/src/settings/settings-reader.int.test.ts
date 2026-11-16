@@ -64,10 +64,32 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
     });
   });
 
+  it('finds a supplier with name and status, active or not', async () => {
+    const insert = database.sqlite.prepare(
+      `INSERT INTO supplier (name, name_key, active, version, created_at, updated_at)
+       VALUES (?, ?, ?, 1, '2026-11-16T08:00:00.000Z', '2026-11-16T08:00:00.000Z')`,
+    );
+    const ost = Number(insert.run('Lieferant Ost', 'lieferant ost', 1).lastInsertRowid);
+    const west = Number(insert.run('Lieferant West', 'lieferant west', 0).lastInsertRowid);
+    const reader = createSettingsReader(database.db);
+
+    await expect(reader.findSupplier(ost)).resolves.toEqual({
+      id: ost,
+      name: 'Lieferant Ost',
+      active: true,
+    });
+    await expect(reader.findSupplier(west)).resolves.toEqual({
+      id: west,
+      name: 'Lieferant West',
+      active: false,
+    });
+  });
+
   it('returns undefined for an unknown id', async () => {
     const reader = createSettingsReader(database.db);
 
     await expect(reader.findDeviceType(999)).resolves.toBeUndefined();
     await expect(reader.findManufacturer(999)).resolves.toBeUndefined();
+    await expect(reader.findSupplier(999)).resolves.toBeUndefined();
   });
 });
