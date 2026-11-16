@@ -202,6 +202,73 @@ export const seedDatasheetLayout: SeedArea = async (api) => {
 };
 
 /**
+ * Model templates (S3, UI-006, UI-007): a few notebooks and a mini PC of the demo manufacturers
+ * on the initial device types, one with MPN "unbekannt" and one with an original EAN from the
+ * GS1 range for internal use (prefix 200), so it belongs to no real product. Device types and
+ * manufacturers are looked up by name, as the user chooses them in UI-007.
+ */
+export const DEMO_MODEL_TEMPLATES = [
+  {
+    deviceType: 'Notebook',
+    manufacturer: 'Lenovo',
+    modelName: 'ThinkPad E15 Gen 2',
+    typeDesignation: '20TD',
+    mpn: '20TD002MGE',
+    originalEan: '',
+  },
+  {
+    deviceType: 'Notebook',
+    manufacturer: 'Lenovo',
+    modelName: 'ThinkPad T14 Gen 2',
+    typeDesignation: '20W0',
+    mpn: '20W000T9GE',
+    originalEan: '2000000177007',
+  },
+  {
+    deviceType: 'Notebook',
+    manufacturer: 'HP',
+    modelName: 'EliteBook 840 G8',
+    typeDesignation: '',
+    mpn: '6FY52AV',
+    originalEan: '',
+  },
+  {
+    deviceType: 'PC/Mini-PC',
+    manufacturer: 'Fujitsu',
+    modelName: 'Esprimo Q957',
+    typeDesignation: '',
+    mpn: null,
+    originalEan: '',
+  },
+] as const;
+
+/** Ids by name from a list answer `{ items: [{ id, name }] }`. */
+async function idsByName(api: DemoApi, path: string): Promise<Map<string, number>> {
+  const { items } = await api.request<{ items: { id: number; name: string }[] }>('GET', path);
+  return new Map(items.map(({ id, name }) => [name, id]));
+}
+
+function idOf(ids: Map<string, number>, name: string): number {
+  const id = ids.get(name);
+  if (id === undefined) throw new Error(`Demo data: ${name} is missing`);
+  return id;
+}
+
+export const seedModelTemplates: SeedArea = async (api) => {
+  const deviceTypes = await idsByName(api, '/api/device-types?limit=200');
+  const manufacturers = await idsByName(api, '/api/manufacturers?limit=200');
+  for (const { deviceType, manufacturer, mpn, ...template } of DEMO_MODEL_TEMPLATES) {
+    await api.request('POST', '/api/model-templates', {
+      deviceTypeId: idOf(deviceTypes, deviceType),
+      manufacturerId: idOf(manufacturers, manufacturer),
+      ...template,
+      mpn,
+      mpnUnknown: mpn === null,
+    });
+  }
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
@@ -213,6 +280,7 @@ export const SEED_AREAS: readonly SeedArea[] = [
   seedMerchantProfile,
   seedTextBlocks,
   seedDatasheetLayout,
+  seedModelTemplates,
 ];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */

@@ -5,6 +5,20 @@ import type { DB, ModelTemplateTable } from '../db/schema.ts';
 
 export type ModelTemplateRow = Selectable<ModelTemplateTable>;
 
+/** Columns of a new model template (3.3); keys, values and flags are set by the caller. */
+export interface ModelTemplateInsert {
+  deviceTypeId: number;
+  manufacturerId: number;
+  modelName: string;
+  modelNameKey: string;
+  typeDesignation: string | null;
+  mpn: string | null;
+  mpnUnknown: boolean;
+  originalEan: string | null;
+  searchKey: string;
+  at: string;
+}
+
 export interface ModelTemplateListQuery {
   /** Search term, already checked for at least 2 characters; without it the latest created. */
   q?: string;
@@ -74,6 +88,45 @@ export function createModelTemplateRepository(db: Kysely<DB>) {
 
     async findById(id: number): Promise<ModelTemplateRow | undefined> {
       return db.selectFrom('model_template').selectAll().where('id', '=', id).executeTakeFirst();
+    },
+
+    /** A model template with the names of device type and manufacturer, e.g. for the audit entry. */
+    async findWithNamesById(id: number) {
+      return filtered({})
+        .selectAll('mt')
+        .select(['dt.name as device_type_name', 'm.name as manufacturer_name'])
+        .where('mt.id', '=', id)
+        .executeTakeFirst();
+    },
+
+    /**
+     * Stores a new model template with version 1, without attribute values and without import
+     * review (3.3; the values follow with #178); returns its id.
+     */
+    async insert(template: ModelTemplateInsert): Promise<number> {
+      const { id } = await db
+        .insertInto('model_template')
+        .values({
+          device_type_id: template.deviceTypeId,
+          manufacturer_id: template.manufacturerId,
+          model_name: template.modelName,
+          model_name_key: template.modelNameKey,
+          type_designation: template.typeDesignation,
+          mpn: template.mpn,
+          mpn_unknown: template.mpnUnknown ? 1 : 0,
+          original_ean: template.originalEan,
+          model_values: '{}',
+          default_device_values: '{}',
+          search_key: template.searchKey,
+          import_review_pending: 0,
+          import_review_keys: '[]',
+          version: 1,
+          created_at: template.at,
+          updated_at: template.at,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      return id;
     },
   };
 }

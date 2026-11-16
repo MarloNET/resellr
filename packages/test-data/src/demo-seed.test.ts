@@ -10,6 +10,7 @@ import {
   seedDeviceTypes,
   seedDemoData,
   seedManufacturers,
+  seedModelTemplates,
   type SeedArea,
   seedMerchantProfile,
   seedSuppliers,
@@ -116,7 +117,7 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout', () => {
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout, then S3 model templates', () => {
     expect(SEED_AREAS).toEqual([
       seedDeviceTypes,
       seedSuppliers,
@@ -124,7 +125,102 @@ describe('seedDemoData', () => {
       seedMerchantProfile,
       seedTextBlocks,
       seedDatasheetLayout,
+      seedModelTemplates,
     ]);
+  });
+
+  it('creates the demo model templates through POST /api/model-templates with the ids of device type and manufacturer', async () => {
+    const requests: unknown[][] = [];
+    const lists: Record<string, unknown> = {
+      '/api/device-types?limit=200': {
+        items: [
+          { id: 1, name: 'Notebook' },
+          { id: 2, name: 'PC/Mini-PC' },
+        ],
+      },
+      '/api/manufacturers?limit=200': {
+        items: [
+          { id: 11, name: 'Lenovo' },
+          { id: 12, name: 'HP' },
+          { id: 13, name: 'Fujitsu' },
+        ],
+      },
+    };
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (method: string, path: string, body?: unknown) => {
+        requests.push(body === undefined ? [method, path] : [method, path, body]);
+        return (method === 'GET' ? lists[path] : { id: requests.length }) as never;
+      },
+    };
+
+    await seedModelTemplates(recording);
+
+    expect(requests).toEqual([
+      ['GET', '/api/device-types?limit=200'],
+      ['GET', '/api/manufacturers?limit=200'],
+      [
+        'POST',
+        '/api/model-templates',
+        {
+          deviceTypeId: 1,
+          manufacturerId: 11,
+          modelName: 'ThinkPad E15 Gen 2',
+          typeDesignation: '20TD',
+          mpn: '20TD002MGE',
+          mpnUnknown: false,
+          originalEan: '',
+        },
+      ],
+      [
+        'POST',
+        '/api/model-templates',
+        {
+          deviceTypeId: 1,
+          manufacturerId: 11,
+          modelName: 'ThinkPad T14 Gen 2',
+          typeDesignation: '20W0',
+          mpn: '20W000T9GE',
+          mpnUnknown: false,
+          originalEan: '2000000177007',
+        },
+      ],
+      [
+        'POST',
+        '/api/model-templates',
+        {
+          deviceTypeId: 1,
+          manufacturerId: 12,
+          modelName: 'EliteBook 840 G8',
+          typeDesignation: '',
+          mpn: '6FY52AV',
+          mpnUnknown: false,
+          originalEan: '',
+        },
+      ],
+      [
+        'POST',
+        '/api/model-templates',
+        {
+          deviceTypeId: 2,
+          manufacturerId: 13,
+          modelName: 'Esprimo Q957',
+          typeDesignation: '',
+          mpn: null,
+          mpnUnknown: true,
+          originalEan: '',
+        },
+      ],
+    ]);
+  });
+
+  it('stops with the name when a demo manufacturer is missing', async () => {
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async () => ({ items: [] }) as never,
+    };
+
+    await expect(seedModelTemplates(recording)).rejects.toThrow('Demo data: Notebook is missing');
   });
 
   it('creates the demo device types through POST /api/device-types', async () => {

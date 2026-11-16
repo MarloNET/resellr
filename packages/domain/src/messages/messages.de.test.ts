@@ -33,6 +33,8 @@ const MESSAGE_TABLE: [string, string][] = [
   ['M-21', 'Zeile: höchstens 1.000 Zeichen'],
   ['M-22', 'Excel-Datei: höchstens 10 MB'],
   ['M-24', 'Prüfdatum und prüfende Stelle erforderlich'],
+  ['M-25', 'Herstellernummer: höchstens 40 Zeichen'],
+  ['M-26', 'Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt'],
   ['M-30', 'Name: 1 bis 100 Zeichen'],
   ['M-31', 'Prüfende Stelle: höchstens 100 Zeichen'],
 ];
@@ -40,6 +42,8 @@ const MESSAGE_TABLE: [string, string][] = [
 const EXPECTED_KEYS = [
   ...Array.from({ length: 22 }, (_, i) => `M-${String(i + 1).padStart(2, '0')}`),
   'M-24',
+  'M-25',
+  'M-26',
   'M-30',
   'M-31',
 ];
@@ -55,7 +59,7 @@ describe('message catalog (E1)', () => {
     );
   });
 
-  it('has exactly the keys M-01 to M-22, M-24, M-30 and M-31', () => {
+  it('has exactly the keys M-01 to M-22, M-24 to M-26, M-30 and M-31', () => {
     expect(Object.keys(MESSAGES)).toEqual(EXPECTED_KEYS);
   });
 
@@ -91,6 +95,10 @@ describe('message catalog (E1)', () => {
     expect(ERROR_MESSAGES['name_taken.device_type']).toBe('Name ist bereits vergeben');
   });
 
+  it('has the field text of a missing device type (UI-007, Nachtrag MAR-925)', () => {
+    expect(FIELD_MESSAGES.deviceTypeMissing).toBe('Geräteart fehlt');
+  });
+
   it('has the field text of the device type name (UI-027)', () => {
     expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
   });
@@ -102,6 +110,15 @@ describe('message catalog (E1)', () => {
   it('names the deactivated manufacturer in manufacturer_deactivated (2.0.6, UI-008)', () => {
     expect(ERROR_MESSAGES['manufacturer_deactivated.default']('Lenovo')).toBe(
       'Hersteller Lenovo ist deaktiviert',
+    );
+  });
+
+  it('names the deactivated device type and manufacturer of a model template (2.0.6, 2.0.11, UI-007)', () => {
+    expect(ERROR_MESSAGES['device_type_deactivated.model_template']('Monitor')).toBe(
+      'Geräteart Monitor ist deaktiviert',
+    );
+    expect(ERROR_MESSAGES['manufacturer_deactivated.model_template']('Fujitsu')).toBe(
+      'Hersteller Fujitsu ist deaktiviert',
     );
   });
 
