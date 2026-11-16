@@ -92,6 +92,7 @@ function mockApi({
   suppliers = () => [L1, L2],
   conditions = () => [USED, DEFECT],
   holdSuppliers,
+  holdConditions,
 }: {
   initial?: Entry[];
   list?: Route;
@@ -100,6 +101,8 @@ function mockApi({
   conditions?: () => ConditionOfTest[];
   /** A read of the suppliers waits for the returned promise, e.g. to choose during a reload. */
   holdSuppliers?: () => Promise<void> | undefined;
+  /** A read of the condition values waits for the returned promise, like `holdSuppliers`. */
+  holdConditions?: () => Promise<void> | undefined;
 } = {}) {
   let items: Entry[] = [...initial];
   const sent: { method: string; path: string; body: unknown }[] = [];
@@ -118,6 +121,7 @@ function mockApi({
         return Response.json({ items: suppliers(), total: suppliers().length });
       }
       if (path.startsWith('/api/pick-lists/1/values')) {
+        await holdConditions?.();
         return Response.json({ items: conditions(), total: conditions().length });
       }
       if (path.startsWith('/api/pick-lists')) {
@@ -770,6 +774,242 @@ describe('UI-033 condition codes (CU-100)', () => {
       expect(shown(supplierSelect())).toBe('L3');
       expect(screen.queryByText(/ist deaktiviert/)).toBeNull();
       expect(supplierSelect().getAttribute('aria-invalid')).not.toBe('true');
+    });
+
+    it('UI-033.validation T5j after supplier_deactivated a suggestion chosen during the reload and missing in the new list is emptied with its own text; it is never sent', async () => {
+      let l1 = L1;
+      let used = USED;
+      let hold: Promise<void> | undefined;
+      let release = () => {};
+      const { sent } = mockApi({
+        suppliers: () => [l1, L2, L3],
+        conditions: () => [used, DEFECT],
+        holdSuppliers: () => hold,
+        holdConditions: () => hold,
+        writes: {
+          'POST /api/condition-codes': (init) => {
+            if (sent.length > 1) return created(JSON.parse(String(init?.body)));
+            l1 = { ...L1, active: false, version: 2 };
+            used = { ...USED, active: false, version: 2 };
+            hold = new Promise((resolve) => (release = resolve));
+            return rejection(
+              'supplier_deactivated',
+              'Lieferant L1 ist deaktiviert',
+              'supplierId',
+              1,
+            );
+          },
+        },
+      });
+      await openPage();
+      enterNew({ supplier: '1' });
+      expect(await screen.findByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(hold).toBeDefined());
+
+      fireEvent.change(conditionSelect(), { target: { value: '11' } });
+      expect(conditionSelect().value).toBe('11');
+      release();
+
+      expect(await screen.findByText('Vorschlag Zustand Gebraucht ist deaktiviert')).toBeTruthy();
+      expect(conditionSelect().value).toBe('');
+      expect(conditionSelect().getAttribute('aria-invalid')).toBe('true');
+      expect(screen.getByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(document.activeElement).toBe(supplierSelect()));
+
+      fireEvent.change(supplierSelect(), { target: { value: '3' } });
+      fireEvent.click(saveButton());
+
+      expect(await screen.findByText('Gespeichert')).toBeTruthy();
+      expect(sent[1]?.body).toMatchObject({ supplierId: 3, suggestedConditionValueId: null });
+      expectAccessibleForm();
+    });
+
+    it('UI-033.validation T5j after pick_list_value_deactivated a supplier chosen during the reload and missing in the new list is emptied with its own text', async () => {
+      let used = USED;
+      let l3 = L3;
+      let hold: Promise<void> | undefined;
+      let release = () => {};
+      const { sent } = mockApi({
+        suppliers: () => [L1, L2, l3],
+        conditions: () => [used, DEFECT],
+        holdSuppliers: () => hold,
+        holdConditions: () => hold,
+        writes: {
+          [PATCH_DGS]: () => {
+            used = { ...USED, active: false, version: 2 };
+            l3 = { ...L3, active: false, version: 2 };
+            hold = new Promise((resolve) => (release = resolve));
+            return rejection(
+              'pick_list_value_deactivated',
+              'Vorschlag Zustand Gebraucht ist deaktiviert',
+              'suggestedConditionValueId',
+              11,
+            );
+          },
+        },
+      });
+      await openPage();
+      fireEvent.change(conditionSelect(), { target: { value: '11' } });
+      changePlainText('Neu');
+      expect(await screen.findByText('Vorschlag Zustand Gebraucht ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(hold).toBeDefined());
+
+      fireEvent.change(supplierSelect(), { target: { value: '3' } });
+      expect(supplierSelect().value).toBe('3');
+      release();
+
+      expect(await screen.findByText('Lieferant L3 ist deaktiviert')).toBeTruthy();
+      expect(shown(supplierSelect())).toBe('Bitte wählen');
+      expect(screen.getByText('Vorschlag Zustand Gebraucht ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(document.activeElement).toBe(supplierSelect()));
+
+      fireEvent.click(saveButton());
+
+      expect(await screen.findByText('Lieferant: Lieferanten oder „alle“ wählen')).toBeTruthy();
+      expect(sent).toHaveLength(1);
+      expectAccessibleForm();
+    });
+
+    it('UI-033.validation a supplier "alle" (null) is not checked after the reload and stays unchanged', async () => {
+      let used = USED;
+      mockApi({
+        suppliers: () => [L2],
+        conditions: () => [used, DEFECT],
+        writes: {
+          [PATCH_DGS]: () => {
+            used = { ...USED, active: false, version: 2 };
+            return rejection(
+              'pick_list_value_deactivated',
+              'Vorschlag Zustand Gebraucht ist deaktiviert',
+              'suggestedConditionValueId',
+              11,
+            );
+          },
+        },
+      });
+      await openPage();
+      fireEvent.change(conditionSelect(), { target: { value: '11' } });
+      changePlainText('Neu');
+
+      expect(await screen.findByText('Vorschlag Zustand Gebraucht ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(labels(conditionSelect())).toEqual(['–']));
+      expect(supplierSelect().value).toBe('');
+      expect(shown(supplierSelect())).toBe('alle');
+      expect(supplierSelect().getAttribute('aria-invalid')).not.toBe('true');
+      expect(screen.queryByText(/^Lieferant \S+ ist deaktiviert$/)).toBeNull();
+    });
+
+    it('UI-033.validation a supplier "nicht gewählt" after supplier_deactivated is not checked after the reload; only the rejection text stands', async () => {
+      let l1 = L1;
+      mockApi({
+        suppliers: () => [l1, L2],
+        writes: {
+          'POST /api/condition-codes': () => {
+            l1 = { ...L1, active: false, version: 2 };
+            return rejection(
+              'supplier_deactivated',
+              'Lieferant L1 ist deaktiviert',
+              'supplierId',
+              1,
+            );
+          },
+        },
+      });
+      await openPage();
+      enterNew({ supplier: '1' });
+
+      expect(await screen.findByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(labels(supplierSelect())).toEqual(['Bitte wählen', 'alle']));
+      expect(supplierSelect().value).toBe('not-chosen');
+      expect(screen.getAllByText(/^Lieferant \S+ ist deaktiviert$/)).toHaveLength(1);
+    });
+
+    it('UI-033.validation the rejected supplier is not offered during the reload, so it cannot be chosen again in the field of details.path and is never sent', async () => {
+      let hold: Promise<void> | undefined;
+      let release = () => {};
+      const { sent } = mockApi({
+        suppliers: () => [L1, L2, L3],
+        holdSuppliers: () => hold,
+        writes: {
+          'POST /api/condition-codes': (init) => {
+            if (sent.length > 1) return created(JSON.parse(String(init?.body)));
+            hold = new Promise((resolve) => (release = resolve));
+            return rejection(
+              'supplier_deactivated',
+              'Lieferant L1 ist deaktiviert',
+              'supplierId',
+              1,
+            );
+          },
+        },
+      });
+      await openPage();
+      enterNew({ supplier: '1' });
+      expect(await screen.findByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
+      await vi.waitFor(() => expect(hold).toBeDefined());
+
+      // L1 is still active for the server in this test; only the rejection removes it.
+      expect(labels(supplierSelect())).toEqual(['Bitte wählen', 'alle', 'L3']);
+      release();
+      await vi.waitFor(() => expect(document.activeElement).toBe(supplierSelect()));
+      expect(labels(supplierSelect())).toEqual(['Bitte wählen', 'alle', 'L3']);
+
+      fireEvent.click(saveButton());
+      expect(await screen.findByText('Lieferant: Lieferanten oder „alle“ wählen')).toBeTruthy();
+      fireEvent.change(supplierSelect(), { target: { value: '3' } });
+      fireEvent.click(saveButton());
+
+      expect(await screen.findByText('Gespeichert')).toBeTruthy();
+      expect(sent.map((each) => (each.body as { supplierId: unknown }).supplierId)).toEqual([1, 3]);
+    });
+
+    it('UI-033.validation when the reload fails, another supplier chosen during it stays chosen and the rejected id is no longer offered', async () => {
+      let failSuppliers = false;
+      let failed = false;
+      let hold: Promise<void> | undefined;
+      let release = () => {};
+      const { sent } = mockApi({
+        suppliers: () => [L1, L2, L3],
+        writes: {
+          'POST /api/condition-codes': (init) => {
+            if (sent.length > 1) return created(JSON.parse(String(init?.body)));
+            failSuppliers = true;
+            hold = new Promise((resolve) => (release = resolve));
+            return rejection(
+              'supplier_deactivated',
+              'Lieferant L1 ist deaktiviert',
+              'supplierId',
+              1,
+            );
+          },
+        },
+      });
+      const fetchOfPage = vi.mocked(fetch).getMockImplementation();
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        if (failSuppliers && String(input).startsWith('/api/suppliers')) {
+          await hold;
+          failed = true;
+          return Response.json(errorBody('internal_error'), { status: 500 });
+        }
+        return (fetchOfPage as typeof fetch)(input, init);
+      });
+      await openPage();
+      enterNew({ supplier: '1' });
+      expect(await screen.findByText('Lieferant L1 ist deaktiviert')).toBeTruthy();
+
+      fireEvent.change(supplierSelect(), { target: { value: '3' } });
+      release();
+
+      await vi.waitFor(() => expect(failed).toBe(true));
+      await vi.waitFor(() => expect(labels(supplierSelect())).toEqual(['alle', 'L3']));
+      expect(supplierSelect().value).toBe('3');
+      expect(screen.queryByText(/ist deaktiviert/)).toBeNull();
+      expect(labels(supplierSelect())).not.toContain('L1');
+
+      fireEvent.click(saveButton());
+
+      expect(await screen.findByText('Gespeichert')).toBeTruthy();
+      expect(sent[1]?.body).toMatchObject({ supplierId: 3 });
     });
 
     it('UI-033.validation "Speichern" without a supplier chosen after the rejection shows "Lieferant: Lieferanten oder „alle“ wählen" and sends nothing; "alle" sends supplierId null', async () => {
