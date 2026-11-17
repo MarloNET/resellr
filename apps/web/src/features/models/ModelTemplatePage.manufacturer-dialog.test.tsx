@@ -55,7 +55,7 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 type Route = () => Promise<Response> | Response;
 
 /**
- * `fetch` of UI-007: the frame status, the device types, the manufacturers (Lenovo, plus each
+ * `fetch` of UI-007: the frame status, the device types without attributes, the manufacturers (Lenovo, plus each
  * one created by `create`), `POST /api/manufacturers` from `create` and
  * `POST /api/model-templates`. Records the bodies of the writes.
  */
@@ -69,6 +69,10 @@ function mockApi({ create }: { create?: Route } = {}) {
     if (url.pathname === '/api/ops/health') return Response.json({ state: 'ready' });
     if (url.pathname === '/api/device-types') {
       return Response.json({ items: [NOTEBOOK], total: 1 });
+    }
+    // The notebook has no attributes here (#178), so no attribute fields appear.
+    if (url.pathname === '/api/device-types/1/attributes' || url.pathname === '/api/pick-lists') {
+      return Response.json({ items: [], total: 0 });
     }
     if (method === 'GET' && url.pathname === '/api/manufacturers') {
       return Response.json({ items, total: items.length });
@@ -206,6 +210,10 @@ describe('UI-008 manufacturer dialog opened from UI-007 (CU-115, CU-114)', () =>
     fireEvent.change(within(form()).getByRole('combobox', { name: /^Geräteart/ }), {
       target: { value: '1' },
     });
+    // Saving waits for the attributes of the device type (#178).
+    await vi.waitFor(() =>
+      expect(within(form()).getByRole('group', { name: 'Merkmale Ebene Modell' })).toBeTruthy(),
+    );
     fireEvent.change(within(form()).getByRole('textbox', { name: /^Modellbezeichnung/ }), {
       target: { value: 'Lifebook E5510' },
     });

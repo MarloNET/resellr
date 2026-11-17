@@ -139,6 +139,12 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('names attribute and value of a deactivated pick list value (2.0.6, 8.2, UI-007)', () => {
+    expect(
+      ERROR_MESSAGES['pick_list_value_deactivated.attribute']('Tastaturlayout', 'Ungarisch'),
+    ).toBe('Tastaturlayout: Ungarisch ist deaktiviert');
+  });
+
   it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
     expect(FIELD_MESSAGES.manufacturerName).toBe('Name: 1 bis 50 Zeichen');
   });

@@ -1,17 +1,38 @@
 import { ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
+import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
 import {
   type ModelTemplateCreateInput,
   modelTemplateCreateSchema,
   type ModelTemplateMatch,
+  modelTemplateValuesSchema,
 } from '@resellr/domain/schemas/model-template.schema';
 import type { ManufacturerCreateResult } from '@resellr/domain/schemas/manufacturer.schema';
+import type { PickListList, PickListValueList } from '@resellr/domain/schemas/pick-list.schema';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
 import { possibleDuplicatesOf, useCreateModelTemplateMutation } from '../../api/catalog.api.ts';
-import { useDeviceTypesQuery, useManufacturersQuery } from '../../api/settings.api.ts';
+import { queryKeys } from '../../api/query-keys.ts';
+import {
+  useAttributesQuery,
+  useDeviceTypesQuery,
+  useManufacturersQuery,
+} from '../../api/settings.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
+import {
+  AttributeFieldsForm,
+  type AttributeInputs,
+  attributeRequestValues,
+  attributesOfLevel,
+} from '../../components/forms/AttributeFieldsForm.tsx';
+import type { AttributeInputValue, PortInput } from '../../components/forms/AttributeInput.tsx';
+import {
+  type ChoiceItem,
+  findMissingChoices,
+  type MissingChoice,
+} from '../../components/forms/deactivated-choice.ts';
 import {
   FormField,
   useDeferredBlurCheck,
@@ -33,7 +54,7 @@ import { DuplicateDialog } from './DuplicateDialog.tsx';
 import { ManufacturerCreateDialog } from './ManufacturerCreateDialog.tsx';
 
 // Texts of UI-007 `screen.md` and its mockup (UI/UX design v0.6.2, v0.6.3 for the empty MPN,
-// v0.6.7 for the placeholder).
+// v0.6.7 for the placeholder and the hint of the attribute areas).
 const TEXTS = {
   back: 'Zurück zur Modell-Bibliothek',
   title: 'Modellvorlage anlegen',
@@ -47,6 +68,9 @@ const TEXTS = {
   mpn: 'Herstellernummer',
   mpnUnknown: 'unbekannt',
   originalEan: 'Original-EAN',
+  modelAttributes: 'Merkmale Ebene Modell',
+  deviceDefaults: 'Vorbelegungswerte für Geräte',
+  chooseDeviceType: 'Geräteart wählen, dann erscheinen die Merkmale',
   newManufacturer: 'Neuen Hersteller anlegen',
   /** UI-008 after creating; "GPSR-Herstellerangaben" is the link to UI-031 (DER-50-06). */
   createdHint: {
@@ -84,6 +108,9 @@ interface Draft {
   mpn: string;
   mpnUnknown: boolean;
   originalEan: string;
+  /** Inputs of the attributes of the level model and of the device defaults (#178). */
+  modelValues: AttributeInputs;
+  defaultDeviceValues: AttributeInputs;
 }
 
 const FIELDS = [
@@ -94,14 +121,26 @@ const FIELDS = [
   'mpn',
   'originalEan',
 ] as const;
-type Field = (typeof FIELDS)[number];
-type FieldErrors = Partial<Record<Field, string>>;
 
-const isField = (path: string): path is Field => (FIELDS as readonly string[]).includes(path);
+/** The objects of the attribute values with their level (2.4); fields `<object>.<id>`. */
+const VALUE_OBJECTS = [
+  { key: 'modelValues', level: 'model' },
+  { key: 'defaultDeviceValues', level: 'device' },
+] as const;
+type ValueObject = (typeof VALUE_OBJECTS)[number]['key'];
+
+/** Field errors by path: a field of the model data or `modelValues.<id>` (2.0.5). */
+type FieldErrors = Partial<Record<string, string>>;
+
+const ATTRIBUTE_PATH = /^(modelValues|defaultDeviceValues)\.(\d+)$/;
+const isField = (path: string) =>
+  (FIELDS as readonly string[]).includes(path) || ATTRIBUTE_PATH.test(path);
 
 /** The choices whose entry the server can reject as deactivated (2.0.11), in form order. */
 const CHOICE_FIELDS = ['deviceTypeId', 'manufacturerId'] as const;
 type ChoiceField = (typeof CHOICE_FIELDS)[number];
+const isChoiceField = (path: string): path is ChoiceField =>
+  (CHOICE_FIELDS as readonly string[]).includes(path);
 
 /** Texts of a deactivated entry at its choice in UI-007 (CU-012, `.model_template`). */
 const DEACTIVATED_TEXTS: Readonly<Record<ChoiceField, (name: string) => string>> = {
@@ -109,33 +148,163 @@ const DEACTIVATED_TEXTS: Readonly<Record<ChoiceField, (name: string) => string>>
   manufacturerId: ERROR_MESSAGES['manufacturer_deactivated.model_template'],
 };
 
-/** Rejections of a deactivated choice and the field of their `details.path` (2.0.11). */
-const DEACTIVATED_CODES: Readonly<Record<string, ChoiceField>> = {
-  device_type_deactivated: 'deviceTypeId',
-  manufacturer_deactivated: 'manufacturerId',
-};
+/** Whether a rejection of a deactivated entry belongs to the field of its `details.path`. */
+function isDeactivatedAt(code: string | undefined, path: string): boolean {
+  if (code === 'device_type_deactivated') return path === 'deviceTypeId';
+  if (code === 'manufacturer_deactivated') return path === 'manufacturerId';
+  return code === 'pick_list_value_deactivated' && ATTRIBUTE_PATH.test(path);
+}
 
-/** Request body of `POST /api/model-templates`: every field, "unbekannt" with `mpn: null`. */
-const bodyOf = ({ mpn, mpnUnknown, ...draft }: Draft): ModelTemplateCreateInput => ({
+/** Text of a deactivated pick list value at the field of its attribute (CU-012, `.attribute`). */
+const deactivatedValueText = (label: string) => (value: string) =>
+  ERROR_MESSAGES['pick_list_value_deactivated.attribute'](label, value);
+
+/**
+ * Request body of `POST /api/model-templates`: every field, "unbekannt" with `mpn: null`, and
+ * every attribute the form asks for (2.0.5 rule (2)).
+ */
+const bodyOf = (
+  { mpn, mpnUnknown, modelValues, defaultDeviceValues, ...draft }: Draft,
+  attributes: readonly Attribute[],
+): ModelTemplateCreateInput => ({
   ...draft,
   mpn: mpnUnknown ? null : mpn,
   mpnUnknown,
+  modelValues: attributeRequestValues(attributes, 'model', modelValues),
+  defaultDeviceValues: attributeRequestValues(attributes, 'device', defaultDeviceValues),
 });
 
 /**
- * Field errors of the Zod check in the browser, the same schema as on the server (2.0.7): the
+ * Field errors of the Zod check in the browser, the same schemas as on the server (2.0.7): the
+ * model data, then the attribute values against the definitions of the device type (2.4); the
  * first message per field (2.0.5).
  */
-function checkAll(draft: Draft): FieldErrors {
+function checkAll(draft: Draft, attributes: readonly Attribute[]): FieldErrors {
   const errors: FieldErrors = {};
-  for (const issue of modelTemplateCreateSchema.safeParse(bodyOf(draft)).error?.issues ?? []) {
+  const body = bodyOf(draft, attributes);
+  const issues = [
+    ...(modelTemplateCreateSchema.safeParse(body).error?.issues ?? []),
+    ...(modelTemplateValuesSchema(attributes).safeParse({
+      modelValues: body.modelValues,
+      defaultDeviceValues: body.defaultDeviceValues,
+    }).error?.issues ?? []),
+  ];
+  for (const issue of issues) {
     const path = issue.path.join('.');
     if (isField(path)) errors[path] ??= issue.message;
   }
   return errors;
 }
 
+/** The input without the pick list value `id`: a choice emptied, a port entry without it. */
+function withoutChoice(attribute: Attribute, input: AttributeInputValue, id: number) {
+  if (attribute.dataType === 'pick') return input === id ? null : input;
+  if (!Array.isArray(input)) return input;
+  return input.map((entry): PortInput => ({
+    ...entry,
+    typeId: entry.typeId === id ? null : entry.typeId,
+    positionId: entry.positionId === id ? null : entry.positionId,
+  }));
+}
+
+/** Ids of the lists `port_type` and `port_position`, as read for the inputs of CU-112. */
+function portListIds(queryClient: QueryClient) {
+  const lists = queryClient.getQueryData<PickListList>(queryKeys.settings.pickLists())?.items;
+  const idOfList = (key: string) => lists?.find((list) => list.key === key)?.id ?? null;
+  return { type: idOfList('port_type'), position: idOfList('port_position') };
+}
+
+/** A pick list value chosen in an attribute field, with the key of the list it comes from. */
+interface AttributeChoice {
+  path: string;
+  id: number;
+  list: string;
+  message: (name: string) => string;
+}
+
+/** A list of pick list values before and after reading it again; `after` is `null` if it failed. */
+interface ReloadedList {
+  before: readonly ChoiceItem[];
+  after: readonly ChoiceItem[] | null;
+}
+
+/**
+ * The pick list values chosen in the attribute fields, in form order, with the list they come
+ * from and the text of their usage (2.0.11).
+ */
+function attributeChoices(
+  attributes: readonly Attribute[],
+  draft: Draft,
+  ports: { type: number | null; position: number | null },
+): AttributeChoice[] {
+  const choices: AttributeChoice[] = [];
+  for (const { key, level } of VALUE_OBJECTS) {
+    for (const attribute of attributesOfLevel(attributes, level)) {
+      const path = `${key}.${attribute.id}`;
+      const message = deactivatedValueText(attribute.label);
+      const input = draft[key][String(attribute.id)];
+      if (attribute.dataType === 'pick' && typeof input === 'number') {
+        choices.push({ path, id: input, list: String(attribute.pickListId), message });
+      }
+      if (attribute.dataType === 'ports' && Array.isArray(input)) {
+        for (const { typeId, positionId } of input) {
+          if (typeId !== null)
+            choices.push({ path, id: typeId, list: String(ports.type), message });
+          if (positionId !== null) {
+            choices.push({ path, id: positionId, list: String(ports.position), message });
+          }
+        }
+      }
+    }
+  }
+  return choices;
+}
+
+/**
+ * Key of the list the rejected pick list value of the field `path` comes from: the list of the
+ * attribute, for ports the list of types or of positions that held the value before the reload;
+ * `undefined` if the form has no such field.
+ */
+function attributeChoiceList(
+  attributes: readonly Attribute[],
+  path: string,
+  id: number,
+  ports: { type: number | null; position: number | null },
+  lists: Readonly<Record<string, ReloadedList>>,
+): string | undefined {
+  const attributeId = ATTRIBUTE_PATH.exec(path)?.[2];
+  const attribute = attributes.find((candidate) => String(candidate.id) === attributeId);
+  if (attribute?.dataType === 'pick') return String(attribute.pickListId);
+  if (attribute?.dataType !== 'ports') return undefined;
+  return [String(ports.type), String(ports.position)].find((list) =>
+    lists[list]?.before.some((entry) => entry.id === id),
+  );
+}
+
+const asItems = (list: PickListValueList | undefined): ChoiceItem[] =>
+  (list?.items ?? []).map(({ id, label, active }) => ({ id, label, active }));
+
+/**
+ * The attribute choices whose value is missing in their reloaded list, in form order, through
+ * CU-319. A field of data type ports holds values of two lists, so each choice is checked with
+ * the list it comes from; a new model template has no stored value.
+ */
+function missingAttributeChoices(
+  choices: readonly AttributeChoice[],
+  lists: Readonly<Record<string, ReloadedList>>,
+): MissingChoice[] {
+  return choices.flatMap(({ path, id, list, message }) =>
+    findMissingChoices([{ path, id, storedId: null, before: lists[list]?.before ?? [], message }], {
+      [path]: lists[list]?.after ?? undefined,
+    }),
+  );
+}
+
 const hasErrors = (errors: FieldErrors) => Object.values(errors).some(Boolean);
+
+/** The errors without those of the attribute fields, whose inputs went with the device type. */
+const withoutAttributePaths = (errors: FieldErrors): FieldErrors =>
+  Object.fromEntries(Object.entries(errors).filter(([path]) => !ATTRIBUTE_PATH.test(path)));
 
 const optionValue = (id: number | null) => (id === null ? '' : String(id));
 const idOf = (value: string) => (value === '' ? null : Number(value));
@@ -144,11 +313,13 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
  * Model template UI-007 for a new model template (CU-114, REQ-008; Technical Specification
  * 2.4): device type, manufacturer, model name, type designation, MPN or "unbekannt" and original
  * EAN, "Modellvorlage speichern" (also Ctrl+S) and "Abbrechen". Device type and manufacturer open
- * with the placeholder "Bitte wählen" (Design v0.6.7). States: default, loading,
+ * with the placeholder "Bitte wählen" (Design v0.6.7). With a device type its attribute fields
+ * appear (CU-111): those of the level model below the model data, the device defaults in their
+ * own area; without one both areas show a hint (2.4, #178). States: default, loading,
  * validation (focus on the first error), speichert and ausgang-unbekannt (P-08), success (banner
  * on the calling page), error, unreachable (P-06) for the reads, wird-beendet (P-07) for the
  * save and the dialog dublette for a possible duplicate (REQ-011). "Neuen Hersteller anlegen"
- * opens the dialog UI-008 (#179). The attribute fields (#178) and changing (#181) follow.
+ * opens the dialog UI-008 (#179). Changing (#181) follows.
  */
 export function ModelTemplatePage() {
   const navigate = useNavigate();
@@ -156,6 +327,7 @@ export function ModelTemplatePage() {
   const manufacturers = useManufacturersQuery();
   const createMutation = useCreateModelTemplateMutation();
   const writesLocked = useWritesLocked();
+  const queryClient = useQueryClient();
 
   // A rejected entry whose list could not be read again counts as missing (2.4, Nachtrag
   // MAR-925): it is no longer offered.
@@ -167,14 +339,22 @@ export function ModelTemplatePage() {
     ({ id, active }) => active && id !== dropped.manufacturerId,
   );
 
+  // Pick list values rejected as deactivated whose list could not be read again (2.0.11).
+  const [droppedValues, setDroppedValues] = useState<ReadonlySet<number>>(new Set());
+
   const [draft, setDraft] = useState<Draft | null>(null);
   // The current inputs for the check after reloading the choices.
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // The fields of the attributes of the chosen device type; none are loaded without one (2.4).
+  const attributesQuery = useAttributesQuery(draft?.deviceTypeId ?? null);
+  const attributes = draft?.deviceTypeId == null ? [] : attributesQuery.data?.items;
+  const attributesRef = useRef(attributes);
+  attributesRef.current = attributes;
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   // Choices that show the text of a rejection; it stays until the next choice (Design v0.6.7).
-  const [rejectionShown, setRejectionShown] = useState<Partial<Record<Field, boolean>>>({});
+  const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
   const [reloading, setReloading] = useState(false);
   // Hits of a possible duplicate; the dialog UI-007.dublette is open while they are set.
   const [duplicates, setDuplicates] = useState<ModelTemplateMatch[] | null>(null);
@@ -184,6 +364,8 @@ export function ModelTemplatePage() {
 
   const formId = useId();
   const modelDataId = useId();
+  const modelAttributesId = useId();
+  const deviceDefaultsId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const focusFirstError = useFocusFirstError(formRef);
   const blurCheck = useDeferredBlurCheck();
@@ -200,22 +382,44 @@ export function ModelTemplatePage() {
       mpn: '',
       mpnUnknown: false,
       originalEan: '',
+      modelValues: {},
+      defaultDeviceValues: {},
     });
   }, [draft, choicesLoaded]);
 
   const saving = createMutation.isPending;
-  // Until the choices are read again after a rejection, a save could send the rejected id.
-  // While the dialog of a possible duplicate is open, only its choices save (Ctrl+S does not).
-  const canSave = draft !== null && !saving && !writesLocked && !reloading && duplicates === null;
+  // Until the choices are read again after a rejection, a save could send the rejected id; until
+  // the attributes have arrived, it would send none of their values. While the dialog of a
+  // possible duplicate is open, only its choices save (Ctrl+S does not).
+  const canSave =
+    draft !== null &&
+    attributes !== undefined &&
+    !saving &&
+    !writesLocked &&
+    !reloading &&
+    duplicates === null;
 
   function change(next: Partial<Draft>) {
     if (draft !== null) setDraft({ ...draft, ...next });
   }
 
-  /** A choice from the list: any entry offered is valid, so the text of the field goes. */
+  /**
+   * A choice from the list: any entry offered is valid, so the text of the field goes. Another
+   * device type has other attributes: the inputs of both attribute areas are dropped (2.4
+   * "Abhängige Eingaben", Design v0.6.7).
+   */
   function choose(field: ChoiceField, value: string) {
-    change({ [field]: idOf(value) });
-    setErrors((previous) => ({ ...previous, [field]: undefined }));
+    const id = idOf(value);
+    const attributesDropped = field === 'deviceTypeId' && id !== draft?.deviceTypeId;
+    change({
+      [field]: id,
+      ...(attributesDropped && { modelValues: {}, defaultDeviceValues: {} }),
+    });
+    setErrors((previous) =>
+      attributesDropped
+        ? withoutAttributePaths({ ...previous, [field]: undefined })
+        : { ...previous, [field]: undefined },
+    );
     setRejectionShown((previous) => ({ ...previous, [field]: false }));
   }
 
@@ -237,12 +441,24 @@ export function ModelTemplatePage() {
     setCreatedId(id);
   }
 
-  function checkOnBlur(field: Field) {
+  /** The input of an attribute; a new choice in a field ends the text of a rejection there. */
+  function changeAttribute(key: ValueObject, attributeId: number, input: AttributeInputValue) {
     if (draft === null) return;
+    setDraft({ ...draft, [key]: { ...draft[key], [attributeId]: input } });
+    const path = `${key}.${attributeId}`;
+    if (rejectionShown[path]) {
+      setErrors((previous) => ({ ...previous, [path]: undefined }));
+      setRejectionShown((previous) => ({ ...previous, [path]: false }));
+    }
+  }
+
+  function checkOnBlur(field: string) {
+    if (draft === null || attributes === undefined) return;
     if (rejectionShown[field]) return;
     const current = draft;
+    const definitions = attributes;
     blurCheck.checkOnBlur(() =>
-      setErrors((previous) => ({ ...previous, [field]: checkAll(current)[field] })),
+      setErrors((previous) => ({ ...previous, [field]: checkAll(current, definitions)[field] })),
     );
   }
 
@@ -262,14 +478,17 @@ export function ModelTemplatePage() {
         return;
       }
     }
-    // A device type or manufacturer deactivated in another window: the text stands at the field
-    // of `details.path`, and both choices are read again without it (2.4, 2.0.11).
-    const field = DEACTIVATED_CODES[error.error?.code ?? ''];
+    // A device type, manufacturer or pick list value deactivated in another window: the text
+    // stands at the field of `details.path`, and the choices are read again (2.4, 2.0.11).
     const { path, id } = error.error?.details ?? {};
-    if (error.kind === 'rejected' && field !== undefined && path === field) {
-      showFieldErrors({ [field]: error.error?.message });
-      setRejectionShown({ [field]: true });
-      if (typeof id === 'number') void reloadAfterRejection(field, id);
+    if (
+      error.kind === 'rejected' &&
+      typeof path === 'string' &&
+      isDeactivatedAt(error.error?.code, path)
+    ) {
+      showFieldErrors({ [path]: error.error?.message });
+      setRejectionShown({ [path]: true });
+      if (typeof id === 'number') void reloadAfterRejection(path, id);
       return;
     }
     // The question comes only if the save would succeed otherwise (2.4 "Prüfreihenfolge").
@@ -290,13 +509,25 @@ export function ModelTemplatePage() {
    * Checked is the input at the end of the reload, so a choice made while the lists load is
    * checked like any other (2.4 "Wahl während des Neuladens", Nachtrag MAR-963).
    */
-  async function reloadAfterRejection(rejected: ChoiceField, id: number) {
+  async function reloadAfterRejection(rejected: string, id: number) {
     setReloading(true);
     const before = { deviceTypeId: deviceTypes.data, manufacturerId: manufacturers.data };
-    const [types, makers] = await Promise.all([deviceTypes.refetch(), manufacturers.refetch()]);
+    const valueKey = queryKeys.settings.pickListValues(0).slice(0, -1);
+    const valuesBefore = new Map(
+      queryClient
+        .getQueriesData<PickListValueList>({ queryKey: valueKey })
+        .map(([key, list]) => [String(key.at(-1)), list]),
+    );
+    const [types, makers] = await Promise.all([
+      deviceTypes.refetch(),
+      manufacturers.refetch(),
+      queryClient.refetchQueries({ queryKey: valueKey }),
+    ]);
     const reloaded = { deviceTypeId: types, manufacturerId: makers };
     // Without a new list the rejected entry is no longer offered, whatever is chosen now.
-    if (reloaded[rejected].isError) setDropped((previous) => ({ ...previous, [rejected]: id }));
+    if (isChoiceField(rejected) && reloaded[rejected].isError) {
+      setDropped((previous) => ({ ...previous, [rejected]: id }));
+    }
 
     const emptied: Partial<Record<ChoiceField, null>> = {};
     const texts: FieldErrors = {};
@@ -314,7 +545,21 @@ export function ModelTemplatePage() {
       texts[field] = DEACTIVATED_TEXTS[field](name);
     }
 
-    setDraft((previous) => (previous === null ? previous : { ...previous, ...emptied }));
+    // Without the device type its attribute inputs go (2.4 "Abhängige Eingaben").
+    const typeEmptied = 'deviceTypeId' in emptied;
+    setDraft((previous) =>
+      previous === null
+        ? previous
+        : {
+            ...previous,
+            ...emptied,
+            ...(typeEmptied && { modelValues: {}, defaultDeviceValues: {} }),
+          },
+    );
+    if (typeEmptied) setErrors((previous) => withoutAttributePaths(previous));
+    else {
+      Object.assign(texts, checkAttributeChoices(rejected, id, valuesBefore));
+    }
     if (hasErrors(texts)) {
       setErrors((previous) => ({ ...previous, ...texts }));
       setRejectionShown((previous) => ({
@@ -327,11 +572,74 @@ export function ModelTemplatePage() {
     setReloading(false);
   }
 
+  /**
+   * The attribute choices after the lists were read again (2.0.11, DG-20 standard solution,
+   * Nachtrag MAR-963): every pick list value the form holds at the end of the reload, also one
+   * chosen meanwhile and the one at `details.path`, that is missing or deactivated in its
+   * reloaded list is emptied and named with "<Merkmal>: <Wert> ist deaktiviert". If the list of
+   * the rejected value could not be read, it is no longer offered, and only the rejected value
+   * counts as missing. Returns the new texts.
+   */
+  function checkAttributeChoices(
+    rejected: string,
+    id: number,
+    valuesBefore: ReadonlyMap<string, PickListValueList | undefined>,
+  ): FieldErrors {
+    const definitions = attributesRef.current ?? [];
+    const current = draftRef.current;
+    if (current === null) return {};
+    const lists: Record<string, ReloadedList> = {};
+    for (const [list, before] of valuesBefore) {
+      const state = queryClient.getQueryState<PickListValueList>(
+        queryKeys.settings.pickListValues(Number(list)),
+      );
+      lists[list] = {
+        before: asItems(before),
+        after: state?.status === 'error' ? null : asItems(state?.data),
+      };
+    }
+    const choices = attributeChoices(definitions, current, portListIds(queryClient));
+    const missing = missingAttributeChoices(choices, lists);
+    const rejectedList = ATTRIBUTE_PATH.test(rejected)
+      ? attributeChoiceList(definitions, rejected, id, portListIds(queryClient), lists)
+      : undefined;
+    if (rejectedList !== undefined && lists[rejectedList]?.after == null) {
+      setDroppedValues((previous) => new Set([...previous, id]));
+      const held = choices.find((choice) => choice.path === rejected && choice.id === id);
+      if (held !== undefined) {
+        const name = lists[rejectedList]?.before.find((entry) => entry.id === id)?.label ?? '';
+        missing.push({ path: rejected, id, message: held.message(name) });
+      }
+    }
+    if (missing.length === 0) return {};
+
+    setDraft((previous) => {
+      if (previous === null) return previous;
+      const next = { ...previous };
+      for (const choice of missing) {
+        const [, key, attributeId] = ATTRIBUTE_PATH.exec(choice.path) ?? [];
+        const attribute = definitions.find((candidate) => String(candidate.id) === attributeId);
+        if (attribute === undefined) continue;
+        const object = key as ValueObject;
+        const input = next[object][String(attribute.id)];
+        if (input === undefined) continue;
+        next[object] = {
+          ...next[object],
+          [attribute.id]: withoutChoice(attribute, input, choice.id),
+        };
+      }
+      return next;
+    });
+    const texts: FieldErrors = {};
+    for (const { path, message } of missing) texts[path] ??= message;
+    return texts;
+  }
+
   function save() {
     // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
-    if (draft === null || !canSave) return;
-    const found = checkAll(draft);
+    if (draft === null || attributes === undefined || !canSave) return;
+    const found = checkAll(draft, attributes);
     setRejectionShown({});
     if (hasErrors(found)) {
       showFieldErrors(found);
@@ -339,7 +647,7 @@ export function ModelTemplatePage() {
     }
     setErrors({});
     setNotice(null);
-    send(bodyOf(draft));
+    send(bodyOf(draft, attributes));
   }
 
   function send(body: ModelTemplateCreateInput) {
@@ -355,7 +663,8 @@ export function ModelTemplatePage() {
   /** "Trotzdem anlegen": the same model template again, with the confirmation (DER-53-03). */
   function createAnyway() {
     setDuplicates(null);
-    if (draft !== null && !writesLocked) send({ ...bodyOf(draft), confirmDuplicate: true });
+    if (draft === null || attributes === undefined || writesLocked) return;
+    send({ ...bodyOf(draft, attributes), confirmDuplicate: true });
   }
 
   /**
@@ -380,8 +689,42 @@ export function ModelTemplatePage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  /**
+   * The fields of one attribute area, or the hint while no device type is chosen (Design
+   * v0.6.7): the level model with "*" at required attributes, the device defaults all optional
+   * (2.4, DER-50-10, DER-50-11).
+   */
+  function attributeArea(key: ValueObject, headingId: string) {
+    if (draft === null) return null;
+    if (draft.deviceTypeId === null) {
+      return <p className="m-0 text-body text-text-secondary">{TEXTS.chooseDeviceType}</p>;
+    }
+    if (attributes === undefined) return null;
+    const prefix = `${key}.`;
+    const fieldErrors = Object.fromEntries(
+      Object.entries(errors)
+        .filter(([path]) => path.startsWith(prefix))
+        .map(([path, text]) => [path.slice(prefix.length), text]),
+    );
+    return (
+      <div role="group" aria-labelledby={headingId} className="flex flex-col gap-4">
+        <AttributeFieldsForm
+          attributes={attributes}
+          level={key === 'modelValues' ? 'model' : 'device'}
+          inputs={draft[key]}
+          errors={fieldErrors}
+          withRequired={key === 'modelValues'}
+          dropped={droppedValues}
+          disabled={saving}
+          onChange={(attributeId, input) => changeAttribute(key, attributeId, input)}
+          onBlur={(attributeId) => checkOnBlur(`${key}.${attributeId}`)}
+        />
+      </div>
+    );
+  }
+
   // A failed read shows P-06 or the error banner; the inputs stay (2.0.7).
-  const loadFailed = deviceTypes.error ?? manufacturers.error;
+  const loadFailed = deviceTypes.error ?? manufacturers.error ?? attributesQuery.error;
   const loading = draft === null && loadFailed === null;
 
   return (
@@ -560,6 +903,27 @@ export function ModelTemplatePage() {
                   />
                 )}
               </FormField>
+
+              <h3
+                id={modelAttributesId}
+                className="m-0 border-t border-border pt-4 text-body font-semibold"
+              >
+                {TEXTS.modelAttributes}
+              </h3>
+              {attributeArea('modelValues', modelAttributesId)}
+            </section>
+
+            <section
+              aria-labelledby={deviceDefaultsId}
+              className="flex min-w-0 flex-col gap-4 self-start rounded-control border border-border bg-surface p-6"
+            >
+              <h2
+                id={deviceDefaultsId}
+                className="m-0 border-b border-border pb-4 text-section font-semibold"
+              >
+                {TEXTS.deviceDefaults}
+              </h2>
+              {attributeArea('defaultDeviceValues', deviceDefaultsId)}
             </section>
           </form>
         )}
