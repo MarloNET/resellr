@@ -65,9 +65,9 @@ function checkName(name: string): string | undefined {
 
 /**
  * Dialog UI-008 "Hersteller anlegen" (CU-115, REQ-100; Technical Specification 2.2, 2.0.10):
- * the name of the new manufacturer. Opened from UI-031 (#158, Q-7); the call from UI-007
- * follows with #179. States: validation, error, speichert and ausgang-unbekannt (P-08),
- * conflict (P-05), wird-beendet (P-07) (DER-37-13). The inputs stay visible in each of them.
+ * the name of the new manufacturer. Opened from UI-031 (#158, Q-7) and from UI-007 with
+ * "Neuen Hersteller anlegen" (#179, DER-50-06). States: validation, error, speichert and ausgang-unbekannt (P-08),
+ * conflict (P-05), wird-beendet (P-07) (DER-37-13, DER-50-16). The inputs stay visible in each of them.
  */
 export function ManufacturerCreateDialog({
   open,
