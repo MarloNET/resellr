@@ -98,7 +98,8 @@ export const catalogRoutes: FastifyPluginAsyncZod<CatalogRoutesOptions> = async 
   );
 
   // `201` with the new model template (2.0.1); the field rules of CU-104 give
-  // `422 validation_failed`, "unbekannt" with a value `400 bad_request` (2.4).
+  // `422 validation_failed`, "unbekannt" with a value `400 bad_request` (2.4); a possible
+  // duplicate without `confirmDuplicate: true` gives `422 confirmation_required` (CU-107).
   app.post(
     '/api/model-templates',
     { schema: { body: modelTemplateCreateSchema, response: { 201: modelTemplateSchema } } },
