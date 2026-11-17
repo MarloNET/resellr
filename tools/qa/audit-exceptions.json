@@ -1,0 +1,11 @@
+{
+  "exceptions": [
+    {
+      "id": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "expires": "2026-12-29",
+      "reference": "MAR-1019",
+      "reason": "ReDoS nur über Glob-Muster aus Konfigurationsdateien im Repository; picomatch 4.0.7 nur in Entwicklungswerkzeugen (vite, vitest, tinyglobby, fdir, @boundaries/elements), nicht ausgeliefert; kein Fix veröffentlicht (betroffen bis 4.0.7)."
+    }
+  ]
+}
