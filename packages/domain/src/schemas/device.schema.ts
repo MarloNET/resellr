@@ -139,6 +139,21 @@ export const deviceSchema = z.object({
 export type Device = z.infer<typeof deviceSchema>;
 
 /**
+ * `GET /api/model-templates/{id}/device-prefill` (2.5, CU-293): the prefill of CU-117 with its
+ * review flags and the result of the condition code (`found: false` without a code; the code
+ * follows with #193).
+ */
+export const devicePrefillSchema = z.object({
+  conditionValueId: idSchema.nullable(),
+  visualGrade: z.int().nullable(),
+  conditionDescription: z.string(),
+  values: anyValuesSchema,
+  reviewKeys: z.array(z.string()),
+  codeResult: z.object({ found: z.boolean(), plainText: z.string().nullable() }),
+});
+export type DevicePrefillAnswer = z.infer<typeof devicePrefillSchema>;
+
+/**
  * `GET /api/devices/{id}` (2.5): the device with its model listing (display title) or `null` for
  * "nicht zugeordnet". Model data, sale and cancellation follow with UI-010 (#187) and S9.
  */

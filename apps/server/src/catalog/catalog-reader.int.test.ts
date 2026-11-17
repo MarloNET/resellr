@@ -74,7 +74,7 @@ describe('catalog reader (CU-108, Technical Specification 2.1, Nachtrag MAR-879)
     ).resolves.toEqual([]);
   });
 
-  it('finds a model template with its device type; undefined for an unknown id', async () => {
+  it('finds a model template with its device type and default values; undefined for an unknown id', async () => {
     const { sqlite } = database;
     const notebook = insertDeviceType(sqlite, 'Notebook');
     const apple = insertManufacturer(sqlite, 'Apple');
@@ -83,12 +83,14 @@ describe('catalog reader (CU-108, Technical Specification 2.1, Nachtrag MAR-879)
       manufacturerId: apple,
       modelName: 'MacBook Air M2',
       mpn: null,
+      defaultDeviceValues: { '7': 16, '8': { percent: 85 } },
     });
     const reader = createCatalogReader(database.db);
 
     await expect(reader.findModelTemplate(air)).resolves.toEqual({
       id: air,
       deviceTypeId: notebook,
+      defaultDeviceValues: { '7': 16, '8': { percent: 85 } },
     });
     await expect(reader.findModelTemplate(999)).resolves.toBeUndefined();
   });

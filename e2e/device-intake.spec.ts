@@ -30,6 +30,7 @@ function uniqueHash(title: string, project: string) {
 
 interface AttributeEntry {
   id: number;
+  label: string;
   level: 'model' | 'device';
   dataType: string;
   required: boolean;
@@ -41,7 +42,12 @@ interface AttributeEntry {
  * (`local-guard` G-2, G-4), with a value for every active required attribute of the level model.
  * The attributes are read, because other specs change those of the notebook on this server.
  */
-async function createNotebookTemplate(page: Page, baseUrl: string, hash: string) {
+async function createNotebookTemplate(
+  page: Page,
+  baseUrl: string,
+  hash: string,
+  defaults: Record<string, unknown> = {},
+) {
   const headers = { origin: baseUrl };
   const types = (await (
     await page.request.get(`${baseUrl}/api/device-types?limit=200`)
@@ -57,6 +63,14 @@ async function createNotebookTemplate(page: Page, baseUrl: string, hash: string)
     attributes.items
       .filter(({ level, required, active }) => level === 'model' && required && active)
       .map(({ id, dataType }) => [id, dataType === 'text' ? 'Intel Core i5-1135G7' : '14']),
+  );
+  // Defaults of the level device by attribute label, e.g. `{ RAM: 16 }` (REQ-013).
+  const defaultDeviceValues = Object.fromEntries(
+    Object.entries(defaults).map(([label, value]) => {
+      const attribute = attributes.items.find((entry) => entry.label === label);
+      if (attribute === undefined) throw new Error(`${label} is missing`);
+      return [attribute.id, value];
+    }),
   );
 
   const manufacturer = await page.request.post(`${baseUrl}/api/manufacturers`, {
@@ -76,7 +90,7 @@ async function createNotebookTemplate(page: Page, baseUrl: string, hash: string)
       mpnUnknown: false,
       originalEan: '',
       modelValues,
-      defaultDeviceValues: {},
+      defaultDeviceValues,
     },
   });
   expect(template.status()).toBe(201);
@@ -137,6 +151,62 @@ test.describe('UI-003 Gerät einbuchen (CU-132)', () => {
     };
     expect(device).toMatchObject({ wiNr, stockStatus: 'available', listing: null });
     expect(Object.values(device.values)).toContainEqual({ percent: 87 });
+  });
+
+  test('AC-REQ-013-01 AC-REQ-013-04 prefilled values carry "zu prüfen" until confirmed, then the device is stored as checked', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const wiNr = `P${hash}`.slice(0, 20);
+    const { modelName, manufacturer } = await createNotebookTemplate(page, server.baseUrl, hash, {
+      RAM: 16,
+      Speicherkapazität: 512,
+    });
+    await page.goto('/geraete/neu');
+    await field(page, 'WI-Nr').fill(wiNr);
+    await form(page)
+      .getByRole('searchbox', { name: /^Modellvorlage suchen/ })
+      .fill(modelName);
+    await page.getByRole('button', { name: new RegExp(`^${manufacturer} ${modelName}`) }).click();
+
+    await expect(field(page, 'RAM')).toHaveValue('16');
+    await expect(field(page, 'Speicherkapazität')).toHaveValue('512');
+    await expect(form(page).getByText('zu prüfen')).toHaveCount(2);
+    await expect(
+      page.getByRole('complementary', { name: 'Modelldaten (nur lesen)' }).getByText('zu prüfen'),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'Noch 2 Werte zu prüfen. Das Gerät kann gespeichert, aber noch nicht zugeordnet werden.',
+      ),
+    ).toBeVisible();
+    const assign = page.getByRole('button', { name: 'Speichern und zuordnen' });
+    await expect(assign).toBeDisabled();
+    await expect(assign).toHaveAttribute('title', 'Erst Werte prüfen');
+    await expect(page.getByText('Erst Werte prüfen: RAM, Speicherkapazität')).toBeVisible();
+
+    await page.getByRole('button', { name: 'RAM bestätigen' }).click();
+    await expect(field(page, 'RAM')).toBeFocused();
+    await field(page, 'Speicherkapazität').fill('256');
+    await expect(page.getByText('Alle Werte geprüft.')).toBeVisible();
+    await expect(form(page).getByText('zu prüfen')).toHaveCount(0);
+
+    await field(page, 'Zustand').selectOption({ label: 'gebraucht' });
+    await field(page, 'Optik-Note').fill('2');
+    await field(page, 'Tastaturlayout').selectOption({ label: 'Deutsch (QWERTZ)' });
+    await field(page, 'Betriebssystem').selectOption({ label: 'Windows 11 Pro' });
+    await field(page, 'Netzteil').selectOption({ label: 'mit Netzteil (original)' });
+    await field(page, 'Akku').selectOption({ label: 'ohne Akku' });
+    await expectReachable(page);
+    const created = page.waitForResponse(
+      (answer) => answer.request().method() === 'POST' && answer.url().endsWith('/api/devices'),
+    );
+    await saveButton(page).click();
+
+    const answer = await created;
+    expect(answer.status()).toBe(201);
+    expect(await answer.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
   });
 
   test('R-1 below 1366 px the form stacks into one column and every field and action stays reachable (FM-3, FM-4)', async ({

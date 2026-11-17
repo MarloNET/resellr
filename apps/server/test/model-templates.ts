@@ -12,6 +12,9 @@ export interface ModelTemplateOfTest {
   mpn: string | null;
   /** Creation time; the list without a search term is sorted by it (2.4). */
   createdAt?: string;
+  /** Values of the level model and default values of the level device, stored form (3.4). */
+  modelValues?: Record<string, unknown>;
+  defaultDeviceValues?: Record<string, unknown>;
 }
 
 const AT = '2026-11-10T08:00:00.000Z';
@@ -53,7 +56,7 @@ export function insertModelTemplate(
       `INSERT INTO model_template (device_type_id, manufacturer_id, model_name, model_name_key,
          type_designation, mpn, mpn_unknown, original_ean, model_values, default_device_values,
          search_key, import_review_pending, import_review_keys, version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, '{}', '{}', ?, 0, '[]', 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, 0, '[]', 1, ?, ?)`,
     )
     .run(
       template.deviceTypeId,
@@ -63,6 +66,8 @@ export function insertModelTemplate(
       typeDesignation,
       template.mpn,
       template.mpn === null ? 1 : 0,
+      JSON.stringify(template.modelValues ?? {}),
+      JSON.stringify(template.defaultDeviceValues ?? {}),
       modelTemplateSearchKey({ modelName: template.modelName, typeDesignation, mpn: template.mpn }),
       createdAt,
       createdAt,

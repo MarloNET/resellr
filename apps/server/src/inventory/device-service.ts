@@ -1,5 +1,6 @@
 import type { FieldError } from '@resellr/domain/errors/error-response';
 import { formatNumber, formatYesNo } from '@resellr/domain/format/format-value';
+import { captureStatusOf, remainingReviewKeys } from '@resellr/domain/inventory/review-flags';
 import type {
   AttributeValue,
   AttributeValues,
@@ -26,6 +27,7 @@ import {
 } from '../settings/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { BadRequestError, RuleViolation, ValidationError } from '../shared/domain-error.ts';
+import { readDevicePrefill } from './device-prefill-query.ts';
 import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
 import { createListingRepository } from './listing-repository.ts';
 
@@ -160,7 +162,9 @@ function readable(
  * available, unassigned and with its capture date, together with its audit entry in one
  * transaction (2.0.4). Order of the checks (2.0.11): the rules of the request with the values of
  * the level device (CU-116, CU-067) after the model template is known, the supplier, then the
- * WI-Nr. Prefill and review flags follow with #188, changing a device with #190.
+ * WI-Nr. The service forms the prefill again (CU-117 with the same inputs as CU-293) and keeps
+ * the review flags neither confirmed nor changed (CU-118), so the capture status is `checked` only
+ * without one (AC-REQ-013-04). Changing a device follows with #190.
  */
 export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
   return {
@@ -205,6 +209,14 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           });
         }
 
+        // Remaining = prefill keys − confirmed keys − keys whose value differs (2.5, REQ-013).
+        const prefill = await readDevicePrefill(settings, template, attributes);
+        const reviewKeys = remainingReviewKeys(prefill.reviewKeys, device.confirmedKeys, prefill, {
+          conditionValueId: device.conditionValueId,
+          visualGrade: device.visualGrade,
+          values: deviceValues,
+        });
+
         const at = clock.now().toISOString();
         const id = await devices.insert({
           wi_nr: device.wiNr,
@@ -218,8 +230,8 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           visual_grade: device.visualGrade,
           condition_description: device.conditionDescription,
           device_values: JSON.stringify(device.values),
-          review_keys: '[]',
-          capture_status: 'checked',
+          review_keys: JSON.stringify(reviewKeys),
+          capture_status: captureStatusOf(reviewKeys),
           stock_status: 'available',
           sold_channel_id: null,
           sold_on: null,
