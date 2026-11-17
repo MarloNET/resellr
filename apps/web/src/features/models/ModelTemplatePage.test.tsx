@@ -700,6 +700,148 @@ describe('UI-007 attribute fields and device defaults (CU-111, CU-112, CU-114, #
     },
   );
 
+  /**
+   * Rejects Windows 11 Pro in the device defaults; the read of the keyboard layouts again waits
+   * for `release`, so the user can choose there meanwhile (Spec 10.2, pattern T5j).
+   */
+  function rejectWindowsWithDelayedKeyboardRead() {
+    let release: () => void = () => {};
+    const reloaded = new Promise<void>((resolve) => (release = resolve));
+    const keyboard = listId('keyboard_layout');
+    const operatingSystem = listId('operating_system');
+    const reads = new Map<number, number>();
+    const api = mockApi({
+      attributes: notebookAttributes,
+      pickListValues: async (pickListId) => {
+        const count = (reads.get(pickListId) ?? 0) + 1;
+        reads.set(pickListId, count);
+        if (count > 1 && pickListId === operatingSystem) {
+          return valuesOf([{ ...WINDOWS, active: false }, LINUX]);
+        }
+        if (pickListId !== keyboard) return valuesOf(NOTEBOOK_VALUES[pickListId] ?? []);
+        if (count === 1) return valuesOf([GERMAN, HUNGARIAN, { ...SWISS, active: true }]);
+        await reloaded;
+        return valuesOf([GERMAN, HUNGARIAN, SWISS]);
+      },
+      create: () =>
+        Response.json(
+          errorBody('pick_list_value_deactivated', {
+            message: 'Betriebssystem: Windows 11 Pro ist deaktiviert',
+            details: { path: 'defaultDeviceValues.22', id: 51 },
+          }),
+          { status: 422 },
+        ),
+    });
+    return { ...api, release, keyboardReads: () => reads.get(keyboard) ?? 0 };
+  }
+
+  it('DER-50-20 checks a choice made in another field while the lists load: a value missing there is emptied and named, the focus goes to the first marked field after the reload (Nachtrag MAR-963)', async () => {
+    const { sent, release, keyboardReads } = rejectWindowsWithDelayedKeyboardRead();
+    await openPage();
+    await fill();
+    fillNotebookAttributes();
+    await vi.waitFor(() =>
+      expect(optionTexts(selectIn(modelArea(), 'Tastaturlayout'))).toContain('Schweiz'),
+    );
+    fireEvent.change(selectIn(defaultsArea(), 'Betriebssystem'), { target: { value: '51' } });
+
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(keyboardReads()).toBe(2));
+    fireEvent.change(selectIn(modelArea(), 'Tastaturlayout'), { target: { value: '43' } });
+    expect(document.activeElement).toBe(selectIn(defaultsArea(), 'Betriebssystem'));
+    release();
+
+    await vi.waitFor(() =>
+      expect(errorOf(selectIn(modelArea(), 'Tastaturlayout'))).toBe(
+        'Tastaturlayout: Schweiz ist deaktiviert',
+      ),
+    );
+    expect(selectIn(modelArea(), 'Tastaturlayout').value).toBe('');
+    expect(selectIn(defaultsArea(), 'Betriebssystem').value).toBe('');
+    expect(errorOf(selectIn(defaultsArea(), 'Betriebssystem'))).toBe(
+      'Betriebssystem: Windows 11 Pro ist deaktiviert',
+    );
+    // The model attributes come before the device defaults in the form.
+    expect(document.activeElement).toBe(selectIn(modelArea(), 'Tastaturlayout'));
+    fireEvent.blur(selectIn(modelArea(), 'Tastaturlayout'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(errorOf(selectIn(modelArea(), 'Tastaturlayout'))).toBe(
+      'Tastaturlayout: Schweiz ist deaktiviert',
+    );
+
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toMatchObject({ modelValues: { 14: null }, defaultDeviceValues: { 22: null } });
+  });
+
+  it('DER-50-20 keeps a choice made in another field while the lists load when its value is active in the new list, without a text (Nachtrag MAR-963)', async () => {
+    const { release, keyboardReads } = rejectWindowsWithDelayedKeyboardRead();
+    await openPage();
+    await fill();
+    fillNotebookAttributes();
+    await vi.waitFor(() =>
+      expect(optionTexts(selectIn(defaultsArea(), 'Betriebssystem'))).toContain('Windows 11 Pro'),
+    );
+    fireEvent.change(selectIn(defaultsArea(), 'Betriebssystem'), { target: { value: '51' } });
+
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(keyboardReads()).toBe(2));
+    fireEvent.change(selectIn(modelArea(), 'Tastaturlayout'), { target: { value: '41' } });
+    release();
+
+    await vi.waitFor(() => expect(selectIn(defaultsArea(), 'Betriebssystem').value).toBe(''));
+    await vi.waitFor(() => expect(saveButton().disabled).toBe(false));
+    expect(selectIn(modelArea(), 'Tastaturlayout').value).toBe('41');
+    expect(errorOf(selectIn(modelArea(), 'Tastaturlayout'))).toBeNull();
+    expect(document.activeElement).toBe(selectIn(defaultsArea(), 'Betriebssystem'));
+  });
+
+  it('DER-50-20 keeps another choice in the field of details.path when its list cannot be read again, and no longer offers the rejected value (Nachtrag MAR-963)', async () => {
+    let release: () => void = () => {};
+    const reloaded = new Promise<void>((resolve) => (release = resolve));
+    const keyboard = listId('keyboard_layout');
+    let keyboardReads = 0;
+    mockApi({
+      attributes: notebookAttributes,
+      pickListValues: async (pickListId) => {
+        if (pickListId !== keyboard) return valuesOf(NOTEBOOK_VALUES[pickListId] ?? []);
+        keyboardReads += 1;
+        if (keyboardReads === 1) return valuesOf([GERMAN, HUNGARIAN]);
+        await reloaded;
+        return Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX6' }), {
+          status: 500,
+        });
+      },
+      create: () =>
+        Response.json(
+          errorBody('pick_list_value_deactivated', {
+            message: 'Tastaturlayout: Ungarisch ist deaktiviert',
+            details: { path: 'modelValues.14', id: 42 },
+          }),
+          { status: 422 },
+        ),
+    });
+    await openPage();
+    await fill();
+    fillNotebookAttributes();
+    await vi.waitFor(() =>
+      expect(optionTexts(selectIn(modelArea(), 'Tastaturlayout'))).toContain('Ungarisch'),
+    );
+    fireEvent.change(selectIn(modelArea(), 'Tastaturlayout'), { target: { value: '42' } });
+
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(keyboardReads).toBe(2));
+    fireEvent.change(selectIn(modelArea(), 'Tastaturlayout'), { target: { value: '41' } });
+    release();
+
+    await vi.waitFor(() =>
+      expect(optionTexts(selectIn(modelArea(), 'Tastaturlayout'))).toEqual(['', 'Deutsch']),
+    );
+    await vi.waitFor(() => expect(saveButton().disabled).toBe(false));
+    expect(selectIn(modelArea(), 'Tastaturlayout').value).toBe('41');
+    expect(errorOf(selectIn(modelArea(), 'Tastaturlayout'))).toBeNull();
+  });
+
   it('DER-50-20 empties the rejected value and no longer offers it when its list cannot be read again', async () => {
     const values = pickListValues(NOTEBOOK_VALUES, { [listId('keyboard_layout')]: 'fail' });
     mockApi({
