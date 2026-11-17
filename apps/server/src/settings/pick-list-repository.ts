@@ -86,14 +86,23 @@ export function createPickListRepository(db: Kysely<DB>) {
       return db.selectFrom('pick_list_value').selectAll().where('id', '=', id).executeTakeFirst();
     },
 
-    /** The values with these ids and the key of their list, by id; unknown ids are left out. */
-    async findValuesWithList(ids: readonly number[]) {
+    /**
+     * Values by id with the key of their list, for the check of new entries (2.0.11); unknown
+     * ids are missing from the result. No ids: `[]` without a query.
+     */
+    async findValuesByIds(ids: readonly number[]) {
+      if (ids.length === 0) return [];
       return db
-        .selectFrom('pick_list_value as v')
-        .innerJoin('pick_list as l', 'l.id', 'v.pick_list_id')
-        .select(['v.id', 'v.pick_list_id', 'l.key as pick_list_key', 'v.label', 'v.active'])
-        .where('v.id', 'in', ids)
-        .orderBy('v.id')
+        .selectFrom('pick_list_value')
+        .innerJoin('pick_list', 'pick_list.id', 'pick_list_value.pick_list_id')
+        .select([
+          'pick_list_value.id',
+          'pick_list_value.pick_list_id',
+          'pick_list.key as pick_list_key',
+          'pick_list_value.label',
+          'pick_list_value.active',
+        ])
+        .where('pick_list_value.id', 'in', ids)
         .execute();
     },
 

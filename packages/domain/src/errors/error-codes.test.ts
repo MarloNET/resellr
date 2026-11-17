@@ -28,6 +28,7 @@ const DOMAIN_CODES: [string, number][] = [
   ['manufacturer_deactivated', 422],
   ['pick_list_value_deactivated', 422],
   ['placeholder_not_allowed', 422],
+  ['supplier_deactivated', 422],
   ['variant_flag_would_merge_listings', 422],
 ];
 

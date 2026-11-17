@@ -178,7 +178,7 @@ describe('seedDemoData', () => {
           mpn: '20TD002MGE',
           mpnUnknown: false,
           originalEan: '',
-          modelValues: { 101: 'Intel Core i5-1135G7', 102: '15,6' },
+          modelValues: { 101: 'Intel Core i5-1135G7', 102: '15.6' },
           defaultDeviceValues: {},
         },
       ],

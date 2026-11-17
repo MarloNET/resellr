@@ -207,8 +207,8 @@ export const seedDatasheetLayout: SeedArea = async (api) => {
  * GS1 range for internal use (prefix 200), so it belongs to no real product. Device types and
  * manufacturers are looked up by name, as the user chooses them in UI-007. `modelValues` holds
  * the values of the attributes of the level model by label, at least those of the required ones
- * (Prozessor, Displaygröße; 2.4, AC-REQ-008-05), entered as in the form; the device defaults stay
- * empty.
+ * (Prozessor, Displaygröße; 2.4, AC-REQ-008-05); a decimal with a point, as stored, so the run of
+ * REQ-106 finds every seeded text again (e2e `write-paths`); the device defaults stay empty.
  */
 export const DEMO_MODEL_TEMPLATES = [
   {
@@ -218,7 +218,7 @@ export const DEMO_MODEL_TEMPLATES = [
     typeDesignation: '20TD',
     mpn: '20TD002MGE',
     originalEan: '',
-    modelValues: { Prozessor: 'Intel Core i5-1135G7', Displaygröße: '15,6' },
+    modelValues: { Prozessor: 'Intel Core i5-1135G7', Displaygröße: '15.6' },
   },
   {
     deviceType: 'Notebook',

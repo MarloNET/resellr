@@ -1408,6 +1408,140 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     expectAccessiblePage();
   });
 
+  describe('UI-007.dublette possible duplicate (REQ-011, 2.4)', () => {
+    const M_27 =
+      'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.';
+    const MATCHES = [
+      {
+        id: 4,
+        manufacturer: { id: 11, name: 'Lenovo' },
+        modelName: 'ThinkPad E15 Gen 2',
+        mpn: '20TD002MGE',
+      },
+      {
+        id: 5,
+        manufacturer: { id: 11, name: 'Lenovo' },
+        modelName: 'Thinkpad E15 gen2',
+        mpn: null,
+      },
+    ];
+    const duplicate = () =>
+      Response.json(
+        errorBody('confirmation_required', {
+          message: M_27,
+          details: { kind: 'possible_duplicate', matches: MATCHES },
+        }),
+        { status: 422 },
+      );
+
+    const dialog = () => screen.getByRole('dialog', { name: 'Mögliche Dublette' });
+    const useExistingButtons = () =>
+      within(dialog()).getAllByRole('button', { name: /^Vorhandene verwenden/ });
+
+    async function openDialog(create: Route = duplicate) {
+      const api = mockApi({ create });
+      const router = await openPage();
+      await fill();
+      fireEvent.click(saveButton());
+      await screen.findByRole('dialog', { name: 'Mögliche Dublette' });
+      return { ...api, router };
+    }
+
+    it('AC-REQ-011-01 DER-53-01 shows "Mögliche Dublette" with the text M-27, the hits with manufacturer, model name and MPN, "Vorhandene verwenden" per hit and "Trotzdem anlegen"; nothing is stored', async () => {
+      const { sent, router } = await openDialog();
+
+      expect(within(dialog()).getByText(M_27)).toBeTruthy();
+      const rows = within(dialog()).getAllByRole('row').slice(1);
+      expect(
+        rows.map((row) =>
+          within(row)
+            .getAllByRole('cell')
+            .map((c) => c.textContent),
+        ),
+      ).toEqual([
+        ['Lenovo', 'ThinkPad E15 Gen 2', '20TD002MGE', 'Vorhandene verwenden'],
+        ['Lenovo', 'Thinkpad E15 gen2', 'unbekannt', 'Vorhandene verwenden'],
+      ]);
+      expect(
+        within(dialog())
+          .getAllByRole('columnheader')
+          .map((header) => header.textContent),
+      ).toEqual(['Hersteller', 'Modellbezeichnung', 'Herstellernummer']);
+      expect(useExistingButtons()).toHaveLength(2);
+      expect(within(dialog()).getByRole('button', { name: 'Trotzdem anlegen' })).toBeTruthy();
+      expect(sent).toEqual([expect.not.objectContaining({ confirmDuplicate: expect.anything() })]);
+      expect(router.state.location.pathname).toBe('/modelle/neu');
+      // Accessibility: named dialog, every button of the dialog with a name.
+      for (const button of within(dialog()).getAllByRole('button')) {
+        expect(button.textContent?.trim()).toBeTruthy();
+      }
+    });
+
+    it('DER-53-01 Esc closes the dialog without saving and keeps the inputs', async () => {
+      const { sent } = await openDialog();
+
+      fireEvent.keyDown(dialog(), { key: 'Escape' });
+
+      await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(sent).toHaveLength(1);
+      expect(textbox('Modellbezeichnung').value).toBe('ThinkPad E15 Gen 2');
+      expect(saveButton().disabled).toBe(false);
+      expectAccessiblePage();
+    });
+
+    it('DER-53-01 Ctrl+S does not save again while the dialog is open', async () => {
+      const { sent } = await openDialog();
+
+      fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+
+      expect(sent).toHaveLength(1);
+      expect(dialog()).toBeTruthy();
+    });
+
+    it('DER-53-02 "Vorhandene verwenden" at the second hit creates nothing, discards the inputs and opens exactly that model template in UI-007 for changing', async () => {
+      const { sent, router } = await openDialog();
+
+      fireEvent.click(useExistingButtons()[1]!);
+
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/modelle/5'));
+      expect(sent).toHaveLength(1);
+      expect(screen.queryByRole('form', { name: 'Modellvorlage anlegen' })).toBeNull();
+    });
+
+    it('DER-53-03 UI-007.speichert UI-007.success "Trotzdem anlegen" sends the same model template with confirmDuplicate: true and shows "Modellvorlage gespeichert"', async () => {
+      let answer: (response: Response) => void = () => {};
+      let calls = 0;
+      const { sent, router } = await openDialog(() =>
+        ++calls === 1 ? duplicate() : new Promise((resolve) => (answer = resolve)),
+      );
+
+      fireEvent.click(within(dialog()).getByRole('button', { name: 'Trotzdem anlegen' }));
+
+      await vi.waitFor(() => expect(sent).toHaveLength(2));
+      expect(sent[1]).toEqual({ ...(sent[0] as object), confirmDuplicate: true });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(saveButton().textContent).toBe('Speichern …');
+      expect(saveButton().disabled).toBe(true);
+
+      answer(Response.json(CREATED, { status: 201 }));
+
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/modelle'));
+      expect(await screen.findByText('Modellvorlage gespeichert')).toBeTruthy();
+    });
+
+    it('AC-REQ-011-02 saves without a duplicate hint when the server finds no duplicate', async () => {
+      const { sent } = mockApi();
+      const router = await openPage();
+      await fill();
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/modelle'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(sent).toHaveLength(1);
+    });
+  });
+
   // Last test of the file: the lock "gesperrt bis Neuladen" (CU-049) lasts until the module is
   // loaded again, and Vitest loads it again per test file only.
   it('UI-007.ausgang-unbekannt DER-50-12 shows "Ausgang unbekannt, bitte neu laden." without button after a lost connection, keeps the inputs and locks the save', async () => {

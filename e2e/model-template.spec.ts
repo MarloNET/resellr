@@ -290,4 +290,111 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await expect(field(page, 'Geräteart')).toBeFocused();
     await expectReachable(page);
   });
+
+  test.describe('UI-007.dublette possible duplicate (REQ-011, 2.4)', () => {
+    /** Creates "MacBook Pro 13" of the manufacturer through the API; returns its id. */
+    async function createExisting(page: Page, baseUrl: string, manufacturerId: number) {
+      const types = await page.request.get(`${baseUrl}/api/device-types`);
+      const { items } = (await types.json()) as { items: { id: number; name: string }[] };
+      const deviceTypeId = items.find(({ name }) => name === 'Notebook')?.id;
+      const attributes = await page.request.get(
+        `${baseUrl}/api/device-types/${deviceTypeId}/attributes`,
+      );
+      const attributeItems = (
+        (await attributes.json()) as { items: { id: number; label: string }[] }
+      ).items;
+      const attributeId = (label: string) =>
+        attributeItems.find((attribute) => attribute.label === label)?.id;
+      const response = await page.request.post(`${baseUrl}/api/model-templates`, {
+        headers: { origin: baseUrl },
+        data: {
+          deviceTypeId,
+          manufacturerId,
+          modelName: 'MacBook Pro 13',
+          typeDesignation: '',
+          mpn: 'MHGT3D/A',
+          mpnUnknown: false,
+          originalEan: '',
+          // The required attributes of the level model of a notebook (fillNotebookAttributes).
+          modelValues: {
+            [String(attributeId('Prozessor'))]: 'Intel Core i5-1135G7',
+            [String(attributeId('Displaygröße'))]: '15,6',
+          },
+          defaultDeviceValues: {},
+        },
+      });
+      expect(response.status()).toBe(201);
+      return ((await response.json()) as { id: number }).id;
+    }
+
+    async function saveDuplicate(page: Page, manufacturer: string) {
+      await page.goto('/modelle/neu');
+      await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+      await fillNotebookAttributes(page);
+      await field(page, 'Hersteller').selectOption({ label: manufacturer });
+      await field(page, 'Modellbezeichnung').fill('MacBook  pro 13');
+      await field(page, 'Herstellernummer').fill('MNEH3D/A');
+      await saveButton(page).click();
+      const dialog = page.getByRole('dialog', { name: 'Mögliche Dublette' });
+      await expect(dialog).toBeVisible();
+      return dialog;
+    }
+
+    test('AC-REQ-011-01 DER-53-01 DER-53-03 shows the existing model template, Esc stores nothing, "Trotzdem anlegen" stores the second one', async ({
+      page,
+      server,
+    }, testInfo) => {
+      const manufacturer = uniqueName('Apple', testInfo.title, testInfo.project.name);
+      const { id } = await createManufacturer(page, server.baseUrl, manufacturer);
+      await createExisting(page, server.baseUrl, id);
+
+      const dialog = await saveDuplicate(page, manufacturer);
+
+      await expect(
+        dialog.getByText(
+          'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+        ),
+      ).toBeVisible();
+      await expect(dialog.getByRole('row').nth(1).getByRole('cell')).toHaveText([
+        manufacturer,
+        'MacBook Pro 13',
+        'MHGT3D/A',
+        'Vorhandene verwenden',
+      ]);
+      await expectReachable(page);
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(field(page, 'Modellbezeichnung')).toHaveValue('MacBook  pro 13');
+
+      await saveButton(page).click();
+      await dialog.getByRole('button', { name: 'Trotzdem anlegen' }).click();
+
+      await expect(page).toHaveURL(/\/modelle$/);
+      await expect(page.getByText('Modellvorlage gespeichert')).toBeVisible();
+      await page.getByRole('searchbox', { name: 'Suchbegriff' }).fill(manufacturer);
+      await expect(
+        page.getByRole('table', { name: 'Modellvorlagen' }).getByRole('row').filter({
+          hasText: manufacturer,
+        }),
+      ).toHaveCount(2);
+    });
+
+    test('DER-53-02 "Vorhandene verwenden" creates nothing and opens the existing model template', async ({
+      page,
+      server,
+    }, testInfo) => {
+      const manufacturer = uniqueName('Apple', testInfo.title, testInfo.project.name);
+      const { id } = await createManufacturer(page, server.baseUrl, manufacturer);
+      const existing = await createExisting(page, server.baseUrl, id);
+
+      const dialog = await saveDuplicate(page, manufacturer);
+      await dialog.getByRole('button', { name: 'Vorhandene verwenden' }).click();
+
+      await expect(page).toHaveURL(new RegExp(`/modelle/${existing}$`));
+      const list = await page.request.get(
+        `${server.baseUrl}/api/model-templates?q=${encodeURIComponent(manufacturer)}`,
+      );
+      expect(((await list.json()) as { total: number }).total).toBe(1);
+    });
+  });
 });

@@ -21,6 +21,7 @@ export const ERROR_CODES = {
   shutting_down: 503,
   stale_content: 409,
   stale_stock: 409,
+  supplier_deactivated: 422,
   unsupported_media_type: 415,
   validation_failed: 422,
   variant_flag_would_merge_listings: 422,

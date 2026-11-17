@@ -3,6 +3,7 @@ import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
 import {
   type ModelTemplateCreateInput,
   modelTemplateCreateSchema,
+  type ModelTemplateMatch,
   modelTemplateValuesSchema,
 } from '@resellr/domain/schemas/model-template.schema';
 import type { PickListList, PickListValueList } from '@resellr/domain/schemas/pick-list.schema';
@@ -11,7 +12,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
-import { useCreateModelTemplateMutation } from '../../api/catalog.api.ts';
+import { possibleDuplicatesOf, useCreateModelTemplateMutation } from '../../api/catalog.api.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import {
   useAttributesQuery,
@@ -27,9 +28,9 @@ import {
 } from '../../components/forms/AttributeFieldsForm.tsx';
 import type { AttributeInputValue, PortInput } from '../../components/forms/AttributeInput.tsx';
 import {
-  type ChoiceInForm,
+  type ChoiceItem,
   findMissingChoices,
-  type ReloadedList,
+  type MissingChoice,
 } from '../../components/forms/deactivated-choice.ts';
 import {
   FormField,
@@ -48,6 +49,7 @@ import { Button } from '../../components/ui/Button.tsx';
 import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
+import { DuplicateDialog } from './DuplicateDialog.tsx';
 
 // Texts of UI-007 `screen.md` and its mockup (UI/UX design v0.6.2, v0.6.3 for the empty MPN,
 // v0.6.7 for the placeholder and the hint of the attribute areas).
@@ -77,6 +79,8 @@ const TEXTS = {
 
 /** The calling page; UI-007 is opened from UI-006 (the call from UI-003 follows with S4). */
 const CALLER_PATH = '/modelle';
+/** UI-007 for changing a model template, as UI-006 opens it. */
+const templatePath = (id: number) => `${CALLER_PATH}/${id}`;
 
 /** State a calling page takes over after the save: the success banner of UI-007 (DER-50-02). */
 export interface SavedNoticeState {
@@ -196,6 +200,20 @@ function portListIds(queryClient: QueryClient) {
   return { type: idOfList('port_type'), position: idOfList('port_position') };
 }
 
+/** A pick list value chosen in an attribute field, with the key of the list it comes from. */
+interface AttributeChoice {
+  path: string;
+  id: number;
+  list: string;
+  message: (name: string) => string;
+}
+
+/** A list of pick list values before and after reading it again; `after` is `null` if it failed. */
+interface ReloadedList {
+  before: readonly ChoiceItem[];
+  after: readonly ChoiceItem[] | null;
+}
+
 /**
  * The pick list values chosen in the attribute fields, in form order, with the list they come
  * from and the text of their usage (2.0.11).
@@ -204,8 +222,8 @@ function attributeChoices(
   attributes: readonly Attribute[],
   draft: Draft,
   ports: { type: number | null; position: number | null },
-): ChoiceInForm[] {
-  const choices: ChoiceInForm[] = [];
+): AttributeChoice[] {
+  const choices: AttributeChoice[] = [];
   for (const { key, level } of VALUE_OBJECTS) {
     for (const attribute of attributesOfLevel(attributes, level)) {
       const path = `${key}.${attribute.id}`;
@@ -249,8 +267,24 @@ function attributeChoiceList(
   );
 }
 
-const asEntries = (list: PickListValueList | undefined) =>
-  (list?.items ?? []).map(({ id, label, active }) => ({ id, name: label, active }));
+const asItems = (list: PickListValueList | undefined): ChoiceItem[] =>
+  (list?.items ?? []).map(({ id, label, active }) => ({ id, label, active }));
+
+/**
+ * The attribute choices whose value is missing in their reloaded list, in form order, through
+ * CU-319. A field of data type ports holds values of two lists, so each choice is checked with
+ * the list it comes from; a new model template has no stored value.
+ */
+function missingAttributeChoices(
+  choices: readonly AttributeChoice[],
+  lists: Readonly<Record<string, ReloadedList>>,
+): MissingChoice[] {
+  return choices.flatMap(({ path, id, list, message }) =>
+    findMissingChoices([{ path, id, storedId: null, before: lists[list]?.before ?? [], message }], {
+      [path]: lists[list]?.after ?? undefined,
+    }),
+  );
+}
 
 const hasErrors = (errors: FieldErrors) => Object.values(errors).some(Boolean);
 
@@ -269,8 +303,9 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
  * appear (CU-111): those of the level model below the model data, the device defaults in their
  * own area; without one both areas show a hint (2.4, #178). States: default, loading,
  * validation (focus on the first error), speichert and ausgang-unbekannt (P-08), success (banner
- * on the calling page), error, unreachable (P-06) for the reads and wird-beendet (P-07) for the
- * save. The dialog UI-008 (#179), the duplicate hint (#184) and changing (#181) follow.
+ * on the calling page), error, unreachable (P-06) for the reads, wird-beendet (P-07) for the
+ * save and the dialog dublette for a possible duplicate (REQ-011). The dialog UI-008 (#179) and
+ * changing (#181) follow.
  */
 export function ModelTemplatePage() {
   const navigate = useNavigate();
@@ -307,6 +342,8 @@ export function ModelTemplatePage() {
   // Choices that show the text of a rejection; it stays until the next choice (Design v0.6.7).
   const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
   const [reloading, setReloading] = useState(false);
+  // Hits of a possible duplicate; the dialog UI-007.dublette is open while they are set.
+  const [duplicates, setDuplicates] = useState<ModelTemplateMatch[] | null>(null);
 
   const formId = useId();
   const modelDataId = useId();
@@ -335,9 +372,15 @@ export function ModelTemplatePage() {
 
   const saving = createMutation.isPending;
   // Until the choices are read again after a rejection, a save could send the rejected id; until
-  // the attributes have arrived, it would send none of their values.
+  // the attributes have arrived, it would send none of their values. While the dialog of a
+  // possible duplicate is open, only its choices save (Ctrl+S does not).
   const canSave =
-    draft !== null && attributes !== undefined && !saving && !writesLocked && !reloading;
+    draft !== null &&
+    attributes !== undefined &&
+    !saving &&
+    !writesLocked &&
+    !reloading &&
+    duplicates === null;
 
   function change(next: Partial<Draft>) {
     if (draft !== null) setDraft({ ...draft, ...next });
@@ -411,6 +454,12 @@ export function ModelTemplatePage() {
       showFieldErrors({ [path]: error.error?.message });
       setRejectionShown({ [path]: true });
       if (typeof id === 'number' && draft !== null) void reloadAfterRejection(path, id, draft);
+      return;
+    }
+    // The question comes only if the save would succeed otherwise (2.4 "Prüfreihenfolge").
+    const matches = possibleDuplicatesOf(error);
+    if (matches !== null) {
+      setDuplicates(matches);
       return;
     }
     setNotice(noticeOf(error));
@@ -508,12 +557,12 @@ export function ModelTemplatePage() {
         queryKeys.settings.pickListValues(Number(list)),
       );
       lists[list] = {
-        before: asEntries(before),
-        after: state?.status === 'error' ? null : asEntries(state?.data),
+        before: asItems(before),
+        after: state?.status === 'error' ? null : asItems(state?.data),
       };
     }
     const choices = attributeChoices(definitions, current, portListIds(queryClient));
-    const missing = findMissingChoices(choices, lists);
+    const missing = missingAttributeChoices(choices, lists);
     const rejectedList = ATTRIBUTE_PATH.test(rejected)
       ? attributeChoiceList(definitions, rejected, id, portListIds(queryClient), lists)
       : undefined;
@@ -521,7 +570,7 @@ export function ModelTemplatePage() {
       setDroppedValues((previous) => new Set([...previous, id]));
       const held = choices.find((choice) => choice.path === rejected && choice.id === id);
       if (held !== undefined) {
-        const name = lists[rejectedList]?.before.find((entry) => entry.id === id)?.name ?? '';
+        const name = lists[rejectedList]?.before.find((entry) => entry.id === id)?.label ?? '';
         missing.push({ path: rejected, id, message: held.message(name) });
       }
     }
@@ -561,13 +610,33 @@ export function ModelTemplatePage() {
     }
     setErrors({});
     setNotice(null);
-    createMutation.mutate(bodyOf(draft, attributes), {
+    send(bodyOf(draft, attributes));
+  }
+
+  function send(body: ModelTemplateCreateInput) {
+    createMutation.mutate(body, {
       onSuccess: () => {
         const state: SavedNoticeState = { savedNotice: TEXTS.saved };
         void navigate(CALLER_PATH, { state });
       },
       onError: onFailed,
     });
+  }
+
+  /** "Trotzdem anlegen": the same model template again, with the confirmation (DER-53-03). */
+  function createAnyway() {
+    setDuplicates(null);
+    if (draft === null || attributes === undefined || writesLocked) return;
+    send({ ...bodyOf(draft, attributes), confirmDuplicate: true });
+  }
+
+  /**
+   * "Vorhandene verwenden": the inputs are discarded and the chosen model template opens in
+   * UI-007 for changing (DER-53-02). The return to UI-003 follows with #186 (DER-54-14).
+   */
+  function chooseExisting(id: number) {
+    setDuplicates(null);
+    void navigate(templatePath(id));
   }
 
   // Ctrl+S saves like the primary button (UI-007 "Aktionen").
@@ -811,6 +880,14 @@ export function ModelTemplatePage() {
           {saving ? TEXTS.saving : TEXTS.save}
         </Button>
       </div>
+
+      <DuplicateDialog
+        matches={duplicates}
+        onUseExisting={chooseExisting}
+        onCreateAnyway={createAnyway}
+        onClose={() => setDuplicates(null)}
+        createDisabled={writesLocked}
+      />
     </div>
   );
 }

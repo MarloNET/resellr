@@ -808,5 +808,140 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
 
       expect(response.json().error.code).toBe('pick_list_value_deactivated');
     });
+
+    it('checks the attribute values before the question about a possible duplicate (2.4 "Prüfreihenfolge")', async () => {
+      const likeMvA = { ...WITH_VALUES(), manufacturerId: ids.apple, modelName: 'MacBook Pro 13' };
+      deactivateValue(V.matt);
+      const deactivated = await post(likeMvA);
+      likeMvA.modelValues = { ...likeMvA.modelValues, [A.surface]: V.glossy, [A.processor]: '' };
+      const missing = fieldsOf(await post(likeMvA));
+
+      expect(deactivated.json().error.code).toBe('pick_list_value_deactivated');
+      expect(missing).toEqual([
+        { path: `modelValues.${A.processor}`, code: 'value_missing', message: 'Prozessor fehlt' },
+      ]);
+      expect(count()).toBe(1);
+    });
+  });
+
+  describe('possible duplicate (CU-107, 2.4 "Mögliche Dublette", REQ-011)', () => {
+    /** MV-A's manufacturer and model name with other spaces and case (AC-REQ-011-01). */
+    const LIKE_MV_A = () => ({
+      ...NEW(),
+      manufacturerId: ids.apple,
+      modelName: 'MacBook  pro 13',
+      typeDesignation: '',
+      mpn: 'MNEH3D/A',
+    });
+
+    const MV_A_MATCH = () => ({
+      id: ids.mvA,
+      manufacturer: { id: ids.apple, name: 'Apple' },
+      modelName: 'MacBook Pro 13',
+      mpn: 'MHGT3D/A',
+    });
+
+    const deactivate = (table: 'device_type' | 'manufacturer', id: number) =>
+      t.database.sqlite.prepare(`UPDATE ${table} SET active = 0 WHERE id = ?`).run(id);
+
+    it('AC-REQ-011-01 DER-53-01 answers 422 confirmation_required possible_duplicate with MV-A in details.matches and stores nothing', async () => {
+      const response = await post(LIKE_MV_A());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'confirmation_required',
+        message:
+          'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+        fields: [],
+        details: { kind: 'possible_duplicate', matches: [MV_A_MATCH()] },
+        referenceNumber: null,
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('AC-REQ-011-01 lists every model template of the same manufacturer and model name key, MPN "unbekannt" as null', async () => {
+      const second = insertModelTemplate(t.database.sqlite, {
+        deviceTypeId: ids.monitor,
+        manufacturerId: ids.apple,
+        modelName: 'macbook pro13',
+        mpn: null,
+      });
+
+      const response = await post(LIKE_MV_A());
+
+      expect(response.json().error.details.matches).toEqual([
+        MV_A_MATCH(),
+        {
+          id: second,
+          manufacturer: { id: ids.apple, name: 'Apple' },
+          modelName: 'macbook pro13',
+          mpn: null,
+        },
+      ]);
+    });
+
+    it('AC-REQ-011-02 stores without a hint when no model template has the same manufacturer and model name', async () => {
+      const otherManufacturer = await post({ ...LIKE_MV_A(), manufacturerId: ids.lenovo });
+      const otherModelName = await post({ ...LIKE_MV_A(), modelName: 'MacBook Pro 14' });
+
+      expect(otherManufacturer.statusCode).toBe(201);
+      expect(otherModelName.statusCode).toBe(201);
+      expect(count()).toBe(3);
+    });
+
+    it('DER-53-03 stores the model template with confirmDuplicate: true', async () => {
+      const response = await post({ ...LIKE_MV_A(), confirmDuplicate: true });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        manufacturerId: ids.apple,
+        modelName: 'MacBook  pro 13',
+      });
+      expect(count()).toBe(2);
+    });
+
+    it('still asks with confirmDuplicate: false', async () => {
+      const response = await post({ ...LIKE_MV_A(), confirmDuplicate: false });
+
+      expect(response.json().error).toMatchObject({ code: 'confirmation_required' });
+      expect(count()).toBe(1);
+    });
+
+    it('DER-53-01 a field rule comes before the question: a duplicate with the MPN "ABC#123" gives validation_failed (2.4 "Prüfreihenfolge")', async () => {
+      const fields = fieldsOf(await post({ ...LIKE_MV_A(), mpn: 'ABC#123' }));
+
+      expect(fields).toEqual([{ path: 'mpn', code: 'mpn_invalid_chars', message: MPN_INVALID }]);
+      expect(count()).toBe(1);
+    });
+
+    it('DER-53-04 T3 a deactivated manufacturer comes before the question: manufacturer_deactivated, nothing stored', async () => {
+      deactivate('manufacturer', ids.apple);
+
+      const response = await post(LIKE_MV_A());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'manufacturer_deactivated',
+        details: { path: 'manufacturerId', id: ids.apple },
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('DER-53-04 T3 a deactivated device type comes before the question: device_type_deactivated, nothing stored', async () => {
+      deactivate('device_type', ids.notebook);
+
+      const response = await post(LIKE_MV_A());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'device_type_deactivated',
+        details: { path: 'deviceTypeId', id: ids.notebook },
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('rejects confirmDuplicate that is not a boolean as bad_request', async () => {
+      expect((await post({ ...LIKE_MV_A(), confirmDuplicate: 'yes' })).statusCode).toBe(400);
+    });
   });
 });

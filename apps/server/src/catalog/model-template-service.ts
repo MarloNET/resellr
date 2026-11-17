@@ -19,6 +19,7 @@ import {
 } from '../settings/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { BadRequestError, RuleViolation, ValidationError } from '../shared/domain-error.ts';
+import { createDuplicateCheck } from './duplicate-check.ts';
 import {
   createModelTemplateRepository,
   type ModelTemplateRow,
@@ -231,18 +232,21 @@ function checkedAttributeValues(
  * stores the trimmed values; device type and manufacturer it checks through `settings-reader`
  * (CU-086) with `tx.db`, so the check sees the state of the writing transaction. Then the
  * pick list values and the attribute values against the attribute definitions of the device
- * type (2.0.11, 2.5). Changing (#181) and the duplicate hint (#184) follow.
+ * type (2.0.11, 2.5). The question about a possible duplicate (CU-107) comes after every
+ * rejection, so the user never confirms a save that fails afterwards (2.4 "Prüfreihenfolge beim
+ * Speichern", 2.0.11). Changing (#181) follows.
  */
 export function createModelTemplateService({ uow, clock }: ModelTemplateServiceDeps) {
   return {
     /** `POST /api/model-templates`: the new model template with version 1. */
-    async create(input: ModelTemplateCreate): Promise<ModelTemplate> {
+    async create({ confirmDuplicate, ...input }: ModelTemplateCreate): Promise<ModelTemplate> {
       const { result } = await uow.run(async (tx) => {
         const settings = createSettingsReader(tx.db);
         await checkActiveEntries(settings, input);
         const attributes = await settings.listAttributes(input.deviceTypeId);
         await checkPickListValues(settings, pickListValueReferences(attributes, input));
         const values = checkedAttributeValues(attributes, input);
+        await createDuplicateCheck(tx.db).checkPossibleDuplicate({ ...input, confirmDuplicate });
         const repository = createModelTemplateRepository(tx.db);
         const audit = createAuditWriter({ db: tx.db, clock });
         const id = await repository.insert({

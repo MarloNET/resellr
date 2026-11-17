@@ -89,7 +89,7 @@ export function createSettingsReader(db: Kysely<DB>) {
      */
     async findPickListValues(ids: readonly number[]): Promise<PickListValueEntry[]> {
       if (ids.length === 0) return [];
-      const rows = await pickLists.findValuesWithList([...new Set(ids)]);
+      const rows = await pickLists.findValuesByIds([...new Set(ids)]);
       return rows.map((row) => ({
         id: row.id,
         pickListId: row.pick_list_id,

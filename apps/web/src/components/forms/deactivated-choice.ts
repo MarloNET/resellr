@@ -1,29 +1,51 @@
-/** An entry of a choice list with its name and status, e.g. a pick list value. */
-export interface ChoiceEntry {
+import { FIXED_TEXTS } from '@resellr/domain/messages/messages.de';
+
+/** An entry of a choice: supplier, device type, manufacturer or pick list value. */
+export interface ChoiceItem {
   id: number;
-  name: string;
+  label: string;
   active: boolean;
 }
 
-/** A choice of the form, and the list it chooses from. */
-export interface ChoiceInForm {
-  /** Field path like `fields[].path`, e.g. `modelValues.14`. */
+/** An entry as the choice offers it. */
+export interface ChoiceOption {
+  id: number;
+  label: string;
+}
+
+/**
+ * Entries a choice offers (Technical Specification 2.0.11 "Anzeige vorher", addendum MAR-929):
+ * the active ones and the stored one, even if deactivated meanwhile. With `markDeactivated` the
+ * stored, deactivated entry carries "(deaktiviert)" (UI-003, UI-010, UI-014, UI-033).
+ */
+export function choiceOptions(
+  items: readonly ChoiceItem[],
+  { storedId, markDeactivated = false }: { storedId: number | null; markDeactivated?: boolean },
+): ChoiceOption[] {
+  return items
+    .filter((item) => item.active || item.id === storedId)
+    .map((item) => ({
+      id: item.id,
+      label:
+        !item.active && markDeactivated ? FIXED_TEXTS.deactivatedChoice(item.label) : item.label,
+    }));
+}
+
+/** A choice of the form, checked after the lists were reloaded. */
+export interface ChoiceField {
+  /** Path of the field in the request (`fields[].path`, `details.path`). */
   path: string;
-  /** The value of the form at the end of the reload; `null` for an empty field. */
+  /** Chosen id; `null` = nothing chosen. */
   id: number | null;
-  /** Key of the list in `reloadedLists`. */
-  list: string;
-  /** Text of the usage with the name of the entry, from CU-012. */
+  /** Stored id of the entry being changed; `null` while a new one is entered. */
+  storedId: number | null;
+  /** Entries before the reload, for the name in the text. */
+  before: readonly ChoiceItem[];
+  /** Text of the usage from the message catalog CU-012, e.g. "Lieferant <Name> ist deaktiviert". */
   message: (name: string) => string;
 }
 
-/** A list before and after reading it again; `after` is `null` if the read failed. */
-export interface ReloadedList {
-  before: readonly ChoiceEntry[];
-  after: readonly ChoiceEntry[] | null;
-}
-
-/** A choice whose entry is missing after reading the lists again, with its text. */
+/** A field whose new value is no longer offered. */
 export interface MissingChoice {
   path: string;
   id: number;
@@ -31,26 +53,20 @@ export interface MissingChoice {
 }
 
 /**
- * Choices whose new value is missing after the lists were read again (CU-319; Technical
- * Specification 2.0.11 "Auswahl nach der Ablehnung", Nachtrag MAR-929, MAR-963): the server
- * names only the first deactivated entry, so the form passes every choice with a new value, also
- * the one at `details.path`, with its value at the end of the reload; an empty one is not
- * checked. Its entry is missing if the reloaded list lacks it or holds it deactivated; the text
- * names the entry as the list did before the reload. A list whose read failed decides nothing; the screen treats
- * only the rejected id as missing then. Values, texts and the state "not chosen" set the screen.
+ * Fields with a new value that the reloaded list no longer offers (2.0.11 "Erkennen nach dem
+ * Neuladen", addendum MAR-929). The server reports only the first hit, so the form checks every
+ * choice itself. A stored value is never missing, as it stays in the choice. A field without a
+ * reloaded list (the reload failed) is not checked.
  */
 export function findMissingChoices(
-  fields: readonly ChoiceInForm[],
-  reloadedLists: Readonly<Record<string, ReloadedList>>,
+  fields: readonly ChoiceField[],
+  reloadedLists: Readonly<Record<string, readonly ChoiceItem[] | undefined>>,
 ): MissingChoice[] {
-  const missing: MissingChoice[] = [];
-  for (const { path, id, list, message } of fields) {
-    if (id === null) continue;
-    const lists = reloadedLists[list];
-    if (lists?.after == null) continue;
-    if (lists.after.some((entry) => entry.id === id && entry.active)) continue;
-    const name = lists.before.find((entry) => entry.id === id)?.name ?? '';
-    missing.push({ path, id, message: message(name) });
-  }
-  return missing;
+  return fields.flatMap(({ path, id, storedId, before, message }) => {
+    const reloaded = reloadedLists[path];
+    if (id === null || id === storedId || reloaded === undefined) return [];
+    if (reloaded.some((item) => item.id === id && item.active)) return [];
+    const name = before.find((item) => item.id === id)?.label ?? '';
+    return [{ path, id, message: message(name) }];
+  });
 }
