@@ -338,10 +338,10 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
       'Lieferant',
       'Zustand',
       'Optik-Note',
-      'Zustandsbeschreibung',
       'Tastaturlayout',
       'Netzteil',
       'Akku',
+      'Zustandsbeschreibung',
     ]);
     expect(within(form()).getByRole('region', { name: 'Gerätewerte' })).toBeTruthy();
     expect(textbox('WI-Nr').getAttribute('aria-required')).toBe('true');
@@ -359,7 +359,12 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
 
     // The battery capacity appears after a battery value with "Akku vorhanden".
     await choose('Akku', WITH_BATTERY);
-    expect(labels().slice(-3)).toEqual(['Akku', 'Akkukapazität', 'nicht ermittelbar']);
+    expect(labels().slice(-4)).toEqual([
+      'Akku',
+      'Akkukapazität',
+      'nicht ermittelbar',
+      'Zustandsbeschreibung',
+    ]);
     expect(textbox('Akkukapazität').getAttribute('aria-required')).toBe('true');
     expectAccessiblePage();
   });
@@ -383,17 +388,23 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expect(textbox('Akkukapazität').value).toBe('');
   });
 
-  it('UI-003.validation DER-54-01 names a missing required attribute and the missing battery capacity at the field, nothing sent', async () => {
+  it('UI-003.validation DER-54-01 names a missing required attribute and the missing battery capacity at the field in form order, nothing sent', async () => {
     const { sent } = mockApi();
     await openPage();
     await fillValid({ battery: WITH_BATTERY });
     fireEvent.change(select('Netzteil'), { target: { value: '' } });
+    fireEvent.change(textbox('Zustandsbeschreibung'), { target: { value: 'x'.repeat(1001) } });
 
     fireEvent.click(saveButton());
 
     expect(errorOf(select('Netzteil'))).toBe('Netzteil fehlt');
     expect(errorOf(textbox('Akkukapazität'))).toBe(CAPACITY_RULE);
-    expect(summaryItems()).toEqual(['Netzteil fehlt', CAPACITY_RULE]);
+    // In the order of the card: the attributes, then the condition description (mockup).
+    expect(summaryItems()).toEqual([
+      'Netzteil fehlt',
+      CAPACITY_RULE,
+      'Zustandsbeschreibung: höchstens 1.000 Zeichen',
+    ]);
     expect(document.activeElement).toBe(select('Netzteil'));
     expect(sent).toEqual([]);
     expectAccessiblePage();

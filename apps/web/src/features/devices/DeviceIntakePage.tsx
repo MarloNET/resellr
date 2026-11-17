@@ -82,7 +82,7 @@ const TEXTS = {
 /** Wait after the last keystroke before the model templates are searched (as in UI-006). */
 const SEARCH_DELAY_MS = 300;
 
-/** The fixed fields of the form in form order (DER-54-01); the values of the attributes follow. */
+/** The fixed fields of the form (DER-54-01). */
 const FIELDS = [
   'wiNr',
   'supplierId',
@@ -92,6 +92,8 @@ const FIELDS = [
   'conditionDescription',
 ] as const;
 type Field = (typeof FIELDS)[number];
+/** The fixed fields before the attributes; the condition description ends the card (mockup). */
+const FIELDS_BEFORE_VALUES = FIELDS.slice(0, -1);
 /** A field error by path: the fixed fields and `values.<id>` (2.0.5). */
 type FieldErrors = Partial<Record<string, ReactNode>>;
 
@@ -197,14 +199,18 @@ function checkAll(draft: Draft, device: DeviceAttributes | null): FieldErrors {
 }
 
 /**
- * Errors in form order: the fixed fields, then the values in the order of the attributes (2.0.5
- * "Fehlerzusammenfassung").
+ * Errors in form order: the fixed fields, the values in the order of the attributes, then the
+ * condition description, as the card "Gerätewerte" shows them (2.0.5 "Fehlerzusammenfassung").
  */
 function inFormOrder(
   errors: FieldErrors,
   attributes: readonly Attribute[] = [],
 ): [string, ReactNode][] {
-  const paths = [...FIELDS, ...attributes.map(({ id }) => valuePath(id))];
+  const paths = [
+    ...FIELDS_BEFORE_VALUES,
+    ...attributes.map(({ id }) => valuePath(id)),
+    'conditionDescription',
+  ];
   const order = (path: string) => {
     const index = paths.indexOf(path);
     return index === -1 ? paths.length : index;
@@ -863,6 +869,19 @@ export function DeviceIntakePage() {
                           />
                         )}
                       </FormField>
+                      {device !== null && (
+                        <AttributeFieldsForm
+                          attributes={attributeFields}
+                          level="device"
+                          inputs={draft.values}
+                          errors={attributeErrors(errors)}
+                          withRequired
+                          dropped={NO_DROPPED_VALUES}
+                          disabled={saving}
+                          onChange={changeAttribute}
+                          onBlur={(attributeId) => checkOnBlur(valuePath(attributeId))}
+                        />
+                      )}
                     </div>
                     <FormField
                       label={TEXTS.conditionDescription}
@@ -880,21 +899,6 @@ export function DeviceIntakePage() {
                         />
                       )}
                     </FormField>
-                    {device !== null && (
-                      <div className="grid grid-cols-1 gap-4 full:grid-cols-3">
-                        <AttributeFieldsForm
-                          attributes={attributeFields}
-                          level="device"
-                          inputs={draft.values}
-                          errors={attributeErrors(errors)}
-                          withRequired
-                          dropped={NO_DROPPED_VALUES}
-                          disabled={saving}
-                          onChange={changeAttribute}
-                          onBlur={(attributeId) => checkOnBlur(valuePath(attributeId))}
-                        />
-                      </div>
-                    )}
                   </>
                 )}
               </section>
