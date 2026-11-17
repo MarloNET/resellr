@@ -11,6 +11,7 @@ import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import { createSettingsReader, type SettingsReader } from '../settings/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { BadRequestError, RuleViolation } from '../shared/domain-error.ts';
+import { createDuplicateCheck } from './duplicate-check.ts';
 import {
   createModelTemplateRepository,
   type ModelTemplateRow,
@@ -80,15 +81,18 @@ async function checkActiveEntries(
  * template together with its audit entry in one transaction (2.0.4); without the entry nothing
  * is stored. The field rules are checked before by the schema of CU-104 (route), so the service
  * stores the trimmed values; device type and manufacturer it checks through `settings-reader`
- * (CU-086) with `tx.db`, so the check sees the state of the writing transaction. Changing (#181), the attribute values (#178) and the duplicate hint
- * (#184) follow.
+ * (CU-086) with `tx.db`, so the check sees the state of the writing transaction. The question
+ * about a possible duplicate (CU-107) comes after every rejection, so the user never confirms a
+ * save that fails afterwards (2.4 "Prüfreihenfolge beim Speichern", 2.0.11). Changing (#181) and
+ * the attribute values (#178) follow.
  */
 export function createModelTemplateService({ uow, clock }: ModelTemplateServiceDeps) {
   return {
     /** `POST /api/model-templates`: the new model template with version 1. */
-    async create(input: ModelTemplateCreate): Promise<ModelTemplate> {
+    async create({ confirmDuplicate, ...input }: ModelTemplateCreate): Promise<ModelTemplate> {
       const { result } = await uow.run(async (tx) => {
         await checkActiveEntries(createSettingsReader(tx.db), input);
+        await createDuplicateCheck(tx.db).checkPossibleDuplicate({ ...input, confirmDuplicate });
         const repository = createModelTemplateRepository(tx.db);
         const audit = createAuditWriter({ db: tx.db, clock });
         const id = await repository.insert({

@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
+  CONFIRMATION_TITLES,
   ERROR_MESSAGES,
   type ErrorMessageUsage,
   FIELD_MESSAGES,
@@ -111,6 +112,22 @@ describe('message catalog (E1)', () => {
     expect(ERROR_MESSAGES['manufacturer_deactivated.default']('Lenovo')).toBe(
       'Hersteller Lenovo ist deaktiviert',
     );
+  });
+
+  it('DER-38-11 names the deactivated supplier and condition suggestion of a condition code entry (2.0.6, 8.2, UI-033)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.condition_code']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+    expect(
+      ERROR_MESSAGES['pick_list_value_deactivated.condition_suggestion']('Stark gebraucht'),
+    ).toBe('Vorschlag Zustand Stark gebraucht ist deaktiviert');
+  });
+
+  it('DER-38-12 has the texts of a choice after a rejection for deactivation (2.0.11, 8.2, UI-033)', () => {
+    expect(FIELD_MESSAGES.conditionCodeSupplierNotChosen).toBe(
+      'Lieferant: Lieferanten oder „alle“ wählen',
+    );
+    expect(FIXED_TEXTS.deactivatedChoice('Lieferant West')).toBe('Lieferant West (deaktiviert)');
   });
 
   it('names the deactivated device type and manufacturer of a model template (2.0.6, 2.0.11, UI-007)', () => {
@@ -260,6 +277,15 @@ describe('message catalog (E1)', () => {
       '{Baustein:Name} ist im Textbaustein nicht zulässig',
     );
     expect(FIELD_MESSAGES.textBlockBody).toBe('Text: 1 bis 5.000 Zeichen');
+  });
+
+  it('has title and text of M-27 under confirmation_required.possible_duplicate (8.2)', () => {
+    expect(CONFIRMATION_TITLES['confirmation_required.possible_duplicate']).toBe(
+      'Mögliche Dublette',
+    );
+    expect(ERROR_MESSAGES['confirmation_required.possible_duplicate']).toBe(
+      'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+    );
   });
 
   it('derives the usages of a code from the catalog keys', () => {

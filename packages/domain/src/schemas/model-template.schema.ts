@@ -44,6 +44,19 @@ export const modelTemplateReferenceSchema = z.object({ id: idSchema, name: z.str
 export type ModelTemplateReference = z.infer<typeof modelTemplateReferenceSchema>;
 
 /**
+ * A model template in `details.matches[]` of `confirmation_required` (2.4): `possible_duplicate`
+ * (REQ-011) names manufacturer, model name and MPN of each hit; with MPN "unbekannt" `mpn` is
+ * null (3.3).
+ */
+export const modelTemplateMatchSchema = z.object({
+  id: idSchema,
+  manufacturer: modelTemplateReferenceSchema,
+  modelName: z.string(),
+  mpn: z.string().nullable(),
+});
+export type ModelTemplateMatch = z.infer<typeof modelTemplateMatchSchema>;
+
+/**
  * Hit of `GET /api/model-templates` (2.4): device type, manufacturer, model name, type
  * designation and MPN; with MPN "unbekannt" `mpn` is null and `mpnUnknown` true (3.3).
  */
@@ -172,6 +185,8 @@ export const modelTemplateCreateSchema = z
     mpn: mpnSchema.nullable(),
     mpnUnknown: z.boolean(),
     originalEan: originalEanSchema,
+    /** "Trotzdem anlegen" of UI-007.dublette: no question about a possible duplicate (2.4). */
+    confirmDuplicate: z.boolean().optional(),
   })
   .superRefine(
     ({ mpn, mpnUnknown }, context) => {

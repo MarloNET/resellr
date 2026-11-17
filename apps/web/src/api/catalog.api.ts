@@ -1,7 +1,9 @@
-import type {
-  ModelTemplate,
-  ModelTemplateCreateInput,
-  ModelTemplateList,
+import {
+  type ModelTemplate,
+  type ModelTemplateCreateInput,
+  type ModelTemplateList,
+  type ModelTemplateMatch,
+  modelTemplateMatchSchema,
 } from '@resellr/domain/schemas/model-template.schema';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -62,4 +64,18 @@ export function useCreateModelTemplateMutation() {
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: queryKeys.catalog.modelTemplateLists() }),
   });
+}
+
+const matchesSchema = modelTemplateMatchSchema.array().min(1);
+
+/**
+ * The hits of a possible duplicate (`422 confirmation_required`, `details.kind:
+ * possible_duplicate`, REQ-011; 2.4) from a failed `POST /api/model-templates`; `null` for any
+ * other error.
+ */
+export function possibleDuplicatesOf(error: ApiError): ModelTemplateMatch[] | null {
+  const details = error.error?.details;
+  if (error.kind !== 'confirmation-required' || details?.kind !== 'possible_duplicate') return null;
+  const matches = matchesSchema.safeParse(details.matches);
+  return matches.success ? matches.data : null;
 }

@@ -97,6 +97,11 @@ export const FIELD_MESSAGES = {
   conditionDescription: 'Zustandsbeschreibung: höchstens 1.000 Zeichen',
   /** UI-003 "Zustand" without a choice (2.5). */
   conditionMissing: 'Zustand fehlt',
+  /**
+   * UI-033 "Lieferant", "Speichern" while no supplier is chosen after a rejection for
+   * deactivation; only in the browser (2.0.11, design v0.6.8, addendum MAR-929).
+   */
+  conditionCodeSupplierNotChosen: 'Lieferant: Lieferanten oder „alle“ wählen',
   /** UI-026 "Kontaktangaben", longer than 500 characters. */
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-007 "Geräteart" without a choice (Design v0.6.7, Nachtrag MAR-925). */
@@ -178,6 +183,9 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
+  'confirmation_required.possible_duplicate':
+    'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
@@ -192,11 +200,19 @@ export const ERROR_MESSAGES = {
   'name_taken.supplier': 'Name ist bereits vergeben',
   'name_taken.text_block': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
+  /**
+   * UI-033 "Vorschlag Zustand", a new or changed suggestion is deactivated (2.0.11, design
+   * v0.6.8, addendum MAR-929).
+   */
+  'pick_list_value_deactivated.condition_suggestion': (value: string) =>
+    `Vorschlag Zustand ${value} ist deaktiviert`,
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
   /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
   'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
+  /** UI-033 "Lieferant", a new or changed supplier is deactivated (2.0.11, Nachtrag MAR-904). */
+  'supplier_deactivated.condition_code': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
   /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   'variant_flag_would_merge_listings.flag': (listings: string) =>
@@ -211,6 +227,15 @@ export const ERROR_MESSAGES = {
   'wi_nr_taken.unassigned': (wiNr: string) =>
     `WI-Nr bereits vergeben: Gerät ${wiNr} (nicht zugeordnet)`,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
+
+/**
+ * Titles of the confirmation dialogs by `confirmation_required.<details.kind>` (8.2); their text
+ * is the `message` of the answer from `ERROR_MESSAGES`.
+ */
+export const CONFIRMATION_TITLES = {
+  /** UI-007.dublette (M-27, REQ-011). */
+  'confirmation_required.possible_duplicate': 'Mögliche Dublette',
+} as const;
 
 /**
  * Usages with a text in `ERROR_MESSAGES` for a code, e.g. `'default'` for `not_found`. A service
