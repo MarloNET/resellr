@@ -191,7 +191,15 @@ function mockApi({
   create = () => Response.json(CREATED, { status: 201 }),
   suppliers = () => list([OST, WEST, ALT]),
   search = () => list([MV_A]),
-}: { create?: Route; suppliers?: Route; search?: Route } = {}) {
+  modelTemplate = () => Response.json(MODEL_TEMPLATE),
+  portTypes = () => list(PORT_TYPES),
+}: {
+  create?: Route;
+  suppliers?: Route;
+  search?: Route;
+  modelTemplate?: Route;
+  portTypes?: Route;
+} = {}) {
   const sent: Record<string, unknown>[] = [];
   const reads = { suppliers: 0 };
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
@@ -206,13 +214,13 @@ function mockApi({
     }
     if (route === 'GET /api/pick-lists') return list(PICK_LISTS);
     if (route === 'GET /api/pick-lists/1/values') return list(CONDITIONS);
-    if (route === 'GET /api/pick-lists/8/values') return list(PORT_TYPES);
+    if (route === 'GET /api/pick-lists/8/values') return portTypes(init);
     if (route === 'GET /api/pick-lists/9/values') return list(PORT_POSITIONS);
     if (route === 'GET /api/pick-lists/10/values') return list(BATTERIES);
     if (route === 'GET /api/pick-lists/11/values') return list(KEYBOARD_LAYOUTS);
     if (route === 'GET /api/pick-lists/12/values') return list(POWER_SUPPLIES);
     if (route === 'GET /api/model-templates') return search(init);
-    if (route === 'GET /api/model-templates/7') return Response.json(MODEL_TEMPLATE);
+    if (route === 'GET /api/model-templates/7') return modelTemplate(init);
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
     if (route === 'POST /api/devices') {
       sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
@@ -983,6 +991,69 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
     expect(textbox('WI-Nr').value).toBe('626198');
     expect(searchBox().value).toBe('T14');
+  });
+
+  it('UI-003.unreachable DER-54-12 (b) shows P-06 when the model template of the panel "Modelldaten" gets no answer, keeping the inputs', async () => {
+    mockApi({
+      modelTemplate: () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+    await openPage();
+    fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
+    await chooseModelTemplate();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
+    expect(within(banner).getByRole('button', { name: 'Erneut versuchen' })).toBeTruthy();
+    expect(textbox('WI-Nr').value).toBe('626198');
+    expect(screen.getByTestId('chosen-model-template').textContent).toBe(MV_A_LINE);
+    expectAccessiblePage();
+  });
+
+  it('UI-003.error shows the banner with the reference number when the model template of the panel "Modelldaten" fails with 500, keeping the inputs', async () => {
+    mockApi({
+      modelTemplate: () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+          status: 500,
+        }),
+    });
+    await openPage();
+    fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
+    await chooseModelTemplate();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('Referenz: R-7K2M-9QX4');
+    expect(textbox('WI-Nr').value).toBe('626198');
+    expect(screen.getByTestId('chosen-model-template').textContent).toBe(MV_A_LINE);
+    expectAccessiblePage();
+  });
+
+  it('UI-003.unreachable DER-54-12 (b) shows P-06 when a pick list of the model data gets no answer', async () => {
+    mockApi({
+      portTypes: () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+    await openPage();
+    await chooseModelTemplate();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
+  });
+
+  it('UI-003.error shows the banner when a pick list of the model data fails with 500', async () => {
+    mockApi({
+      portTypes: () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+          status: 500,
+        }),
+    });
+    await openPage();
+    await chooseModelTemplate();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('Referenz: R-7K2M-9QX4');
   });
 
   it('UI-003.wird-beendet DER-54-12 (c) shows P-07 without reference number on 503 shutting_down and keeps the inputs', async () => {

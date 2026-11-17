@@ -55,7 +55,14 @@ import type {
   TextBlockUpdate,
   TextBlockUpdateResult,
 } from '@resellr/domain/schemas/text-block.schema';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  queryOptions,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 
 import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
@@ -413,7 +420,16 @@ export function usePickListsQuery() {
 
 /** Values of one list, active and deactivated (`GET /api/pick-lists/{id}/values`). */
 export function usePickListValuesQuery(pickListId: number | null) {
-  return useQuery<PickListValueList, ApiError>({
+  return useQuery(pickListValuesQuery(pickListId));
+}
+
+/** The values of several pick lists at once, each in the cache of `usePickListValuesQuery`. */
+export function usePickListValuesQueries(pickListIds: readonly number[]) {
+  return useQueries({ queries: pickListIds.map((id) => pickListValuesQuery(id)) });
+}
+
+function pickListValuesQuery(pickListId: number | null) {
+  return queryOptions<PickListValueList, ApiError>({
     queryKey: queryKeys.settings.pickListValues(pickListId ?? 0),
     queryFn: ({ signal }) =>
       apiClient.get<PickListValueList>(`/api/pick-lists/${pickListId}/values?${ALL}`, { signal }),

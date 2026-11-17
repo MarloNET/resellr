@@ -1,7 +1,15 @@
 import type { Page } from '@playwright/test';
 
-import { expect, test } from './fixtures/app-fixture.ts';
+import { type AppServer, test as appTest, expect, workerServer } from './fixtures/app-fixture.ts';
 import { expectReachable } from './fixtures/reachability.ts';
+
+/**
+ * UI-006 lists every model template of its server: the model templates of this spec live on a
+ * server of their own, so the lists of the other specs stay as they expect them.
+ */
+const test = appTest.extend<object, { server: AppServer }>({
+  server: [workerServer, { scope: 'worker' }],
+});
 
 /** Rows of the matrix with the full frame (FM-5 and FM-7 only check the narrow UI-019, 6.3). */
 const FRAME_ROWS = ['FM-1', 'FM-2', 'FM-3', 'FM-4', 'FM-6'];

@@ -279,10 +279,14 @@ test.describe('Backup notice UI-044 without state (#138)', () => {
     await content.getByRole('link', { name: 'Gerät einbuchen' }).click();
     await expect(page).toHaveURL(/\/geraete\/neu$/);
 
-    // The notice asks for nothing: no dialog, no alert, no inert or hidden part of the page.
+    // The notice asks for nothing: no dialog, no alert, no inert or hidden part of the page. Only
+    // the decorative "*" of a required field (CU-057) is hidden from assistive technology.
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('alert')).toHaveCount(0);
-    await expect(page.locator('[inert], [aria-hidden="true"]:not(svg)')).toHaveCount(0);
+    await expect(page.locator('[inert]')).toHaveCount(0);
+    await expect(
+      page.locator('[aria-hidden="true"]:not(svg)').filter({ hasNotText: /^\*$/ }),
+    ).toHaveCount(0);
     expect(await notice(page).innerText()).toBe(expected);
   });
 

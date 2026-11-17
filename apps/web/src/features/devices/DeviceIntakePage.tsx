@@ -5,9 +5,11 @@ import type { PortEntry } from '@resellr/domain/schemas/attribute-values.schema'
 import type { BatteryValueFlag } from '@resellr/domain/schemas/pick-list.schema';
 import { type DeviceCreateInput, deviceCreateSchema } from '@resellr/domain/schemas/device.schema';
 import {
+  type ModelTemplate,
   type ModelTemplateListItem,
   modelTemplateSearchTermSchema,
 } from '@resellr/domain/schemas/model-template.schema';
+import type { PickList } from '@resellr/domain/schemas/pick-list.schema';
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
@@ -17,6 +19,7 @@ import { useCreateDeviceMutation } from '../../api/inventory.api.ts';
 import {
   useAttributesQuery,
   usePickListsQuery,
+  usePickListValuesQueries,
   usePickListValuesQuery,
   useSuppliersQuery,
 } from '../../api/settings.api.ts';
@@ -282,10 +285,15 @@ function PickListLabel({ pickListId, valueId }: { pickListId: number | null; val
   return <>{values.data?.items.find(({ id }) => id === valueId)?.label ?? ''}</>;
 }
 
+/** The id of a pick list by its key, e.g. `port_type`. */
+function listIdOf(lists: readonly PickList[] | undefined, key: string) {
+  return lists?.find((list) => list.key === key)?.id ?? null;
+}
+
 /** "2 × USB-C vorn, 1 × HDMI" from the lists port type and port position. */
 function PortsLabel({ entries }: { entries: readonly PortEntry[] }) {
   const lists = usePickListsQuery();
-  const listId = (key: string) => lists.data?.items.find((list) => list.key === key)?.id ?? null;
+  const listId = (key: string) => listIdOf(lists.data?.items, key);
   return (
     <>
       {entries.map(({ count, typeId, positionId }, index) => (
@@ -323,9 +331,31 @@ function ModelValue({ attribute, value }: { attribute: Attribute; value: unknown
   }
 }
 
+/** The active attributes of the level model with a value in the model template, in their order. */
+function modelDataRows(
+  attributes: readonly Attribute[] | undefined,
+  template: ModelTemplate | undefined,
+) {
+  return (attributes ?? []).filter(
+    ({ id, level, active }) =>
+      level === 'model' && active && template?.modelValues[String(id)] !== undefined,
+  );
+}
+
+/** The pick lists whose values the panel "Modelldaten" shows as labels. */
+function modelDataPickListIds(rows: readonly Attribute[], lists: readonly PickList[] | undefined) {
+  const ids = rows.flatMap(({ dataType, pickListId }) =>
+    dataType === 'ports'
+      ? [listIdOf(lists, 'port_type'), listIdOf(lists, 'port_position')]
+      : [pickListId],
+  );
+  return [...new Set(ids.filter((id) => id !== null))];
+}
+
 /**
  * Panel "Modelldaten (nur lesen)": the values of the active attributes of the level model of the
- * chosen model template, in the order of the attributes, without review flag (DER-54-02).
+ * chosen model template, in the order of the attributes, without review flag (DER-54-02). The
+ * page reads the same queries and shows their errors (2.0.7).
  */
 function ModelDataPanel({
   templateId,
@@ -337,10 +367,7 @@ function ModelDataPanel({
   const headingId = useId();
   const template = useModelTemplateQuery(templateId);
   const attributes = useAttributesQuery(deviceTypeId);
-  const rows = (attributes.data?.items ?? []).filter(
-    ({ id, level, active }) =>
-      level === 'model' && active && template.data?.modelValues[String(id)] !== undefined,
-  );
+  const rows = modelDataRows(attributes.data?.items, template.data);
   return (
     <aside
       aria-labelledby={headingId}
@@ -410,6 +437,14 @@ export function DeviceIntakePage() {
     attributesQuery.data?.items.find(({ systemRole }) => systemRole === 'battery')?.pickListId ??
     null;
   const batteryValuesQuery = usePickListValuesQuery(batteryListId);
+  // The reads of the panel "Modelldaten", here for their errors (2.0.7).
+  const templateQuery = useModelTemplateQuery(template?.id ?? null);
+  const modelDataLists = usePickListValuesQueries(
+    modelDataPickListIds(
+      modelDataRows(attributesQuery.data?.items, templateQuery.data),
+      pickLists.data?.items,
+    ),
+  );
   const device: DeviceAttributes | null =
     template === null || attributesQuery.data === undefined
       ? null
@@ -660,6 +695,8 @@ export function DeviceIntakePage() {
     conditions.error,
     attributesQuery.error,
     batteryValuesQuery.error,
+    templateQuery.error,
+    ...modelDataLists.map(({ error }) => error),
     search.error,
   ];
   const unreachable = readErrors.some((error) => error?.kind === 'unreachable');
