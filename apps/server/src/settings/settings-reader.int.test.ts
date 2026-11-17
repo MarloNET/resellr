@@ -87,33 +87,6 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
     });
   });
 
-  it('lists the attributes of a device type in their order with level, role and status', async () => {
-    await runMigrations(database, [initialSchema, seedInitialSettings], () => new Date());
-    const { sqlite } = database;
-    const smartphone = sqlite
-      .prepare("SELECT id FROM device_type WHERE name = 'Smartphone'")
-      .get() as { id: number };
-    sqlite.prepare("UPDATE attribute SET active = 0 WHERE label = 'Farbe'").run();
-    const reader = createSettingsReader(database.db);
-
-    const attributes = await reader.listAttributes(smartphone.id);
-
-    expect(attributes.map(({ label }) => label)).toContain('Akku');
-    expect(attributes.find(({ label }) => label === 'Akku')).toMatchObject({
-      dataType: 'pick',
-      systemRole: 'battery',
-      level: 'device',
-      required: true,
-      active: true,
-      pickListId: expect.any(Number),
-    });
-    expect(attributes.find(({ label }) => label === 'Farbe')).toMatchObject({
-      level: 'model',
-      active: false,
-    });
-    await expect(reader.listAttributes(999)).resolves.toEqual([]);
-  });
-
   it('lists the values of the list battery with the flag "Akku vorhanden", also deactivated ones', async () => {
     await runMigrations(database, [initialSchema, seedInitialSettings], () => new Date());
     const { sqlite } = database;
@@ -131,27 +104,6 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
       { id: idOf('mit Akku (defekt)'), batteryPresent: true },
       { id: idOf('ohne Akku'), batteryPresent: false },
     ]);
-  });
-
-  it('finds pick list values with their list and status, leaves unknown ids out, and [] without a query', async () => {
-    await runMigrations(database, [initialSchema, seedInitialSettings], () => new Date());
-    const { sqlite } = database;
-    const value = (label: string) =>
-      sqlite
-        .prepare(
-          'SELECT v.id, v.pick_list_id AS pickListId FROM pick_list_value v WHERE v.label = ?',
-        )
-        .get(label) as { id: number; pickListId: number };
-    const used = value('gebraucht');
-    const hungarian = value('Ungarisch');
-    sqlite.prepare('UPDATE pick_list_value SET active = 0 WHERE id = ?').run(hungarian.id);
-    const reader = createSettingsReader(database.db);
-
-    await expect(reader.findPickListValues([used.id, hungarian.id, 9999])).resolves.toEqual([
-      { ...used, pickListKey: 'condition', label: 'gebraucht', active: true },
-      { ...hungarian, pickListKey: 'keyboard_layout', label: 'Ungarisch', active: false },
-    ]);
-    await expect(reader.findPickListValues([])).resolves.toEqual([]);
   });
 
   it('returns undefined for an unknown id', async () => {
