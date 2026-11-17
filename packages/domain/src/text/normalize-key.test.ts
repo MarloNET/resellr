@@ -31,6 +31,10 @@ describe('key normalization (E5)', () => {
     expect(toModelNameKey(`Elite ${NFD}`)).toBe(toModelNameKey(`elite${NFC}`));
   });
 
+  it('AC-REQ-011-01 builds the same model name key for "MacBook  pro 13" and "macbook pro 13"', () => {
+    expect(toModelNameKey('MacBook  pro 13')).toBe(toModelNameKey('macbook pro 13'));
+  });
+
   it('keeps different names apart', () => {
     expect(toKey('T14')).not.toBe(toKey('T15'));
     expect(toModelNameKey('T14 Gen 3')).not.toBe(toModelNameKey('T14 Gen 4'));

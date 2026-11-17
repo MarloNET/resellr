@@ -168,6 +168,9 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
+  'confirmation_required.possible_duplicate':
+    'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
@@ -190,6 +193,15 @@ export const ERROR_MESSAGES = {
   'variant_flag_would_merge_listings.flag': (listings: string) =>
     `Änderung nicht möglich: Modell-Inserate ${listings} würden gleiche Variantenangaben haben`,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
+
+/**
+ * Titles of the confirmation dialogs by `confirmation_required.<details.kind>` (8.2); their text
+ * is the `message` of the answer from `ERROR_MESSAGES`.
+ */
+export const CONFIRMATION_TITLES = {
+  /** UI-007.dublette (M-27, REQ-011). */
+  'confirmation_required.possible_duplicate': 'Mögliche Dublette',
+} as const;
 
 /**
  * Usages with a text in `ERROR_MESSAGES` for a code, e.g. `'default'` for `not_found`. A service
