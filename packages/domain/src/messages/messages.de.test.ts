@@ -114,6 +114,22 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('DER-38-11 names the deactivated supplier and condition suggestion of a condition code entry (2.0.6, 8.2, UI-033)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.condition_code']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+    expect(
+      ERROR_MESSAGES['pick_list_value_deactivated.condition_suggestion']('Stark gebraucht'),
+    ).toBe('Vorschlag Zustand Stark gebraucht ist deaktiviert');
+  });
+
+  it('DER-38-12 has the texts of a choice after a rejection for deactivation (2.0.11, 8.2, UI-033)', () => {
+    expect(FIELD_MESSAGES.conditionCodeSupplierNotChosen).toBe(
+      'Lieferant: Lieferanten oder „alle“ wählen',
+    );
+    expect(FIXED_TEXTS.deactivatedChoice('Lieferant West')).toBe('Lieferant West (deaktiviert)');
+  });
+
   it('names the deactivated device type and manufacturer of a model template (2.0.6, 2.0.11, UI-007)', () => {
     expect(ERROR_MESSAGES['device_type_deactivated.model_template']('Monitor')).toBe(
       'Geräteart Monitor ist deaktiviert',

@@ -93,6 +93,11 @@ export const FIELD_MESSAGES = {
    * there is no "Klartext fehlt" (design v0.6.2 O-2, AC-REQ-022-04).
    */
   conditionCodePlainText: 'Klartext: 1 bis 500 Zeichen',
+  /**
+   * UI-033 "Lieferant", "Speichern" while no supplier is chosen after a rejection for
+   * deactivation; only in the browser (2.0.11, design v0.6.8, addendum MAR-929).
+   */
+  conditionCodeSupplierNotChosen: 'Lieferant: Lieferanten oder „alle“ wählen',
   /** UI-026 "Kontaktangaben", longer than 500 characters. */
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-007 "Geräteart" without a choice (Design v0.6.7, Nachtrag MAR-925). */
@@ -185,9 +190,17 @@ export const ERROR_MESSAGES = {
   'name_taken.supplier': 'Name ist bereits vergeben',
   'name_taken.text_block': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
+  /**
+   * UI-033 "Vorschlag Zustand", a new or changed suggestion is deactivated (2.0.11, design
+   * v0.6.8, addendum MAR-929).
+   */
+  'pick_list_value_deactivated.condition_suggestion': (value: string) =>
+    `Vorschlag Zustand ${value} ist deaktiviert`,
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
+  /** UI-033 "Lieferant", a new or changed supplier is deactivated (2.0.11, Nachtrag MAR-904). */
+  'supplier_deactivated.condition_code': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
   /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   'variant_flag_would_merge_listings.flag': (listings: string) =>
@@ -234,6 +247,11 @@ const BACKUP_NOTICE_LINES = {
  * texts of the patterns P-05 to P-08 (design chapter 5).
  */
 export const FIXED_TEXTS = {
+  /**
+   * A stored, deactivated entry in a choice of UI-003, UI-010, UI-014 and UI-033 (2.0.11, design
+   * v0.6.8, addendum MAR-929).
+   */
+  deactivatedChoice: (name: string) => `${name} (deaktiviert)`,
   backupNoticeTitle: 'Sicherung einrichten',
   ...BACKUP_NOTICE_LINES,
   backupNoticeText: (dataDirPath: string) =>

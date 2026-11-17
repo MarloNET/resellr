@@ -2062,19 +2062,193 @@ describe('condition code API (CU-087, Technical Specification 2.2)', () => {
     ]);
   });
 
-  it('answers 404 not_found for an unknown supplier or a suggestion that is not a value of the list Zustand', async () => {
-    const keyboard = (await createValue(KEYBOARD, { label: 'DE', active: true })).json();
+  describe('DER-38-11 supplier and condition suggestion present and active (2.0.11, Nachtrag MAR-904)', () => {
+    const deactivateSupplier = (id: number) =>
+      write('PATCH', `/api/suppliers/${id}`, { version: 1, active: false });
+    const deactivateCondition = (id: number) => patchValue(id, { version: 1, active: false });
 
-    const unknownSupplier = await createCode({ ...DGS, supplierId: 99 });
-    const otherList = await createCode({ ...DGS, suggestedConditionValueId: keyboard.id });
+    it('T6 (c) answers 400 bad_request for an unknown supplier, an unknown condition id and a value of another list; stores and logs nothing', async () => {
+      const keyboard = (await createValue(KEYBOARD, { label: 'DE', active: true })).json();
 
-    for (const response of [unknownSupplier, otherList]) {
-      expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual(
-        errorOf('not_found', 'Dieser Eintrag ist nicht mehr vorhanden.'),
-      );
-    }
-    expect(countCodes()).toBe(0);
+      const unknownSupplier = await createCode({ ...DGS, supplierId: 99 });
+      const unknownCondition = await createCode({ ...DGS, suggestedConditionValueId: 9999 });
+      const otherList = await createCode({ ...DGS, suggestedConditionValueId: keyboard.id });
+
+      for (const response of [unknownSupplier, unknownCondition, otherList]) {
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error.code).toBe('bad_request');
+      }
+      expect(countCodes()).toBe(0);
+      expect(auditRows()).toEqual([]);
+    });
+
+    it('T6 (a) rejects a deactivated supplier with 422 supplier_deactivated at supplierId; stores and logs nothing', async () => {
+      const l1 = await createSupplier('Lieferant West');
+      await deactivateSupplier(l1.id);
+
+      const response = await createCode({ ...DGS, supplierId: l1.id });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toEqual({
+        error: {
+          code: 'supplier_deactivated',
+          message: 'Lieferant Lieferant West ist deaktiviert',
+          fields: [],
+          details: { path: 'supplierId', id: l1.id },
+          referenceNumber: null,
+        },
+      });
+      expect(countCodes()).toBe(0);
+      expect(auditRows()).toEqual([]);
+    });
+
+    it('T6 (b) rejects a deactivated condition suggestion with 422 pick_list_value_deactivated at suggestedConditionValueId; stores and logs nothing', async () => {
+      const worn = await createCondition('Stark gebraucht');
+      await deactivateCondition(worn.id);
+
+      const response = await createCode({ ...DGS, suggestedConditionValueId: worn.id });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toEqual({
+        error: {
+          code: 'pick_list_value_deactivated',
+          message: 'Vorschlag Zustand Stark gebraucht ist deaktiviert',
+          fields: [],
+          details: { path: 'suggestedConditionValueId', id: worn.id },
+          referenceNumber: null,
+        },
+      });
+      expect(countCodes()).toBe(0);
+      expect(auditRows()).toEqual([]);
+    });
+
+    it('T6 reports only supplier_deactivated if supplier and condition suggestion are deactivated', async () => {
+      const l1 = await createSupplier('L1');
+      const worn = await createCondition('Stark gebraucht');
+      await deactivateSupplier(l1.id);
+      await deactivateCondition(worn.id);
+
+      const response = await createCode({
+        ...DGS,
+        supplierId: l1.id,
+        suggestedConditionValueId: worn.id,
+      });
+
+      expect(response.json().error).toMatchObject({
+        code: 'supplier_deactivated',
+        details: { path: 'supplierId', id: l1.id },
+      });
+    });
+
+    it('checks the ids before the active entries: an unknown condition id wins over a deactivated supplier', async () => {
+      const l1 = await createSupplier('L1');
+      await deactivateSupplier(l1.id);
+
+      const response = await createCode({
+        ...DGS,
+        supplierId: l1.id,
+        suggestedConditionValueId: 9999,
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('checks the active entries before the uniqueness of code and supplier', async () => {
+      const l1 = await createSupplier('L1');
+      await createCode({ ...DGS, supplierId: l1.id });
+      await deactivateSupplier(l1.id);
+
+      const response = await createCode({ ...DGS, supplierId: l1.id });
+
+      expect(response.json().error.code).toBe('supplier_deactivated');
+    });
+
+    it('checks version_conflict before a deactivated supplier', async () => {
+      const l1 = await createSupplier('L1');
+      const entry = (await createCode(DGS)).json();
+      await deactivateSupplier(l1.id);
+
+      const response = await patchCode(entry.id, { version: 7, supplierId: l1.id });
+
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('PATCH of only the plain text of an entry with a supplier and suggestion deactivated meanwhile answers 200', async () => {
+      const l1 = await createSupplier('L1');
+      const worn = await createCondition('Stark gebraucht');
+      const entry = (
+        await createCode({ ...DGS, supplierId: l1.id, suggestedConditionValueId: worn.id })
+      ).json();
+      await deactivateSupplier(l1.id);
+      await deactivateCondition(worn.id);
+
+      // UI-033 sends every field; the unchanged supplier and suggestion are not checked.
+      const response = await patchCode(entry.id, {
+        version: 1,
+        code: 'DGS',
+        supplierId: l1.id,
+        plainText: 'Neuer Text',
+        suggestedConditionValueId: worn.id,
+        suggestedVisualGrade: null,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        supplierId: l1.id,
+        plainText: 'Neuer Text',
+        suggestedConditionValueId: worn.id,
+        version: 2,
+      });
+    });
+
+    it('PATCH to a deactivated condition suggestion answers 422 pick_list_value_deactivated and changes nothing', async () => {
+      const good = await createCondition('Gebraucht');
+      const worn = await createCondition('Stark gebraucht');
+      const entry = (await createCode({ ...DGS, suggestedConditionValueId: good.id })).json();
+      await deactivateCondition(worn.id);
+
+      const response = await patchCode(entry.id, {
+        version: 1,
+        suggestedConditionValueId: worn.id,
+      });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'pick_list_value_deactivated',
+        message: 'Vorschlag Zustand Stark gebraucht ist deaktiviert',
+        details: { path: 'suggestedConditionValueId', id: worn.id },
+      });
+      expect((await listCodes()).json().items).toEqual([entry]);
+      expect(auditRows()).toHaveLength(1);
+    });
+
+    it('PATCH to a deactivated or unknown supplier is rejected', async () => {
+      const l1 = await createSupplier('L1');
+      const entry = (await createCode(DGS)).json();
+      await deactivateSupplier(l1.id);
+
+      expect(
+        (await patchCode(entry.id, { version: 1, supplierId: l1.id })).json().error,
+      ).toMatchObject({
+        code: 'supplier_deactivated',
+        details: { path: 'supplierId', id: l1.id },
+      });
+      expect((await patchCode(entry.id, { version: 1, supplierId: 99 })).statusCode).toBe(400);
+      expect((await listCodes()).json().items).toEqual([entry]);
+    });
+
+    it('PATCH to an unknown condition id or a value of another list answers 400 bad_request and changes nothing', async () => {
+      const keyboard = (await createValue(KEYBOARD, { label: 'DE', active: true })).json();
+      const entry = (await createCode(DGS)).json();
+
+      for (const suggestedConditionValueId of [9999, keyboard.id]) {
+        const response = await patchCode(entry.id, { version: 1, suggestedConditionValueId });
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error.code).toBe('bad_request');
+      }
+      expect((await listCodes()).json().items).toEqual([entry]);
+      expect(auditRows()).toHaveLength(1);
+    });
   });
 
   it('changes an entry, keeps the omitted fields and removes a suggestion with null', async () => {
