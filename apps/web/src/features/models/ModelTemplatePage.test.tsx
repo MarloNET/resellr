@@ -1180,6 +1180,35 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
       };
     };
 
+    /**
+     * A list answer: the first call with `before`, the next one stays open until `answer` (items)
+     * or `fail` (500), so a choice is possible while the lists load (Nachtrag MAR-963).
+     */
+    const firstThenHeld = (before: unknown[]) => {
+      let calls = 0;
+      let resolve: (response: Response) => void = () => {};
+      return {
+        route: () => {
+          calls += 1;
+          if (calls === 1) return Response.json({ items: before, total: before.length });
+          return new Promise<Response>((settle) => {
+            resolve = settle;
+          });
+        },
+        held: () => calls === 2,
+        answer: (items: unknown[]) =>
+          act(() => resolve(Response.json({ items, total: items.length }))),
+        fail: () =>
+          act(() =>
+            resolve(
+              Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX6' }), {
+                status: 500,
+              }),
+            ),
+          ),
+      };
+    };
+
     const rejectOnce = (code: string, message: string, path: string, id: number) => {
       let calls = 0;
       return () => {
@@ -1363,20 +1392,27 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     });
 
     it.each([
-      ['T5g', 'device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1],
-      ['T5h', 'manufacturer_deactivated', FUJITSU_DEACTIVATED, 'manufacturerId', 13],
+      ['T5g', 'device_type_deactivated', 'Geräteart', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1],
+      ['T5h', 'manufacturer_deactivated', 'Hersteller', FUJITSU_DEACTIVATED, 'manufacturerId', 13],
     ] as const)(
       'AC-REQ-004-03 AC-REQ-101-02 DER-50-18 %s empties and marks both fields when both entries are deactivated, %s, focus on "Geräteart" (Nachtrag MAR-952)',
-      async (_test, code, message, path, id) => {
+      async (_test, code, rejected, message, path, id) => {
+        const manufacturers = firstThenHeld([LENOVO, FUJITSU]);
         const { sent } = mockApi({
           deviceTypes: firstThen([NOTEBOOK, TABLET], [{ ...NOTEBOOK, active: false }, TABLET]),
-          manufacturers: firstThen([LENOVO, FUJITSU], [LENOVO]),
+          manufacturers: manufacturers.route,
           create: rejectOnce(code, message, path, id),
         });
         await openPage();
         await fill({ manufacturerId: '13' });
 
         fireEvent.click(saveButton());
+
+        // Until the lists are read again, the focus stands at the rejected field (#407).
+        await vi.waitFor(() => expect(errorOf(select(rejected))).toBe(message));
+        await vi.waitFor(() => expect(manufacturers.held()).toBe(true));
+        await vi.waitFor(() => expect(document.activeElement).toBe(select(rejected)));
+        await manufacturers.answer([LENOVO]);
 
         await vi.waitFor(() => expect(select('Hersteller').value).toBe(''));
         // Each field shows what it would send: nothing, never another entry (FIND-946-01).
@@ -1448,6 +1484,124 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
         expect((sent[1] as Record<string, unknown>)[otherPath]).toBe(Number(kept[0]));
       },
     );
+
+    it('DER-50-18 T5j empties and marks a manufacturer chosen while the lists load when it is missing in the new list, focus on "Geräteart" after the reload (Nachtrag MAR-963)', async () => {
+      const manufacturers = firstThenHeld([LENOVO, FUJITSU]);
+      const { sent } = mockApi({
+        deviceTypes: firstThen([NOTEBOOK, TABLET], [{ ...NOTEBOOK, active: false }, TABLET]),
+        manufacturers: manufacturers.route,
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
+      });
+      await openPage();
+      await fill({ manufacturerId: '13' });
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED));
+      await vi.waitFor(() => expect(manufacturers.held()).toBe(true));
+      // The user chooses "Lenovo" while the lists load; another window has deactivated it.
+      select('Hersteller').focus();
+      fireEvent.change(select('Hersteller'), { target: { value: '11' } });
+      await manufacturers.answer([manufacturer(11, 'Lenovo', false), FUJITSU]);
+
+      await vi.waitFor(() => expect(select('Hersteller').value).toBe(''));
+      expect(shownText(select('Hersteller'))).toBe(PLACEHOLDER);
+      expect(errorOf(select('Hersteller'))).toBe('Hersteller Lenovo ist deaktiviert');
+      expect(select('Geräteart').value).toBe('');
+      expect(shownText(select('Geräteart'))).toBe(PLACEHOLDER);
+      expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED);
+      await vi.waitFor(() => expect(document.activeElement).toBe(select('Geräteart')));
+      expectAccessiblePage();
+
+      // The text stays at the second field when it is left without a choice.
+      fireEvent.blur(select('Hersteller'));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(errorOf(select('Hersteller'))).toBe('Hersteller Lenovo ist deaktiviert');
+
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(errorOf(select('Hersteller'))).toBe('Hersteller fehlt'));
+      expect(sent).toHaveLength(1);
+    });
+
+    it('DER-50-18 T5k keeps a manufacturer chosen while the lists load when it is active in the new list, without a text (Nachtrag MAR-963)', async () => {
+      const manufacturers = firstThenHeld([LENOVO, FUJITSU]);
+      mockApi({
+        deviceTypes: firstThen([NOTEBOOK, TABLET], [{ ...NOTEBOOK, active: false }, TABLET]),
+        manufacturers: manufacturers.route,
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
+      });
+      await openPage();
+      await fill({ manufacturerId: '13' });
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(manufacturers.held()).toBe(true));
+      fireEvent.change(select('Hersteller'), { target: { value: '11' } });
+      await manufacturers.answer([LENOVO, FUJITSU]);
+
+      await vi.waitFor(() => expect(select('Geräteart').value).toBe(''));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect([select('Hersteller').value, shownText(select('Hersteller'))]).toEqual([
+        '11',
+        'Lenovo',
+      ]);
+      expect(errorOf(select('Hersteller'))).toBeNull();
+      expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED);
+    });
+
+    it('DER-50-18 T5l empties the rejected device type chosen again while the lists load and never sends it (Nachtrag MAR-963)', async () => {
+      const deviceTypes = firstThenHeld([NOTEBOOK, TABLET]);
+      const { sent } = mockApi({
+        deviceTypes: deviceTypes.route,
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
+      });
+      await openPage();
+      await fill();
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(deviceTypes.held()).toBe(true));
+      // The user switches to "Tablet" and back to the rejected "Notebook" while the lists load.
+      fireEvent.change(select('Geräteart'), { target: { value: '3' } });
+      fireEvent.change(select('Geräteart'), { target: { value: '1' } });
+      expect(errorOf(select('Geräteart'))).toBeNull();
+      await deviceTypes.answer([{ ...NOTEBOOK, active: false }, TABLET]);
+
+      await vi.waitFor(() => expect(select('Geräteart').value).toBe(''));
+      expect(shownText(select('Geräteart'))).toBe(PLACEHOLDER);
+      expect(errorOf(select('Geräteart'))).toBe(NOTEBOOK_DEACTIVATED);
+      expect(optionTexts(select('Geräteart'))).toEqual([PLACEHOLDER, 'Tablet']);
+
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe('Geräteart fehlt'));
+      expect(sent).toHaveLength(1);
+    });
+
+    it('DER-50-18 T5m keeps another device type chosen while the lists load when reloading fails and drops the rejected entry (Nachtrag MAR-963)', async () => {
+      const deviceTypes = firstThenHeld([NOTEBOOK, TABLET]);
+      const { sent } = mockApi({
+        deviceTypes: deviceTypes.route,
+        create: rejectOnce('device_type_deactivated', NOTEBOOK_DEACTIVATED, 'deviceTypeId', 1),
+      });
+      await openPage();
+      await fill();
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(deviceTypes.held()).toBe(true));
+      fireEvent.change(select('Geräteart'), { target: { value: '3' } });
+      await deviceTypes.fail();
+
+      await vi.waitFor(() =>
+        expect(Array.from(select('Geräteart').options, ({ value }) => value)).not.toContain('1'),
+      );
+      expect([select('Geräteart').value, shownText(select('Geräteart'))]).toEqual(['3', 'Tablet']);
+      expect(errorOf(select('Geräteart'))).toBeNull();
+
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(sent).toHaveLength(2));
+      expect(sent[1]).toMatchObject({ deviceTypeId: 3, manufacturerId: 11 });
+    });
 
     it('DER-50-18 locks the save while the choices are read again after a rejection (FIND-397-06)', async () => {
       let deviceTypeCalls = 0;

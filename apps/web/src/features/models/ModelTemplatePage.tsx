@@ -139,6 +139,8 @@ const isField = (path: string) =>
 /** The choices whose entry the server can reject as deactivated (2.0.11), in form order. */
 const CHOICE_FIELDS = ['deviceTypeId', 'manufacturerId'] as const;
 type ChoiceField = (typeof CHOICE_FIELDS)[number];
+const isChoiceField = (path: string): path is ChoiceField =>
+  (CHOICE_FIELDS as readonly string[]).includes(path);
 
 /** Texts of a deactivated entry at its choice in UI-007 (CU-012, `.model_template`). */
 const DEACTIVATED_TEXTS: Readonly<Record<ChoiceField, (name: string) => string>> = {
@@ -486,7 +488,7 @@ export function ModelTemplatePage() {
     ) {
       showFieldErrors({ [path]: error.error?.message });
       setRejectionShown({ [path]: true });
-      if (typeof id === 'number' && draft !== null) void reloadAfterRejection(path, id, draft);
+      if (typeof id === 'number') void reloadAfterRejection(path, id);
       return;
     }
     // The question comes only if the save would succeed otherwise (2.4 "Prüfreihenfolge").
@@ -504,8 +506,10 @@ export function ModelTemplatePage() {
    * Nachtrag MAR-925). The server names only the first deactivated entry, so the other choice is
    * checked against its new list as well and emptied with its own text when its entry is missing
    * there; if its read fails, it keeps its entry (2.4 "Beide Felder prüfen", Nachtrag MAR-952).
+   * Checked is the input at the end of the reload, so a choice made while the lists load is
+   * checked like any other (2.4 "Wahl während des Neuladens", Nachtrag MAR-963).
    */
-  async function reloadAfterRejection(rejected: string, id: number, sent: Draft) {
+  async function reloadAfterRejection(rejected: string, id: number) {
     setReloading(true);
     const before = { deviceTypeId: deviceTypes.data, manufacturerId: manufacturers.data };
     const valueKey = queryKeys.settings.pickListValues(0).slice(0, -1);
@@ -520,25 +524,25 @@ export function ModelTemplatePage() {
       queryClient.refetchQueries({ queryKey: valueKey }),
     ]);
     const reloaded = { deviceTypeId: types, manufacturerId: makers };
+    // Without a new list the rejected entry is no longer offered, whatever is chosen now.
+    if (isChoiceField(rejected) && reloaded[rejected].isError) {
+      setDropped((previous) => ({ ...previous, [rejected]: id }));
+    }
 
     const emptied: Partial<Record<ChoiceField, null>> = {};
     const texts: FieldErrors = {};
     for (const field of CHOICE_FIELDS) {
-      const value = field === rejected ? id : sent[field];
-      // A choice made while the lists load is the user's new choice and stays.
-      if (value === null || draftRef.current?.[field] !== value) continue;
+      const value = draftRef.current?.[field] ?? null;
+      if (value === null) continue;
       const result = reloaded[field];
       const missing = result.isError
-        ? field === rejected
+        ? field === rejected && value === id
         : !result.data?.items.some((entry) => entry.id === value && entry.active);
       if (!missing) continue;
+      // Emptied with the text of its use, also when the rejected entry was chosen again.
       emptied[field] = null;
-      if (field === rejected) {
-        if (result.isError) setDropped((previous) => ({ ...previous, [field]: id }));
-      } else {
-        const name = before[field]?.items.find((entry) => entry.id === value)?.name ?? '';
-        texts[field] = DEACTIVATED_TEXTS[field](name);
-      }
+      const name = before[field]?.items.find((entry) => entry.id === value)?.name ?? '';
+      texts[field] = DEACTIVATED_TEXTS[field](name);
     }
 
     // Without the device type its attribute inputs go (2.4 "Abhängige Eingaben").
