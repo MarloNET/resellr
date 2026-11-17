@@ -212,10 +212,10 @@ export const ERROR_MESSAGES = {
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
-  /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
-  'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   /** UI-033 "Lieferant", a new or changed supplier is deactivated (2.0.11, Nachtrag MAR-904). */
   'supplier_deactivated.condition_code': (name: string) => `Lieferant ${name} ist deaktiviert`,
+  /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
+  'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
   /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   'variant_flag_would_merge_listings.flag': (listings: string) =>

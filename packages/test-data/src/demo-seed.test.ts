@@ -7,6 +7,7 @@ import {
   type DemoApi,
   SEED_AREAS,
   seedDatasheetLayout,
+  seedDevices,
   seedDeviceTypes,
   seedDemoData,
   seedManufacturers,
@@ -117,7 +118,7 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout, then S3 model templates', () => {
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout, S3 model templates, then S4 devices', () => {
     expect(SEED_AREAS).toEqual([
       seedDeviceTypes,
       seedSuppliers,
@@ -126,7 +127,152 @@ describe('seedDemoData', () => {
       seedTextBlocks,
       seedDatasheetLayout,
       seedModelTemplates,
+      seedDevices,
     ]);
+  });
+
+  it('captures the demo devices through POST /api/devices with the ids of model template, supplier, condition and pick list values', async () => {
+    const requests: unknown[][] = [];
+    const attributes = [
+      { id: 14, label: 'RAM', pickListId: null },
+      { id: 15, label: 'Speicherkapazität', pickListId: null },
+      { id: 16, label: 'Tastaturlayout', pickListId: 11 },
+      { id: 13, label: 'Betriebssystem', pickListId: 13 },
+      { id: 17, label: 'Netzteil', pickListId: 12 },
+      { id: 18, label: 'Akku', pickListId: 10 },
+      { id: 19, label: 'Akkukapazität', pickListId: null },
+    ];
+    const lists: Record<string, unknown> = {
+      '/api/model-templates?limit=200': {
+        items: [
+          { id: 1, modelName: 'ThinkPad E15 Gen 2', deviceType: { id: 1 } },
+          { id: 2, modelName: 'ThinkPad T14 Gen 2', deviceType: { id: 1 } },
+          { id: 3, modelName: 'EliteBook 840 G8', deviceType: { id: 1 } },
+        ],
+      },
+      '/api/suppliers?limit=200': {
+        items: [
+          { id: 4, name: 'Lieferant A' },
+          { id: 5, name: 'Lieferant B' },
+        ],
+      },
+      '/api/pick-lists?limit=200': {
+        items: [
+          { id: 1, key: 'condition' },
+          { id: 10, key: 'battery' },
+        ],
+      },
+      '/api/pick-lists/1/values?limit=200': {
+        items: [
+          { id: 21, label: 'gebraucht' },
+          { id: 22, label: 'defekt' },
+        ],
+      },
+      '/api/device-types/1/attributes': { items: attributes },
+      '/api/pick-lists/10/values?limit=200': {
+        items: [
+          { id: 101, label: 'mit Akku' },
+          { id: 102, label: 'mit Akku (defekt)' },
+          { id: 103, label: 'ohne Akku' },
+        ],
+      },
+      '/api/pick-lists/11/values?limit=200': {
+        items: [
+          { id: 111, label: 'Deutsch (QWERTZ)' },
+          { id: 112, label: 'Englisch (QWERTY, US)' },
+        ],
+      },
+      '/api/pick-lists/13/values?limit=200': {
+        items: [
+          { id: 131, label: 'Windows 11 Pro' },
+          { id: 132, label: 'Windows 11 Home' },
+          { id: 133, label: 'Windows 10 Pro' },
+        ],
+      },
+      '/api/pick-lists/12/values?limit=200': {
+        items: [
+          { id: 121, label: 'mit Netzteil (original)' },
+          { id: 122, label: 'mit Netzteil (nicht original)' },
+          { id: 123, label: 'ohne Netzteil' },
+        ],
+      },
+    };
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (method: string, path: string, body?: unknown) => {
+        if (method !== 'GET') requests.push([method, path, body]);
+        return (method === 'GET' ? lists[path] : { id: requests.length }) as never;
+      },
+    };
+
+    await seedDevices(recording);
+
+    expect(requests).toEqual([
+      [
+        'POST',
+        '/api/devices',
+        {
+          wiNr: '626198',
+          supplierId: 4,
+          modelTemplateId: 2,
+          conditionValueId: 21,
+          visualGrade: 2,
+          conditionDescription: 'Leichte Gebrauchsspuren am Deckel',
+          values: { 13: 131, 14: 16, 15: 512, 16: 111, 17: 121, 18: 101, 19: { percent: 87 } },
+          confirmedKeys: [],
+        },
+      ],
+      [
+        'POST',
+        '/api/devices',
+        {
+          wiNr: 'A637607',
+          supplierId: null,
+          modelTemplateId: 1,
+          conditionValueId: 21,
+          visualGrade: 3,
+          conditionDescription: '',
+          values: { 13: 133, 14: 8, 15: 256, 16: 111, 17: 123, 18: 103 },
+          confirmedKeys: [],
+        },
+      ],
+      [
+        'POST',
+        '/api/devices',
+        {
+          wiNr: '626199',
+          supplierId: 5,
+          modelTemplateId: 3,
+          conditionValueId: 22,
+          visualGrade: 4,
+          conditionDescription: 'Display mit Pixelfehlern',
+          values: {
+            13: 132,
+            14: 16,
+            15: 512,
+            16: 112,
+            17: 122,
+            18: 102,
+            19: { notDeterminable: true },
+          },
+          confirmedKeys: [],
+        },
+      ],
+    ]);
+  });
+
+  it('stops with the name when a demo model template is missing', async () => {
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (_method: string, path: string) =>
+        (path === '/api/pick-lists?limit=200'
+          ? { items: [{ id: 1, key: 'condition' }] }
+          : { items: [] }) as never,
+    };
+
+    await expect(seedDevices(recording)).rejects.toThrow(
+      'Demo data: ThinkPad T14 Gen 2 is missing',
+    );
   });
 
   it('creates the demo model templates through POST /api/model-templates with the ids of device type and manufacturer', async () => {

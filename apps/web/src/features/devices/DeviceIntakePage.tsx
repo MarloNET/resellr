@@ -2,6 +2,7 @@ import { formatNumber, formatWithUnit, formatYesNo } from '@resellr/domain/forma
 import { ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
 import type { PortEntry } from '@resellr/domain/schemas/attribute-values.schema';
+import type { BatteryValueFlag } from '@resellr/domain/schemas/pick-list.schema';
 import { type DeviceCreateInput, deviceCreateSchema } from '@resellr/domain/schemas/device.schema';
 import {
   type ModelTemplateListItem,
@@ -20,6 +21,16 @@ import {
   useSuppliersQuery,
 } from '../../api/settings.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
+import {
+  AttributeFieldsForm,
+  type AttributeInputs,
+  attributeRequestValues,
+  attributesOfLevel,
+} from '../../components/forms/AttributeFieldsForm.tsx';
+import {
+  type AttributeInputValue,
+  emptyAttributeInput,
+} from '../../components/forms/AttributeInput.tsx';
 import { type ChoiceItem, findMissingChoices } from '../../components/forms/deactivated-choice.ts';
 import {
   FormField,
@@ -71,7 +82,7 @@ const TEXTS = {
 /** Wait after the last keystroke before the model templates are searched (as in UI-006). */
 const SEARCH_DELAY_MS = 300;
 
-/** The fields of the form in form order (DER-54-01); the values of the attributes follow. */
+/** The fixed fields of the form in form order (DER-54-01); the values of the attributes follow. */
 const FIELDS = [
   'wiNr',
   'supplierId',
@@ -91,6 +102,8 @@ interface Draft {
   conditionValueId: number | null;
   visualGrade: string;
   conditionDescription: string;
+  /** Inputs of the attributes of the level device by attribute id (CU-111). */
+  values: AttributeInputs;
 }
 
 const EMPTY_DRAFT: Draft = {
@@ -100,20 +113,61 @@ const EMPTY_DRAFT: Draft = {
   conditionValueId: null,
   visualGrade: '',
   conditionDescription: '',
+  values: {},
 };
 
+/** The path of the value of an attribute in the request and its field errors (2.0.5). */
+const valuePath = (attributeId: number) => `values.${attributeId}`;
+
+/** The attributes of the device type with their values of the list battery, as the form uses them. */
+interface DeviceAttributes {
+  attributes: readonly Attribute[];
+  batteryValues: readonly BatteryValueFlag[];
+}
+
 /**
- * Request body of `POST /api/devices`: every field, nothing chosen as `null`. The values of the
- * attributes of the level device come with the attribute fields (CU-111, #178).
+ * Whether the field "Akkukapazität" shows: only while the chosen value of the active attribute
+ * with the role `battery` carries "Akku vorhanden" (UI-003 "Eingaben", 2.5, FIND-353).
  */
-const bodyOf = (draft: Draft): DeviceCreateInput => ({
+function batteryCapacityShown(
+  { attributes, batteryValues }: DeviceAttributes,
+  values: AttributeInputs,
+): boolean {
+  const battery = attributesOfLevel(attributes, 'device').find(
+    ({ systemRole }) => systemRole === 'battery',
+  );
+  const chosen = battery === undefined ? undefined : values[String(battery.id)];
+  return batteryValues.some(({ id, batteryPresent }) => id === chosen && batteryPresent === true);
+}
+
+/**
+ * The attributes of the level device the form asks for, in their order: the active ones, the
+ * battery capacity only while the battery value carries "Akku vorhanden" and then required with
+ * "*" (DER-54-01, UI-003 "Eingaben"; the schema of CU-067 checks it from the battery value).
+ */
+function shownAttributes(device: DeviceAttributes, values: AttributeInputs): Attribute[] {
+  const withCapacity = batteryCapacityShown(device, values);
+  return attributesOfLevel(device.attributes, 'device').flatMap((attribute) => {
+    if (attribute.systemRole !== 'battery_capacity') return [attribute];
+    return withCapacity ? [{ ...attribute, required: true }] : [];
+  });
+}
+
+/**
+ * Request body of `POST /api/devices`: every field, nothing chosen as `null`, and every attribute
+ * the form asks for (2.0.5 rule (2)); without the field "Akkukapazität" no value of it (2.5).
+ */
+const bodyOf = (draft: Draft, device: DeviceAttributes | null): DeviceCreateInput => ({
   wiNr: draft.wiNr,
   supplierId: draft.supplierId,
   modelTemplateId: draft.modelTemplate?.id ?? null,
   conditionValueId: draft.conditionValueId,
   visualGrade: draft.visualGrade,
   conditionDescription: draft.conditionDescription,
-  values: {},
+  values:
+    device === null
+      ? {}
+      : attributeRequestValues(shownAttributes(device, draft.values), 'device', draft.values),
   confirmedKeys: [],
 });
 
@@ -125,12 +179,16 @@ const isDeviceValue = (path: string) =>
   path.startsWith('values.');
 
 /**
- * Field errors of the check in the browser, the same schema as on the server (2.0.7); without a
+ * Field errors of the check in the browser, the same schema as on the server (2.0.7): with the
+ * attributes of the device type and the values of the list battery once they are read; without a
  * model template only those of the fields shown.
  */
-function checkAll(draft: Draft): FieldErrors {
+function checkAll(draft: Draft, device: DeviceAttributes | null): FieldErrors {
   const errors: FieldErrors = {};
-  for (const issue of deviceCreateSchema(null).safeParse(bodyOf(draft)).error?.issues ?? []) {
+  const schema = deviceCreateSchema(device?.attributes ?? null, {
+    batteryValues: device?.batteryValues,
+  });
+  for (const issue of schema.safeParse(bodyOf(draft, device)).error?.issues ?? []) {
     const path = issue.path.join('.');
     if (draft.modelTemplate === null && isDeviceValue(path)) continue;
     errors[path] ??= issue.message;
@@ -138,20 +196,42 @@ function checkAll(draft: Draft): FieldErrors {
   return errors;
 }
 
-/** Errors in form order: the fixed fields, then the values (2.0.5 "Fehlerzusammenfassung"). */
-function inFormOrder(errors: FieldErrors): [string, ReactNode][] {
+/**
+ * Errors in form order: the fixed fields, then the values in the order of the attributes (2.0.5
+ * "Fehlerzusammenfassung").
+ */
+function inFormOrder(
+  errors: FieldErrors,
+  attributes: readonly Attribute[] = [],
+): [string, ReactNode][] {
+  const paths = [...FIELDS, ...attributes.map(({ id }) => valuePath(id))];
   const order = (path: string) => {
-    const index = (FIELDS as readonly string[]).indexOf(path);
-    return index === -1 ? FIELDS.length : index;
+    const index = paths.indexOf(path);
+    return index === -1 ? paths.length : index;
   };
   return Object.entries(errors)
     .filter(([, error]) => Boolean(error))
     .sort(([a], [b]) => order(a) - order(b));
 }
 
-/** The input of a field, to see whether it changed since the server answered. */
-const fieldValue = (draft: Draft, field: Field) =>
-  field === 'modelTemplateId' ? draft.modelTemplate?.id : draft[field];
+/** The input of a field or `values.<id>`, to see whether it changed since the server answered. */
+function fieldValue(draft: Draft, path: string): unknown {
+  if (path === 'modelTemplateId') return draft.modelTemplate?.id;
+  if (path.startsWith('values.')) return draft.values[path.slice('values.'.length)];
+  return draft[path as Exclude<Field, 'modelTemplateId'>];
+}
+
+/** The field errors of the attribute fields by attribute id, as CU-111 shows them. */
+function attributeErrors(errors: FieldErrors): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(errors)
+      .filter(([path, error]) => path.startsWith('values.') && typeof error === 'string')
+      .map(([path, error]) => [path.slice('values.'.length), error as string]),
+  );
+}
+
+/** No pick list value is dropped in UI-003 yet; the choice after a rejection follows with #190. */
+const NO_DROPPED_VALUES: ReadonlySet<number> = new Set();
 
 const optionValue = (id: number | null) => (id === null ? '' : String(id));
 const idOf = (value: string) => (value === '' ? null : Number(value));
@@ -298,9 +378,10 @@ const TEXT_AREA_CLASS = cn(
  * und zuordnen" (Ctrl+Enter). States: default (focus in WI-Nr), validation with the error summary
  * at the top and `wi_nr_taken` at the WI-Nr, success, error, ausgang-unbekannt (P-08), conflict
  * (P-05), unreachable (P-06) for the reads and wird-beendet (P-07). After
- * `supplier_deactivated` the supplier is emptied with its text (2.0.11, design v0.6.8). The
- * attribute fields (#178), the condition code (#193), prefill and review flags (#188), the draft
- * for UI-007 (#186) and the dialog UI-004 (#189) follow.
+ * `supplier_deactivated` the supplier is emptied with its text (2.0.11, design v0.6.8). The card
+ * "Gerätewerte" holds a field per attribute of the level device (CU-111), the battery capacity
+ * only while the battery value carries "Akku vorhanden". The condition code (#193), prefill and
+ * review flags (#188), the draft for UI-007 (#186) and the dialog UI-004 (#189) follow.
  */
 export function DeviceIntakePage() {
   const suppliers = useSuppliersQuery();
@@ -314,6 +395,25 @@ export function DeviceIntakePage() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const template = draft.modelTemplate;
+
+  // The attributes of the device type of the model template and the values of the list battery,
+  // for the fields of the card "Gerätewerte" and the rule of the battery capacity (2.5).
+  const attributesQuery = useAttributesQuery(template?.deviceType.id ?? null);
+  const batteryListId =
+    attributesQuery.data?.items.find(({ systemRole }) => systemRole === 'battery')?.pickListId ??
+    null;
+  const batteryValuesQuery = usePickListValuesQuery(batteryListId);
+  const device: DeviceAttributes | null =
+    template === null || attributesQuery.data === undefined
+      ? null
+      : {
+          attributes: attributesQuery.data.items,
+          batteryValues: batteryValuesQuery.data?.items ?? [],
+        };
+  const deviceRef = useRef(device);
+  deviceRef.current = device;
+  const attributeFields = device === null ? [] : shownAttributes(device, draft.values);
   const [errors, setErrors] = useState<FieldErrors>({});
   // The error summary shows after a save, built from the field errors still shown (2.0.5).
   const [summaryShown, setSummaryShown] = useState(false);
@@ -364,14 +464,44 @@ export function DeviceIntakePage() {
     setErrors((previous) => ({ ...previous, [path]: error }));
   }
 
-  function checkOnBlur(field: Field) {
-    if (field === 'supplierId' && supplierRejected) return;
+  /** Checks the field `path` (a fixed field or `values.<id>`) on leaving it. */
+  function checkOnBlur(path: string) {
+    if (path === 'supplierId' && supplierRejected) return;
     const current = draftRef.current;
     // An error of the server (e.g. `wi_nr_taken`) the browser cannot check stays until the
     // value changes.
     const answered = answeredDraftRef.current;
-    if (answered !== null && fieldValue(answered, field) === fieldValue(current, field)) return;
-    blurCheck.checkOnBlur(() => setError(field, checkAll(current)[field]));
+    if (answered !== null && fieldValue(answered, path) === fieldValue(current, path)) return;
+    blurCheck.checkOnBlur(() => setError(path, checkAll(current, deviceRef.current)[path]));
+  }
+
+  /**
+   * The input of an attribute. When the field "Akkukapazität" goes with the battery value, its
+   * value and error go with it, so it shows empty when it appears again (2.0.11, 2.5).
+   */
+  function changeAttribute(attributeId: number, input: AttributeInputValue) {
+    const values: Record<string, AttributeInputValue> = {
+      ...draftRef.current.values,
+      [attributeId]: input,
+    };
+    const capacity =
+      device === null
+        ? undefined
+        : attributesOfLevel(device.attributes, 'device').find(
+            ({ systemRole }) => systemRole === 'battery_capacity',
+          );
+    if (capacity !== undefined && device !== null && !batteryCapacityShown(device, values)) {
+      values[String(capacity.id)] = emptyAttributeInput(capacity);
+      setError(valuePath(capacity.id), undefined);
+    }
+    change({ values });
+  }
+
+  /** The values of the attributes and their errors go with the model template (DER-54-01). */
+  function withoutValueErrors(previous: FieldErrors): FieldErrors {
+    return Object.fromEntries(
+      Object.entries(previous).filter(([path]) => !path.startsWith('values.')),
+    );
   }
 
   function chooseSupplier(value: string) {
@@ -380,9 +510,9 @@ export function DeviceIntakePage() {
     setSupplierRejected(false);
   }
 
-  function chooseTemplate(template: ModelTemplateListItem) {
-    change({ modelTemplate: template });
-    setError('modelTemplateId', undefined);
+  function chooseTemplate(chosen: ModelTemplateListItem) {
+    change({ modelTemplate: chosen, values: {} });
+    setErrors((previous) => ({ ...withoutValueErrors(previous), modelTemplateId: undefined }));
     setSearchInput('');
     setSearchTerm(undefined);
   }
@@ -484,7 +614,7 @@ export function DeviceIntakePage() {
     blurCheck.cancel();
     if (!canSave) return;
     const current = draftRef.current;
-    const found = checkAll(current);
+    const found = checkAll(current, deviceRef.current);
     answeredDraftRef.current = null;
     setSupplierRejected(false);
     if (inFormOrder(found).length > 0) {
@@ -494,7 +624,7 @@ export function DeviceIntakePage() {
     setErrors({});
     setSummaryShown(false);
     setNotice(null);
-    createMutation.mutate(bodyOf(current), {
+    createMutation.mutate(bodyOf(current, deviceRef.current), {
       onSuccess: (device) => {
         setSavedWiNr(device.wiNr);
         setNotice({ kind: 'success' });
@@ -518,11 +648,20 @@ export function DeviceIntakePage() {
   }, []);
 
   // A failed read shows P-06 or the error banner; the inputs stay (2.0.7).
-  const readErrors = [suppliers.error, pickLists.error, conditions.error, search.error];
+  const readErrors = [
+    suppliers.error,
+    pickLists.error,
+    conditions.error,
+    attributesQuery.error,
+    batteryValuesQuery.error,
+    search.error,
+  ];
   const unreachable = readErrors.some((error) => error?.kind === 'unreachable');
   const readFailed = readErrors.find((error) => error !== null && error.kind !== 'unreachable');
-  const summary = summaryShown ? inFormOrder(errors) : [];
-  const template = draft.modelTemplate;
+  const summary = summaryShown ? inFormOrder(errors, attributeFields) : [];
+  const valuesLoading =
+    (conditions.isPending && conditionListId !== null) ||
+    (attributesQuery.isPending && attributesQuery.error === null);
 
   return (
     <div className="flex h-full flex-col">
@@ -667,7 +806,10 @@ export function DeviceIntakePage() {
                     type="button"
                     className="cursor-pointer self-start text-body text-primary"
                     disabled={saving}
-                    onClick={() => change({ modelTemplate: null })}
+                    onClick={() => {
+                      change({ modelTemplate: null, values: {} });
+                      setErrors(withoutValueErrors);
+                    }}
                   >
                     {TEXTS.otherModelTemplate}
                   </button>
@@ -678,7 +820,7 @@ export function DeviceIntakePage() {
             {template !== null && (
               <section aria-label={TEXTS.deviceValues} className={CARD}>
                 <h2 className={CARD_HEADING}>{TEXTS.deviceValues}</h2>
-                {conditions.isPending && conditionListId !== null ? (
+                {valuesLoading ? (
                   <p role="status" className="m-0 text-body text-text-secondary">
                     {TEXTS.loadingValues}
                   </p>
@@ -738,6 +880,21 @@ export function DeviceIntakePage() {
                         />
                       )}
                     </FormField>
+                    {device !== null && (
+                      <div className="grid grid-cols-1 gap-4 full:grid-cols-3">
+                        <AttributeFieldsForm
+                          attributes={attributeFields}
+                          level="device"
+                          inputs={draft.values}
+                          errors={attributeErrors(errors)}
+                          withRequired
+                          dropped={NO_DROPPED_VALUES}
+                          disabled={saving}
+                          onChange={changeAttribute}
+                          onBlur={(attributeId) => checkOnBlur(valuePath(attributeId))}
+                        />
+                      </div>
+                    )}
                   </>
                 )}
               </section>

@@ -7,7 +7,7 @@ import { createQueryClient } from '../../app/query-client.ts';
 import { routes } from '../../app/router.tsx';
 
 // Component tests of UI-003 "Gerät einbuchen" (CU-132) with a mocked `fetch` (Technical
-// Specification 6.1, 6.2). The attribute fields of the level device follow with #178.
+// Specification 6.1, 6.2), with the attributes of the device type Notebook of the start data.
 
 const OPS_STATUS = {
   dataDirPath: 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten',
@@ -23,18 +23,29 @@ const PICK_LISTS = [
   { id: 1, key: 'condition', name: 'Zustand', isBatteryList: false, version: 1 },
   { id: 8, key: 'port_type', name: 'Anschlusstyp', isBatteryList: false, version: 1 },
   { id: 9, key: 'port_position', name: 'Anschlussposition', isBatteryList: false, version: 1 },
+  { id: 10, key: 'battery', name: 'Akku', isBatteryList: true, version: 1 },
+  { id: 11, key: 'keyboard_layout', name: 'Tastaturlayout', isBatteryList: false, version: 1 },
+  { id: 12, key: 'power_supply', name: 'Netzteil', isBatteryList: false, version: 1 },
 ];
-const value = (id: number, label: string, active = true, sortOrder = id) => ({
-  id,
-  label,
-  active,
-  batteryPresent: null,
-  sortOrder,
-  version: 1,
-});
+const value = (
+  id: number,
+  label: string,
+  active = true,
+  sortOrder = id,
+  batteryPresent: boolean | null = null,
+) => ({ id, label, active, batteryPresent, sortOrder, version: 1 });
 const CONDITIONS = [value(1, 'gebraucht'), value(2, 'refurbished', false), value(3, 'defekt')];
 const PORT_TYPES = [value(81, 'USB-C')];
 const PORT_POSITIONS = [value(91, 'links')];
+const WITH_BATTERY = 101;
+const WITHOUT_BATTERY = 103;
+const BATTERIES = [
+  value(WITH_BATTERY, 'mit Akku', true, 1, true),
+  value(102, 'mit Akku (defekt)', true, 2, true),
+  value(WITHOUT_BATTERY, 'ohne Akku', true, 3, false),
+];
+const KEYBOARD_LAYOUTS = [value(111, 'Deutsch (QWERTZ)')];
+const POWER_SUPPLIES = [value(121, 'mit Netzteil (original)')];
 
 const MV_A = {
   id: 7,
@@ -69,7 +80,48 @@ const ATTRIBUTES = [
   attribute({ id: 20, label: 'Displaygröße', dataType: 'decimal', unit: 'Zoll', sortOrder: 2 }),
   attribute({ id: 22, label: 'Anschlüsse', dataType: 'ports', sortOrder: 3 }),
   attribute({ id: 21, label: 'Farbe', dataType: 'text', active: false, sortOrder: 4 }),
-  attribute({ id: 18, label: 'Akku', dataType: 'pick', level: 'device', sortOrder: 5 }),
+  // The attributes of the level device of a Notebook (start data, Requirements 9.3).
+  attribute({
+    id: 16,
+    label: 'Tastaturlayout',
+    dataType: 'pick',
+    systemRole: 'keyboard_layout',
+    pickListId: 11,
+    level: 'device',
+    required: true,
+    sortOrder: 5,
+  }),
+  attribute({
+    id: 17,
+    label: 'Netzteil',
+    dataType: 'pick',
+    systemRole: 'power_supply',
+    pickListId: 12,
+    level: 'device',
+    required: true,
+    sortOrder: 6,
+  }),
+  attribute({
+    id: 18,
+    label: 'Akku',
+    dataType: 'pick',
+    systemRole: 'battery',
+    pickListId: 10,
+    level: 'device',
+    required: true,
+    sortOrder: 7,
+  }),
+  attribute({
+    id: 19,
+    label: 'Akkukapazität',
+    dataType: 'integer',
+    systemRole: 'battery_capacity',
+    unit: '%',
+    minValue: '0',
+    maxValue: '100',
+    level: 'device',
+    sortOrder: 8,
+  }),
 ];
 const MODEL_TEMPLATE = {
   id: 7,
@@ -156,6 +208,9 @@ function mockApi({
     if (route === 'GET /api/pick-lists/1/values') return list(CONDITIONS);
     if (route === 'GET /api/pick-lists/8/values') return list(PORT_TYPES);
     if (route === 'GET /api/pick-lists/9/values') return list(PORT_POSITIONS);
+    if (route === 'GET /api/pick-lists/10/values') return list(BATTERIES);
+    if (route === 'GET /api/pick-lists/11/values') return list(KEYBOARD_LAYOUTS);
+    if (route === 'GET /api/pick-lists/12/values') return list(POWER_SUPPLIES);
     if (route === 'GET /api/model-templates') return search(init);
     if (route === 'GET /api/model-templates/7') return Response.json(MODEL_TEMPLATE);
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
@@ -221,12 +276,24 @@ async function chooseModelTemplate() {
   await vi.waitFor(() => expect(select('Zustand').options.length).toBeGreaterThan(1));
 }
 
-async function fillValid({ wiNr = '626198', supplierId = '' } = {}) {
+/** Chooses a value of a pick list attribute once its list has arrived. */
+async function choose(name: string, valueId: number) {
+  await vi.waitFor(() =>
+    expect(Array.from(select(name).options, (option) => option.value)).toContain(String(valueId)),
+  );
+  fireEvent.change(select(name), { target: { value: String(valueId) } });
+}
+
+/** A valid form: the fixed fields and the required attributes of a Notebook, "ohne Akku". */
+async function fillValid({ wiNr = '626198', supplierId = '', battery = WITHOUT_BATTERY } = {}) {
   fireEvent.change(textbox('WI-Nr'), { target: { value: wiNr } });
   fireEvent.change(select('Lieferant'), { target: { value: supplierId } });
   await chooseModelTemplate();
   fireEvent.change(select('Zustand'), { target: { value: '1' } });
   fireEvent.change(textbox('Optik-Note'), { target: { value: '3' } });
+  await choose('Tastaturlayout', 111);
+  await choose('Netzteil', 121);
+  await choose('Akku', battery);
 }
 
 /** Accessibility assertion of a state: heading, named controls, linked field errors. */
@@ -262,14 +329,73 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expect(within(form()).queryByRole('region', { name: 'Gerätewerte' })).toBeNull();
 
     await chooseModelTemplate();
+    await vi.waitFor(() => expect(select('Akku')).toBeTruthy());
 
-    const labels = Array.from(form().querySelectorAll('label'), (label) =>
-      label.textContent?.replace('*', ''),
-    );
-    expect(labels).toEqual(['WI-Nr', 'Lieferant', 'Zustand', 'Optik-Note', 'Zustandsbeschreibung']);
+    const labels = () =>
+      Array.from(form().querySelectorAll('label'), (label) => label.textContent?.replace('*', ''));
+    expect(labels()).toEqual([
+      'WI-Nr',
+      'Lieferant',
+      'Zustand',
+      'Optik-Note',
+      'Zustandsbeschreibung',
+      'Tastaturlayout',
+      'Netzteil',
+      'Akku',
+    ]);
     expect(within(form()).getByRole('region', { name: 'Gerätewerte' })).toBeTruthy();
     expect(textbox('WI-Nr').getAttribute('aria-required')).toBe('true');
     expect(select('Lieferant').getAttribute('aria-required')).toBeNull();
+    for (const name of ['Tastaturlayout', 'Netzteil', 'Akku']) {
+      expect(select(name).getAttribute('aria-required')).toBe('true');
+      expect(select(name).options[0]?.text).toBe('Bitte wählen');
+    }
+    expect(optionTexts(select('Akku'))).toEqual([
+      'Bitte wählen',
+      'mit Akku',
+      'mit Akku (defekt)',
+      'ohne Akku',
+    ]);
+
+    // The battery capacity appears after a battery value with "Akku vorhanden".
+    await choose('Akku', WITH_BATTERY);
+    expect(labels().slice(-3)).toEqual(['Akku', 'Akkukapazität', 'nicht ermittelbar']);
+    expect(textbox('Akkukapazität').getAttribute('aria-required')).toBe('true');
+    expectAccessiblePage();
+  });
+
+  it('UI-003.default DER-54-01 shows "Akkukapazität" only with a battery value with "Akku vorhanden", empty when it appears again', async () => {
+    mockApi();
+    await openPage();
+    await chooseModelTemplate();
+
+    await choose('Akku', WITHOUT_BATTERY);
+    expect(within(form()).queryByRole('textbox', { name: /^Akkukapazität/ })).toBeNull();
+
+    await choose('Akku', WITH_BATTERY);
+    fireEvent.change(textbox('Akkukapazität'), { target: { value: '87' } });
+    await choose('Akku', 102);
+    expect(textbox('Akkukapazität').value).toBe('87');
+
+    await choose('Akku', WITHOUT_BATTERY);
+    expect(within(form()).queryByRole('textbox', { name: /^Akkukapazität/ })).toBeNull();
+    await choose('Akku', WITH_BATTERY);
+    expect(textbox('Akkukapazität').value).toBe('');
+  });
+
+  it('UI-003.validation DER-54-01 names a missing required attribute and the missing battery capacity at the field, nothing sent', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    await fillValid({ battery: WITH_BATTERY });
+    fireEvent.change(select('Netzteil'), { target: { value: '' } });
+
+    fireEvent.click(saveButton());
+
+    expect(errorOf(select('Netzteil'))).toBe('Netzteil fehlt');
+    expect(errorOf(textbox('Akkukapazität'))).toBe(CAPACITY_RULE);
+    expect(summaryItems()).toEqual(['Netzteil fehlt', CAPACITY_RULE]);
+    expect(document.activeElement).toBe(select('Netzteil'));
+    expect(sent).toEqual([]);
     expectAccessiblePage();
   });
 
@@ -356,9 +482,42 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
       conditionValueId: 1,
       visualGrade: '3',
       conditionDescription: 'Kratzer am Deckel',
-      values: {},
+      values: { 16: 111, 17: 121, 18: WITHOUT_BATTERY },
       confirmedKeys: [],
     });
+  });
+
+  it('AC-REQ-012-01 sends the battery capacity with a battery value with "Akku vorhanden"', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    await fillValid({ battery: WITH_BATTERY });
+    fireEvent.change(textbox('Akkukapazität'), { target: { value: '87' } });
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.values).toEqual({
+      16: 111,
+      17: 121,
+      18: WITH_BATTERY,
+      19: { percent: '87' },
+    });
+  });
+
+  it('"Andere Modellvorlage wählen" drops the values of the attributes', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    await fillValid();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Andere Modellvorlage wählen' }));
+    await chooseModelTemplate();
+    await vi.waitFor(() => expect(select('Akku')).toBeTruthy());
+
+    expect(select('Tastaturlayout').value).toBe('');
+    expect(select('Akku').value).toBe('');
+    fireEvent.click(saveButton());
+    expect(errorOf(select('Tastaturlayout'))).toBe('Tastaturlayout fehlt');
+    expect(sent).toEqual([]);
   });
 
   it('UI-003.success DER-54-03 shows "Gerät 626198 gespeichert" and the page stays open', async () => {
@@ -412,23 +571,23 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expectAccessiblePage();
   });
 
-  it('UI-003.validation DER-54-05 shows the WI-Nr "62-61" at the field and in the summary from the check in the browser, focus there, nothing sent', async () => {
+  it('UI-003.validation DER-54-05 shows WI-Nr "62-61" and Akkukapazität 101 at the fields and in the summary from the check in the browser, focus there, nothing sent', async () => {
     const { sent } = mockApi();
     await openPage();
-    await fillValid({ wiNr: '62-61' });
-    fireEvent.change(textbox('Optik-Note'), { target: { value: '7' } });
+    await fillValid({ wiNr: '62-61', battery: WITH_BATTERY });
+    fireEvent.change(textbox('Akkukapazität'), { target: { value: '101' } });
 
     fireEvent.click(saveButton());
 
     expect(errorOf(textbox('WI-Nr'))).toBe(WI_NR_RULE);
-    expect(errorOf(textbox('Optik-Note'))).toBe('Optik-Note: ganze Zahl von 1 bis 5');
-    expect(summaryItems()).toEqual([WI_NR_RULE, 'Optik-Note: ganze Zahl von 1 bis 5']);
+    expect(errorOf(textbox('Akkukapazität'))).toBe(CAPACITY_RULE);
+    expect(summaryItems()).toEqual([WI_NR_RULE, CAPACITY_RULE]);
     expect(document.activeElement).toBe(textbox('WI-Nr'));
     expect(sent).toEqual([]);
     expectAccessiblePage();
   });
 
-  it('UI-003.validation DER-54-05 shows the field errors of 422 validation_failed at the field and in the summary, without own text', async () => {
+  it('UI-003.validation DER-54-05 shows WI-Nr "62-61" and Akkukapazität 101 from 422 validation_failed at the fields and in the summary, without own text', async () => {
     mockApi({
       create: () =>
         Response.json(
@@ -442,11 +601,13 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
         ),
     });
     await openPage();
-    await fillValid();
+    await fillValid({ battery: WITH_BATTERY });
+    fireEvent.change(textbox('Akkukapazität'), { target: { value: '87' } });
 
     fireEvent.click(saveButton());
 
     await vi.waitFor(() => expect(errorOf(textbox('WI-Nr'))).toBe(WI_NR_RULE));
+    expect(errorOf(textbox('Akkukapazität'))).toBe(CAPACITY_RULE);
     expect(summaryItems()).toEqual([WI_NR_RULE, CAPACITY_RULE]);
     expect(document.activeElement).toBe(textbox('WI-Nr'));
     expectAccessiblePage();

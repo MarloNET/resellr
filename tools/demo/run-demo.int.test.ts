@@ -6,6 +6,7 @@ import { INITIAL_DEVICE_TYPES } from '@resellr/seed-data/initial-settings';
 import {
   DEMO_DATASHEET_BLOCK_ORDER,
   DEMO_DEVICE_TYPES,
+  DEMO_DEVICES,
   DEMO_MANUFACTURERS,
   DEMO_MERCHANT_PROFILE,
   DEMO_MODEL_TEMPLATES,
@@ -101,8 +102,8 @@ describe('startDemo (CU-004)', () => {
       );
       // The initial settings of the seed migration CU-071 and the demo data written through the
       // API on top of them (CU-061): the device types, suppliers, manufacturers, the merchant
-      // profile, the text blocks and the datasheet layout of S2 and the model templates of S3 with
-      // their audit entries.
+      // profile, the text blocks and the datasheet layout of S2, the model templates of S3 and the
+      // devices of S4 with their audit entries.
       expect(filled.sort()).toEqual([
         'attribute',
         'attribute_mapping',
@@ -110,6 +111,7 @@ describe('startDemo (CU-004)', () => {
         'channel',
         'datasheet_layout',
         'description_template',
+        'device',
         'device_type',
         'manufacturer',
         'merchant_profile',
@@ -156,6 +158,15 @@ describe('startDemo (CU-004)', () => {
           model_name: modelName,
           mpn,
           mpn_unknown: mpn === null ? 1 : 0,
+        })),
+      );
+      expect(
+        db.prepare('SELECT wi_nr, listing_id, stock_status FROM device ORDER BY id').all(),
+      ).toEqual(
+        DEMO_DEVICES.map(({ wiNr }) => ({
+          wi_nr: wiNr,
+          listing_id: null,
+          stock_status: 'available',
         })),
       );
     } finally {

@@ -291,6 +291,123 @@ export const seedModelTemplates: SeedArea = async (api) => {
 };
 
 /**
+ * Devices (S4, UI-003): three notebooks of the demo model templates, captured unassigned, with
+ * the required device values of a Notebook (RAM, Speicherkapazität, Tastaturlayout,
+ * Betriebssystem, Netzteil, Akku; Requirements 9.3); one with a battery
+ * capacity, one without battery and one with a battery capacity "nicht ermittelbar". The WI-Nrs
+ * are invented. Model templates, suppliers and pick list values are looked up by name, as the
+ * user chooses them in UI-003; `values` holds the values of the level device by attribute label,
+ * a pick list value by its label.
+ */
+export const DEMO_DEVICES = [
+  {
+    wiNr: '626198',
+    modelName: 'ThinkPad T14 Gen 2',
+    supplier: 'Lieferant A',
+    condition: 'gebraucht',
+    visualGrade: 2,
+    conditionDescription: 'Leichte Gebrauchsspuren am Deckel',
+    values: {
+      RAM: 16,
+      Speicherkapazität: 512,
+      Tastaturlayout: 'Deutsch (QWERTZ)',
+      Betriebssystem: 'Windows 11 Pro',
+      Netzteil: 'mit Netzteil (original)',
+      Akku: 'mit Akku',
+      Akkukapazität: { percent: 87 },
+    },
+  },
+  {
+    wiNr: 'A637607',
+    modelName: 'ThinkPad E15 Gen 2',
+    supplier: null,
+    condition: 'gebraucht',
+    visualGrade: 3,
+    conditionDescription: '',
+    values: {
+      RAM: 8,
+      Speicherkapazität: 256,
+      Tastaturlayout: 'Deutsch (QWERTZ)',
+      Betriebssystem: 'Windows 10 Pro',
+      Netzteil: 'ohne Netzteil',
+      Akku: 'ohne Akku',
+    },
+  },
+  {
+    wiNr: '626199',
+    modelName: 'EliteBook 840 G8',
+    supplier: 'Lieferant B',
+    condition: 'defekt',
+    visualGrade: 4,
+    conditionDescription: 'Display mit Pixelfehlern',
+    values: {
+      RAM: 16,
+      Speicherkapazität: 512,
+      Tastaturlayout: 'Englisch (QWERTY, US)',
+      Betriebssystem: 'Windows 11 Home',
+      Netzteil: 'mit Netzteil (nicht original)',
+      Akku: 'mit Akku (defekt)',
+      Akkukapazität: { notDeterminable: true },
+    },
+  },
+] as const;
+
+/** The attributes of a device type with the list of a pick list attribute. */
+async function attributesByLabel(api: DemoApi, deviceTypeId: number) {
+  const { items } = await api.request<{
+    items: { id: number; label: string; pickListId: number | null }[];
+  }>('GET', `/api/device-types/${deviceTypeId}/attributes`);
+  return new Map(items.map((attribute) => [attribute.label, attribute]));
+}
+
+/** Value ids by label of a pick list, active and deactivated. */
+async function pickListValueIds(api: DemoApi, pickListId: number) {
+  const { items } = await api.request<{ items: { id: number; label: string }[] }>(
+    'GET',
+    `/api/pick-lists/${pickListId}/values?limit=200`,
+  );
+  return new Map(items.map(({ id, label }) => [label, id]));
+}
+
+export const seedDevices: SeedArea = async (api) => {
+  const { items: templates } = await api.request<{
+    items: { id: number; modelName: string; deviceType: { id: number } }[];
+  }>('GET', '/api/model-templates?limit=200');
+  const suppliers = await idsByName(api, '/api/suppliers?limit=200');
+  const { items: pickLists } = await api.request<{ items: { id: number; key: string }[] }>(
+    'GET',
+    '/api/pick-lists?limit=200',
+  );
+  const conditionList = pickLists.find(({ key }) => key === 'condition');
+  if (conditionList === undefined) throw new Error('Demo data: Zustand is missing');
+  const conditions = await pickListValueIds(api, conditionList.id);
+  for (const { modelName, supplier, condition, values, ...device } of DEMO_DEVICES) {
+    const template = templates.find((candidate) => candidate.modelName === modelName);
+    if (template === undefined) throw new Error(`Demo data: ${modelName} is missing`);
+    const attributes = await attributesByLabel(api, template.deviceType.id);
+    const entries = [];
+    for (const [label, value] of Object.entries(values)) {
+      const attribute = attributes.get(label);
+      if (attribute === undefined) throw new Error(`Demo data: ${label} is missing`);
+      entries.push([
+        attribute.id,
+        typeof value === 'string' && attribute.pickListId !== null
+          ? idOf(await pickListValueIds(api, attribute.pickListId), value)
+          : value,
+      ]);
+    }
+    await api.request('POST', '/api/devices', {
+      ...device,
+      supplierId: supplier === null ? null : idOf(suppliers, supplier),
+      modelTemplateId: template.id,
+      conditionValueId: idOf(conditions, condition),
+      values: Object.fromEntries(entries),
+      confirmedKeys: [],
+    });
+  }
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
@@ -303,6 +420,7 @@ export const SEED_AREAS: readonly SeedArea[] = [
   seedTextBlocks,
   seedDatasheetLayout,
   seedModelTemplates,
+  seedDevices,
 ];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */
