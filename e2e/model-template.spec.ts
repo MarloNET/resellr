@@ -249,6 +249,71 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     expect(Object.values(sent[1]?.modelValues as Record<string, unknown>)).not.toContain(value.id);
   });
 
+  test('UI-008.success DER-50-06 a manufacturer created from UI-007 through UI-008 is chosen, the hint links to UI-031 and the model template is saved with it', async ({
+    page,
+  }, testInfo) => {
+    const manufacturer = uniqueName('Dynabook', testInfo.title, testInfo.project.name);
+    await page.goto('/modelle/neu');
+    await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+    await fillNotebookAttributes(page);
+
+    await form(page).getByRole('button', { name: 'Neuen Hersteller anlegen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Hersteller anlegen' });
+    const name = dialog.getByRole('textbox', { name: /^Name des Herstellers/ });
+    await expect(name).toBeFocused();
+    await expectReachable(page);
+    await name.fill(`  ${manufacturer}  `);
+    await name.press('Enter');
+
+    await expect(dialog).toBeHidden();
+    await expect(field(page, 'Hersteller').locator('option:checked')).toHaveText(manufacturer);
+    const hint = form(page).getByRole('note');
+    await expect(hint).toHaveText(
+      'Hersteller angelegt. GPSR-Herstellerangaben fehlen noch; ohne sie ist keine Freigabe möglich.',
+    );
+    await expect(hint.getByRole('link', { name: 'GPSR-Herstellerangaben' })).toHaveAttribute(
+      'href',
+      '/einstellungen/hersteller',
+    );
+    await field(page, 'Modellbezeichnung').fill('Portégé X30L-K');
+    await form(page).getByRole('checkbox', { name: 'unbekannt' }).check();
+    await saveButton(page).click();
+
+    await expect(page).toHaveURL(/\/modelle$/);
+    await page.getByRole('searchbox', { name: 'Suchbegriff' }).fill(manufacturer);
+    await expect(
+      page
+        .getByRole('table', { name: 'Modellvorlagen' })
+        .getByRole('row')
+        .filter({ hasText: manufacturer }),
+    ).toContainText('Portégé X30L-K');
+  });
+
+  test('UI-008 dialog rule 2.0.10 in FM-4: at most min(480, window − 16) px wide, never higher than the window, title and actions visible', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'FM-4', 'dialog rule checked in FM-4');
+    await page.goto('/modelle/neu');
+    await form(page).getByRole('button', { name: 'Neuen Hersteller anlegen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Hersteller anlegen' });
+    await expect(dialog).toBeVisible();
+
+    const viewport = page.viewportSize();
+    const box = await dialog.boundingBox();
+    expect(viewport).not.toBeNull();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(Math.min(480, viewport!.width - 16) + 0.5);
+    expect(box!.height).toBeLessThanOrEqual(viewport!.height - 16 + 0.5);
+    for (const part of [
+      dialog.getByRole('heading', { name: 'Hersteller anlegen' }),
+      dialog.getByRole('button', { name: 'Hersteller anlegen' }),
+      dialog.getByRole('button', { name: 'Abbrechen' }),
+    ]) {
+      await expect(part).toBeInViewport({ ratio: 1 });
+    }
+    await expectReachable(page);
+  });
+
   test('UI-007.validation DER-50-17 AC-REQ-008-02 the browser shows one message per field and focuses the first error', async ({
     page,
   }) => {
