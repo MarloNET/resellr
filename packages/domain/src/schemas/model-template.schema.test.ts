@@ -6,7 +6,9 @@ import {
   modelTemplateSchema,
   modelTemplateSearchKey,
   modelTemplateSearchTermSchema,
+  modelTemplateValuesSchema,
 } from './model-template.schema.ts';
+import type { AttributeValueDefinition } from './attribute-values.schema.ts';
 
 const messagesOf = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.error?.issues.map((issue) => issue.message) ?? [];
@@ -95,6 +97,8 @@ const MV_A_CREATE = {
   mpn: 'MHGT3D/A',
   mpnUnknown: false,
   originalEan: '',
+  modelValues: {},
+  defaultDeviceValues: {},
 };
 
 /** Issues of a create request as `{ path, code, message }`, the shape of `fields[]` (2.0.5). */
@@ -264,5 +268,83 @@ describe('model template create schema (CU-104, 2.4)', () => {
     expect(issuesOf({ ...MV_A_CREATE, id: 7 })).toEqual([
       expect.objectContaining({ code: 'unrecognized_keys' }),
     ]);
+  });
+});
+
+const definition = (change: Partial<AttributeValueDefinition>): AttributeValueDefinition => ({
+  id: 1,
+  label: 'Merkmal',
+  dataType: 'text',
+  systemRole: null,
+  minValue: null,
+  maxValue: null,
+  level: 'model',
+  required: false,
+  active: true,
+  ...change,
+});
+
+/** Attributes of a notebook: two of the level model, two of the level device (9.3). */
+const NOTEBOOK = [
+  definition({ id: 11, label: 'Prozessor', required: true }),
+  definition({
+    id: 12,
+    label: 'Displaygröße',
+    dataType: 'decimal',
+    minValue: '10',
+    maxValue: '20',
+  }),
+  definition({ id: 21, label: 'RAM', dataType: 'integer', level: 'device', required: true }),
+  definition({
+    id: 22,
+    label: 'Betriebssystem',
+    dataType: 'pick',
+    level: 'device',
+    required: true,
+  }),
+];
+
+const valueIssuesOf = (values: unknown) =>
+  (modelTemplateValuesSchema(NOTEBOOK).safeParse(values).error?.issues ?? []).map((issue) => ({
+    path: issue.path.join('.'),
+    message: issue.message,
+  }));
+
+describe('attribute values of a model template (CU-104 with CU-067, 2.4)', () => {
+  it('AC-REQ-008-05 names a missing required attribute of the level model', () => {
+    expect(valueIssuesOf({ modelValues: { 12: '14' }, defaultDeviceValues: {} })).toEqual([
+      { path: 'modelValues.11', message: 'Prozessor fehlt' },
+    ]);
+  });
+
+  it('DER-50-10 takes the device defaults as optional, but typed', () => {
+    expect(
+      modelTemplateValuesSchema(NOTEBOOK).parse({
+        modelValues: { 11: 'Intel Core i5' },
+        defaultDeviceValues: { 21: null, 22: null },
+      }),
+    ).toEqual({ modelValues: { 11: 'Intel Core i5' }, defaultDeviceValues: {} });
+    expect(
+      valueIssuesOf({ modelValues: { 11: 'Intel Core i5' }, defaultDeviceValues: { 21: '16 GB' } }),
+    ).toEqual([{ path: 'defaultDeviceValues.21', message: 'RAM: ganze Zahl' }]);
+  });
+
+  it('stores a decimal entered with comma or point canonically, never as a date', () => {
+    for (const input of ['14,01', '14.01']) {
+      expect(
+        modelTemplateValuesSchema(NOTEBOOK).parse({
+          modelValues: { 11: 'Intel Core i5', 12: input },
+          defaultDeviceValues: {},
+        }).modelValues,
+      ).toEqual({ 11: 'Intel Core i5', 12: '14.01' });
+    }
+  });
+
+  it('keeps the values of the other level out: an attribute of the level device in modelValues is a structural error', () => {
+    expect(
+      modelTemplateValuesSchema(NOTEBOOK)
+        .safeParse({ modelValues: { 11: 'i5', 21: 16 }, defaultDeviceValues: {} })
+        .error?.issues.map(({ code }) => code),
+    ).toEqual(['unrecognized_keys']);
   });
 });

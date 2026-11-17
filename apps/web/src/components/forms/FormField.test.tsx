@@ -87,6 +87,18 @@ describe('FormField (CU-057, design chapter 5)', () => {
     expect(container.querySelector('.text-error')).toBeNull();
   });
 
+  it('shows an element at the end of the label line without changing the name of the field', () => {
+    render(
+      <FormField label="RAM" aside={<span>zu prüfen</span>}>
+        {(control) => <Input {...control} />}
+      </FormField>,
+    );
+
+    const field = screen.getByRole('textbox', { name: 'RAM' });
+    const aside = screen.getByText('zu prüfen');
+    expect(aside.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('E6 on an error the first faulty field receives the focus', () => {
     render(
       <DeviceForm
