@@ -350,12 +350,14 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
       expect(select(name).getAttribute('aria-required')).toBe('true');
       expect(select(name).options[0]?.text).toBe('Bitte wählen');
     }
-    expect(optionTexts(select('Akku'))).toEqual([
-      'Bitte wählen',
-      'mit Akku',
-      'mit Akku (defekt)',
-      'ohne Akku',
-    ]);
+    await vi.waitFor(() =>
+      expect(optionTexts(select('Akku'))).toEqual([
+        'Bitte wählen',
+        'mit Akku',
+        'mit Akku (defekt)',
+        'ohne Akku',
+      ]),
+    );
 
     // The battery capacity appears after a battery value with "Akku vorhanden".
     await choose('Akku', WITH_BATTERY);
