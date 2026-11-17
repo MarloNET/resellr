@@ -26,6 +26,7 @@ export const ERROR_CODES = {
   validation_failed: 422,
   variant_flag_would_merge_listings: 422,
   version_conflict: 409,
+  wi_nr_taken: 422,
 } as const satisfies Record<string, number>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

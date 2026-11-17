@@ -171,6 +171,22 @@ export function createPickListRepository(db: Kysely<DB>) {
     },
 
     /**
+     * The values of the list battery, active and deactivated, by order then id, with the flag
+     * "Akku vorhanden" (2.5, FIND-353; Nachtrag MAR-973).
+     */
+    async listBatteryValues(): Promise<{ id: number; batteryPresent: boolean }[]> {
+      const rows = await db
+        .selectFrom('pick_list_value as v')
+        .innerJoin('pick_list as l', 'l.id', 'v.pick_list_id')
+        .select(['v.id', 'v.battery_present'])
+        .where('l.is_battery_list', '=', 1)
+        .orderBy('v.sort_order')
+        .orderBy('v.id')
+        .execute();
+      return rows.map((row) => ({ id: row.id, batteryPresent: row.battery_present === 1 }));
+    },
+
+    /**
      * Device types that use the list (scope of `SettingsChanged`, 2.1): those with an attribute
      * of the list, for the port lists also those with an attribute of data type `ports`, and
      * for the list condition all of them, because every device carries a condition (3.3).

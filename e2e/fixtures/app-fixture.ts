@@ -491,6 +491,22 @@ export interface AppFixtureOptions {
   observeFileWrites: boolean;
 }
 
+/**
+ * The worker fixture `server`: one server with data of its own per worker. A spec whose data
+ * must not show in the lists of other specs overrides `server` with it again, which gives it
+ * workers and so a server of its own.
+ */
+export async function workerServer(
+  { observeFileWrites }: AppFixtureOptions,
+  use: (server: AppServer) => Promise<void>,
+): Promise<void> {
+  const { server, stop } = await startServer({ observeFileWrites });
+  await use(server);
+  // Also during the shutdown the server connects nowhere else (REQ-079).
+  const connections = await stop();
+  expect(foreignConnections(connections), 'outbound connections of the server').toEqual([]);
+}
+
 export const test = base.extend<
   { browserRequests: string[]; serverResponseHeaders: void; serverConnections: void },
   { server: AppServer } & AppFixtureOptions
@@ -501,16 +517,7 @@ export const test = base.extend<
    */
   observeFileWrites: [false, { scope: 'worker', option: true }],
 
-  server: [
-    async ({ observeFileWrites }, use) => {
-      const { server, stop } = await startServer({ observeFileWrites });
-      await use(server);
-      // Also during the shutdown the server connects nowhere else (REQ-079).
-      const connections = await stop();
-      expect(foreignConnections(connections), 'outbound connections of the server').toEqual([]);
-    },
-    { scope: 'worker' },
-  ],
+  server: [workerServer, { scope: 'worker' }],
 
   baseURL: async ({ server }, use) => {
     await use(server.baseUrl);

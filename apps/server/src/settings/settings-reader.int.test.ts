@@ -8,6 +8,7 @@ import { insertDeviceType, insertManufacturer } from '../../test/model-templates
 import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
 import { type Database, openDatabase } from '../db/database.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
+import { seedInitialSettings } from '../db/migrations/20261110_0002_seed_initial_settings.ts';
 import { runMigrations } from '../db/migrator.ts';
 import type { DB } from '../db/schema.ts';
 import { createSettingsReader } from './settings-reader.ts';
@@ -65,11 +66,52 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
     });
   });
 
+  it('finds a supplier with name and status, active or not', async () => {
+    const insert = database.sqlite.prepare(
+      `INSERT INTO supplier (name, name_key, active, version, created_at, updated_at)
+       VALUES (?, ?, ?, 1, '2026-11-16T08:00:00.000Z', '2026-11-16T08:00:00.000Z')`,
+    );
+    const ost = Number(insert.run('Lieferant Ost', 'lieferant ost', 1).lastInsertRowid);
+    const west = Number(insert.run('Lieferant West', 'lieferant west', 0).lastInsertRowid);
+    const reader = createSettingsReader(database.db);
+
+    await expect(reader.findSupplier(ost)).resolves.toEqual({
+      id: ost,
+      name: 'Lieferant Ost',
+      active: true,
+    });
+    await expect(reader.findSupplier(west)).resolves.toEqual({
+      id: west,
+      name: 'Lieferant West',
+      active: false,
+    });
+  });
+
+  it('lists the values of the list battery with the flag "Akku vorhanden", also deactivated ones', async () => {
+    await runMigrations(database, [initialSchema, seedInitialSettings], () => new Date());
+    const { sqlite } = database;
+    sqlite.prepare("UPDATE pick_list_value SET active = 0 WHERE label = 'mit Akku (defekt)'").run();
+    const idOf = (label: string) =>
+      (
+        sqlite.prepare('SELECT id FROM pick_list_value WHERE label = ?').get(label) as {
+          id: number;
+        }
+      ).id;
+    const reader = createSettingsReader(database.db);
+
+    await expect(reader.listBatteryValues()).resolves.toEqual([
+      { id: idOf('mit Akku'), batteryPresent: true },
+      { id: idOf('mit Akku (defekt)'), batteryPresent: true },
+      { id: idOf('ohne Akku'), batteryPresent: false },
+    ]);
+  });
+
   it('returns undefined for an unknown id', async () => {
     const reader = createSettingsReader(database.db);
 
     await expect(reader.findDeviceType(999)).resolves.toBeUndefined();
     await expect(reader.findManufacturer(999)).resolves.toBeUndefined();
+    await expect(reader.findSupplier(999)).resolves.toBeUndefined();
   });
 
   it('finds pick list values with their list and status and leaves unknown ids out', async () => {

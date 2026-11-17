@@ -93,6 +93,10 @@ export const FIELD_MESSAGES = {
    * there is no "Klartext fehlt" (design v0.6.2 O-2, AC-REQ-022-04).
    */
   conditionCodePlainText: 'Klartext: 1 bis 500 Zeichen',
+  /** UI-003 "Zustandsbeschreibung", longer than 1,000 characters after trimming (2.5). */
+  conditionDescription: 'Zustandsbeschreibung: höchstens 1.000 Zeichen',
+  /** UI-003 "Zustand" without a choice (2.5). */
+  conditionMissing: 'Zustand fehlt',
   /**
    * UI-033 "Lieferant", "Speichern" while no supplier is chosen after a rejection for
    * deactivation; only in the browser (2.0.11, design v0.6.8, addendum MAR-929).
@@ -121,6 +125,8 @@ export const FIELD_MESSAGES = {
   manufacturerName: 'Name: 1 bis 50 Zeichen',
   /** UI-007 "Modellbezeichnung", empty or longer than 100 characters after trimming. */
   modelName: 'Modellbezeichnung: 1 bis 100 Zeichen',
+  /** UI-003 "Modellvorlage" without a choice (2.5, DER-54-11). */
+  modelTemplateMissing: 'Bitte eine Modellvorlage wählen',
   /**
    * UI-007 "Herstellernummer" empty and not "unbekannt" (`mpn_required`): the wording of
    * AC-REQ-008-02 (DG-17, Technical Specification 2.4, 8.2).
@@ -156,6 +162,10 @@ export const FIELD_MESSAGES = {
   typeDesignation: 'Typbezeichnung: höchstens 50 Zeichen',
   /** UI-033 "Vorschlag Optik-Note", not a whole number from 1 to 5 (REQ-022). */
   visualGrade: 'Optik-Note: ganze Zahl von 1 bis 5',
+  /**
+   * UI-003 "WI-Nr", empty or not 1–20 letters and digits (2.5, Requirements 9.6, AC-REQ-012-03).
+   */
+  wiNr: 'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)',
 } as const;
 
 type MessageText = string | ((...args: string[]) => string);
@@ -204,10 +214,21 @@ export const ERROR_MESSAGES = {
     `Unbekannter Platzhalter ${placeholder}`,
   /** UI-033 "Lieferant", a new or changed supplier is deactivated (2.0.11, Nachtrag MAR-904). */
   'supplier_deactivated.condition_code': (name: string) => `Lieferant ${name} ist deaktiviert`,
+  /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
+  'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
   /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   'variant_flag_would_merge_listings.flag': (listings: string) =>
     `Änderung nicht möglich: Modell-Inserate ${listings} würden gleiche Variantenangaben haben`,
+  /**
+   * UI-003 "WI-Nr" (and UI-013), the WI-Nr belongs to an available or sold device: its stored
+   * WI-Nr and the display title of its model listing, or "nicht zugeordnet" without one (2.0.6,
+   * design v0.6.9, MAR-970).
+   */
+  'wi_nr_taken.listing': (wiNr: string, listingTitle: string) =>
+    `WI-Nr bereits vergeben: Gerät ${wiNr} in ${listingTitle}`,
+  'wi_nr_taken.unassigned': (wiNr: string) =>
+    `WI-Nr bereits vergeben: Gerät ${wiNr} (nicht zugeordnet)`,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
 
 /**

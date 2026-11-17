@@ -139,6 +139,28 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('DER-54-15 names the deactivated supplier of a new device (2.0.6, 8.2, UI-003)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.device']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+  });
+
+  it('AC-REQ-012-02 names the existing device and its model listing in wi_nr_taken (2.0.6, UI-003 v0.6.9)', () => {
+    expect(ERROR_MESSAGES['wi_nr_taken.listing']('626198', 'ThinkPad T14 Gen 2, 16 GB')).toBe(
+      'WI-Nr bereits vergeben: Gerät 626198 in ThinkPad T14 Gen 2, 16 GB',
+    );
+    expect(ERROR_MESSAGES['wi_nr_taken.unassigned']('626198')).toBe(
+      'WI-Nr bereits vergeben: Gerät 626198 (nicht zugeordnet)',
+    );
+  });
+
+  it('has the field texts of the WI-Nr and the model template of a new device (2.5, UI-003)', () => {
+    expect(FIELD_MESSAGES.wiNr).toBe(
+      'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)',
+    );
+    expect(FIELD_MESSAGES.modelTemplateMissing).toBe('Bitte eine Modellvorlage wählen');
+  });
+
   it('names attribute and value of a deactivated pick list value (2.0.6, 8.2, UI-007)', () => {
     expect(
       ERROR_MESSAGES['pick_list_value_deactivated.attribute']('Tastaturlayout', 'Ungarisch'),

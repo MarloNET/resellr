@@ -20,10 +20,14 @@ export interface ModelTemplateFilter {
 
 /**
  * Model templates of UI-006 (`GET /api/model-templates`): without `q` the 50 latest created,
- * with `q` the hits of the search (2.4).
+ * with `q` the hits of the search (2.4). UI-003 asks only with a search term (`enabled`).
  */
-export function useModelTemplatesQuery(filter: ModelTemplateFilter) {
+export function useModelTemplatesQuery(
+  filter: ModelTemplateFilter,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery<ModelTemplateList, ApiError>({
+    enabled,
     queryKey: queryKeys.catalog.modelTemplates(filter),
     queryFn: ({ signal }) => {
       const params = new URLSearchParams();
@@ -33,6 +37,18 @@ export function useModelTemplatesQuery(filter: ModelTemplateFilter) {
       const query = params.size > 0 ? `?${params.toString()}` : '';
       return apiClient.get<ModelTemplateList>(`/api/model-templates${query}`, { signal });
     },
+  });
+}
+
+/**
+ * One model template (`GET /api/model-templates/{id}`, 2.4), e.g. its model values for the
+ * panel "Modelldaten" of UI-003; no request without an id.
+ */
+export function useModelTemplateQuery(id: number | null) {
+  return useQuery<ModelTemplate, ApiError>({
+    queryKey: queryKeys.catalog.modelTemplate(id ?? 0),
+    queryFn: ({ signal }) => apiClient.get<ModelTemplate>(`/api/model-templates/${id}`, { signal }),
+    enabled: id !== null,
   });
 }
 

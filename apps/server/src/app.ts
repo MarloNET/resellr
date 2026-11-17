@@ -10,7 +10,7 @@ import type { Database } from './db/database.ts';
 import type { DB } from './db/schema.ts';
 import { createUnitOfWork } from './db/unit-of-work.ts';
 import { createFrameworkErrorHandler, type HttpCoreDeps, registerHttpCore } from './http/index.ts';
-import { inventoryChecks } from './inventory/index.ts';
+import { inventoryChecks, inventoryRoutes } from './inventory/index.ts';
 import { createMediaFileIntake, mediaRoutes } from './media/index.ts';
 import {
   createShutdownService,
@@ -73,6 +73,7 @@ export function buildApp(deps: AppDeps) {
   app.register(mediaRoutes, { db: deps.database.db, mediaDir });
   app.register(channelsRoutes, { db: deps.database.db });
   app.register(catalogRoutes, { db: deps.database.db, uow, clock: deps.clock });
+  app.register(inventoryRoutes, { db: deps.database.db, uow, clock: deps.clock });
 
   return { app, writeGate, uow };
 }
