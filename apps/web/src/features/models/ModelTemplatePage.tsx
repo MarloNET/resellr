@@ -4,6 +4,7 @@ import {
   modelTemplateCreateSchema,
   type ModelTemplateMatch,
 } from '@resellr/domain/schemas/model-template.schema';
+import type { ManufacturerCreateResult } from '@resellr/domain/schemas/manufacturer.schema';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
@@ -29,6 +30,7 @@ import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
 import { DuplicateDialog } from './DuplicateDialog.tsx';
+import { ManufacturerCreateDialog } from './ManufacturerCreateDialog.tsx';
 
 // Texts of UI-007 `screen.md` and its mockup (UI/UX design v0.6.2, v0.6.3 for the empty MPN,
 // v0.6.7 for the placeholder).
@@ -45,6 +47,13 @@ const TEXTS = {
   mpn: 'Herstellernummer',
   mpnUnknown: 'unbekannt',
   originalEan: 'Original-EAN',
+  newManufacturer: 'Neuen Hersteller anlegen',
+  /** UI-008 after creating; "GPSR-Herstellerangaben" is the link to UI-031 (DER-50-06). */
+  createdHint: {
+    before: 'Hersteller angelegt. ',
+    link: 'GPSR-Herstellerangaben',
+    after: ' fehlen noch; ohne sie ist keine Freigabe möglich.',
+  },
   cancel: 'Abbrechen',
   save: 'Modellvorlage speichern',
   saving: 'Speichern …',
@@ -57,6 +66,9 @@ const TEXTS = {
 const CALLER_PATH = '/modelle';
 /** UI-007 for changing a model template, as UI-006 opens it. */
 const templatePath = (id: number) => `${CALLER_PATH}/${id}`;
+
+/** UI-031 "Hersteller und GPSR", where the GPSR details are completed. */
+const MANUFACTURERS_PATH = '/einstellungen/hersteller';
 
 /** State a calling page takes over after the save: the success banner of UI-007 (DER-50-02). */
 export interface SavedNoticeState {
@@ -135,8 +147,8 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
  * with the placeholder "Bitte wählen" (Design v0.6.7). States: default, loading,
  * validation (focus on the first error), speichert and ausgang-unbekannt (P-08), success (banner
  * on the calling page), error, unreachable (P-06) for the reads, wird-beendet (P-07) for the
- * save and the dialog dublette for a possible duplicate (REQ-011). The attribute fields (#178),
- * the dialog UI-008 (#179) and changing (#181) follow.
+ * save and the dialog dublette for a possible duplicate (REQ-011). "Neuen Hersteller anlegen"
+ * opens the dialog UI-008 (#179). The attribute fields (#178) and changing (#181) follow.
  */
 export function ModelTemplatePage() {
   const navigate = useNavigate();
@@ -166,6 +178,9 @@ export function ModelTemplatePage() {
   const [reloading, setReloading] = useState(false);
   // Hits of a possible duplicate; the dialog UI-007.dublette is open while they are set.
   const [duplicates, setDuplicates] = useState<ModelTemplateMatch[] | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  // The manufacturer created through UI-008; its hint stands while it is chosen (DER-50-06).
+  const [createdId, setCreatedId] = useState<number | null>(null);
 
   const formId = useId();
   const modelDataId = useId();
@@ -202,6 +217,24 @@ export function ModelTemplatePage() {
     change({ [field]: idOf(value) });
     setErrors((previous) => ({ ...previous, [field]: undefined }));
     setRejectionShown((previous) => ({ ...previous, [field]: false }));
+  }
+
+  /**
+   * Answer of UI-008: the new or the existing manufacturer is chosen (2.4 "Hersteller neu",
+   * DER-50-06, DER-50-07). With `existing: true` the dialog stays open with its hint.
+   */
+  function onManufacturerCreated({ id, existing }: ManufacturerCreateResult) {
+    // The answer arrives after renders of the open dialog, so the current draft is used.
+    setDraft((previous) => (previous === null ? previous : { ...previous, manufacturerId: id }));
+    setErrors((previous) => ({ ...previous, manufacturerId: undefined }));
+    setRejectionShown((previous) => ({ ...previous, manufacturerId: false }));
+    // The entry is active again, so it is offered even if its list failed after a rejection.
+    setDropped((previous) =>
+      previous.manufacturerId === id ? { ...previous, manufacturerId: undefined } : previous,
+    );
+    if (existing) return;
+    setDialogOpen(false);
+    setCreatedId(id);
   }
 
   function checkOnBlur(field: Field) {
@@ -425,26 +458,47 @@ export function ModelTemplatePage() {
                 )}
               </FormField>
 
-              <FormField label={TEXTS.manufacturer} required error={errors.manufacturerId}>
-                {(control) => (
-                  <Select
-                    {...control}
-                    value={optionValue(draft.manufacturerId)}
-                    disabled={saving}
-                    onChange={(event) => choose('manufacturerId', event.target.value)}
-                    onBlur={() => checkOnBlur('manufacturerId')}
-                  >
-                    <option value="" disabled>
-                      {TEXTS.choose}
-                    </option>
-                    {(activeManufacturers ?? []).map(({ id, name }) => (
-                      <option key={id} value={id}>
-                        {name}
+              <div className="relative flex flex-col gap-2">
+                <FormField label={TEXTS.manufacturer} required error={errors.manufacturerId}>
+                  {(control) => (
+                    <Select
+                      {...control}
+                      value={optionValue(draft.manufacturerId)}
+                      disabled={saving}
+                      onChange={(event) => choose('manufacturerId', event.target.value)}
+                      onBlur={() => checkOnBlur('manufacturerId')}
+                    >
+                      <option value="" disabled>
+                        {TEXTS.choose}
                       </option>
-                    ))}
-                  </Select>
+                      {(activeManufacturers ?? []).map(({ id, name }) => (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </FormField>
+                {/* Opens a dialog, so it is a button that looks like the link of the design; it
+                    stands right in the row of the label, as in the mockup of UI-007. */}
+                <button
+                  type="button"
+                  className="absolute top-0 right-0 border-0 bg-transparent p-0 text-label text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => setDialogOpen(true)}
+                >
+                  {TEXTS.newManufacturer}
+                </button>
+                {createdId !== null && createdId === draft.manufacturerId && (
+                  <p role="note" className="m-0 text-body text-text-secondary">
+                    {TEXTS.createdHint.before}
+                    <Link to={MANUFACTURERS_PATH} className="text-primary">
+                      {TEXTS.createdHint.link}
+                    </Link>
+                    {TEXTS.createdHint.after}
+                  </p>
                 )}
-              </FormField>
+              </div>
 
               <FormField label={TEXTS.modelName} required error={errors.modelName}>
                 {(control) => (
@@ -527,6 +581,12 @@ export function ModelTemplatePage() {
         onCreateAnyway={createAnyway}
         onClose={() => setDuplicates(null)}
         createDisabled={writesLocked}
+      />
+
+      <ManufacturerCreateDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={onManufacturerCreated}
       />
     </div>
   );
