@@ -13,6 +13,12 @@ const form = (page: Page) => page.getByRole('form', { name: 'Modellvorlage anleg
 const field = (page: Page, name: string) => form(page).getByLabel(new RegExp(`^${name}\\*?$`));
 const saveButton = (page: Page) => page.getByRole('button', { name: 'Modellvorlage speichern' });
 
+/**
+ * Label pattern of the notebook attribute "Prozessor": `device-types.spec.ts` renames the first
+ * attribute of the notebook to "Prozessor <hash>" on the server the worker keeps (AC-REQ-006-02).
+ */
+const PROCESSOR = String.raw`Prozessor(?: [0-9a-z]+)?`;
+
 /** The server keeps its data per worker: each test uses its own names. */
 function uniqueName(base: string, title: string, project: string) {
   let hash = 0;
@@ -25,7 +31,7 @@ function uniqueName(base: string, title: string, project: string) {
  * Requirements 9.3: Prozessor, Displaygröße; AC-REQ-008-05).
  */
 async function fillNotebookAttributes(page: Page) {
-  await field(page, 'Prozessor').fill('Intel Core i5-1135G7');
+  await field(page, PROCESSOR).fill('Intel Core i5-1135G7');
   await field(page, 'Displaygröße').fill('15,6');
 }
 
@@ -169,7 +175,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
 
     await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
     const modelAttributes = form(page).getByRole('group', { name: 'Merkmale Ebene Modell' });
-    await expect(modelAttributes.getByText('Prozessor*', { exact: true })).toBeVisible();
+    await expect(modelAttributes.getByText(new RegExp(`^${PROCESSOR}\\*$`))).toBeVisible();
     await expect(
       form(page).getByRole('group', { name: 'Vorbelegungswerte für Geräte' }).getByLabel(/^RAM$/),
     ).toBeVisible();
@@ -180,8 +186,8 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await field(page, 'Displaygröße').fill('15,6');
     await saveButton(page).click();
 
-    await expect(form(page).getByText('Prozessor fehlt')).toBeVisible();
-    await expect(field(page, 'Prozessor')).toBeFocused();
+    await expect(form(page).getByText(new RegExp(`^${PROCESSOR} fehlt$`))).toBeVisible();
+    await expect(field(page, PROCESSOR)).toBeFocused();
     await expectReachable(page);
   });
 
@@ -238,7 +244,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     await expect(
       field(page, 'Display-Oberfläche').getByRole('option', { name: surface }),
     ).toHaveCount(0);
-    await expect(field(page, 'Prozessor')).toHaveValue('Intel Core i5-1135G7');
+    await expect(field(page, PROCESSOR)).toHaveValue('Intel Core i5-1135G7');
     expect(sent).toHaveLength(1);
     expect(Object.values(sent[0]?.modelValues as Record<string, unknown>)).toContain(value.id);
     await expectReachable(page);
@@ -369,7 +375,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
         (await attributes.json()) as { items: { id: number; label: string }[] }
       ).items;
       const attributeId = (label: string) =>
-        attributeItems.find((attribute) => attribute.label === label)?.id;
+        attributeItems.find((attribute) => new RegExp(`^${label}$`).test(attribute.label))?.id;
       const response = await page.request.post(`${baseUrl}/api/model-templates`, {
         headers: { origin: baseUrl },
         data: {
@@ -382,7 +388,7 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
           originalEan: '',
           // The required attributes of the level model of a notebook (fillNotebookAttributes).
           modelValues: {
-            [String(attributeId('Prozessor'))]: 'Intel Core i5-1135G7',
+            [String(attributeId(PROCESSOR))]: 'Intel Core i5-1135G7',
             [String(attributeId('Displaygröße'))]: '15,6',
           },
           defaultDeviceValues: {},
