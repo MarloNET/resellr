@@ -178,13 +178,17 @@ describe('evaluateAudit', () => {
     });
   });
 
-  it('fails when the fix updates a dependency within its major version', () => {
+  it('keeps the exception when the fix names a dependency update, even within its major version', () => {
+    // An object in `fixAvailable` always means `npm audit fix --force`; only `true` ends it (c).
     const report = withPackage('picomatch', {
       ...PICOMATCH_REPORT.vulnerabilities.picomatch,
       fixAvailable: { name: 'vitest', version: '5.1.1', isSemVerMajor: false },
     });
 
-    expect(evaluate({ report }).failures).toHaveLength(1);
+    expect(evaluate({ report })).toEqual({
+      failures: [],
+      warnings: ['GHSA-fc5q-39xc-vjpf (picomatch) allowed until 2026-12-29 (MAR-1019)'],
+    });
   });
 
   it('fails on a stale exception that npm audit no longer reports', () => {
@@ -202,6 +206,18 @@ describe('evaluateAudit', () => {
     const report = { error: { code: 'ENOTFOUND', summary: 'request to registry failed' } };
 
     expect(evaluate({ report }).failures).toEqual(['npm audit: error: request to registry failed']);
+  });
+
+  it('names the cause when the registry is not reachable', () => {
+    // npm 11 leaves `summary` and `detail` empty and puts the cause into `message`.
+    const report = {
+      message: 'request to https://registry.npmjs.org/ failed, reason: connect ECONNREFUSED',
+      error: { summary: '', detail: '' },
+    };
+
+    expect(evaluate({ report }).failures).toEqual([
+      'npm audit: error: request to https://registry.npmjs.org/ failed, reason: connect ECONNREFUSED',
+    ]);
   });
 
   it('fails on output that is no valid JSON', () => {

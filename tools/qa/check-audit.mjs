@@ -79,20 +79,6 @@ export function parseAuditExceptions(text) {
 }
 
 /**
- * Whether `npm audit fix` fixes the package without `--force`: `fixAvailable` is `true`, or names
- * an update of a dependency within its major version.
- * @param {unknown} fixAvailable
- */
-function isFixableWithoutForce(fixAvailable) {
-  if (fixAvailable === true) return true;
-  return (
-    typeof fixAvailable === 'object' &&
-    fixAvailable !== null &&
-    /** @type {Record<string, unknown>} */ (fixAvailable).isSemVerMajor === false
-  );
-}
-
-/**
  * The `high` and `critical` advisories of an `npm audit --json` result (npm 11): the objects in
  * `vulnerabilities[<package>].via`; strings there refer to other packages and are skipped.
  * @param {Record<string, unknown>} vulnerabilities
@@ -148,13 +134,18 @@ export function evaluateAudit({ audit, exceptions, today }) {
   if (typeof report !== 'object' || report === null) {
     return { failures: ['npm audit: output is no JSON object'], warnings: [] };
   }
-  const { error, vulnerabilities } = /** @type {Record<string, unknown>} */ (report);
+  const { error, message, vulnerabilities } = /** @type {Record<string, unknown>} */ (report);
   if (error !== undefined) {
-    const summary =
+    // npm 11 puts the cause into `summary` and `detail`, or into `message` beside empty ones (for
+    // example when the registry is not reachable).
+    const { summary, detail } =
       typeof error === 'object' && error !== null
-        ? /** @type {Record<string, unknown>} */ (error).summary
-        : error;
-    return { failures: [`npm audit: error: ${String(summary)}`], warnings: [] };
+        ? /** @type {Record<string, unknown>} */ (error)
+        : { summary: error, detail: undefined };
+    const cause = [summary, detail, message]
+      .filter((part) => typeof part === 'string' && part.trim() !== '')
+      .join(' ');
+    return { failures: [`npm audit: error: ${cause || 'without a message'}`], warnings: [] };
   }
   if (typeof vulnerabilities !== 'object' || vulnerabilities === null) {
     return { failures: ['npm audit: output has no "vulnerabilities"'], warnings: [] };
@@ -184,8 +175,9 @@ export function evaluateAudit({ audit, exceptions, today }) {
       failures.push(`${label}: exception expired on ${exception.expires} (${exception.reference})`);
       continue;
     }
-    // (c) A fix without `--force` ends the exception.
-    if (isFixableWithoutForce(advisory.fixAvailable)) {
+    // (c) A fix without `--force` ends the exception. npm reports it as `fixAvailable: true`; an
+    // object there names a dependency update that `npm audit fix` only applies with `--force`.
+    if (advisory.fixAvailable === true) {
       failures.push(`${label}: fix available, update the package and remove the exception`);
       continue;
     }
@@ -205,20 +197,31 @@ export function evaluateAudit({ audit, exceptions, today }) {
   return { failures, warnings };
 }
 
+/** @param {string} failure */
+function fail(failure) {
+  process.stderr.write(`::error::${failure}\n`);
+  process.exitCode = 1;
+}
+
 /** @param {string} root */
 function main(root) {
+  /** @type {string} */
+  let exceptions;
+  try {
+    exceptions = readFileSync(join(root, 'tools/qa/audit-exceptions.json'), 'utf8');
+  } catch (error) {
+    fail(`audit-exceptions.json: cannot be read: ${/** @type {Error} */ (error).message}`);
+    return;
+  }
   // The exit code of `npm audit` is not zero for every finding; the parsed stdout decides (e).
   const result = spawnSync('npm', ['audit', '--json'], {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   });
-  /** @type {string} */
-  let exceptions;
-  try {
-    exceptions = readFileSync(join(root, 'tools/qa/audit-exceptions.json'), 'utf8');
-  } catch {
-    exceptions = '';
+  if (result.error !== undefined) {
+    fail(`npm audit: cannot be run: ${result.error.message}`);
+    return;
   }
   const { failures, warnings } = evaluateAudit({
     audit: result.stdout ?? '',
@@ -228,8 +231,7 @@ function main(root) {
 
   for (const warning of warnings) process.stdout.write(`::warning::${warning}\n`);
   if (failures.length > 0) {
-    for (const failure of failures) process.stderr.write(`::error::${failure}\n`);
-    process.exitCode = 1;
+    for (const failure of failures) fail(failure);
     return;
   }
   process.stdout.write('Dependency audit: no high or critical advisory without an exception.\n');
