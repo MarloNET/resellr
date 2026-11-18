@@ -80,6 +80,9 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
+/** A supplier of UI-003, chosen in the draft of the tests opened from UI-003 (#186). */
+const OST = { id: 4, name: 'Lieferant Ost', active: true, version: 1 };
+
 /**
  * `fetch` of the page: `GET /api/ops/status` for the frame, the device types and manufacturers
  * for the choices, the list of UI-006 after the return and `POST /api/model-templates`. Records
@@ -115,6 +118,8 @@ function mockApi({
       return Response.json({ items, total: items.length });
     }
     if (url.pathname === '/api/pick-lists') return Response.json({ items: PICK_LISTS, total: 9 });
+    // The suppliers of UI-003 after the return to it (#186).
+    if (url.pathname === '/api/suppliers') return Response.json({ items: [OST], total: 1 });
     const valuesPath = /^\/api\/pick-lists\/(\d+)\/values$/.exec(url.pathname);
     if (valuesPath) return pickListValues(Number(valuesPath[1]));
     if (method === 'GET' && url.pathname === '/api/model-templates') {
@@ -1899,13 +1904,29 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
         setItem.mockRestore();
       });
 
-      it('"Abbrechen" goes back to UI-003, which keeps its draft', async () => {
+      it('"Abbrechen" goes back to UI-003, which shows the inputs of its draft unchanged', async () => {
+        sessionStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ form: INTAKE_FORM, modelTemplateId: null }),
+        );
         mockApi();
         const router = await openPage({ fromDeviceIntake: true });
+        await fill();
 
         fireEvent.click(cancelButton());
 
         await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/neu'));
+        const intake = await screen.findByRole('form', { name: 'Gerät einbuchen' });
+        await vi.waitFor(() =>
+          expect(
+            within(intake).getByRole<HTMLSelectElement>('combobox', { name: /^Lieferant/ }).value,
+          ).toBe('4'),
+        );
+        expect(
+          within(intake).getByRole<HTMLInputElement>('textbox', { name: /^WI-Nr/ }).value,
+        ).toBe('626198');
+        // No model template is handed back; UI-003 took the draft over once.
+        expect(screen.queryByTestId('chosen-model-template')).toBeNull();
         expect(storedDraft()).toBeNull();
       });
     });

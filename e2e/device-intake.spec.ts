@@ -377,11 +377,14 @@ test.describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, CU-114, 
   }, testInfo) => {
     const hash = uniqueHash(testInfo.title, testInfo.project.name);
     const wiNr = `D${hash}`.slice(0, 20);
+    const supplier = `Südhandel ${hash}`;
+    await createSupplier(page, server.baseUrl, supplier);
     const { modelName, manufacturer } = await createNotebookTemplate(page, server.baseUrl, hash);
     const secondName = `THINKPAD T14 ${hash}`;
     const secondId = await createDuplicateTemplate(page, server.baseUrl, modelName, secondName);
     await page.goto('/geraete/neu');
     await field(page, 'WI-Nr').fill(wiNr);
+    await field(page, 'Lieferant').selectOption({ label: supplier });
 
     await newTemplateLink(page).click();
     await templateField(page, 'Geräteart').selectOption({ label: 'Notebook' });
@@ -417,11 +420,13 @@ test.describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, CU-114, 
       form(page).getByRole('region', { name: 'Gerätewerte' }).getByRole('status'),
     ).toHaveText('Lade Gerätewerte …');
     await expect(field(page, 'WI-Nr')).toHaveValue(wiNr);
+    await expect(field(page, 'Lieferant').locator('option:checked')).toHaveText(supplier);
     release();
     await expect(chosenTemplate(page)).toHaveText(
       `${manufacturer} ${secondName} (20W1) · Notebook · Herstellernummer unbekannt`,
     );
     await expect(field(page, 'WI-Nr')).toHaveValue(wiNr);
+    await expect(field(page, 'Lieferant').locator('option:checked')).toHaveText(supplier);
     expect(posts).toHaveLength(1);
     expect(posts[0]).not.toContain('confirmDuplicate');
     await expectReachable(page);

@@ -744,6 +744,7 @@ export function DeviceIntakePage() {
     setErrors((previous) => ({ ...withoutValueErrors(previous), modelTemplateId: undefined }));
     setSearchInput('');
     setSearchTerm(undefined);
+    setReturnFailed(null);
   }
 
   // The model template handed back by UI-007 is chosen like a hit once it and the names of its
@@ -758,6 +759,20 @@ export function DeviceIntakePage() {
     chooseTemplateRef.current(item);
     setReturnedTemplateId(null);
   }, [returnedTemplateId, templateQuery.data, deviceTypes.data, manufacturers.data]);
+  // If one of these reads fails (`.error`), the return is given up: the search and the choice
+  // show again and the error banner stays until a model template is chosen; the inputs stay.
+  // When the server is unreachable, "Erneut versuchen" reads them again (2.0.7).
+  const [returnFailed, setReturnFailed] = useState<ApiError | null>(null);
+  const returnError = returning
+    ? [templateQuery.error, deviceTypes.error, manufacturers.error].find(
+        (error) => error !== null && error.kind !== 'unreachable',
+      )
+    : undefined;
+  useEffect(() => {
+    if (returnError === undefined) return;
+    setReturnFailed(returnError);
+    setReturnedTemplateId(null);
+  }, [returnError]);
 
   /** "Neue Modellvorlage anlegen": the inputs stay in the draft while UI-007 is open (2.5). */
   function openNewModelTemplate() {
@@ -877,8 +892,9 @@ export function DeviceIntakePage() {
       onSuccess: (device) => {
         setSavedWiNr(device.wiNr);
         setNotice({ kind: 'success' });
-        // Only "Gerät speichern" empties the form, once no value is left to review (DER-54-08).
-        if (!assign && nextDeviceRef.current && openReviewKeys(current).length === 0) {
+        // Only "Gerät speichern" empties the form, once no value is left to review; the answer
+        // counts, as the server builds the review flags again (DER-54-08, 2.0.11, 2.5).
+        if (!assign && nextDeviceRef.current && device.captureStatus === 'checked') {
           emptyForNextDevice();
         }
       },
@@ -938,6 +954,7 @@ export function DeviceIntakePage() {
     templateQuery.error,
     prefillQuery.error,
     ...(returning ? [deviceTypes.error, manufacturers.error] : []),
+    returnFailed,
     ...modelDataLists.map(({ error }) => error),
     search.error,
   ];
@@ -970,7 +987,16 @@ export function DeviceIntakePage() {
   const reviewHintId = useId();
 
   // Opens UI-007 with UI-003 as calling page; the inputs stay in the draft (UI-003 "Aktionen").
-  const newTemplateLink = (
+  // Locked like the other triggers while the save runs (P-08, 2.0.7 `.speichert`).
+  const newTemplateLink = saving ? (
+    <a
+      role="link"
+      aria-disabled="true"
+      className="self-start cursor-not-allowed text-body text-text-secondary"
+    >
+      {TEXTS.newModelTemplate}
+    </a>
+  ) : (
     <Link
       to={MODEL_TEMPLATE_NEW_PATH}
       state={FROM_DEVICE_INTAKE}

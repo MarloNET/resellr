@@ -114,6 +114,9 @@ const CREATED = {
 type Route = () => Promise<Response> | Response;
 const list = (items: unknown[]) => Response.json({ items, total: items.length });
 const pending = () => new Promise<Response>(() => {});
+/** A `201` whose device is still to be reviewed (2.5). */
+const createdToReview = (reviewKeys: string[]) => () =>
+  Response.json({ ...CREATED, reviewKeys, captureStatus: 'review_pending' }, { status: 201 });
 
 /** `GET /api/model-templates/7/device-prefill` without values (REQ-013, 2.5). */
 const NO_PREFILL = {
@@ -128,7 +131,8 @@ const NO_PREFILL = {
 function mockApi({
   modelTemplate = () => Response.json(MODEL_TEMPLATE),
   prefill = () => Response.json(NO_PREFILL),
-}: { modelTemplate?: Route; prefill?: Route } = {}) {
+  create = () => Response.json(CREATED, { status: 201 }),
+}: { modelTemplate?: Route; prefill?: Route; create?: Route } = {}) {
   const sent: Record<string, unknown>[] = [];
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://127.0.0.1');
@@ -147,7 +151,7 @@ function mockApi({
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
     if (route === 'POST /api/devices') {
       sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
-      return Response.json(CREATED, { status: 201 });
+      return create();
     }
     throw new Error(`unexpected request ${route}`);
   });
@@ -351,6 +355,7 @@ describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, #186)', () =>
     // "Tastaturlayout" comes prefilled and stays to be reviewed (REQ-013).
     mockApi({
       prefill: () => Response.json({ ...NO_PREFILL, values: { 16: 111 }, reviewKeys: ['16'] }),
+      create: createdToReview(['16']),
     });
     await openPage();
     fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
@@ -365,6 +370,70 @@ describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, #186)', () =>
     expect(await screen.findByText('Gerät 626198 gespeichert')).toBeTruthy();
     expect(textbox('WI-Nr').value).toBe('626198');
     expect(nextDeviceBox().checked).toBe(true);
+  });
+
+  it('DER-54-08 keeps the inputs when the answer still has a value to review, though none is open in the browser', async () => {
+    mockApi({ create: createdToReview(['16']) });
+    await openPage();
+    await fillValid();
+
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByText('Gerät 626198 gespeichert')).toBeTruthy();
+    expect(textbox('WI-Nr').value).toBe('626198');
+    expect(select('Tastaturlayout').value).toBe('111');
+  });
+
+  it('UI-003.speichert locks "Neue Modellvorlage anlegen" while the save runs (P-08)', async () => {
+    mockApi({ create: pending });
+    const router = await openPage();
+    await fillValid();
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(saveButton().textContent).toBe('Speichern …'));
+    expect(screen.getByRole('button', { name: 'Andere Modellvorlage wählen' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    const link = newTemplateLink();
+    expect(link.getAttribute('aria-disabled')).toBe('true');
+    expect(link.getAttribute('href')).toBeNull();
+    fireEvent.click(link);
+    expect(router.state.location.pathname).toBe('/geraete/neu');
+    expect(sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+    expectAccessiblePage();
+  });
+
+  it('UI-003.error a failed read of the model template handed back gives up the return: the error shows, the search and the inputs stay and the save is possible again', async () => {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ form: storedForm(), modelTemplateId: 7 }));
+    mockApi({
+      modelTemplate: () =>
+        Response.json(
+          {
+            error: {
+              code: 'internal_error',
+              message: '',
+              fields: [],
+              details: {},
+              referenceNumber: 'R-7K2M-9QX4',
+            },
+          },
+          { status: 500 },
+        ),
+    });
+    await openPage();
+
+    expect(
+      await within(form()).findByRole('searchbox', { name: /^Modellvorlage suchen/ }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Referenz: R-7K2M-9QX4/)).toBeTruthy();
+    expect(textbox('WI-Nr').value).toBe('626198');
+    expect(select('Lieferant').value).toBe('4');
+    expect(within(form()).queryByRole('region', { name: 'Gerätewerte' })).toBeNull();
+    expect(saveButton().disabled).toBe(false);
+    expect(newTemplateLink()).toBeTruthy();
+    expectAccessiblePage();
   });
 
   it('DER-54-08 "Speichern und zuordnen" does not empty the form', async () => {
