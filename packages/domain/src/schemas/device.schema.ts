@@ -2,7 +2,13 @@ import { z } from 'zod';
 
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
 import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
-import { dateSchema, idSchema, timestampSchema, versionSchema } from './common.schema.ts';
+import {
+  dateSchema,
+  idSchema,
+  pageQuerySchema,
+  timestampSchema,
+  versionSchema,
+} from './common.schema.ts';
 import { CONDITION_CODE_MAX } from './condition-code.schema.ts';
 import type { BatteryValueFlag } from './pick-list.schema.ts';
 
@@ -160,6 +166,9 @@ export const deviceSchema = z.object({
 });
 export type Device = z.infer<typeof deviceSchema>;
 
+/** The model listing of a device by its display title, `null` for "nicht zugeordnet" (2.5). */
+const deviceListingSchema = z.object({ id: idSchema, title: z.string() }).nullable();
+
 /**
  * `GET /api/model-templates/{id}/device-prefill?conditionCode=&supplierId=` (2.5, CU-293): the
  * prefill of CU-117 with its review flags and the result of the condition code (`found: false`
@@ -176,10 +185,37 @@ export const devicePrefillSchema = z.object({
 export type DevicePrefillAnswer = z.infer<typeof devicePrefillSchema>;
 
 /**
- * `GET /api/devices/{id}` (2.5): the device with its model listing (display title) or `null` for
- * "nicht zugeordnet". Model data, sale and cancellation follow with UI-010 (#187) and S9.
+ * `GET /api/devices/{id}` (2.5): the device with the name of its model template (head of UI-010,
+ * #187) and its model listing (display title) or `null` for "nicht zugeordnet". The other model
+ * data, sale and cancellation follow with #190 and S9.
  */
 export const deviceDetailSchema = deviceSchema.extend({
-  listing: z.object({ id: idSchema, title: z.string() }).nullable(),
+  modelTemplateLabel: z.string(),
+  listing: deviceListingSchema,
 });
 export type DeviceDetail = z.infer<typeof deviceDetailSchema>;
+
+/**
+ * Query of the device search `GET /api/devices?wiNr=&limit=&offset=` (2.5, REQ-016): a part of
+ * the WI-Nr with at least 1 character, paged after 2.0.1. The user interface never sends an
+ * empty term, so a missing or empty one is a wrong request (`400 bad_request`, 2.0.5).
+ */
+export const deviceSearchQuerySchema = pageQuerySchema.extend({ wiNr: z.string().min(1) });
+
+/**
+ * A hit of the device search (2.5): every inventory status, a cancelled device with its status
+ * (AC-REQ-012-05); `listing` is `null` for "nicht zugeordnet".
+ */
+export const deviceSearchItemSchema = z.object({
+  id: idSchema,
+  wiNr: z.string(),
+  modelTemplateLabel: z.string(),
+  listing: deviceListingSchema,
+  stockStatus: z.enum(STOCK_STATUSES),
+  captureStatus: z.enum(CAPTURE_STATUSES),
+});
+export type DeviceSearchItem = z.infer<typeof deviceSearchItemSchema>;
+
+/** Answer of the device search (2.5): the hits of the page, without `total` (Nachtrag MAR-1030). */
+export const deviceSearchResultSchema = z.object({ items: z.array(deviceSearchItemSchema) });
+export type DeviceSearchResult = z.infer<typeof deviceSearchResultSchema>;

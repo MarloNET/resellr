@@ -106,4 +106,55 @@ describe('device repository (CU-122, Technical Specification 2.5, Nachtrag MAR-9
     });
     await expect(repository.findTakenByWiNrKey('633641')).resolves.toBeUndefined();
   });
+
+  describe('search (REQ-016, #187)', () => {
+    const hit = (id: number, wiNr: string, change: Partial<DeviceInsert> = {}) => {
+      const row = device(wiNr, change);
+      return {
+        id,
+        wi_nr: row.wi_nr,
+        model_template_id: row.model_template_id,
+        listing_id: row.listing_id,
+        stock_status: row.stock_status,
+        capture_status: row.capture_status,
+      };
+    };
+
+    it('finds devices of every inventory status by a part of the WI-Nr key, ordered by key and id', async () => {
+      const repository = createDeviceRepository(database.db);
+      const cancelled = { stock_status: 'cancelled', cancel_reason: 'falsch', cancelled_at: STAMP };
+      const sold = { stock_status: 'sold', sold_on: '2026-11-16' };
+      const old = await repository.insert(device('633641', cancelled));
+      const now = await repository.insert(device('633641'));
+      const other = await repository.insert(device('A633640', sold));
+      await repository.insert(device('626198'));
+
+      await expect(repository.search({ wiNrKey: '6336', limit: 50, offset: 0 })).resolves.toEqual([
+        hit(old, '633641', cancelled),
+        hit(now, '633641'),
+        hit(other, 'A633640', sold),
+      ]);
+    });
+
+    it('compares the key literally, so % and _ match nothing', async () => {
+      const repository = createDeviceRepository(database.db);
+      await repository.insert(device('626198'));
+
+      await expect(repository.search({ wiNrKey: '%', limit: 50, offset: 0 })).resolves.toEqual([]);
+      await expect(repository.search({ wiNrKey: '6_6', limit: 50, offset: 0 })).resolves.toEqual(
+        [],
+      );
+    });
+
+    it('pages the hits with limit and offset', async () => {
+      const repository = createDeviceRepository(database.db);
+      await repository.insert(device('626198'));
+      const second = await repository.insert(device('626199'));
+      await repository.insert(device('626200'));
+
+      await expect(repository.search({ wiNrKey: '62', limit: 1, offset: 1 })).resolves.toEqual([
+        hit(second, '626199'),
+      ]);
+    });
+  });
 });

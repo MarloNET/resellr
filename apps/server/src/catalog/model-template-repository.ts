@@ -89,6 +89,20 @@ export function createModelTemplateRepository(db: Kysely<DB>) {
         .execute();
     },
 
+    /**
+     * `id` and `model_name` of the given model templates, by `id` (for CU-108); unknown ids are
+     * left out. Without ids there is no query, as `in ()` is invalid in SQLite.
+     */
+    async listByIds(ids: readonly number[]) {
+      if (ids.length === 0) return [];
+      return db
+        .selectFrom('model_template')
+        .select(['id', 'model_name'])
+        .where('id', 'in', ids)
+        .orderBy('id')
+        .execute();
+    },
+
     async findById(id: number): Promise<ModelTemplateRow | undefined> {
       return db.selectFrom('model_template').selectAll().where('id', '=', id).executeTakeFirst();
     },
