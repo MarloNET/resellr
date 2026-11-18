@@ -80,6 +80,9 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
+/** A supplier of UI-003, chosen in the draft of the tests opened from UI-003 (#186). */
+const OST = { id: 4, name: 'Lieferant Ost', active: true, version: 1 };
+
 /**
  * `fetch` of the page: `GET /api/ops/status` for the frame, the device types and manufacturers
  * for the choices, the list of UI-006 after the return and `POST /api/model-templates`. Records
@@ -115,6 +118,8 @@ function mockApi({
       return Response.json({ items, total: items.length });
     }
     if (url.pathname === '/api/pick-lists') return Response.json({ items: PICK_LISTS, total: 9 });
+    // The suppliers of UI-003 after the return to it (#186).
+    if (url.pathname === '/api/suppliers') return Response.json({ items: [OST], total: 1 });
     const valuesPath = /^\/api\/pick-lists\/(\d+)\/values$/.exec(url.pathname);
     if (valuesPath) return pickListValues(Number(valuesPath[1]));
     if (method === 'GET' && url.pathname === '/api/model-templates') {
@@ -130,8 +135,13 @@ function mockApi({
   return { sent, attributeReads };
 }
 
-function renderPage() {
-  const router = createMemoryRouter(routes, { initialEntries: ['/modelle', '/modelle/neu'] });
+/** UI-007 opened from UI-006, or with `fromDeviceIntake` through the link of UI-003 (#186). */
+function renderPage({ fromDeviceIntake = false } = {}) {
+  const router = createMemoryRouter(routes, {
+    initialEntries: fromDeviceIntake
+      ? ['/geraete/neu', { pathname: '/modelle/neu', state: { caller: 'device-intake' } }]
+      : ['/modelle', '/modelle/neu'],
+  });
   render(
     <QueryClientProvider client={createQueryClient()}>
       <RouterProvider router={router} />
@@ -166,8 +176,8 @@ const optionTexts = (control: HTMLSelectElement) => Array.from(control.options, 
 /** The text the field shows: the selected option. */
 const shownText = (control: HTMLSelectElement) => control.selectedOptions[0]?.text ?? null;
 
-async function openPage() {
-  const router = renderPage();
+async function openPage(options: { fromDeviceIntake?: boolean } = {}) {
+  const router = renderPage(options);
   await screen.findByRole('form', { name: 'Modellvorlage anlegen' });
   return router;
 }
@@ -1734,9 +1744,9 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     const useExistingButtons = () =>
       within(dialog()).getAllByRole('button', { name: /^Vorhandene verwenden/ });
 
-    async function openDialog(create: Route = duplicate) {
+    async function openDialog(create: Route = duplicate, { fromDeviceIntake = false } = {}) {
       const api = mockApi({ create });
-      const router = await openPage();
+      const router = await openPage({ fromDeviceIntake });
       await fill();
       fireEvent.click(saveButton());
       await screen.findByRole('dialog', { name: 'Mögliche Dublette' });
@@ -1835,6 +1845,90 @@ describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/modelle'));
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(sent).toHaveLength(1);
+    });
+
+    describe('opened from UI-003 (#186)', () => {
+      const DRAFT_KEY = 'resellr.deviceIntake.draft';
+      const INTAKE_FORM = { wiNr: '626198', supplierId: 4 };
+      const storedDraft = () => JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? 'null') as unknown;
+
+      afterEach(() => sessionStorage.clear());
+
+      it('DER-54-14 "Vorhandene verwenden" at the second hit creates nothing, hands that model template to UI-003 and keeps its inputs', async () => {
+        sessionStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ form: INTAKE_FORM, modelTemplateId: null }),
+        );
+        const { sent, router } = await openDialog(duplicate, { fromDeviceIntake: true });
+
+        fireEvent.click(useExistingButtons()[1]!);
+
+        await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/neu'));
+        // Only the first save without confirmation: no second model template.
+        expect(sent).toEqual([
+          expect.not.objectContaining({ confirmDuplicate: expect.anything() }),
+        ]);
+        expect(screen.queryByRole('form', { name: 'Modellvorlage anlegen' })).toBeNull();
+      });
+
+      it('DER-54-07 UI-007.success "Modellvorlage speichern" hands the new model template to UI-003 with the banner', async () => {
+        sessionStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ form: INTAKE_FORM, modelTemplateId: null }),
+        );
+        mockApi();
+        const router = await openPage({ fromDeviceIntake: true });
+        await fill();
+
+        fireEvent.click(saveButton());
+
+        await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/neu'));
+        expect(await screen.findByText('Modellvorlage gespeichert')).toBeTruthy();
+      });
+
+      it('writes the chosen model template into the draft before UI-003 opens', async () => {
+        sessionStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ form: INTAKE_FORM, modelTemplateId: null }),
+        );
+        const setItem = vi.spyOn(Storage.prototype, 'setItem');
+        const { router } = await openDialog(duplicate, { fromDeviceIntake: true });
+
+        fireEvent.click(useExistingButtons()[1]!);
+
+        await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/neu'));
+        expect(setItem).toHaveBeenCalledWith(
+          DRAFT_KEY,
+          JSON.stringify({ form: INTAKE_FORM, modelTemplateId: 5 }),
+        );
+        setItem.mockRestore();
+      });
+
+      it('"Abbrechen" goes back to UI-003, which shows the inputs of its draft unchanged', async () => {
+        sessionStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ form: INTAKE_FORM, modelTemplateId: null }),
+        );
+        mockApi();
+        const router = await openPage({ fromDeviceIntake: true });
+        await fill();
+
+        fireEvent.click(cancelButton());
+
+        await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/neu'));
+        const intake = await screen.findByRole('form', { name: 'Gerät einbuchen' });
+        await vi.waitFor(() =>
+          expect(
+            within(intake).getByRole<HTMLSelectElement>('combobox', { name: /^Lieferant/ }).value,
+          ).toBe('4'),
+        );
+        expect(
+          within(intake).getByRole<HTMLInputElement>('textbox', { name: /^WI-Nr/ }).value,
+        ).toBe('626198');
+        // No model template is handed back; UI-003 took the draft over once.
+        expect(screen.queryByTestId('chosen-model-template')).toBeNull();
+        expect(storedDraft()).toBeNull();
+      });
     });
   });
 

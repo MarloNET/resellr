@@ -10,7 +10,7 @@ import type { ManufacturerCreateResult } from '@resellr/domain/schemas/manufactu
 import type { PickListList, PickListValueList } from '@resellr/domain/schemas/pick-list.schema';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
 import { possibleDuplicatesOf, useCreateModelTemplateMutation } from '../../api/catalog.api.ts';
@@ -50,6 +50,11 @@ import { Button } from '../../components/ui/Button.tsx';
 import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
+import {
+  chooseModelTemplateInDraft,
+  DEVICE_INTAKE_PATH,
+  isCalledFromDeviceIntake,
+} from '../devices/device-intake-draft.ts';
 import { DuplicateDialog } from './DuplicateDialog.tsx';
 import { ManufacturerCreateDialog } from './ManufacturerCreateDialog.tsx';
 
@@ -86,10 +91,10 @@ const TEXTS = {
     `Modellvorlage konnte nicht gespeichert werden. Referenz: ${referenceNumber ?? '–'}`,
 } as const;
 
-/** The calling page; UI-007 is opened from UI-006 (the call from UI-003 follows with S4). */
-const CALLER_PATH = '/modelle';
+/** UI-006, the calling page unless UI-007 is opened from UI-003. */
+const LIBRARY_PATH = '/modelle';
 /** UI-007 for changing a model template, as UI-006 opens it. */
-const templatePath = (id: number) => `${CALLER_PATH}/${id}`;
+const templatePath = (id: number) => `${LIBRARY_PATH}/${id}`;
 
 /** UI-031 "Hersteller und GPSR", where the GPSR details are completed. */
 const MANUFACTURERS_PATH = '/einstellungen/hersteller';
@@ -319,10 +324,17 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
  * validation (focus on the first error), speichert and ausgang-unbekannt (P-08), success (banner
  * on the calling page), error, unreachable (P-06) for the reads, wird-beendet (P-07) for the
  * save and the dialog dublette for a possible duplicate (REQ-011). "Neuen Hersteller anlegen"
- * opens the dialog UI-008 (#179). Changing (#181) follows.
+ * opens the dialog UI-008 (#179). Opened from UI-003 ("Neue Modellvorlage anlegen"), the calling
+ * page is UI-003: the saved model template, or the existing one of "Vorhandene verwenden", goes
+ * into the draft of UI-003 (CU-133) and UI-003 opens again (DER-54-07, DER-54-14). Changing (#181)
+ * follows.
  */
 export function ModelTemplatePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // UI-003 or UI-006 (UI-007 "Aktionen": "Aufrufseite").
+  const fromDeviceIntake = isCalledFromDeviceIntake(location.state);
+  const callerPath = fromDeviceIntake ? DEVICE_INTAKE_PATH : LIBRARY_PATH;
   const deviceTypes = useDeviceTypesQuery();
   const manufacturers = useManufacturersQuery();
   const createMutation = useCreateModelTemplateMutation();
@@ -652,9 +664,11 @@ export function ModelTemplatePage() {
 
   function send(body: ModelTemplateCreateInput) {
     createMutation.mutate(body, {
-      onSuccess: () => {
+      onSuccess: (created) => {
+        // Back in UI-003 the new model template is chosen (DER-54-07).
+        if (fromDeviceIntake) chooseModelTemplateInDraft(created.id);
         const state: SavedNoticeState = { savedNotice: TEXTS.saved };
-        void navigate(CALLER_PATH, { state });
+        void navigate(callerPath, { state });
       },
       onError: onFailed,
     });
@@ -668,11 +682,17 @@ export function ModelTemplatePage() {
   }
 
   /**
-   * "Vorhandene verwenden": the inputs are discarded and the chosen model template opens in
-   * UI-007 for changing (DER-53-02). The return to UI-003 follows with #186 (DER-54-14).
+   * "Vorhandene verwenden": the inputs are discarded and nothing is created. Opened from UI-003,
+   * the model template of the hit is chosen there and its inputs stay (DER-54-14); otherwise it
+   * opens in UI-007 for changing (DER-53-02).
    */
   function chooseExisting(id: number) {
     setDuplicates(null);
+    if (fromDeviceIntake) {
+      chooseModelTemplateInDraft(id);
+      void navigate(DEVICE_INTAKE_PATH);
+      return;
+    }
     void navigate(templatePath(id));
   }
 
@@ -730,7 +750,7 @@ export function ModelTemplatePage() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
-        <Link to={CALLER_PATH} className="self-start text-body text-primary no-underline">
+        <Link to={LIBRARY_PATH} className="self-start text-body text-primary no-underline">
           <span aria-hidden="true">← </span>
           {TEXTS.back}
         </Link>
@@ -931,7 +951,7 @@ export function ModelTemplatePage() {
 
       {/* The action bar stays visible below the scrolling form (DESIGN.md "Fenstergröße"). */}
       <div className="flex shrink-0 flex-wrap justify-end gap-4 border-t border-border bg-surface px-6 py-4">
-        <Button disabled={saving || writesLocked} onClick={() => void navigate(CALLER_PATH)}>
+        <Button disabled={saving || writesLocked} onClick={() => void navigate(callerPath)}>
           {TEXTS.cancel}
         </Button>
         <Button type="submit" form={formId} variant="primary" disabled={!canSave}>
