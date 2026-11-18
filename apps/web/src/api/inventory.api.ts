@@ -5,13 +5,15 @@ import type {
   DevicePrefillAnswer,
   DeviceSearchResult,
 } from '@resellr/domain/schemas/device.schema';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import type { Listing, ListingCreateInput } from '@resellr/domain/schemas/listing.schema';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
 
-// Hooks of the devices of F-05 (CU-131, Technical Specification 2.5). Changing (#190), the
-// unassigned devices (#258) and the model listings follow.
+// Hooks of the devices of F-05 and the model listings of F-06 (CU-131, Technical Specification
+// 2.5, 2.6). Changing (#190), the unassigned devices (#258), assigning (#194) and the other model
+// listing hooks follow.
 
 /**
  * Hits of the device search of UI-009 (`GET /api/devices?wiNr=`, REQ-016): the first page of
@@ -59,5 +61,17 @@ export function useDevicePrefillQuery(modelTemplateId: number | null) {
 export function useCreateDeviceMutation() {
   return useMutation<Device, ApiError, DeviceCreateInput>({
     mutationFn: (body) => apiClient.post<Device>('/api/devices', body),
+  });
+}
+
+/**
+ * "Neues Modell-Inserat anlegen" of UI-004 (`POST /api/listings`, 2.6): the device is then
+ * assigned to the new model listing, so the cached devices are read again.
+ */
+export function useCreateListingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Listing, ApiError, ListingCreateInput>({
+    mutationFn: (body) => apiClient.post<Listing>('/api/listings', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
   });
 }
