@@ -175,6 +175,24 @@ const failed = () =>
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
+/**
+ * The next read of list `delayedListId` again, answered when the test calls `answer` (open
+ * promise), so a choice fits in between; later reads answer as usual.
+ */
+function delayedReload(delayedListId: number) {
+  let answer: (response: Response) => void = () => {};
+  const delayed = new Promise<Response>((resolve) => {
+    answer = resolve;
+  });
+  let given = false;
+  const reload = (listId: number) => {
+    if (listId !== delayedListId || given) return undefined;
+    given = true;
+    return delayed;
+  };
+  return { reload, answer };
+}
+
 /** The answer of a saved `PATCH` as the server gives it: the values merged, `null` removes. */
 function savedAnswer(init: RequestInit | undefined) {
   const { values, ...fields } = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -611,15 +629,12 @@ describe('UI-010 choice after pick_list_value_deactivated (2.0.11, design v0.6.8
     expect(errorOf(select('Tastaturlayout'))).toBeNull();
   });
 
-  it('T5j a choice while the lists are read again is checked like any other; the stored entry chosen meanwhile stays without text', async () => {
-    let answer: (response: Response) => void = () => {};
-    const delayed = new Promise<Response>((resolve) => {
-      answer = resolve;
-    });
+  it('T5j a choice while the lists are read again is checked like any other: missing → emptied with its text, focus only after the reload, the text stays on leaving, a new save does not send it; the stored entry stays choosable', async () => {
+    const { reload, answer } = delayedReload(11);
     const api = mockApi({
       device: WITH_DEACTIVATED,
       update: deactivated('Zustand defekt ist deaktiviert', 'conditionValueId', DEFECT),
-      reload: (listId) => (listId === 11 ? delayed : undefined),
+      reload,
     });
     api.deactivate(1, REFURBISHED);
     api.deactivate(11, HUNGARIAN);
@@ -650,15 +665,137 @@ describe('UI-010 choice after pick_list_value_deactivated (2.0.11, design v0.6.8
     );
     expect(select('Tastaturlayout').value).toBe('');
     expect(document.activeElement).toBe(select('Zustand'));
-    // The stored "Ungarisch" stays choosable with "(deaktiviert)" and ends the text.
+    fireEvent.blur(select('Tastaturlayout'));
+    expect(errorOf(select('Tastaturlayout'))).toBe(
+      'Tastaturlayout: Englisch (QWERTY, US) ist deaktiviert',
+    );
+
+    // A new save with a condition chosen stops at the empty keyboard layout and sends nothing.
+    await choose('Zustand', USED);
+    fireEvent.click(saveButton());
+    expect(errorOf(select('Tastaturlayout'))).toBe('Tastaturlayout fehlt');
+    expect(api.sent).toHaveLength(1);
+
+    // The stored "Ungarisch" stays choosable with "(deaktiviert)"; chosen, the field is valid.
     expect(optionTexts(select('Tastaturlayout'))).toEqual([
       'Bitte wählen',
       'Deutsch (QWERTZ)',
       'Ungarisch (deaktiviert)',
     ]);
     await choose('Tastaturlayout', HUNGARIAN);
+    fireEvent.blur(select('Tastaturlayout'));
     expect(errorOf(select('Tastaturlayout'))).toBeNull();
     expect(api.sent.filter((body) => JSON.stringify(body).includes(`"16":${ENGLISH}`))).toEqual([]);
+  });
+
+  it('T5k the stored entry and an entry active in the new list, chosen while the lists are read again, stay chosen without text and are saved', async () => {
+    const { reload, answer } = delayedReload(11);
+    let patches = 0;
+    const api = mockApi({
+      device: WITH_DEACTIVATED,
+      update: (init) => {
+        patches += 1;
+        return patches === 1
+          ? deactivated('Zustand defekt ist deaktiviert', 'conditionValueId', DEFECT)()
+          : savedAnswer(init);
+      },
+      reload,
+    });
+    api.deactivate(1, REFURBISHED);
+    api.deactivate(11, HUNGARIAN);
+    await openDevice();
+    await choose('Zustand', DEFECT);
+    await choose('Tastaturlayout', GERMAN);
+    api.deactivate(1, DEFECT);
+    fireEvent.click(saveButton());
+    await vi.waitFor(() =>
+      expect(errorOf(select('Zustand'))).toBe('Zustand defekt ist deaktiviert'),
+    );
+
+    // During the reload: the stored, deactivated "Ungarisch" and the active "HDD" chosen.
+    await choose('Tastaturlayout', HUNGARIAN);
+    await choose('Speichertyp', HDD);
+    textbox('Optik-Note').focus();
+    answer(
+      list([
+        value(GERMAN, 'Deutsch (QWERTZ)'),
+        value(HUNGARIAN, 'Ungarisch', false),
+        value(ENGLISH, 'Englisch (QWERTY, US)'),
+      ]),
+    );
+
+    await vi.waitFor(() => expect(document.activeElement).toBe(select('Zustand')));
+    expect(shownText(select('Tastaturlayout'))).toBe('Ungarisch (deaktiviert)');
+    expect(errorOf(select('Tastaturlayout'))).toBeNull();
+    expect(shownText(select('Speichertyp'))).toBe('HDD');
+    expect(errorOf(select('Speichertyp'))).toBeNull();
+    expectAccessibleCard();
+
+    await choose('Zustand', USED);
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(api.sent).toHaveLength(2));
+    expect(api.sent[1]).toMatchObject({
+      conditionValueId: USED,
+      values: { 15: HDD, 16: HUNGARIAN },
+    });
+    expect(await screen.findByText('Gerät gespeichert')).toBeTruthy();
+  });
+
+  it('T5l the rejected id chosen again in the field of details.path while the lists are read again is emptied with its text and never sent', async () => {
+    const { reload, answer } = delayedReload(1);
+    const api = mockApi({
+      update: deactivated('Zustand defekt ist deaktiviert', 'conditionValueId', DEFECT),
+      reload,
+    });
+    await openDevice();
+    await choose('Zustand', DEFECT);
+    fireEvent.click(saveButton());
+    await vi.waitFor(() =>
+      expect(errorOf(select('Zustand'))).toBe('Zustand defekt ist deaktiviert'),
+    );
+
+    // During the reload: another entry, then the rejected "defekt" again from the old list.
+    await choose('Zustand', USED);
+    await choose('Zustand', DEFECT);
+    answer(
+      list([
+        value(USED, 'gebraucht'),
+        value(REFURBISHED, 'refurbished'),
+        value(DEFECT, 'defekt', false),
+      ]),
+    );
+
+    await vi.waitFor(() =>
+      expect(optionTexts(select('Zustand'))).toEqual(['Bitte wählen', 'gebraucht', 'refurbished']),
+    );
+    expect(select('Zustand').value).toBe('');
+    expect(errorOf(select('Zustand'))).toBe('Zustand defekt ist deaktiviert');
+    fireEvent.click(saveButton());
+    expect(errorOf(select('Zustand'))).toBe('Zustand fehlt');
+    expect(api.sent).toHaveLength(1);
+  });
+
+  it('T5m when reading the lists again fails, another choice in the field of details.path made meanwhile stays, and the rejected id is no longer offered', async () => {
+    const { reload, answer } = delayedReload(1);
+    mockApi({
+      update: deactivated('Zustand defekt ist deaktiviert', 'conditionValueId', DEFECT),
+      reload,
+    });
+    await openDevice();
+    await choose('Zustand', DEFECT);
+    fireEvent.click(saveButton());
+    await vi.waitFor(() =>
+      expect(errorOf(select('Zustand'))).toBe('Zustand defekt ist deaktiviert'),
+    );
+    await choose('Zustand', REFURBISHED);
+
+    answer(failed());
+
+    await vi.waitFor(() =>
+      expect(optionTexts(select('Zustand'))).toEqual(['Bitte wählen', 'gebraucht', 'refurbished']),
+    );
+    expect(select('Zustand').value).toBe(String(REFURBISHED));
+    expect(errorOf(select('Zustand'))).toBeNull();
   });
 });
 

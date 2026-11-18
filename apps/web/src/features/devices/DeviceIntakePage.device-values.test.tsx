@@ -600,7 +600,44 @@ describe('UI-003 choice after pick_list_value_deactivated (2.0.11, design v0.6.8
     );
   });
 
-  it('T5j the rejected id chosen again during the reload is emptied with its text; when the reload fails another choice stays and the rejected id leaves the list', async () => {
+  it('T5k an entry active in the new list, chosen while the lists are read again, stays chosen without text and is saved', async () => {
+    let answer: (response: Response) => void = () => {};
+    const delayed = new Promise<Response>((resolve) => {
+      answer = resolve;
+    });
+    let posts = 0;
+    const api = mockApi({
+      create: () => {
+        posts += 1;
+        return posts === 1
+          ? deactivated(REFURBISHED_DEACTIVATED, 'conditionValueId', REFURBISHED)()
+          : Response.json(CREATED, { status: 201 });
+      },
+      reload: (listId) => (listId === 11 ? delayed : undefined),
+    });
+    await fillValid();
+    api.deactivate(1, REFURBISHED);
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(errorOf(select('Zustand'))).toBe(REFURBISHED_DEACTIVATED));
+
+    // During the reload: "Deutsch" chosen, still active in the new list.
+    await choose('Tastaturlayout', GERMAN);
+    textbox('Optik-Note').focus();
+    answer(list([value(GERMAN, 'Deutsch (QWERTZ)'), value(HUNGARIAN, 'Ungarisch', false)]));
+
+    await vi.waitFor(() => expect(document.activeElement).toBe(select('Zustand')));
+    expect(shownText(select('Tastaturlayout'))).toBe('Deutsch (QWERTZ)');
+    expect(errorOf(select('Tastaturlayout'))).toBeNull();
+    expect(summaryItems()).toEqual([REFURBISHED_DEACTIVATED]);
+    expectAccessibleForm();
+
+    await choose('Zustand', USED);
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(api.sent).toHaveLength(2));
+    expect(api.sent[1]).toMatchObject({ conditionValueId: USED, values: { 16: GERMAN } });
+  });
+
+  it('T5l the rejected id chosen again in the field of details.path during the reload stays emptied with its text, also when the reload fails, and is never sent', async () => {
     let answer: (response: Response) => void = () => {};
     const delayed = new Promise<Response>((resolve) => {
       answer = resolve;
@@ -625,7 +662,7 @@ describe('UI-003 choice after pick_list_value_deactivated (2.0.11, design v0.6.8
     expect(api.sent).toHaveLength(1);
   });
 
-  it('T5j when the reload fails, another choice in the field of details.path stays, and the rejected id is no longer offered', async () => {
+  it('T5m when the reload fails, another choice in the field of details.path stays, and the rejected id is no longer offered', async () => {
     let answer: (response: Response) => void = () => {};
     const delayed = new Promise<Response>((resolve) => {
       answer = resolve;
