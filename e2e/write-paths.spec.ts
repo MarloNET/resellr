@@ -232,10 +232,19 @@ const DETAIL_PATHS = new Set(['/api/model-templates']);
 const ENTRY_PATHS = new Set(['/api/devices']);
 
 /**
+ * Collections without any read of their own yet, with the read that shows each created entry by
+ * the body of its request: a model listing through the device it was created from (`listing` of
+ * `GET /api/devices/{id}`, 2.5); the reads of the listings follow with #198.
+ */
+const VIA_PATHS: Record<string, (body: unknown) => string> = {
+  '/api/listings': (body) => `/api/devices/${(body as { fromDeviceId: number }).fromDeviceId}`,
+};
+
+/**
  * What the user sees of the seeded data: the answer of `GET` on every collection the demo data
  * created entries in and on every single resource it saved (`PUT`, e.g. the merchant profile). A
  * seed area that writes to a path without `GET` fails here and has to name how its data is read
- * (`READ_PATHS`, `DETAIL_PATHS`, `ENTRY_PATHS`).
+ * (`READ_PATHS`, `DETAIL_PATHS`, `ENTRY_PATHS`, `VIA_PATHS`).
  */
 async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<unknown> {
   const api = createDemoApi(baseUrl);
@@ -248,6 +257,13 @@ async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<un
       for (const { answer } of writes.filter((w) => w.method === 'POST' && w.path === path)) {
         const { id } = answer as { id: number };
         state[`${path}/${id}`] = await api.request('GET', `${path}/${id}`);
+      }
+      continue;
+    }
+    const via = VIA_PATHS[path];
+    if (via !== undefined) {
+      for (const { body } of writes.filter((w) => w.method === 'POST' && w.path === path)) {
+        state[`${path} via ${via(body)}`] = await api.request('GET', via(body));
       }
       continue;
     }

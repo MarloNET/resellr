@@ -1,4 +1,8 @@
-import { variantsMatch, type VariantSpec } from '@resellr/domain/inventory/compare-variants';
+import {
+  descriptionKey,
+  variantsMatch,
+  type VariantSpec,
+} from '@resellr/domain/inventory/compare-variants';
 import type { AttributeValues } from '@resellr/domain/schemas/attribute-values.schema';
 import {
   type Listing,
@@ -45,9 +49,6 @@ export function toListing(row: ListingRow, deliveryScopeTextBlockIds: number[]):
     version: row.version,
   };
 }
-
-/** Condition description as the comparison rule sees it (3.3 `condition_description_key`). */
-const descriptionKey = (description: string) => description.trim().toLowerCase();
 
 /**
  * The values of a device split for its model listing (2.6, AC-REQ-019-01): the variant values

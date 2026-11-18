@@ -322,14 +322,35 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
     });
     expect(count('listing')).toBe(1);
 
-    // The article number is unique without regard to case (2.7).
-    const sameKey = await createListing({
+    const another = await createListing({
       fromDeviceId: deviceId,
       deviceVersion: 1,
-      articleNumber: 'MI-626199'.toLowerCase(),
+      articleNumber: 'mi-626199',
     });
-    expect(sameKey.statusCode).toBe(201);
-    expect(sameKey.json().articleNumber).toBe('mi-626199');
+    expect(another.statusCode).toBe(201);
+    expect(another.json().articleNumber).toBe('mi-626199');
+  });
+
+  it('rejects an article number that differs only in case with article_number_taken (2.7)', async () => {
+    await createListing({
+      fromDeviceId: await captureDevice('626198'),
+      deviceVersion: 1,
+      articleNumber: 'MI-A',
+    });
+    const deviceId = await captureDevice('626199', { visualGrade: '4' });
+
+    const response = await createListing({
+      fromDeviceId: deviceId,
+      deviceVersion: 1,
+      articleNumber: 'mi-a',
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'article_number_taken',
+      details: { path: 'articleNumber' },
+    });
+    expect(count('listing')).toBe(1);
   });
 
   it('rejects an article number of another form with validation_failed at the field', async () => {

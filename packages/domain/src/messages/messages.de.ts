@@ -231,10 +231,10 @@ export const ERROR_MESSAGES = {
   /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
   'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
-  /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   /** UI-004 "Neues Modell-Inserat anlegen" (2.0.6, AC-REQ-019-02): the display title of it. */
   'variant_duplicate.new_listing': (listingTitle: string) =>
     `Gleiche Variantenangaben wie Modell-Inserat ${listingTitle}; bitte dort zuordnen`,
+  /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   'variant_flag_would_merge_listings.flag': (listings: string) =>
     `Änderung nicht möglich: Modell-Inserate ${listings} würden gleiche Variantenangaben haben`,
   /**

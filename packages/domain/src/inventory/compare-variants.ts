@@ -16,7 +16,7 @@ export interface VariantSpec {
 export type VariantKey = 'condition' | 'visualGrade' | 'conditionDescription' | `${number}`;
 
 /** Condition description as compared: trimmed and in Unicode lower case (2.6). */
-const descriptionKey = (description: string) => description.trim().toLowerCase();
+export const descriptionKey = (description: string) => description.trim().toLowerCase();
 
 /**
  * A value as compared: a missing value only equals a missing value, multiple entries (ports)
