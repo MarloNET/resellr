@@ -354,3 +354,181 @@ describe('GET /api/devices/{id} (CU-130, Technical Specification 2.5)', () => {
     expect(response.json().error.code).toBe('not_found');
   });
 });
+
+/**
+ * MV-B: an iPhone with processor at the level model and the defaults of AC-REQ-013-01 for
+ * operating system, battery and battery capacity at the level device.
+ */
+function insertMvB(): number {
+  const { sqlite } = t.database;
+  const smartphone = (
+    sqlite.prepare("SELECT id FROM device_type WHERE name = 'Smartphone'").get() as { id: number }
+  ).id;
+  const processor = (
+    sqlite
+      .prepare("SELECT id FROM attribute WHERE device_type_id = ? AND label = 'Prozessor'")
+      .get(smartphone) as { id: number }
+  ).id;
+  return insertModelTemplate(sqlite, {
+    deviceTypeId: smartphone,
+    manufacturerId: insertManufacturer(sqlite, 'Apple Inc.'),
+    modelName: 'iPhone 14',
+    mpn: 'MPUF3ZD/A',
+    modelValues: { [processor]: 'A15 Bionic' },
+    defaultDeviceValues: {
+      [ids.operatingSystem]: ids.ios,
+      [ids.battery]: ids.withBattery,
+      [ids.batteryCapacity]: { percent: 85 },
+    },
+  });
+}
+
+const setActive = (valueId: number, active: boolean) =>
+  t.database.sqlite
+    .prepare('UPDATE pick_list_value SET active = ? WHERE id = ?')
+    .run(active ? 1 : 0, valueId);
+
+/** The values of MV-B unchanged, as UI-003 sends them after the prefill. */
+const prefilledBody = (mvB: number, change: Record<string, unknown> = {}) =>
+  body({
+    modelTemplateId: mvB,
+    values: {
+      [ids.operatingSystem]: ids.ios,
+      [ids.battery]: ids.withBattery,
+      [ids.batteryCapacity]: { percent: 85 },
+    },
+    ...change,
+  });
+
+describe('GET /api/model-templates/{id}/device-prefill (CU-293, Technical Specification 2.5)', () => {
+  it('AC-REQ-013-01 prefills battery and battery capacity of MV-A with review flags, the processor of the level model without', async () => {
+    const mvB = insertMvB();
+
+    const response = await get(`/api/model-templates/${mvB}/device-prefill`);
+
+    expect(response.statusCode).toBe(200);
+    const prefill = response.json();
+    expect(prefill).toEqual({
+      conditionValueId: null,
+      visualGrade: null,
+      conditionDescription: '',
+      values: {
+        [ids.operatingSystem]: ids.ios,
+        [ids.battery]: ids.withBattery,
+        [ids.batteryCapacity]: { percent: 85 },
+      },
+      reviewKeys: expect.any(Array),
+      codeResult: { found: false, plainText: null },
+    });
+    expect([...prefill.reviewKeys].sort()).toEqual(
+      [ids.operatingSystem, ids.battery, ids.batteryCapacity].map(String).sort(),
+    );
+  });
+
+  it('DER-55-06 leaves out a deactivated pick list value, which stays stored at the model template', async () => {
+    const mvB = insertMvB();
+    setActive(ids.ios, false);
+
+    const prefill = (await get(`/api/model-templates/${mvB}/device-prefill`)).json();
+
+    expect(prefill.values).not.toHaveProperty(String(ids.operatingSystem));
+    expect(prefill.reviewKeys).not.toContain(String(ids.operatingSystem));
+    const stored = t.database.sqlite
+      .prepare('SELECT default_device_values FROM model_template WHERE id = ?')
+      .get(mvB) as { default_device_values: string };
+    expect(JSON.parse(stored.default_device_values)).toHaveProperty(
+      String(ids.operatingSystem),
+      ids.ios,
+    );
+
+    setActive(ids.ios, true);
+    const again = (await get(`/api/model-templates/${mvB}/device-prefill`)).json();
+    expect(again.values).toHaveProperty(String(ids.operatingSystem), ids.ios);
+    expect(again.reviewKeys).toContain(String(ids.operatingSystem));
+  });
+
+  it('answers 404 not_found for an unknown model template', async () => {
+    const response = await get('/api/model-templates/999/device-prefill');
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('not_found');
+  });
+});
+
+describe('review flags of POST /api/devices (CU-121, CU-118, Technical Specification 2.5)', () => {
+  it('AC-REQ-013-04 stores a device with open review flags as "review_pending", without one as "checked"', async () => {
+    const mvB = insertMvB();
+
+    const pending = await post(prefilledBody(mvB));
+    expect(pending.statusCode).toBe(201);
+    expect(pending.json().captureStatus).toBe('review_pending');
+    expect([...pending.json().reviewKeys].sort()).toEqual(
+      [ids.operatingSystem, ids.battery, ids.batteryCapacity].map(String).sort(),
+    );
+
+    const checked = await post(
+      prefilledBody(mvB, {
+        wiNr: '626199',
+        confirmedKeys: [ids.operatingSystem, ids.battery, ids.batteryCapacity].map(String),
+      }),
+    );
+    expect(checked.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
+    const stored = t.database.sqlite
+      .prepare('SELECT capture_status, review_keys FROM device WHERE wi_nr = ?')
+      .get('626199');
+    expect(stored).toEqual({ capture_status: 'checked', review_keys: '[]' });
+  });
+
+  it('AC-REQ-013-02 lifts the flag of the battery capacity confirmed unchanged', async () => {
+    const mvB = insertMvB();
+
+    const response = await post(
+      prefilledBody(mvB, { confirmedKeys: [String(ids.batteryCapacity)] }),
+    );
+
+    expect(response.json().reviewKeys).not.toContain(String(ids.batteryCapacity));
+    expect(response.json().reviewKeys).toContain(String(ids.battery));
+    expect(response.json().captureStatus).toBe('review_pending');
+  });
+
+  it('lifts the flag of a value changed from the prefilled one', async () => {
+    const mvB = insertMvB();
+
+    const response = await post(
+      prefilledBody(mvB, {
+        values: {
+          [ids.operatingSystem]: ids.ios,
+          [ids.battery]: ids.withBattery,
+          [ids.batteryCapacity]: { percent: 87 },
+        },
+        confirmedKeys: [String(ids.operatingSystem), String(ids.battery)],
+      }),
+    );
+
+    expect(response.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
+  });
+
+  it('DER-55-06 forms no flag for a deactivated default, so an active value chosen instead saves', async () => {
+    const mvB = insertMvB();
+    setActive(ids.ios, false);
+    const android = (
+      t.database.sqlite.prepare("SELECT id FROM pick_list_value WHERE label = 'Android'").get() as {
+        id: number;
+      }
+    ).id;
+
+    const response = await post(
+      prefilledBody(mvB, {
+        values: {
+          [ids.operatingSystem]: android,
+          [ids.battery]: ids.withBattery,
+          [ids.batteryCapacity]: { percent: 85 },
+        },
+        confirmedKeys: [String(ids.battery), String(ids.batteryCapacity)],
+      }),
+    );
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
+  });
+});

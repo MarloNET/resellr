@@ -163,6 +163,23 @@ const CREATED = {
   updatedAt: '2026-11-16T10:00:00.000Z',
 };
 
+/** The prefill of a model template without defaults and without condition code (2.5). */
+const NO_PREFILL = {
+  conditionValueId: null,
+  visualGrade: null,
+  conditionDescription: '',
+  values: {},
+  reviewKeys: [],
+  codeResult: { found: false, plainText: null },
+};
+
+/** The prefill of MV-A with the defaults of AC-REQ-013-01: battery "mit Akku", capacity 85. */
+const MV_A_PREFILL = {
+  ...NO_PREFILL,
+  values: { 16: 111, 18: WITH_BATTERY, 19: { percent: 85 } },
+  reviewKeys: ['16', '18', '19'],
+};
+
 const WI_NR_RULE = 'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)';
 const CAPACITY_RULE = 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“';
 const WEST_DEACTIVATED = 'Lieferant Lieferant West ist deaktiviert';
@@ -193,12 +210,14 @@ function mockApi({
   search = () => list([MV_A]),
   modelTemplate = () => Response.json(MODEL_TEMPLATE),
   portTypes = () => list(PORT_TYPES),
+  prefill = () => Response.json(NO_PREFILL),
 }: {
   create?: Route;
   suppliers?: Route;
   search?: Route;
   modelTemplate?: Route;
   portTypes?: Route;
+  prefill?: Route;
 } = {}) {
   const sent: Record<string, unknown>[] = [];
   const reads = { suppliers: 0 };
@@ -221,6 +240,7 @@ function mockApi({
     if (route === 'GET /api/pick-lists/12/values') return list(POWER_SUPPLIES);
     if (route === 'GET /api/model-templates') return search(init);
     if (route === 'GET /api/model-templates/7') return modelTemplate(init);
+    if (route === 'GET /api/model-templates/7/device-prefill') return prefill(init);
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
     if (route === 'POST /api/devices') {
       sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
@@ -325,6 +345,179 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe('UI-003 prefill and review flags (CU-132, REQ-013; Technical Specification 2.5)', () => {
+  const chips = () => within(form()).queryAllByText('zu prüfen');
+  const confirmButton = (field: string) =>
+    within(form()).getByRole<HTMLButtonElement>('button', { name: `${field} bestätigen` });
+  const statusLine = () =>
+    screen.queryByText(/^Noch \d+ Werte zu prüfen\./) ?? screen.queryByText('Alle Werte geprüft.');
+
+  async function choosePrefilled() {
+    await chooseModelTemplate();
+    await vi.waitFor(() => expect(chips()).toHaveLength(3));
+  }
+
+  it('UI-003.loading DER-55-01 shows "Lade Gerätewerte …" in the values card while the prefill loads', async () => {
+    mockApi({ prefill: pending });
+    await openPage();
+    fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
+
+    fireEvent.change(searchBox(), { target: { value: 'T14' } });
+    fireEvent.click(await screen.findByRole('button', { name: MV_A_LINE }));
+
+    const card = await screen.findByRole('region', { name: 'Gerätewerte' });
+    await vi.waitFor(() =>
+      expect(within(card).getByRole('status').textContent).toBe('Lade Gerätewerte …'),
+    );
+    expect(within(card).queryByRole('combobox')).toBeNull();
+    expect(saveAndAssignButton().disabled).toBe(false);
+    expectAccessiblePage();
+  });
+
+  it('UI-003.default AC-REQ-013-01 DER-55-02 prefills battery and battery capacity of MV-A with "zu prüfen" and "Bestätigen", the processor without', async () => {
+    mockApi({ prefill: () => Response.json(MV_A_PREFILL) });
+    await openPage();
+
+    await choosePrefilled();
+
+    expect(select('Tastaturlayout').value).toBe('111');
+    expect(select('Akku').value).toBe(String(WITH_BATTERY));
+    expect(textbox('Akkukapazität').value).toBe('85');
+    expect(select('Netzteil').value).toBe('');
+    for (const field of ['Tastaturlayout', 'Akku', 'Akkukapazität']) {
+      expect(confirmButton(field).textContent).toBe('Bestätigen');
+    }
+    expect(within(form()).queryByRole('button', { name: 'Netzteil bestätigen' })).toBeNull();
+    const panel = screen.getByRole('complementary', { name: 'Modelldaten (nur lesen)' });
+    await within(panel).findByText('Intel Core i5-1135G7');
+    expect(within(panel).queryByText('zu prüfen')).toBeNull();
+    expect(statusLine()?.textContent).toBe(
+      'Noch 3 Werte zu prüfen. Das Gerät kann gespeichert, aber noch nicht zugeordnet werden.',
+    );
+    expectAccessiblePage();
+  });
+
+  it('UI-003.default DER-55-02 shows "Alle Werte geprüft." once every flag is lifted, also without defaults', async () => {
+    mockApi({ prefill: () => Response.json(MV_A_PREFILL) });
+    await openPage();
+    await choosePrefilled();
+
+    for (const field of ['Tastaturlayout', 'Akku', 'Akkukapazität']) {
+      fireEvent.click(confirmButton(field));
+    }
+
+    expect(chips()).toHaveLength(0);
+    expect(statusLine()?.textContent).toBe('Alle Werte geprüft.');
+  });
+
+  it('UI-003.disabled DER-55-03 deactivates "Speichern und zuordnen" with the tooltip and the hint naming the fields, also for Ctrl+Enter', async () => {
+    const { sent } = mockApi({ prefill: () => Response.json(MV_A_PREFILL) });
+    await openPage();
+    await choosePrefilled();
+
+    const button = saveAndAssignButton();
+    expect(button.disabled).toBe(true);
+    expect(button.title).toBe('Erst Werte prüfen');
+    const hint = document.getElementById(button.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe('Erst Werte prüfen: Tastaturlayout, Akku, Akkukapazität');
+    expect(screen.getByText('Erst Werte prüfen: Tastaturlayout, Akku, Akkukapazität')).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    expect(sent).toEqual([]);
+    expect(saveButton().disabled).toBe(false);
+    expectAccessiblePage();
+  });
+
+  it('DER-55-04 "Bestätigen" and changing a value lift its flag and the count drops by one', async () => {
+    mockApi({ prefill: () => Response.json(MV_A_PREFILL) });
+    await openPage();
+    await choosePrefilled();
+
+    fireEvent.click(confirmButton('Akkukapazität'));
+    expect(statusLine()?.textContent).toMatch(/^Noch 2 Werte zu prüfen\./);
+    expect(textbox('Akkukapazität').value).toBe('85');
+    expect(document.activeElement).toBe(textbox('Akkukapazität'));
+
+    await choose('Akku', 102);
+    expect(statusLine()?.textContent).toMatch(/^Noch 1 Werte zu prüfen\./);
+    expect(within(form()).queryByRole('button', { name: 'Akku bestätigen' })).toBeNull();
+    expect(screen.getByText('Erst Werte prüfen: Tastaturlayout')).toBeTruthy();
+  });
+
+  it('AC-REQ-013-04 "Gerät speichern" with open flags sends no confirmation, the server answers "review_pending"', async () => {
+    const { sent } = mockApi({ prefill: () => Response.json(MV_A_PREFILL) });
+    await openPage();
+    fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
+    await choosePrefilled();
+    fireEvent.change(select('Zustand'), { target: { value: '1' } });
+    fireEvent.change(textbox('Optik-Note'), { target: { value: '3' } });
+    await choose('Netzteil', 121);
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({
+      values: { 16: 111, 17: 121, 18: WITH_BATTERY, 19: { percent: '85' } },
+      confirmedKeys: [],
+    });
+  });
+
+  it('AC-REQ-013-02 sends the confirmed and the changed fields as confirmedKeys with "Speichern und zuordnen"', async () => {
+    const { sent } = mockApi({ prefill: () => Response.json(MV_A_PREFILL) });
+    await openPage();
+    fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
+    await choosePrefilled();
+    fireEvent.change(select('Zustand'), { target: { value: '1' } });
+    fireEvent.change(textbox('Optik-Note'), { target: { value: '3' } });
+    await choose('Netzteil', 121);
+    fireEvent.click(confirmButton('Akkukapazität'));
+    fireEvent.click(confirmButton('Tastaturlayout'));
+    await choose('Akku', 102);
+
+    expect(saveAndAssignButton().disabled).toBe(false);
+    expect(saveAndAssignButton().title).toBe('');
+    fireEvent.click(saveAndAssignButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect([...(sent[0]?.confirmedKeys as string[])].sort()).toEqual(['16', '18', '19']);
+  });
+
+  it('DER-55-06 the field of a deactivated default stays empty without "zu prüfen" and the user chooses an active value', async () => {
+    // The server leaves the deactivated keyboard layout out of the prefill (CU-117).
+    mockApi({
+      prefill: () =>
+        Response.json({
+          ...MV_A_PREFILL,
+          values: { 18: WITH_BATTERY, 19: { percent: 85 } },
+          reviewKeys: ['18', '19'],
+        }),
+    });
+    await openPage();
+    await chooseModelTemplate();
+    await vi.waitFor(() => expect(chips()).toHaveLength(2));
+
+    expect(select('Tastaturlayout').value).toBe('');
+    expect(within(form()).queryByRole('button', { name: 'Tastaturlayout bestätigen' })).toBeNull();
+    await choose('Tastaturlayout', 111);
+
+    expect(select('Tastaturlayout').value).toBe('111');
+    expect(chips()).toHaveLength(2);
+    expect(statusLine()?.textContent).toMatch(/^Noch 2 Werte zu prüfen\./);
+  });
+
+  it('"Andere Modellvorlage wählen" drops the prefill with its flags and loads it again', async () => {
+    mockApi({ prefill: () => Response.json(MV_A_PREFILL) });
+    await openPage();
+    await choosePrefilled();
+    fireEvent.click(confirmButton('Akku'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Andere Modellvorlage wählen' }));
+    expect(statusLine()).toBeNull();
+    await choosePrefilled();
+
+    expect(statusLine()?.textContent).toMatch(/^Noch 3 Werte zu prüfen\./);
+  });
 });
 
 describe('UI-003 Gerät einbuchen (CU-132)', () => {

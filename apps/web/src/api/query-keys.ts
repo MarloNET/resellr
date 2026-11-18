@@ -36,6 +36,8 @@ export const queryKeys = {
   inventory: {
     all: ['inventory'] as const,
     device: (id: number) => ['inventory', 'device', id] as const,
+    devicePrefill: (modelTemplateId: number) =>
+      ['inventory', 'device-prefill', modelTemplateId] as const,
   },
 } as const;
 

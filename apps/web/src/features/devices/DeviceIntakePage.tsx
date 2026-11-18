@@ -1,9 +1,13 @@
 import { formatNumber, formatWithUnit, formatYesNo } from '@resellr/domain/format/format-value';
 import { ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
-import type { PortEntry } from '@resellr/domain/schemas/attribute-values.schema';
+import type { AttributeValue, PortEntry } from '@resellr/domain/schemas/attribute-values.schema';
 import type { BatteryValueFlag } from '@resellr/domain/schemas/pick-list.schema';
-import { type DeviceCreateInput, deviceCreateSchema } from '@resellr/domain/schemas/device.schema';
+import {
+  type DeviceCreateInput,
+  deviceCreateSchema,
+  type DevicePrefillAnswer,
+} from '@resellr/domain/schemas/device.schema';
 import {
   type ModelTemplate,
   type ModelTemplateListItem,
@@ -15,7 +19,7 @@ import { Link } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
 import { useModelTemplateQuery, useModelTemplatesQuery } from '../../api/catalog.api.ts';
-import { useCreateDeviceMutation } from '../../api/inventory.api.ts';
+import { useCreateDeviceMutation, useDevicePrefillQuery } from '../../api/inventory.api.ts';
 import {
   useAttributesQuery,
   usePickListsQuery,
@@ -31,6 +35,7 @@ import {
   attributesOfLevel,
 } from '../../components/forms/AttributeFieldsForm.tsx';
 import {
+  attributeInputOf,
   type AttributeInputValue,
   emptyAttributeInput,
 } from '../../components/forms/AttributeInput.tsx';
@@ -48,6 +53,7 @@ import {
   type SaveNotice,
 } from '../../components/patterns/SaveNoticeBanners.tsx';
 import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.tsx';
+import { Badge } from '../../components/ui/Badge.tsx';
 import { Button } from '../../components/ui/Button.tsx';
 import { cn } from '../../components/ui/cn.ts';
 import { Input } from '../../components/ui/Input.tsx';
@@ -80,6 +86,13 @@ const TEXTS = {
   error: (referenceNumber: string | null) =>
     `Das Gerät konnte nicht gespeichert werden. Bitte erneut versuchen. Referenz: ${referenceNumber ?? '–'}`,
   notDeterminable: 'nicht ermittelbar',
+  toReview: 'zu prüfen',
+  confirm: 'Bestätigen',
+  confirmField: (field: string) => `${field} bestätigen`,
+  reviewOpen: (count: number) =>
+    `Noch ${count} Werte zu prüfen. Das Gerät kann gespeichert, aber noch nicht zugeordnet werden.`,
+  allReviewed: 'Alle Werte geprüft.',
+  reviewFirst: 'Erst Werte prüfen',
 } as const;
 
 /** Wait after the last keystroke before the model templates are searched (as in UI-006). */
@@ -109,6 +122,10 @@ interface Draft {
   conditionDescription: string;
   /** Inputs of the attributes of the level device by attribute id (CU-111). */
   values: AttributeInputs;
+  /** The review flags of the prefill (REQ-013): attribute ids, `condition`, `visualGrade`. */
+  reviewKeys: readonly string[];
+  /** The flags the user lifted by "Bestätigen" or by changing the value (UI-003 "Aktionen"). */
+  confirmedKeys: readonly string[];
 }
 
 const EMPTY_DRAFT: Draft = {
@@ -119,7 +136,47 @@ const EMPTY_DRAFT: Draft = {
   visualGrade: '',
   conditionDescription: '',
   values: {},
+  reviewKeys: [],
+  confirmedKeys: [],
 };
+
+/** The review flags still open: the prefilled ones not confirmed or changed (2.5, CU-118). */
+const openReviewKeys = ({ reviewKeys, confirmedKeys }: Draft) =>
+  reviewKeys.filter((key) => !confirmedKeys.includes(key));
+
+/** The draft with a review flag lifted; a key without a flag is not recorded. */
+function withConfirmed(draft: Draft, keys: readonly string[]): Pick<Draft, 'confirmedKeys'> {
+  const lifted = keys.filter((key) => draft.reviewKeys.includes(key));
+  return { confirmedKeys: [...new Set([...draft.confirmedKeys, ...lifted])] };
+}
+
+/**
+ * The inputs of the prefill (REQ-013, 2.5): the prefilled values of the attributes the form asks
+ * for and the suggestions of the condition code; an input the prefill has no value for stays.
+ */
+function prefilledDraft(
+  draft: Draft,
+  prefill: DevicePrefillAnswer,
+  attributes: readonly Attribute[],
+): Draft {
+  const values = Object.fromEntries(
+    attributesOfLevel(attributes, 'device').flatMap((attribute) => {
+      const value = prefill.values[String(attribute.id)];
+      return value === undefined
+        ? []
+        : [[String(attribute.id), attributeInputOf(attribute, value as AttributeValue)]];
+    }),
+  );
+  return {
+    ...draft,
+    conditionValueId: prefill.conditionValueId ?? draft.conditionValueId,
+    visualGrade: prefill.visualGrade === null ? draft.visualGrade : String(prefill.visualGrade),
+    conditionDescription: prefill.conditionDescription || draft.conditionDescription,
+    values: { ...draft.values, ...values },
+    reviewKeys: prefill.reviewKeys,
+    confirmedKeys: [],
+  };
+}
 
 /** The path of the value of an attribute in the request and its field errors (2.0.5). */
 const valuePath = (attributeId: number) => `values.${attributeId}`;
@@ -173,7 +230,7 @@ const bodyOf = (draft: Draft, device: DeviceAttributes | null): DeviceCreateInpu
     device === null
       ? {}
       : attributeRequestValues(shownAttributes(device, draft.values), 'device', draft.values),
-  confirmedKeys: [],
+  confirmedKeys: [...draft.confirmedKeys],
 });
 
 /** Fields of the card "Gerätewerte", shown only once a model template is chosen (DER-54-01). */
@@ -241,6 +298,40 @@ function attributeErrors(errors: FieldErrors): Record<string, string | undefined
 
 /** No pick list value is dropped in UI-003 yet; the choice after a rejection follows with #190. */
 const NO_DROPPED_VALUES: ReadonlySet<number> = new Set();
+
+/**
+ * Chip "zu prüfen" and link "Bestätigen" of a prefilled field (DER-55-02, DESIGN.md
+ * "Prüfmarkierung"). After confirming, the focus goes to the control of the field.
+ */
+function ReviewMark({
+  field,
+  disabled,
+  onConfirm,
+}: {
+  field: string;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  return (
+    <span className="flex items-center gap-2">
+      <Badge variant="warn">{TEXTS.toReview}</Badge>
+      <button
+        type="button"
+        aria-label={TEXTS.confirmField(field)}
+        disabled={disabled}
+        className="cursor-pointer text-label text-primary"
+        onClick={(event) => {
+          // The mark sits in the label line of its form field (CU-057), the control below it.
+          const formField = event.currentTarget.parentElement?.parentElement?.parentElement;
+          onConfirm();
+          formField?.querySelector<HTMLElement>('input, select, textarea')?.focus();
+        }}
+      >
+        {TEXTS.confirm}
+      </button>
+    </span>
+  );
+}
 
 const optionValue = (id: number | null) => (id === null ? '' : String(id));
 const idOf = (value: string) => (value === '' ? null : Number(value));
@@ -413,8 +504,11 @@ const TEXT_AREA_CLASS = cn(
  * (P-05), unreachable (P-06) for the reads and wird-beendet (P-07). After
  * `supplier_deactivated` the supplier is emptied with its text (2.0.11, design v0.6.8). The card
  * "Gerätewerte" holds a field per attribute of the level device (CU-111), the battery capacity
- * only while the battery value carries "Akku vorhanden". The condition code (#193), prefill and
- * review flags (#188), the draft for UI-007 (#186) and the dialog UI-004 (#189) follow.
+ * only while the battery value carries "Akku vorhanden". After the choice of a model template the
+ * card loads the prefill (loading, DER-55-01) and marks each prefilled field with "zu prüfen" and
+ * "Bestätigen"; the status line counts the open flags and "Speichern und zuordnen" stays
+ * deactivated while one is open (disabled, DER-55-02 to DER-55-04). The condition code (#193),
+ * the draft for UI-007 (#186) and the dialog UI-004 (#189) follow.
  */
 export function DeviceIntakePage() {
   const suppliers = useSuppliersQuery();
@@ -437,6 +531,17 @@ export function DeviceIntakePage() {
     attributesQuery.data?.items.find(({ systemRole }) => systemRole === 'battery')?.pickListId ??
     null;
   const batteryValuesQuery = usePickListValuesQuery(batteryListId);
+  // The prefill of the chosen model template, taken into the form once (REQ-013, 2.5).
+  const prefillQuery = useDevicePrefillQuery(template?.id ?? null);
+  const [prefilledFor, setPrefilledFor] = useState<number | null>(null);
+  useEffect(() => {
+    const prefill = prefillQuery.data;
+    const attributes = attributesQuery.data?.items;
+    if (template === null || prefilledFor === template.id) return;
+    if (prefill === undefined || attributes === undefined) return;
+    setDraft((previous) => prefilledDraft(previous, prefill, attributes));
+    setPrefilledFor(template.id);
+  }, [template, prefilledFor, prefillQuery.data, attributesQuery.data]);
   // The reads of the panel "Modelldaten", here for their errors (2.0.7).
   const templateQuery = useModelTemplateQuery(template?.id ?? null);
   const modelDataLists = usePickListValuesQueries(
@@ -531,11 +636,19 @@ export function DeviceIntakePage() {
         : attributesOfLevel(device.attributes, 'device').find(
             ({ systemRole }) => systemRole === 'battery_capacity',
           );
+    // Changing a value lifts its review flag (DER-55-04), also of the capacity that goes.
+    const changed = [String(attributeId)];
     if (capacity !== undefined && device !== null && !batteryCapacityShown(device, values)) {
       values[String(capacity.id)] = emptyAttributeInput(capacity);
       setError(valuePath(capacity.id), undefined);
+      changed.push(String(capacity.id));
     }
-    change({ values });
+    change({ values, ...withConfirmed(draftRef.current, changed) });
+  }
+
+  /** "Bestätigen" lifts the review flag of a field with its value unchanged (AC-REQ-013-02). */
+  function confirm(key: string) {
+    change(withConfirmed(draftRef.current, [key]));
   }
 
   /** The values of the attributes and their errors go with the model template (DER-54-01). */
@@ -552,7 +665,8 @@ export function DeviceIntakePage() {
   }
 
   function chooseTemplate(chosen: ModelTemplateListItem) {
-    change({ modelTemplate: chosen, values: {} });
+    change({ modelTemplate: chosen, values: {}, reviewKeys: [], confirmedKeys: [] });
+    setPrefilledFor(null);
     setErrors((previous) => ({ ...withoutValueErrors(previous), modelTemplateId: undefined }));
     setSearchInput('');
     setSearchTerm(undefined);
@@ -682,6 +796,8 @@ export function DeviceIntakePage() {
       const ctrl = event.ctrlKey || event.metaKey;
       if (!ctrl || (event.key.toLowerCase() !== 's' && event.key !== 'Enter')) return;
       event.preventDefault();
+      // "Speichern und zuordnen" waits while values are to be reviewed (UI-003.disabled).
+      if (event.key === 'Enter' && openReviewKeys(draftRef.current).length > 0) return;
       saveRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
@@ -696,15 +812,36 @@ export function DeviceIntakePage() {
     attributesQuery.error,
     batteryValuesQuery.error,
     templateQuery.error,
+    prefillQuery.error,
     ...modelDataLists.map(({ error }) => error),
     search.error,
   ];
   const unreachable = readErrors.some((error) => error?.kind === 'unreachable');
   const readFailed = readErrors.find((error) => error !== null && error.kind !== 'unreachable');
   const summary = summaryShown ? inFormOrder(errors, attributeFields) : [];
+  // Loading until the prefill is in the form (DER-55-01), unless a read failed (2.0.7).
+  const prefillPending =
+    template !== null &&
+    prefilledFor !== template.id &&
+    prefillQuery.error === null &&
+    attributesQuery.error === null;
   const valuesLoading =
     (conditions.isPending && conditionListId !== null) ||
-    (attributesQuery.isPending && attributesQuery.error === null);
+    (attributesQuery.isPending && attributesQuery.error === null) ||
+    prefillPending;
+  const openKeys = openReviewKeys(draft);
+  const fieldOf = (key: string) =>
+    key === 'condition'
+      ? TEXTS.condition
+      : key === 'visualGrade'
+        ? TEXTS.visualGrade
+        : (attributesQuery.data?.items.find(({ id }) => String(id) === key)?.label ?? key);
+  const reviewMark = (key: string, field: string) =>
+    openKeys.includes(key) ? (
+      <ReviewMark field={field} disabled={saving} onConfirm={() => confirm(key)} />
+    ) : null;
+  const reviewShown = template !== null && !valuesLoading;
+  const reviewHintId = useId();
 
   return (
     <div className="flex h-full flex-col">
@@ -850,7 +987,13 @@ export function DeviceIntakePage() {
                     className="cursor-pointer self-start text-body text-primary"
                     disabled={saving}
                     onClick={() => {
-                      change({ modelTemplate: null, values: {} });
+                      change({
+                        modelTemplate: null,
+                        values: {},
+                        reviewKeys: [],
+                        confirmedKeys: [],
+                      });
+                      setPrefilledFor(null);
                       setErrors(withoutValueErrors);
                     }}
                   >
@@ -870,14 +1013,22 @@ export function DeviceIntakePage() {
                 ) : (
                   <>
                     <div className="grid grid-cols-1 gap-4 full:grid-cols-3">
-                      <FormField label={TEXTS.condition} required error={errors.conditionValueId}>
+                      <FormField
+                        label={TEXTS.condition}
+                        required
+                        error={errors.conditionValueId}
+                        aside={reviewMark('condition', TEXTS.condition)}
+                      >
                         {(control) => (
                           <Select
                             {...control}
                             value={optionValue(draft.conditionValueId)}
                             disabled={saving}
                             onChange={(event) => {
-                              change({ conditionValueId: idOf(event.target.value) });
+                              change({
+                                conditionValueId: idOf(event.target.value),
+                                ...withConfirmed(draftRef.current, ['condition']),
+                              });
                               setError('conditionValueId', undefined);
                             }}
                             onBlur={() => checkOnBlur('conditionValueId')}
@@ -893,7 +1044,12 @@ export function DeviceIntakePage() {
                           </Select>
                         )}
                       </FormField>
-                      <FormField label={TEXTS.visualGrade} required error={errors.visualGrade}>
+                      <FormField
+                        label={TEXTS.visualGrade}
+                        required
+                        error={errors.visualGrade}
+                        aside={reviewMark('visualGrade', TEXTS.visualGrade)}
+                      >
                         {(control) => (
                           <Input
                             {...control}
@@ -901,7 +1057,12 @@ export function DeviceIntakePage() {
                             autoComplete="off"
                             value={draft.visualGrade}
                             disabled={saving}
-                            onChange={(event) => change({ visualGrade: event.target.value })}
+                            onChange={(event) =>
+                              change({
+                                visualGrade: event.target.value,
+                                ...withConfirmed(draftRef.current, ['visualGrade']),
+                              })
+                            }
                             onBlur={() => checkOnBlur('visualGrade')}
                           />
                         )}
@@ -917,6 +1078,7 @@ export function DeviceIntakePage() {
                           disabled={saving}
                           onChange={changeAttribute}
                           onBlur={(attributeId) => checkOnBlur(valuePath(attributeId))}
+                          reviewMark={({ id, label }) => reviewMark(String(id), label)}
                         />
                       )}
                     </div>
@@ -949,13 +1111,46 @@ export function DeviceIntakePage() {
       </div>
 
       {/* The action bar stays visible below the scrolling form (DESIGN.md "Fenstergröße"). */}
-      <div className="flex shrink-0 flex-wrap justify-end gap-4 border-t border-border bg-surface px-6 py-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-4 border-t border-border bg-surface px-6 py-4">
+        {reviewShown && (
+          <div aria-live="polite" className="mr-auto flex min-w-0 flex-col gap-1 text-body">
+            {openKeys.length > 0 ? (
+              <>
+                <p className="m-0 flex items-start gap-2 text-flag-warn">
+                  <svg aria-hidden="true" viewBox="0 0 16 16" className="mt-1 size-4 shrink-0">
+                    <path
+                      d="M8 1.5 15 14.5H1L8 1.5Zm0 4.5v4m0 2v.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                  {TEXTS.reviewOpen(openKeys.length)}
+                </p>
+                <p id={reviewHintId} className="m-0 text-label text-text-secondary">
+                  {`${TEXTS.reviewFirst}: ${openKeys.map(fieldOf).join(', ')}`}
+                </p>
+              </>
+            ) : (
+              <p className="m-0">{TEXTS.allReviewed}</p>
+            )}
+          </div>
+        )}
         <Button type="submit" form={formId} disabled={!canSave}>
           {saving ? TEXTS.saving : TEXTS.save}
         </Button>
-        <Button variant="primary" disabled={!canSave} onClick={save}>
-          {TEXTS.saveAndAssign}
-        </Button>
+        {/* Deactivated while values are to be reviewed, with the tooltip (UI-003.disabled). */}
+        <span title={openKeys.length > 0 ? TEXTS.reviewFirst : undefined}>
+          <Button
+            variant="primary"
+            disabled={!canSave || openKeys.length > 0}
+            title={openKeys.length > 0 ? TEXTS.reviewFirst : undefined}
+            aria-describedby={reviewShown && openKeys.length > 0 ? reviewHintId : undefined}
+            onClick={save}
+          >
+            {TEXTS.saveAndAssign}
+          </Button>
+        </span>
       </div>
     </div>
   );

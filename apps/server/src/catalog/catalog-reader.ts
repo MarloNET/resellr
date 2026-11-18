@@ -21,12 +21,27 @@ export function createCatalogReader(db: Kysely<DB>) {
     },
 
     /**
-     * A model template with its device type, `undefined` if unknown (2.5: the device service
-     * checks the values of a new device by the attributes of this device type; Nachtrag MAR-973).
+     * A model template with its device type and its default values, `undefined` if unknown (2.5:
+     * the device service checks the values of a new device by the attributes of this device type;
+     * the defaults are the prefill of CU-293 and CU-121, stored as they are, unfiltered;
+     * Nachtrag MAR-973).
      */
-    async findModelTemplate(id: number): Promise<{ id: number; deviceTypeId: number } | undefined> {
+    async findModelTemplate(id: number): Promise<
+      | {
+          id: number;
+          deviceTypeId: number;
+          defaultDeviceValues: Record<string, unknown>;
+        }
+      | undefined
+    > {
       const row = await repository.findById(id);
-      return row && { id: row.id, deviceTypeId: row.device_type_id };
+      return (
+        row && {
+          id: row.id,
+          deviceTypeId: row.device_type_id,
+          defaultDeviceValues: JSON.parse(row.default_device_values) as Record<string, unknown>,
+        }
+      );
     },
   };
 }

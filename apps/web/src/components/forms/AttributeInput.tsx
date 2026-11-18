@@ -1,4 +1,10 @@
+import { formatNumber } from '@resellr/domain/format/format-value';
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
+import type {
+  AttributeValue,
+  BatteryCapacityValue,
+  PortEntry,
+} from '@resellr/domain/schemas/attribute-values.schema';
 import type { PickListValue } from '@resellr/domain/schemas/pick-list.schema';
 
 import { usePickListsQuery, usePickListValuesQuery } from '../../api/settings.api.ts';
@@ -80,6 +86,33 @@ export function attributeRequestValue(
     );
   }
   return input;
+}
+
+/**
+ * The input of a stored value (3.4), e.g. of a prefill (REQ-013): numbers as text with decimal
+ * comma, the battery capacity as its percent or "nicht ermittelbar".
+ */
+export function attributeInputOf(
+  { dataType, systemRole }: Pick<AttributeInputDefinition, 'dataType' | 'systemRole'>,
+  value: AttributeValue,
+): AttributeInputValue {
+  if (systemRole === 'battery_capacity') {
+    const capacity = value as BatteryCapacityValue;
+    return 'percent' in capacity ? { percent: String(capacity.percent) } : capacity;
+  }
+  switch (dataType) {
+    case 'integer':
+    case 'decimal':
+      return formatNumber(value as number | string);
+    case 'ports':
+      return (value as PortEntry[]).map(({ count, typeId, positionId }) => ({
+        count: String(count),
+        typeId,
+        positionId,
+      }));
+    default:
+      return value as string | boolean | number;
+  }
 }
 
 const optionValue = (id: number | null) => (id === null ? '' : String(id));
