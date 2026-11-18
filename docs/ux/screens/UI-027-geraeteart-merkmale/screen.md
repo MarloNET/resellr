@@ -12,7 +12,7 @@
 |---|---|---|---|
 | Einstellungs-Liste | 14 Bereiche (Händlermarke, Gerätearten und Merkmale, Auswahllisten, Titelmuster, Textbausteine, Hersteller und GPSR, Lieferanten, Code-Übersetzung, Zustandszuordnung, Kategoriezuordnung, Merkmalszuordnung, Beschreibungsvorlagen, Kanäle und Preisregeln, Datenblatt-Layout; „Zugangspasswort“ entfällt in Release 0.1, OD-02 Variante A) | Kap. 9.5 | zweite Navigationsspalte, 240 px |
 | Geräteart-Liste | Name, Status „aktiv“/„deaktiviert“ | REQ-004 | |
-| Merkmal-Tabelle | Reihenfolge, Bezeichnung, Datentyp, Einheit, Ebene (Modell/Gerät), variantenbildend (Ja/Nein/–), Pflicht, Datenblatt-Block, Status | REQ-005 | Reihenfolge per Ziehen oder Buttons „nach oben/unten“. Spalte „Status“ als Text „aktiv“ oder „deaktiviert“ (nie nur durch Farbe); deaktivierte Merkmale bleiben in der Tabelle an ihrem Platz in der Reihenfolge (v0.6.4, siehe „Wieder aktivieren“) |
+| Merkmal-Tabelle | Reihenfolge, Bezeichnung, Datentyp, Einheit, Ebene (Modell/Gerät), variantenbildend (Ja/Nein/–), Pflicht, Datenblatt-Block, Status | REQ-005 | Reihenfolge per Ziehen oder Buttons „nach oben/unten“; passt eine Reihenfolge nicht mehr zur Geräteart (ein anderes Fenster hat inzwischen ein Merkmal angelegt), meldet der Server `409 version_conflict` und UI-027 verfährt nach P-05 („Neu laden“; v0.6.13, MAR-548, kein neuer Zustand, kein neuer Text). Spalte „Status“ als Text „aktiv“ oder „deaktiviert“ (nie nur durch Farbe); deaktivierte Merkmale bleiben in der Tabelle an ihrem Platz in der Reihenfolge (v0.6.4, siehe „Wieder aktivieren“) |
 | Merkmal-Formular | Seitenpanel „Merkmal bearbeiten“ | | |
 
 ## Eingaben und Validierung
@@ -20,10 +20,10 @@
 |---|---|---|---|---|
 | Geräteart: Name | Text | ja | 1–50 Zeichen, eindeutig ohne Groß-/Kleinschreibung | „Name ist bereits vergeben“ / „Name: 1 bis 50 Zeichen“ |
 | Geräteart: Status | Umschalter | ja | aktiv/deaktiviert | – |
-| Merkmal: Bezeichnung | Text | ja | 1–100 Zeichen, ohne { }, nicht gleich einem festen Platzhalternamen, eindeutig je Geräteart | „Bezeichnung ist bei dieser Geräteart bereits vergeben“; „Bezeichnung: 1 bis 100 Zeichen“; „Bezeichnung darf { und } nicht enthalten“; „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ (v0.6, meldungskatalog.md M-02 bis M-04) |
+| Merkmal: Bezeichnung | Text | ja | 1–100 Zeichen, ohne { }, nicht gleich einem festen Platzhalternamen, eindeutig je Geräteart | „Bezeichnung ist bei dieser Geräteart bereits vergeben“; „Bezeichnung: 1 bis 100 Zeichen“; „Bezeichnung darf { und } nicht enthalten“; „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ (Vergleich ohne Randleerzeichen und ohne Groß-/Kleinschreibung, z. B. „stückzahl“; auch eine Bezeichnung mit Präfix „Baustein:“ wird so abgelehnt; v0.6.13, MAR-548; v0.6, meldungskatalog.md M-02 bis M-04) |
 | Datentyp | Auswahl | ja | Text, Ganzzahl, Dezimalzahl, Ja/Nein, Auswahl aus Liste, Mehrfachangabe Anzahl × Typ | – |
 | Einheit, Schreibweise | Text, Auswahl | nein | Schreibweise „mit/ohne Leerzeichen“ | „Einheit: höchstens 20 Zeichen“ (**v0.6.12, MAR-494:** Wortlaut nach PO-Entscheidung MAR-492, Owner bestätigt mit der nächsten Freigabe; Grenze 0 bis 20 aus der Spec unverändert) |
-| Mindest-/Höchstwert | Zahl | nein | nur bei Zahlen; Min ≤ Max | „Mindestwert darf nicht größer als Höchstwert sein“ |
+| Mindest-/Höchstwert | Zahl | nein | nur bei Zahlen; Min ≤ Max | „Mindestwert darf nicht größer als Höchstwert sein“; „Mindestwert: Zahl“, „Höchstwert: Zahl“, bei Datentyp Ganzzahl „Mindestwert: ganze Zahl“, „Höchstwert: ganze Zahl“ (**v0.6.13, MAR-548:** Wortlaut aus der Specification, meldungskatalog.md Ergänzung v0.6.13, Owner bestätigt mit der nächsten Freigabe) |
 | Auswahlliste | Auswahl | ja bei Datentyp „Auswahl aus Liste“ | Liste aus UI-028 | „Auswahlliste fehlt“ |
 | Ebene | Auswahl | ja | Modell/Gerät; nach gespeicherten Werten gesperrt | „Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.“ (Datentyp analog: „Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.“) |
 | Variantenbildend | Kontrollkästchen | ja bei Ebene Gerät | Akkukapazität immer „Nein“; Änderung wird abgelehnt, wenn danach zwei Modell-Inserate derselben Modellvorlage übereinstimmen | „Änderung nicht möglich: Modell-Inserate <Liste> würden gleiche Variantenangaben haben“ |
