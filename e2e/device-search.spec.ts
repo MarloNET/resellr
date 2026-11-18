@@ -178,5 +178,5 @@ test.describe('UI-009 Geräte and UI-010 Gerät (CU-136, CU-137)', () => {
 
     await expect(page).toHaveURL(/\/geraete\/neu$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Gerät einbuchen' })).toBeVisible();
-});
+  });
 });
