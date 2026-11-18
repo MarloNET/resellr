@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
@@ -337,14 +337,204 @@ describe('POST /api/devices (CU-121, Technical Specification 2.5)', () => {
   });
 });
 
+describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specification 2.5)', () => {
+  const cancel = (id: number) =>
+    t.database.sqlite
+      .prepare(
+        "UPDATE device SET stock_status = 'cancelled', cancel_reason = 'falsch', cancelled_at = ? WHERE id = ?",
+      )
+      .run(STAMP, id);
+
+  const insertListing = (title: string, articleNumber: string, modelTemplateId = ids.mvA) =>
+    Number(
+      t.database.sqlite
+        .prepare(
+          `INSERT INTO listing (model_template_id, condition_value_id, visual_grade,
+             condition_description, condition_description_key, variant_values, other_device_values,
+             article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
+             stock_hash, version, created_at, updated_at)
+           VALUES (?, ?, 3, '', '', '{}', '{}', ?, ?, 'original', ?, 0, '{}', '', 1, ?, ?)`,
+        )
+        .run(
+          modelTemplateId,
+          ids.used,
+          articleNumber,
+          articleNumber.toLowerCase(),
+          title,
+          STAMP,
+          STAMP,
+        ).lastInsertRowid,
+    );
+
+  it('AC-REQ-012-05 after the cancellation of the device "633641" a new device "633641" is stored, and the search for "633641" shows both with their inventory status', async () => {
+    const cancelled = (await post(body({ wiNr: '633641' }))).json();
+    cancel(cancelled.id);
+
+    const created = await post(body({ wiNr: '633641' }));
+    expect(created.statusCode).toBe(201);
+
+    const response = await get('/api/devices?wiNr=633641');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        {
+          id: cancelled.id,
+          wiNr: '633641',
+          modelTemplateLabel: 'iPhone 13',
+          listing: null,
+          stockStatus: 'cancelled',
+          captureStatus: 'checked',
+        },
+        {
+          id: created.json().id,
+          wiNr: '633641',
+          modelTemplateLabel: 'iPhone 13',
+          listing: null,
+          stockStatus: 'available',
+          captureStatus: 'checked',
+        },
+      ],
+    });
+  });
+
+  it('finds by a part of the WI-Nr without regard to case and names the model listing of each hit', async () => {
+    const assigned = (await post(body({ wiNr: 'A637607' }))).json();
+    const unassigned = (await post(body({ wiNr: 'B637608' }))).json();
+    await post(body({ wiNr: '626198' }));
+    const listingId = insertListing('iPhone 13, iOS', 'MI-1');
+    t.database.sqlite
+      .prepare('UPDATE device SET listing_id = ? WHERE id = ?')
+      .run(listingId, assigned.id);
+
+    const response = await get('/api/devices?wiNr=a6376');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ items: [{ id: assigned.id }] });
+    expect(response.json().items).toHaveLength(1);
+    expect(response.json().items[0].listing).toEqual({ id: listingId, title: 'iPhone 13, iOS' });
+
+    const both = (await get('/api/devices?wiNr=63760')).json();
+    expect(both.items.map((item: { id: number }) => item.id)).toEqual([assigned.id, unassigned.id]);
+    expect(both.items[1].listing).toBeNull();
+  });
+
+  /** The answer to `GET url` and the statements prepared on the connection for it, as SQL text. */
+  const getCounted = async (url: string) => {
+    const prepare = vi.spyOn(t.database.sqlite, 'prepare');
+    try {
+      const response = await get(url);
+      return { response, statements: prepare.mock.calls.map(([sql]) => sql) };
+    } finally {
+      prepare.mockRestore();
+    }
+  };
+  const readsOf = (statements: string[], table: 'listing' | 'model_template') =>
+    statements.filter((sql) => sql.includes(`from "${table}"`)).length;
+
+  it('names model template and model listing of each hit over two model templates and two model listings with one query each (Nachtrag MAR-1030)', async () => {
+    const mvB = insertModelTemplate(t.database.sqlite, {
+      deviceTypeId: t.database.sqlite
+        .prepare("SELECT id FROM device_type WHERE name = 'Smartphone'")
+        .pluck()
+        .get() as number,
+      manufacturerId: insertManufacturer(t.database.sqlite, 'Samsung'),
+      modelName: 'Galaxy S21',
+      mpn: 'SM-G991B',
+    });
+    const a1 = (await post(body({ wiNr: '700001' }))).json();
+    const b1 = (await post(body({ wiNr: '700002', modelTemplateId: mvB }))).json();
+    const a2 = (await post(body({ wiNr: '700003' }))).json();
+    const b2 = (await post(body({ wiNr: '700004', modelTemplateId: mvB }))).json();
+    const listingA = insertListing('iPhone 13, iOS', 'MI-1');
+    const listingB = insertListing('Galaxy S21, Android', 'MI-2', mvB);
+    const assign = t.database.sqlite.prepare('UPDATE device SET listing_id = ? WHERE id = ?');
+    assign.run(listingA, a1.id);
+    assign.run(listingB, b1.id);
+    assign.run(listingA, a2.id);
+
+    const { response, statements } = await getCounted('/api/devices?wiNr=7000');
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      response
+        .json()
+        .items.map((item: Record<string, unknown>) => [
+          item.id,
+          item.modelTemplateLabel,
+          item.listing,
+        ]),
+    ).toEqual([
+      [a1.id, 'iPhone 13', { id: listingA, title: 'iPhone 13, iOS' }],
+      [b1.id, 'Galaxy S21', { id: listingB, title: 'Galaxy S21, Android' }],
+      [a2.id, 'iPhone 13', { id: listingA, title: 'iPhone 13, iOS' }],
+      [b2.id, 'Galaxy S21', null],
+    ]);
+    expect(readsOf(statements, 'listing')).toBe(1);
+    expect(readsOf(statements, 'model_template')).toBe(1);
+  });
+
+  it('reads neither model listings nor model templates for an empty page (Nachtrag MAR-1030)', async () => {
+    await post(body({ wiNr: '626198' }));
+
+    const { response, statements } = await getCounted('/api/devices?wiNr=999');
+
+    expect(response.json()).toEqual({ items: [] });
+    expect(readsOf(statements, 'listing')).toBe(0);
+    expect(readsOf(statements, 'model_template')).toBe(0);
+  });
+
+  it('answers 500 internal_error with a reference number if the model name of a hit is missing (Nachtrag MAR-1030)', async () => {
+    await post(body({ wiNr: '626198' }));
+    const { sqlite } = t.database;
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare('DELETE FROM model_template WHERE id = ?').run(ids.mvA);
+    sqlite.pragma('foreign_keys = ON');
+
+    const response = await get('/api/devices?wiNr=626198');
+
+    expect(response.statusCode).toBe(500);
+    const { error } = response.json();
+    expect(error.code).toBe('internal_error');
+    expect(error.referenceNumber).toMatch(/^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(t.readErrorLog()).toEqual([expect.objectContaining({ refNo: error.referenceNumber })]);
+  });
+
+  it('pages the hits with limit and offset (2.0.1)', async () => {
+    await post(body({ wiNr: '626198' }));
+    const second = (await post(body({ wiNr: '626199' }))).json();
+
+    const response = await get('/api/devices?wiNr=6261&limit=1&offset=1');
+
+    expect(response.json()).toEqual({ items: [expect.objectContaining({ id: second.id })] });
+  });
+
+  it('answers an empty list without a hit', async () => {
+    await post(body({ wiNr: '626198' }));
+
+    expect((await get('/api/devices?wiNr=999')).json()).toEqual({ items: [] });
+  });
+
+  it.each([
+    ['without wiNr', '/api/devices'],
+    ['with an empty wiNr', '/api/devices?wiNr='],
+    ['with a limit above 200', '/api/devices?wiNr=6&limit=201'],
+  ])('answers 400 bad_request %s', async (_case, url) => {
+    const response = await get(url);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+  });
+});
+
 describe('GET /api/devices/{id} (CU-130, Technical Specification 2.5)', () => {
-  it('returns the device with its model listing, null while unassigned', async () => {
+  it('returns the device with the name of its model template and its model listing, null while unassigned', async () => {
     const created = (await post(body())).json();
 
     const response = await get(`/api/devices/${created.id}`);
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ ...created, listing: null });
+    expect(response.json()).toEqual({ ...created, modelTemplateLabel: 'iPhone 13', listing: null });
   });
 
   it('answers 404 not_found for an unknown device', async () => {

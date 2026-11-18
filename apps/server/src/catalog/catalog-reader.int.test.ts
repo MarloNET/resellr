@@ -94,4 +94,35 @@ describe('catalog reader (CU-108, Technical Specification 2.1, Nachtrag MAR-879)
     });
     await expect(reader.findModelTemplate(999)).resolves.toBeUndefined();
   });
+
+  it('lists the model names of the given model templates by id, leaving out unknown ids', async () => {
+    const { sqlite } = database;
+    const notebook = insertDeviceType(sqlite, 'Notebook');
+    const apple = insertManufacturer(sqlite, 'Apple');
+    const air = insertModelTemplate(sqlite, {
+      deviceTypeId: notebook,
+      manufacturerId: apple,
+      modelName: 'MacBook Air M2',
+      mpn: null,
+    });
+    insertModelTemplate(sqlite, {
+      deviceTypeId: notebook,
+      manufacturerId: apple,
+      modelName: 'MacBook Pro 13',
+      mpn: null,
+    });
+    const studio = insertModelTemplate(sqlite, {
+      deviceTypeId: notebook,
+      manufacturerId: apple,
+      modelName: 'Studio Display',
+      mpn: null,
+    });
+    const reader = createCatalogReader(database.db);
+
+    await expect(reader.listModelTemplateNames([studio, 999, air])).resolves.toEqual([
+      { id: air, modelName: 'MacBook Air M2' },
+      { id: studio, modelName: 'Studio Display' },
+    ]);
+    await expect(reader.listModelTemplateNames([])).resolves.toEqual([]);
+  });
 });
