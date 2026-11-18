@@ -1,3 +1,4 @@
+import { mergeAttributeValues } from '@resellr/domain/schemas/attribute-values.schema';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -174,6 +175,17 @@ const failed = () =>
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
+/** The answer of a saved `PATCH` as the server gives it: the values merged, `null` removes. */
+function savedAnswer(init: RequestInit | undefined) {
+  const { values, ...fields } = JSON.parse(String(init?.body)) as Record<string, unknown>;
+  return Response.json({
+    ...DEVICE,
+    ...fields,
+    values: mergeAttributeValues(STORED_VALUES, values as Record<string, unknown> | undefined),
+    version: 2,
+  });
+}
+
 /**
  * `fetch` of UI-010 with lists the test can change in "another window": `device` answers
  * `GET /api/devices/5`, `update` the `PATCH`, `reload` the reads of a list after its first one.
@@ -181,7 +193,7 @@ type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
  */
 function mockApi({
   device = DEVICE,
-  update = (init) => Response.json({ ...DEVICE, ...JSON.parse(String(init?.body)), version: 2 }),
+  update = savedAnswer,
   reload,
 }: {
   device?: Record<string, unknown> | (() => Record<string, unknown>);
@@ -535,7 +547,7 @@ describe('UI-010 choice after pick_list_value_deactivated (2.0.11, design v0.6.8
         patches += 1;
         return patches === 1
           ? deactivated('Akku: mit Akku (defekt) ist deaktiviert', 'values.18', BROKEN_BATTERY)()
-          : Response.json({ ...DEVICE, ...JSON.parse(String(init?.body)), version: 2 });
+          : savedAnswer(init);
       },
     });
     await openDevice();
