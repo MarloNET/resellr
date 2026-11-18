@@ -2,6 +2,7 @@
 // route registration (CU-087).
 export {
   type AttributeEntry,
+  type ConditionCodeTranslationEntry,
   createSettingsReader,
   type PickListValueEntry,
   type SettingsReader,

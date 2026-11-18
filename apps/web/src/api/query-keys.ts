@@ -18,6 +18,8 @@ export const queryKeys = {
     merchantProfile: () => ['settings', 'merchant-profile'] as const,
     datasheetLayout: () => ['settings', 'datasheet-layout'] as const,
     conditionCodes: () => ['settings', 'condition-codes'] as const,
+    conditionCodeResolution: (code: string, supplierId: number | null) =>
+      ['settings', 'condition-code-resolution', { code, supplierId }] as const,
     pickLists: () => ['settings', 'pick-lists'] as const,
     pickListValues: (pickListId: number) => ['settings', 'pick-list-values', pickListId] as const,
   },
@@ -36,8 +38,10 @@ export const queryKeys = {
   inventory: {
     all: ['inventory'] as const,
     device: (id: number) => ['inventory', 'device', id] as const,
-    devicePrefill: (modelTemplateId: number) =>
-      ['inventory', 'device-prefill', modelTemplateId] as const,
+    devicePrefill: (
+      modelTemplateId: number,
+      code: { conditionCode: string | null; supplierId: number | null },
+    ) => ['inventory', 'device-prefill', modelTemplateId, code] as const,
   },
 } as const;
 

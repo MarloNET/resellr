@@ -159,6 +159,43 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
     database = openDatabase<DB>(join(root, 'resellr.db'));
   });
 
+  it('resolves a condition code with and without supplier, without regard to case (2.2, REQ-015)', async () => {
+    const { sqlite } = database;
+    const supplier = sqlite.prepare(
+      `INSERT INTO supplier (name, name_key, active, version, created_at, updated_at)
+       VALUES (?, ?, 1, 1, '2026-11-16T08:00:00.000Z', '2026-11-16T08:00:00.000Z')`,
+    );
+    const l1 = Number(supplier.run('L1', 'l1').lastInsertRowid);
+    const l2 = Number(supplier.run('L2', 'l2').lastInsertRowid);
+    const insert = sqlite.prepare(
+      `INSERT INTO condition_code (code, code_key, supplier_id, plain_text,
+         suggested_condition_value_id, suggested_visual_grade, version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, ?, 1, '2026-11-16T08:00:00.000Z', '2026-11-16T08:00:00.000Z')`,
+    );
+    insert.run('DGS', 'dgs', null, 'Display- und Gehäuseschaden', null);
+    insert.run('DGS', 'dgs', l1, 'Display und Gehäuse beschädigt (L1)', 4);
+    insert.run('KR', 'kr', l1, 'Kratzer (L1)', null);
+    const reader = createSettingsReader(database.db);
+
+    const withoutSupplier = {
+      code: 'DGS',
+      plainText: 'Display- und Gehäuseschaden',
+      suggestedConditionValueId: null,
+      suggestedVisualGrade: null,
+    };
+    await expect(reader.resolveConditionCode('dgs', null)).resolves.toEqual(withoutSupplier);
+    await expect(reader.resolveConditionCode(' dgs ', l2)).resolves.toEqual(withoutSupplier);
+    await expect(reader.resolveConditionCode('DGS', l1)).resolves.toEqual({
+      code: 'DGS',
+      plainText: 'Display und Gehäuse beschädigt (L1)',
+      suggestedConditionValueId: null,
+      suggestedVisualGrade: 4,
+    });
+    await expect(reader.resolveConditionCode('KR', null)).resolves.toBeUndefined();
+    await expect(reader.resolveConditionCode('XYZ', l1)).resolves.toBeUndefined();
+    await expect(reader.resolveConditionCode('  ', null)).resolves.toBeUndefined();
+  });
+
   it('lists the attributes of a device type in their order with level, rules and status', async () => {
     const { sqlite } = database;
     const notebook = insertDeviceType(sqlite, 'Notebook');

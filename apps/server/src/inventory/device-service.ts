@@ -46,6 +46,7 @@ export function toDevice(row: DeviceRow): Device {
     modelTemplateId: row.model_template_id,
     listingId: row.listing_id,
     supplierId: row.supplier_id,
+    conditionCode: row.condition_code,
     conditionValueId: row.condition_value_id,
     visualGrade: row.visual_grade,
     conditionDescription: row.condition_description,
@@ -162,9 +163,11 @@ function readable(
  * available, unassigned and with its capture date, together with its audit entry in one
  * transaction (2.0.4). Order of the checks (2.0.11): the rules of the request with the values of
  * the level device (CU-116, CU-067) after the model template is known, the supplier, then the
- * WI-Nr. The service forms the prefill again (CU-117 with the same inputs as CU-293) and keeps
- * the review flags neither confirmed nor changed (CU-118), so the capture status is `checked` only
- * without one (AC-REQ-013-04). Changing a device follows with #190.
+ * WI-Nr. The service forms the prefill again (CU-117 with the same inputs as CU-293, the condition
+ * code resolved for the supplier sent) and keeps the review flags neither confirmed nor changed
+ * (CU-118), so the capture status is `checked` only without one (AC-REQ-013-04). A known
+ * condition code is stored as its entry spells it ("dgs" → "DGS", AC-REQ-015-01), an unknown one
+ * as entered. Changing a device follows with #190.
  */
 export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
   return {
@@ -210,7 +213,11 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
         }
 
         // Remaining = prefill keys − confirmed keys − keys whose value differs (2.5, REQ-013).
-        const prefill = await readDevicePrefill(settings, template, attributes);
+        const code =
+          device.conditionCode === null
+            ? undefined
+            : await settings.resolveConditionCode(device.conditionCode, device.supplierId);
+        const prefill = await readDevicePrefill(settings, template, attributes, code ?? null);
         const reviewKeys = remainingReviewKeys(prefill.reviewKeys, device.confirmedKeys, prefill, {
           conditionValueId: device.conditionValueId,
           visualGrade: device.visualGrade,
@@ -225,7 +232,7 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           listing_id: null,
           cancelled_from_listing_id: null,
           supplier_id: device.supplierId,
-          condition_code: null,
+          condition_code: code?.code ?? device.conditionCode,
           condition_value_id: device.conditionValueId,
           visual_grade: device.visualGrade,
           condition_description: device.conditionDescription,
@@ -274,6 +281,9 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
             'WI-Nr': device.wiNr,
             Modellvorlage: modelName ?? String(template.id),
             ...(supplier !== undefined && { Lieferant: supplier.name }),
+            ...(device.conditionCode !== null && {
+              Zustandscode: code?.code ?? device.conditionCode,
+            }),
             Zustand: label(device.conditionValueId),
             'Optik-Note': device.visualGrade,
             ...(device.conditionDescription !== '' && {

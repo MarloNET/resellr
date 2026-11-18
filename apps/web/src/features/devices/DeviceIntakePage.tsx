@@ -3,6 +3,7 @@ import { ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
 import type { AttributeValue, PortEntry } from '@resellr/domain/schemas/attribute-values.schema';
 import type { BatteryValueFlag } from '@resellr/domain/schemas/pick-list.schema';
+import { CONDITION_CODE_MAX } from '@resellr/domain/schemas/condition-code.schema';
 import {
   type DeviceCreateInput,
   deviceCreateSchema,
@@ -19,9 +20,14 @@ import { Link } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
 import { useModelTemplateQuery, useModelTemplatesQuery } from '../../api/catalog.api.ts';
-import { useCreateDeviceMutation, useDevicePrefillQuery } from '../../api/inventory.api.ts';
+import {
+  type DevicePrefillRequest,
+  useCreateDeviceMutation,
+  useDevicePrefillQuery,
+} from '../../api/inventory.api.ts';
 import {
   useAttributesQuery,
+  useConditionCodeResolutionQuery,
   usePickListsQuery,
   usePickListValuesQueries,
   usePickListValuesQuery,
@@ -67,6 +73,9 @@ const TEXTS = {
   device: 'Gerät',
   wiNr: 'WI-Nr',
   supplier: 'Lieferant',
+  conditionCode: 'Zustandscode',
+  plainTextTaken: (text: string) => `Klartext übernommen: ${text}`,
+  conditionCodeUnknown: 'Zustandscode unbekannt',
   modelTemplate: 'Modellvorlage',
   modelTemplateSearch: 'Modellvorlage suchen',
   otherModelTemplate: 'Andere Modellvorlage wählen',
@@ -102,6 +111,7 @@ const SEARCH_DELAY_MS = 300;
 const FIELDS = [
   'wiNr',
   'supplierId',
+  'conditionCode',
   'modelTemplateId',
   'conditionValueId',
   'visualGrade',
@@ -116,6 +126,8 @@ type FieldErrors = Partial<Record<string, ReactNode>>;
 interface Draft {
   wiNr: string;
   supplierId: number | null;
+  /** The condition code as entered (REQ-015); it takes effect on leaving the field. */
+  conditionCode: string;
   modelTemplate: ModelTemplateListItem | null;
   conditionValueId: number | null;
   visualGrade: string;
@@ -131,6 +143,7 @@ interface Draft {
 const EMPTY_DRAFT: Draft = {
   wiNr: '',
   supplierId: null,
+  conditionCode: '',
   modelTemplate: null,
   conditionValueId: null,
   visualGrade: '',
@@ -149,6 +162,12 @@ function withConfirmed(draft: Draft, keys: readonly string[]): Pick<Draft, 'conf
   const lifted = keys.filter((key) => draft.reviewKeys.includes(key));
   return { confirmedKeys: [...new Set([...draft.confirmedKeys, ...lifted])] };
 }
+
+/** The condition code of the form, `null` without one (spaces at the edges do not count). */
+const conditionCodeOf = (draft: Draft) => draft.conditionCode.trim() || null;
+
+/** The review flags of the suggestions of a condition code (2.5, AC-REQ-015-04). */
+const CODE_KEYS: readonly string[] = ['condition', 'visualGrade'];
 
 /**
  * The inputs of the prefill (REQ-013, 2.5): the prefilled values of the attributes the form asks
@@ -176,6 +195,35 @@ function prefilledDraft(
     reviewKeys: prefill.reviewKeys,
     confirmedKeys: [],
   };
+}
+
+/**
+ * The suggestions of a condition code entered after the model template (REQ-015, 2.5): the plain
+ * text into the condition description without flag (AC-REQ-015-01, DER-57-02), the suggested
+ * condition and visual grade with their flags (AC-REQ-015-04). An unknown code takes no text
+ * (AC-REQ-015-03), and a deactivated suggestion comes as none (DER-57-03); an input without
+ * suggestion stays. The flags of the attributes stay, those of the former code go, as the server
+ * forms them on saving from the code sent.
+ */
+function codePrefilledDraft(draft: Draft, prefill: DevicePrefillAnswer): Draft {
+  const codeKeys = prefill.reviewKeys.filter((key) => CODE_KEYS.includes(key));
+  const isAttributeKey = (key: string) => !CODE_KEYS.includes(key);
+  return {
+    ...draft,
+    conditionValueId: prefill.conditionValueId ?? draft.conditionValueId,
+    visualGrade: prefill.visualGrade === null ? draft.visualGrade : String(prefill.visualGrade),
+    conditionDescription: prefill.codeResult.plainText ?? draft.conditionDescription,
+    reviewKeys: [...codeKeys, ...draft.reviewKeys.filter(isAttributeKey)],
+    confirmedKeys: draft.confirmedKeys.filter(isAttributeKey),
+  };
+}
+
+/**
+ * A prefill asked for: after the choice of a model template the whole one, after a condition code
+ * entered with a model template chosen only the part of the code.
+ */
+interface PrefillTask extends DevicePrefillRequest {
+  scope: 'template' | 'code';
 }
 
 /** The path of the value of an attribute in the request and its field errors (2.0.5). */
@@ -222,6 +270,7 @@ function shownAttributes(device: DeviceAttributes, values: AttributeInputs): Att
 const bodyOf = (draft: Draft, device: DeviceAttributes | null): DeviceCreateInput => ({
   wiNr: draft.wiNr,
   supplierId: draft.supplierId,
+  conditionCode: conditionCodeOf(draft),
   modelTemplateId: draft.modelTemplate?.id ?? null,
   conditionValueId: draft.conditionValueId,
   visualGrade: draft.visualGrade,
@@ -507,8 +556,11 @@ const TEXT_AREA_CLASS = cn(
  * only while the battery value carries "Akku vorhanden". After the choice of a model template the
  * card loads the prefill (loading, DER-55-01) and marks each prefilled field with "zu prüfen" and
  * "Bestätigen"; the status line counts the open flags and "Speichern und zuordnen" stays
- * deactivated while one is open (disabled, DER-55-02 to DER-55-04). The condition code (#193),
- * the draft for UI-007 (#186) and the dialog UI-004 (#189) follow.
+ * deactivated while one is open (disabled, DER-55-02 to DER-55-04). The condition code (at most
+ * 20 characters) takes effect on leaving its field: UI-003 shows "Klartext übernommen: <Text>" or
+ * "Zustandscode unbekannt" and takes the plain text and the suggestions with the prefill (REQ-015,
+ * DER-57-01 to DER-57-03); after `supplier_deactivated` the code is resolved again without
+ * supplier (DER-57-04). The draft for UI-007 (#186) and the dialog UI-004 (#189) follow.
  */
 export function DeviceIntakePage() {
   const suppliers = useSuppliersQuery();
@@ -531,17 +583,36 @@ export function DeviceIntakePage() {
     attributesQuery.data?.items.find(({ systemRole }) => systemRole === 'battery')?.pickListId ??
     null;
   const batteryValuesQuery = usePickListValuesQuery(batteryListId);
-  // The prefill of the chosen model template, taken into the form once (REQ-013, 2.5).
-  const prefillQuery = useDevicePrefillQuery(template?.id ?? null);
-  const [prefilledFor, setPrefilledFor] = useState<number | null>(null);
+  // The prefill asked for, each taken into the form once (REQ-013, REQ-015, 2.5): after the
+  // choice of a model template with the condition code and supplier of the form, after a
+  // condition code entered with a model template chosen only its part.
+  const [prefillTask, setPrefillTask] = useState<PrefillTask | null>(null);
+  const [prefilledTask, setPrefilledTask] = useState<PrefillTask | null>(null);
+  const prefillQuery = useDevicePrefillQuery(prefillTask);
   useEffect(() => {
     const prefill = prefillQuery.data;
     const attributes = attributesQuery.data?.items;
-    if (template === null || prefilledFor === template.id) return;
+    if (prefillTask === null || prefilledTask === prefillTask) return;
     if (prefill === undefined || attributes === undefined) return;
-    setDraft((previous) => prefilledDraft(previous, prefill, attributes));
-    setPrefilledFor(template.id);
-  }, [template, prefilledFor, prefillQuery.data, attributesQuery.data]);
+    setDraft((previous) =>
+      prefillTask.scope === 'template'
+        ? prefilledDraft(previous, prefill, attributes)
+        : codePrefilledDraft(previous, prefill),
+    );
+    setPrefilledTask(prefillTask);
+  }, [prefillTask, prefilledTask, prefillQuery.data, attributesQuery.data]);
+  // The condition code as it took effect and the supplier it is resolved for; UI-003 shows its
+  // plain text or "Zustandscode unbekannt" (DER-57-01). After `supplier_deactivated` it is
+  // resolved again without supplier (2.0.11 "Lieferant in UI-003", DER-57-04).
+  const [resolvedCode, setResolvedCode] = useState<{
+    code: string;
+    supplierId: number | null;
+  } | null>(null);
+  const codeResolution = useConditionCodeResolutionQuery(
+    resolvedCode?.code ?? null,
+    resolvedCode?.supplierId ?? null,
+  );
+  const codeHintId = useId();
   // The reads of the panel "Modelldaten", here for their errors (2.0.7).
   const templateQuery = useModelTemplateQuery(template?.id ?? null);
   const modelDataLists = usePickListValuesQueries(
@@ -664,9 +735,37 @@ export function DeviceIntakePage() {
     setSupplierRejected(false);
   }
 
+  /**
+   * Leaving the field "Zustandscode" (UI-003 "Eingaben"): a changed code takes effect, resolved
+   * for the supplier of the form (DER-57-01); with a model template chosen its suggestions come
+   * into the form (REQ-015). An empty code drops the flags of the former one.
+   */
+  function takeConditionCode() {
+    const current = draftRef.current;
+    const code = conditionCodeOf(current);
+    if (code === (resolvedCode?.code ?? null)) return;
+    setResolvedCode(code === null ? null : { code, supplierId: current.supplierId });
+    if (current.modelTemplate === null) return;
+    setPrefillTask({
+      modelTemplateId: current.modelTemplate.id,
+      conditionCode: code,
+      supplierId: current.supplierId,
+      scope: 'code',
+    });
+  }
+
   function chooseTemplate(chosen: ModelTemplateListItem) {
+    const current = draftRef.current;
     change({ modelTemplate: chosen, values: {}, reviewKeys: [], confirmedKeys: [] });
-    setPrefilledFor(null);
+    // The prefill and the plain text shown follow the code and the supplier of the form (2.5).
+    const code = conditionCodeOf(current);
+    setResolvedCode(code === null ? null : { code, supplierId: current.supplierId });
+    setPrefillTask({
+      modelTemplateId: chosen.id,
+      conditionCode: code,
+      supplierId: current.supplierId,
+      scope: 'template',
+    });
     setErrors((previous) => ({ ...withoutValueErrors(previous), modelTemplateId: undefined }));
     setSearchInput('');
     setSearchTerm(undefined);
@@ -715,6 +814,10 @@ export function DeviceIntakePage() {
       const text = error.error?.message;
       showServerErrors({ supplierId: text });
       setSupplierRejected(true);
+      // The condition code is resolved again without supplier; condition, visual grade,
+      // condition description and their flags stay (2.0.11 "Lieferant in UI-003", DER-57-04).
+      const code = conditionCodeOf(draftRef.current);
+      if (code !== null) setResolvedCode({ code, supplierId: null });
       if (typeof id === 'number') void reloadAfterRejection(id, text);
       return;
     }
@@ -813,6 +916,7 @@ export function DeviceIntakePage() {
     batteryValuesQuery.error,
     templateQuery.error,
     prefillQuery.error,
+    codeResolution.error,
     ...modelDataLists.map(({ error }) => error),
     search.error,
   ];
@@ -821,8 +925,8 @@ export function DeviceIntakePage() {
   const summary = summaryShown ? inFormOrder(errors, attributeFields) : [];
   // Loading until the prefill is in the form (DER-55-01), unless a read failed (2.0.7).
   const prefillPending =
-    template !== null &&
-    prefilledFor !== template.id &&
+    prefillTask?.scope === 'template' &&
+    prefilledTask !== prefillTask &&
     prefillQuery.error === null &&
     attributesQuery.error === null;
   const valuesLoading =
@@ -841,6 +945,13 @@ export function DeviceIntakePage() {
       <ReviewMark field={field} disabled={saving} onConfirm={() => confirm(key)} />
     ) : null;
   const reviewShown = template !== null && !valuesLoading;
+  const resolution = resolvedCode === null ? undefined : codeResolution.data;
+  const codeHint =
+    resolution === undefined
+      ? null
+      : resolution.found && resolution.plainText !== null
+        ? TEXTS.plainTextTaken(resolution.plainText)
+        : TEXTS.conditionCodeUnknown;
   const reviewHintId = useId();
 
   return (
@@ -931,6 +1042,34 @@ export function DeviceIntakePage() {
                     </Select>
                   )}
                 </FormField>
+                <div className="flex flex-col gap-1">
+                  <FormField label={TEXTS.conditionCode} error={errors.conditionCode}>
+                    {(control) => (
+                      <Input
+                        {...control}
+                        aria-describedby={
+                          [control['aria-describedby'], codeHint && codeHintId]
+                            .filter(Boolean)
+                            .join(' ') || undefined
+                        }
+                        value={draft.conditionCode}
+                        maxLength={CONDITION_CODE_MAX}
+                        autoComplete="off"
+                        disabled={saving}
+                        onChange={(event) => change({ conditionCode: event.target.value })}
+                        onBlur={takeConditionCode}
+                      />
+                    )}
+                  </FormField>
+                  {/* Appears on leaving the field (UI-003 "Angezeigte Daten"). */}
+                  <p
+                    id={codeHintId}
+                    aria-live="polite"
+                    className="m-0 text-label text-text-secondary [overflow-wrap:anywhere]"
+                  >
+                    {codeHint}
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -993,7 +1132,7 @@ export function DeviceIntakePage() {
                         reviewKeys: [],
                         confirmedKeys: [],
                       });
-                      setPrefilledFor(null);
+                      setPrefillTask(null);
                       setErrors(withoutValueErrors);
                     }}
                   >

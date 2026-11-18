@@ -21,18 +21,37 @@ export function useDeviceQuery(id: number | null) {
   });
 }
 
+/** What a prefill is asked for: the model template, the condition code and its supplier. */
+export interface DevicePrefillRequest {
+  modelTemplateId: number;
+  conditionCode: string | null;
+  supplierId: number | null;
+}
+
 /**
- * The prefill of a device from a model template with its review flags
- * (`GET /api/model-templates/{id}/device-prefill`, 2.5); no request without a model template.
+ * The prefill of a device from a model template with its review flags and the result of the
+ * condition code for the supplier
+ * (`GET /api/model-templates/{id}/device-prefill?conditionCode=&supplierId=`, 2.5); no request
+ * without a model template.
  */
-export function useDevicePrefillQuery(modelTemplateId: number | null) {
+export function useDevicePrefillQuery(request: DevicePrefillRequest | null) {
+  const code = {
+    conditionCode: request?.conditionCode ?? null,
+    supplierId: request?.supplierId ?? null,
+  };
   return useQuery<DevicePrefillAnswer, ApiError>({
-    queryKey: queryKeys.inventory.devicePrefill(modelTemplateId ?? 0),
-    queryFn: ({ signal }) =>
-      apiClient.get<DevicePrefillAnswer>(`/api/model-templates/${modelTemplateId}/device-prefill`, {
-        signal,
-      }),
-    enabled: modelTemplateId !== null,
+    queryKey: queryKeys.inventory.devicePrefill(request?.modelTemplateId ?? 0, code),
+    queryFn: ({ signal }) => {
+      const query = new URLSearchParams();
+      if (code.conditionCode !== null) query.set('conditionCode', code.conditionCode);
+      if (code.supplierId !== null) query.set('supplierId', String(code.supplierId));
+      const search = query.size === 0 ? '' : `?${query}`;
+      return apiClient.get<DevicePrefillAnswer>(
+        `/api/model-templates/${request?.modelTemplateId}/device-prefill${search}`,
+        { signal },
+      );
+    },
+    enabled: request !== null,
   });
 }
 

@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
 import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
 import { dateSchema, idSchema, timestampSchema, versionSchema } from './common.schema.ts';
+import { CONDITION_CODE_MAX } from './condition-code.schema.ts';
 import type { BatteryValueFlag } from './pick-list.schema.ts';
 
-// Device (REQ-012 to REQ-014; Technical Specification 2.5, 3.3, 3.4). The condition code
-// follows with #193, changing a device with #190.
+// Device (REQ-012 to REQ-015; Technical Specification 2.5, 3.3, 3.4). Changing a device follows
+// with #190.
 
 /** WI-Nr: 1–20 letters and digits, nothing else, not even spaces (Requirements 9.6, 2.5). */
 const WI_NR_PATTERN = /^[A-Za-z0-9]{1,20}$/;
@@ -60,6 +61,19 @@ const conditionDescriptionSchema = z
   .trim()
   .max(CONDITION_DESCRIPTION_MAX, FIELD_MESSAGES.conditionDescription);
 
+/**
+ * Condition code as entered (REQ-015, 3.3): spaces at the edges removed, empty is no code. Its
+ * length is checked with the request (`deviceCreateBodySchema`): UI-003 takes at most 20 characters.
+ */
+const conditionCodeInputSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((code) => {
+    const trimmed = code?.trim() ?? '';
+    return trimmed === '' ? null : trimmed;
+  });
+
 /** Attribute values by attribute id before they are checked against the attribute definitions. */
 const anyValuesSchema = z.record(z.string(), z.unknown());
 
@@ -73,6 +87,12 @@ const anyValuesSchema = z.record(z.string(), z.unknown());
 export const deviceCreateBodySchema = z.strictObject({
   wiNr: z.string(),
   supplierId: idSchema.nullable(),
+  // UI-003 takes at most 20 characters (screen.md "Eingaben"); the text of the code (3.1).
+  conditionCode: z
+    .string()
+    .max(CONDITION_CODE_MAX, FIELD_MESSAGES.conditionCode)
+    .nullable()
+    .optional(),
   modelTemplateId: idSchema.nullable(),
   conditionValueId: idSchema.nullable(),
   visualGrade: z.union([z.number(), z.string()]).nullable(),
@@ -96,6 +116,7 @@ export function deviceCreateSchema(
   return z.strictObject({
     wiNr: wiNrSchema,
     supplierId: idSchema.nullable(),
+    conditionCode: conditionCodeInputSchema,
     modelTemplateId: requiredChoice(FIELD_MESSAGES.modelTemplateMissing),
     conditionValueId: requiredChoice(FIELD_MESSAGES.conditionMissing),
     visualGrade: visualGradeSchema,
@@ -124,6 +145,7 @@ export const deviceSchema = z.object({
   modelTemplateId: idSchema,
   listingId: idSchema.nullable(),
   supplierId: idSchema.nullable(),
+  conditionCode: z.string().nullable(),
   conditionValueId: idSchema,
   visualGrade: z.int(),
   conditionDescription: z.string(),
@@ -139,9 +161,9 @@ export const deviceSchema = z.object({
 export type Device = z.infer<typeof deviceSchema>;
 
 /**
- * `GET /api/model-templates/{id}/device-prefill` (2.5, CU-293): the prefill of CU-117 with its
- * review flags and the result of the condition code (`found: false` without a code; the code
- * follows with #193).
+ * `GET /api/model-templates/{id}/device-prefill?conditionCode=&supplierId=` (2.5, CU-293): the
+ * prefill of CU-117 with its review flags and the result of the condition code (`found: false`
+ * without a code or for an unknown one).
  */
 export const devicePrefillSchema = z.object({
   conditionValueId: idSchema.nullable(),
