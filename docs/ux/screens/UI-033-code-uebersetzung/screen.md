@@ -19,7 +19,7 @@ Tabelle: Zustandscode, Lieferant (oder „alle“), Klartext, Vorschlag Zustand,
 - **Vorschlag Zustand (optional).** leer statt „Bitte wählen“ (leere Wahl bleibt zulässig, ändert keine Reichweite).
 - **Meldung.** „Lieferant <Name> ist deaktiviert“ bzw. „Vorschlag Zustand <Name> ist deaktiviert“ am Feld bis zur nächsten Wahl; Fokus auf das Feld, nichts gespeichert.
 - **Abhängige Eingaben.** Zustandscode, Klartext, Vorschlag Optik-Note bleiben erhalten; es gibt keine abhängigen Werte, die verworfen würden.
-- **Ändern.** Kein Rückfall auf den gespeicherten Wert; der gespeicherte, ggf. deaktivierte Lieferant bleibt wählbar („(deaktiviert)“) und wird unverändert ohne Ablehnung gespeichert. Zuordnungsfelder gibt es in UI-033 nicht.
+- **Ändern.** Kein Rückfall auf den gespeicherten Wert; der gespeicherte, ggf. deaktivierte Lieferant bleibt wählbar („(deaktiviert)“) und wird unverändert ohne Ablehnung gespeichert. Zuordnungsfelder gibt es in UI-033 nicht. Zusatz „(deaktiviert)“ nur für den gespeicherten Eintrag. Ein im Entwurf gewählter, noch nicht abgelehnter Eintrag, der nach einem Neuladen deaktiviert ist, bleibt gewählt und ohne Zusatz angeboten; Speichern führt zur Ablehnung nach DG-19.
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
