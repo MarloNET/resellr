@@ -746,11 +746,14 @@ export function DeviceIntakePage() {
     if (code === (resolvedCode?.code ?? null)) return;
     setResolvedCode(code === null ? null : { code, supplierId: current.supplierId });
     if (current.modelTemplate === null) return;
+    // While the prefill of the model template is not in the form yet, the code goes into it, so
+    // the values of the model template are not lost (REQ-013, FIND-1068-01).
+    const templatePending = prefillTask?.scope === 'template' && prefilledTask !== prefillTask;
     setPrefillTask({
       modelTemplateId: current.modelTemplate.id,
       conditionCode: code,
       supplierId: current.supplierId,
-      scope: 'code',
+      scope: templatePending ? 'template' : 'code',
     });
   }
 

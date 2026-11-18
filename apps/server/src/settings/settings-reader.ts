@@ -56,8 +56,9 @@ const toEntry = (row: { id: number; name: string; active: number }): SettingsEnt
  * 2.0.11, Nachtrag MAR-904): device type and manufacturer for the model template service
  * (CU-105), with #178 the attribute definitions of a device type and the pick list values, with
  * #185 the supplier and the values of the list battery for the device service (CU-121), with #193
- * the entry of a condition code for the prefill (CU-293, CU-121); each further method follows with the first task that calls it. Inside an action pass `tx.db`, so
- * the check sees the state of the writing transaction.
+ * the entry of a condition code for the prefill (CU-293, CU-121); each further method follows
+ * with the first task that calls it. Inside an action pass `tx.db`, so the check sees the state
+ * of the writing transaction.
  */
 export function createSettingsReader(db: Kysely<DB>) {
   const deviceTypes = createDeviceTypeRepository(db);

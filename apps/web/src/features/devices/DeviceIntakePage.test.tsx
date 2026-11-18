@@ -708,6 +708,35 @@ describe('UI-003 condition code (CU-132, CU-092, REQ-015; Technical Specificatio
     expect(screen.queryByText('Lade Gerätewerte …')).toBeNull();
   });
 
+  it('UI-003.loading AC-REQ-013-01 a code entered while the prefill of the model template loads keeps the values of the model template (FIND-1068-01)', async () => {
+    let answerFirst: (response: Response) => void = () => {};
+    const { asked } = mockApi({
+      resolve: () => Response.json(DGS),
+      prefill: () =>
+        asked.prefill.length === 1
+          ? new Promise<Response>((resolve) => {
+              answerFirst = resolve;
+            })
+          : Response.json(dgsPrefill()),
+    });
+    await openPage();
+    fireEvent.change(searchBox(), { target: { value: 'T14' } });
+    fireEvent.click(await screen.findByRole('button', { name: MV_A_LINE }));
+    await screen.findByText('Lade Gerätewerte …');
+
+    enterCode('DGS');
+    answerFirst(Response.json(MV_A_PREFILL));
+
+    await vi.waitFor(() => expect(textbox('Zustandsbeschreibung').value).toBe(DGS_TEXT));
+    expect(asked.prefill).toEqual(['', '?conditionCode=DGS']);
+    expect(select('Tastaturlayout').value).toBe('111');
+    expect(select('Akku').value).toBe(String(WITH_BATTERY));
+    expect(chipOf('Tastaturlayout')).toBeTruthy();
+    expect(chipOf('Akku')).toBeTruthy();
+    expect(screen.queryByText('Lade Gerätewerte …')).toBeNull();
+    expectAccessiblePage();
+  });
+
   describe('after supplier_deactivated (2.0.11 "Lieferant in UI-003", design v0.6.8)', () => {
     const suppliersAfter = () => {
       let calls = 0;
