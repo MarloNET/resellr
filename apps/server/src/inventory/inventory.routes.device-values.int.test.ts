@@ -152,7 +152,10 @@ describe('field rules of the device values (CU-116, CU-067, Technical Specificat
 
   it('AC-REQ-014-05 needs no battery capacity with the battery "ohne Akku"', async () => {
     const id = await storedDevice({
-      values: values({ [attribute('Akku')]: value('ohne Akku'), [attribute('Akkukapazität')]: null }),
+      values: values({
+        [attribute('Akku')]: value('ohne Akku'),
+        [attribute('Akkukapazität')]: null,
+      }),
     });
 
     expect((await get(id)).json().values).not.toHaveProperty(String(attribute('Akkukapazität')));
@@ -235,13 +238,20 @@ describe('field rules of the device values (CU-116, CU-067, Technical Specificat
 
     const response = await patch(id, {
       version: 1,
-      values: { [attribute('Akku')]: value('mit Akku (defekt)'), [attribute('Akkukapazität')]: null },
+      values: {
+        [attribute('Akku')]: value('mit Akku (defekt)'),
+        [attribute('Akkukapazität')]: null,
+      },
       confirmedKeys: [],
     });
 
     expect(response.statusCode).toBe(422);
     expect(response.json().error.fields).toEqual([
-      { path: `values.${attribute('Akkukapazität')}`, code: 'value_missing', message: CAPACITY_RULE },
+      {
+        path: `values.${attribute('Akkukapazität')}`,
+        code: 'value_missing',
+        message: CAPACITY_RULE,
+      },
     ]);
   });
 });
@@ -308,21 +318,27 @@ describe('PATCH /api/devices/{id} (CU-121, CU-130, Technical Specification 2.5)'
 
   it.each([
     ['sold', "stock_status = 'sold', sold_on = '2026-11-17'"],
-    ['cancelled', "stock_status = 'cancelled', cancel_reason = 'falsch', cancelled_at = '2026-11-17T08:00:00.000Z'"],
-  ])('DER-56-02 rejects a change of a %s device with 422 device_not_available, storing nothing', async (_status, columns) => {
-    const id = await storedDevice();
-    t.database.sqlite.prepare(`UPDATE device SET ${columns} WHERE id = ?`).run(id);
+    [
+      'cancelled',
+      "stock_status = 'cancelled', cancel_reason = 'falsch', cancelled_at = '2026-11-17T08:00:00.000Z'",
+    ],
+  ])(
+    'DER-56-02 rejects a change of a %s device with 422 device_not_available, storing nothing',
+    async (_status, columns) => {
+      const id = await storedDevice();
+      t.database.sqlite.prepare(`UPDATE device SET ${columns} WHERE id = ?`).run(id);
 
-    const response = await patch(id, { version: 1, visualGrade: '4', confirmedKeys: [] });
+      const response = await patch(id, { version: 1, visualGrade: '4', confirmedKeys: [] });
 
-    expect(response.statusCode).toBe(422);
-    expect(response.json().error).toMatchObject({
-      code: 'device_not_available',
-      message: 'Werte schreibgeschützt',
-    });
-    expect(deviceRow(id)).toMatchObject({ visual_grade: 3, version: 1 });
-    expect(count('audit_entry')).toBe(1);
-  });
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'device_not_available',
+        message: 'Werte schreibgeschützt',
+      });
+      expect(deviceRow(id)).toMatchObject({ visual_grade: 3, version: 1 });
+      expect(count('audit_entry')).toBe(1);
+    },
+  );
 
   it('DER-56-07 answers an outdated version with 409 version_conflict, storing nothing', async () => {
     const id = await storedDevice();
@@ -345,9 +361,7 @@ describe('PATCH /api/devices/{id} (CU-121, CU-130, Technical Specification 2.5)'
   it('lifts a stored review flag confirmed or changed, and the capture status becomes "checked" (2.5, CU-118)', async () => {
     const id = await storedDevice();
     t.database.sqlite
-      .prepare(
-        `UPDATE device SET review_keys = ?, capture_status = 'review_pending' WHERE id = ?`,
-      )
+      .prepare(`UPDATE device SET review_keys = ?, capture_status = 'review_pending' WHERE id = ?`)
       .run(JSON.stringify(['visualGrade', String(attribute('Akkukapazität'))]), id);
 
     const confirmed = await patch(id, { version: 1, confirmedKeys: ['visualGrade'] });
@@ -586,7 +600,9 @@ describe('active entries of the device values (CU-121, Technical Specification 2
     const ports = attribute('Anschlüsse');
     t.database.sqlite.prepare("UPDATE attribute SET level = 'device' WHERE id = ?").run(ports);
     const id = await storedDevice({
-      values: values({ [ports]: [{ count: '2', typeId: value('USB-C'), positionId: value('vorn') }] }),
+      values: values({
+        [ports]: [{ count: '2', typeId: value('USB-C'), positionId: value('vorn') }],
+      }),
     });
     deactivate(value('USB-C'));
     deactivate(value('vorn'));

@@ -146,7 +146,12 @@ function pickListValueReferences(
     const value = request.values[key];
     const before = stored.values[key];
     if (attribute.dataType === 'pick' && typeof value === 'number' && value !== before) {
-      references.push({ path, id: value, expected: { pickListId: attribute.pickListId }, attribute });
+      references.push({
+        path,
+        id: value,
+        expected: { pickListId: attribute.pickListId },
+        attribute,
+      });
     }
     if (attribute.dataType !== 'ports' || !Array.isArray(value)) continue;
     const storedEntries = (Array.isArray(before) ? before : []) as Partial<PortEntry>[];
@@ -539,8 +544,9 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           label,
         );
         const newFields = readableDeviceValues(attributes, after, label);
-        const changedFields = [...new Set([...Object.keys(oldFields), ...Object.keys(newFields)])]
-          .filter((field) => oldFields[field] !== newFields[field]);
+        const changedFields = [
+          ...new Set([...Object.keys(oldFields), ...Object.keys(newFields)]),
+        ].filter((field) => oldFields[field] !== newFields[field]);
         const flagsChanged = reviewKeys.join() !== stored.reviewKeys.join();
         if (changedFields.length === 0 && !flagsChanged) return stored;
 
