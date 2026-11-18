@@ -44,10 +44,10 @@ export const MESSAGES = {
  */
 export const FIELD_MESSAGES = {
   /**
-   * UI-004 "Artikelnummer", not 1–30 letters, digits and "-" (2.7). Text proposed to the Software
-   * Architect with MAR-1053, as the design has none.
+   * UI-004 and UI-014 "Artikelnummer", empty or not 1–30 letters, digits and "-" (2.6, 8.2,
+   * Nachtrag MAR-1053).
    */
-  articleNumber: 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und -',
+  articleNumber: 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“',
   /**
    * Values of the attributes in the input masks (Technical Specification 2.5 "Regeln und Texte
    * je Datentyp", 8.2): `label` is the current label of the attribute, bounds are formatted with
@@ -196,8 +196,8 @@ export const ERROR_MESSAGES = {
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
   /**
-   * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device (2.0.6 "Varianten je
-   * Aktion"); wording of the sale (AC-REQ-021-04), proposed with MAR-1053.
+   * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device: the wording of the sale
+   * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
    */
   'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */

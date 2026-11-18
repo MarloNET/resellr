@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { listingCreateBodySchema, toArticleNumberKey } from './listing.schema.ts';
 
-const RULE = 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und -';
+const RULE = 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“';
 
 describe('listingCreateBodySchema (CU-116, Technical Specification 2.6)', () => {
   it('takes a device with its version, with or without an article number', () => {

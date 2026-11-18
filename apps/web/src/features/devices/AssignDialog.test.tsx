@@ -180,7 +180,7 @@ describe('UI-004 "Neues Modell-Inserat anlegen" (CU-134, #197)', () => {
 
     const errorId = articleNumberInput()!.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(errorId)?.textContent).toContain(
-      'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und -',
+      'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“',
     );
     expect(sent).toHaveLength(1);
   });

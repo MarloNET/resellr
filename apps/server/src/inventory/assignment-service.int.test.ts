@@ -293,6 +293,17 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
     expect(count('listing')).toBe(2);
   });
 
+  it('takes the value of a deactivated variant attribute into the variant values (K-03)', async () => {
+    const deviceId = await captureDevice('626198');
+    t.database.sqlite.prepare('UPDATE attribute SET active = 0 WHERE id = ?').run(ids.storageType);
+
+    const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().variantValues).toMatchObject({ [ids.storageType]: ids.nvme });
+    expect(response.json().otherValues).not.toHaveProperty(String(ids.storageType));
+  });
+
   it('rejects a taken article number with article_number_taken at the field and takes another one', async () => {
     await createListing({
       fromDeviceId: await captureDevice('626198'),
@@ -327,7 +338,7 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
     const response = await createListing({
       fromDeviceId: deviceId,
       deviceVersion: 1,
-      articleNumber: 'MI A',
+      articleNumber: 'ab_1',
     });
 
     expect(response.statusCode).toBe(422);
@@ -336,7 +347,7 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
       fields: [
         {
           path: 'articleNumber',
-          message: 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und -',
+          message: 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“',
         },
       ],
     });
