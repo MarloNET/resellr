@@ -200,6 +200,11 @@ export const ERROR_MESSAGES = {
    * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
    */
   'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
+  /**
+   * UI-010 "Gerätewerte speichern" of a sold or cancelled device (2.5, `UI-010.disabled`,
+   * Auslegung RQ-17).
+   */
+  'device_not_available.device_values': 'Werte schreibgeschützt',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
@@ -217,6 +222,11 @@ export const ERROR_MESSAGES = {
   /** UI-007, UI-003, UI-010, UI-014 at the field of the attribute (2.0.6, Nachtrag MAR-904). */
   'pick_list_value_deactivated.attribute': (label: string, value: string) =>
     `${label}: ${value} ist deaktiviert`,
+  /**
+   * UI-003, UI-010 "Zustand", a new or changed condition of a device is deactivated (2.0.11,
+   * 8.2, Nachtrag MAR-904).
+   */
+  'pick_list_value_deactivated.condition': (value: string) => `Zustand ${value} ist deaktiviert`,
   /**
    * UI-033 "Vorschlag Zustand", a new or changed suggestion is deactivated (2.0.11, design
    * v0.6.8, addendum MAR-929).

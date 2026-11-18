@@ -1,9 +1,21 @@
-import { type Insertable, type Kysely, type Selectable, sql } from 'kysely';
+import { type Insertable, type Kysely, type Selectable, sql, type Updateable } from 'kysely';
 
 import type { DB, DeviceTable } from '../db/schema.ts';
 
 export type DeviceRow = Selectable<DeviceTable>;
 export type DeviceInsert = Omit<Insertable<DeviceTable>, 'id'>;
+/** The device values, review flags and version a change of the device values writes (2.5). */
+export type DeviceUpdate = Pick<
+  Updateable<DeviceTable>,
+  | 'condition_value_id'
+  | 'visual_grade'
+  | 'condition_description'
+  | 'device_values'
+  | 'review_keys'
+  | 'capture_status'
+  | 'version'
+  | 'updated_at'
+>;
 
 export interface DeviceSearchQuery {
   /** Part of a WI-Nr as key (`toWiNrKey`), at least 1 character. */
@@ -96,6 +108,11 @@ export function createDeviceRepository(db: Kysely<DB>) {
         }))
         .where('id', '=', id)
         .executeTakeFirstOrThrow();
+    },
+
+    /** Writes the changed columns of a device (`PATCH /api/devices/{id}`, 2.5). */
+    async update(id: number, changes: DeviceUpdate): Promise<void> {
+      await db.updateTable('device').set(changes).where('id', '=', id).execute();
     },
 
     async findById(id: number): Promise<DeviceRow | undefined> {
