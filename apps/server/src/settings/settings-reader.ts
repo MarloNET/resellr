@@ -29,9 +29,13 @@ export interface PickListValueEntry {
   active: boolean;
 }
 
-/** An attribute definition as the value rules of CU-067 and the check of 2.0.11 need it. */
+/**
+ * An attribute definition as the value rules of CU-067, the check of 2.0.11 and the comparison
+ * rule of CU-119 (flag "variantenbildend", 2.6) need it.
+ */
 export interface AttributeEntry extends AttributeValueDefinition {
   pickListId: number | null;
+  variantForming: boolean;
 }
 
 const toEntry = (row: { id: number; name: string; active: number }): SettingsEntry => ({
@@ -89,6 +93,7 @@ export function createSettingsReader(db: Kysely<DB>) {
         level: row.level as AttributeLevel,
         required: row.required === 1,
         active: row.active === 1,
+        variantForming: row.variant_forming === 1,
       }));
     },
 

@@ -14,7 +14,8 @@ export interface DeviceSearchQuery {
 
 /**
  * Queries on `device` (CU-122; Technical Specification 4.1, Nachtrag MAR-965). Inside an action
- * pass `tx.db`, outside of one the outer `db` (2.0.4). The unassigned devices follow with #258.
+ * pass `tx.db`, outside of one the outer `db` (2.0.4). With #197 the devices of a model listing and
+ * the assignment; the unassigned devices follow with #258.
  */
 export function createDeviceRepository(db: Kysely<DB>) {
   return {
@@ -64,6 +65,37 @@ export function createDeviceRepository(db: Kysely<DB>) {
         .returning('id')
         .executeTakeFirstOrThrow();
       return id;
+    },
+
+    /**
+     * The devices assigned to a model listing with what its stock data need (2.8.2, CU-128), by
+     * `assigned_at` and `id`; WI-Nrs and battery capacity follow with #209.
+     */
+    async listByListing(listingId: number) {
+      return db
+        .selectFrom('device')
+        .select(['id', 'stock_status'])
+        .where('listing_id', '=', listingId)
+        .orderBy('assigned_at')
+        .orderBy('id')
+        .execute();
+    },
+
+    /**
+     * Assigns a device to a model listing at `at` (2.6: `assigned_at` orders the WI-Nrs of
+     * `{WI-Nr}`) and raises its version (2.0.3).
+     */
+    async assign(id: number, listingId: number, at: string): Promise<void> {
+      await db
+        .updateTable('device')
+        .set((eb) => ({
+          listing_id: listingId,
+          assigned_at: at,
+          version: eb('version', '+', 1),
+          updated_at: at,
+        }))
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow();
     },
 
     async findById(id: number): Promise<DeviceRow | undefined> {

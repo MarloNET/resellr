@@ -158,6 +158,34 @@ function readable(
 }
 
 /**
+ * The condition and the values of a device or model listing readable for an audit entry (3.4):
+ * labels instead of pick list ids, by the label of the attribute in the order of the device type;
+ * attributes without a value are left out. Also used by CU-123 (#197).
+ */
+export async function readableValues(
+  settings: SettingsReader,
+  attributes: readonly AttributeEntry[],
+  conditionValueId: number,
+  values: AttributeValues,
+): Promise<{ condition: string; values: Record<string, string> }> {
+  const labels = new Map(
+    (
+      await settings.findPickListValues([conditionValueId, ...pickListValueIds(attributes, values)])
+    ).map((value) => [value.id, value.label]),
+  );
+  const label = (valueId: number) => labels.get(valueId) ?? String(valueId);
+  return {
+    condition: label(conditionValueId),
+    values: Object.fromEntries(
+      attributes.flatMap((attribute) => {
+        const value = values[String(attribute.id)];
+        return value === undefined ? [] : [[attribute.label, readable(attribute, value, label)]];
+      }),
+    ),
+  };
+}
+
+/**
  * Device service (CU-121, REQ-012 to REQ-014; Technical Specification 2.5): creates a device as
  * available, unassigned and with its capture date, together with its audit entry in one
  * transaction (2.0.4). Order of the checks (2.0.11): the rules of the request with the values of
@@ -244,22 +272,11 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           updated_at: at,
         });
 
-        const labels = new Map(
-          (
-            await settings.findPickListValues([
-              device.conditionValueId,
-              ...pickListValueIds(attributes, deviceValues),
-            ])
-          ).map((value) => [value.id, value.label]),
-        );
-        const label = (valueId: number) => labels.get(valueId) ?? String(valueId);
-        const values = Object.fromEntries(
-          attributes.flatMap((attribute) => {
-            const value = deviceValues[String(attribute.id)];
-            return value === undefined
-              ? []
-              : [[attribute.label, readable(attribute, value, label)]];
-          }),
+        const { condition, values } = await readableValues(
+          settings,
+          attributes,
+          device.conditionValueId,
+          deviceValues,
         );
         const modelName = (
           await createCatalogReader(tx.db).listModelTemplatesOfDeviceType(template.deviceTypeId)
@@ -274,7 +291,7 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
             'WI-Nr': device.wiNr,
             Modellvorlage: modelName ?? String(template.id),
             ...(supplier !== undefined && { Lieferant: supplier.name }),
-            Zustand: label(device.conditionValueId),
+            Zustand: condition,
             'Optik-Note': device.visualGrade,
             ...(device.conditionDescription !== '' && {
               Zustandsbeschreibung: device.conditionDescription,

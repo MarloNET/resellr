@@ -44,6 +44,11 @@ export const MESSAGES = {
  */
 export const FIELD_MESSAGES = {
   /**
+   * UI-004 "Artikelnummer", not 1–30 letters, digits and "-" (2.7). Text proposed to the Software
+   * Architect with MAR-1053, as the design has none.
+   */
+  articleNumber: 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und -',
+  /**
    * Values of the attributes in the input masks (Technical Specification 2.5 "Regeln und Texte
    * je Datentyp", 8.2): `label` is the current label of the attribute, bounds are formatted with
    * a decimal comma and without thousands separators.
@@ -179,6 +184,10 @@ const LOGO_FILE_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  /** UI-004 (M-01, AC-REQ-017-04). */
+  'already_assigned.default': MESSAGES['M-01'],
+  /** UI-004 "Neues Modell-Inserat anlegen" at the field "Artikelnummer" (2.6, DER-60-04). */
+  'article_number_taken.default': 'Artikelnummer bereits vergeben',
   'attribute_has_values.data_type':
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
@@ -186,6 +195,11 @@ export const ERROR_MESSAGES = {
   /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+  /**
+   * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device (2.0.6 "Varianten je
+   * Aktion"); wording of the sale (AC-REQ-021-04), proposed with MAR-1053.
+   */
+  'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
@@ -218,6 +232,9 @@ export const ERROR_MESSAGES = {
   'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
   /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
+  /** UI-004 "Neues Modell-Inserat anlegen" (2.0.6, AC-REQ-019-02): the display title of it. */
+  'variant_duplicate.new_listing': (listingTitle: string) =>
+    `Gleiche Variantenangaben wie Modell-Inserat ${listingTitle}; bitte dort zuordnen`,
   'variant_flag_would_merge_listings.flag': (listings: string) =>
     `Änderung nicht möglich: Modell-Inserate ${listings} würden gleiche Variantenangaben haben`,
   /**
