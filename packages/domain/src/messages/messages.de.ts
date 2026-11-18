@@ -196,15 +196,15 @@ export const ERROR_MESSAGES = {
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
   /**
-   * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device: the wording of the sale
-   * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
-   */
-  'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
-  /**
    * UI-010 "Gerätewerte speichern" of a sold or cancelled device (2.5, `UI-010.disabled`,
    * Auslegung RQ-17).
    */
   'device_not_available.device_values': 'Werte schreibgeschützt',
+  /**
+   * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device: the wording of the sale
+   * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
+   */
+  'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
