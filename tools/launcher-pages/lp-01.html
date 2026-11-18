@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- LP-01 "resellr startet" (CU-271, design docs/ux/launcher-pages/LP-01-resellr-startet). -->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>resellr startet</title>
+    <link rel="stylesheet" href="./launcher-pages.css" />
+    <script src="./launcher-pages.js" defer></script>
+  </head>
+  <body data-page="lp-01">
+    <main class="card">
+      <h1>resellr startet</h1>
+      <p>
+        Bitte haben Sie einen Moment Geduld. Der Start dauert diesmal länger als sonst, zum Beispiel
+        weil resellr Ihre Daten prüft. Lassen Sie dieses Fenster geöffnet. resellr öffnet sich von
+        selbst, sobald es bereit ist.
+      </p>
+      <div class="progress">
+        <p id="progress-label">resellr wird gestartet …</p>
+        <div class="progress-bar" role="progressbar" aria-labelledby="progress-label">
+          <div class="progress-bar__indicator"></div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

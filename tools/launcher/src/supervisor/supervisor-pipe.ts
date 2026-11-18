@@ -212,7 +212,33 @@ const FINAL_PHASES: readonly SupervisorPhase[] = [
  * Connects to the pipe of the supervisor, sends `subscribe` and waits for a final event
  * (CU-263, 2.18 step 2). Resolves with null if no supervisor listens on the pipe.
  */
-export async function subscribeToSupervisor(path: string): Promise<SubscribeResult | null> {
+export function subscribeToSupervisor(path: string): Promise<SubscribeResult | null> {
+  return sendAndWait(path, 'subscribe', FINAL_PHASES);
+}
+
+/** Phases that end the wait of `stop`: its result, or an end of the supervisor without one. */
+const STOP_RESULT_PHASES: readonly SupervisorPhase[] = [
+  'stopped',
+  'error',
+  'aborted',
+  'gave_up',
+  'already_running',
+];
+
+/**
+ * Connects to the pipe of the supervisor, sends `stop` and waits for `stopped` or `error`, or
+ * for an end of the supervisor (CU-263, 2.18 command `stop`). Resolves with null if no
+ * supervisor listens on the pipe.
+ */
+export function requestStop(path: string): Promise<SubscribeResult | null> {
+  return sendAndWait(path, 'stop', STOP_RESULT_PHASES);
+}
+
+async function sendAndWait(
+  path: string,
+  cmd: PipeRequest['cmd'],
+  finalPhases: readonly SupervisorPhase[],
+): Promise<SubscribeResult | null> {
   const socket = await connectSocket(path);
   if (socket === null) return null;
   return new Promise((resolve) => {
@@ -222,10 +248,27 @@ export async function subscribeToSupervisor(path: string): Promise<SubscribeResu
     };
     onJsonLines(socket, (value) => {
       const event = parsePhaseEvent(value);
-      if (event !== null && FINAL_PHASES.includes(event.phase)) finish(event);
+      if (event !== null && finalPhases.includes(event.phase)) finish(event);
     });
     socket.on('close', () => finish({ phase: 'closed' }));
     socket.on('error', () => finish({ phase: 'closed' }));
-    socket.write(encodeMessage({ cmd: 'subscribe' }));
+    socket.write(encodeMessage({ cmd }));
   });
+}
+
+/** Interval in which `waitForFreePipe` checks the pipe again. */
+const FREE_PIPE_POLL_MS = 100;
+
+/**
+ * Waits until no supervisor accepts on the pipe any more (2.18 `stop --for-update`). Resolves
+ * with true once the pipe is free, with false if it is still held after `timeoutMs`.
+ */
+export async function waitForFreePipe(path: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (!(await canConnect(path))) return true;
+    const left = deadline - Date.now();
+    if (left <= 0) return false;
+    await sleep(Math.min(FREE_PIPE_POLL_MS, left));
+  }
 }

@@ -131,12 +131,79 @@ describe('installer script resellr.iss (CU-273)', () => {
   });
 
   it('packages the staged program folder as it is', () => {
-    expect(section('Files').map(entry)).toEqual([
+    expect(section('Files').map(entry)[0]).toEqual({
+      Source: '..\\..\\..\\build\\package\\*',
+      Excludes: '\\Betriebshandbuch.pdf',
+      DestDir: '{app}',
+      Flags: 'ignoreversion recursesubdirs createallsubdirs',
+    });
+  });
+
+  it('requires Betriebshandbuch.pdf (CU-316) in its own entry, so the build fails without it (Nachtrag MAR-599)', () => {
+    const files = section('Files').map(entry);
+
+    expect(files.slice(1)).toEqual([
       {
-        Source: '..\\..\\..\\build\\package\\*',
+        Source: '..\\..\\..\\build\\package\\Betriebshandbuch.pdf',
         DestDir: '{app}',
-        Flags: 'ignoreversion recursesubdirs createallsubdirs',
+        Flags: 'ignoreversion',
       },
     ]);
+    expect(SCRIPT).not.toMatch(/skipifsourcedoesntexist/i);
+  });
+
+  describe('stopping before the update and the uninstallation (2.18 stop --for-update, Nachtrag MAR-471)', () => {
+    const code = section('Code').join('\n');
+
+    /** Pascal function or procedure `name`, from its header up to the next routine. */
+    function routine(name: string): string {
+      const match = new RegExp(
+        `^(?:function|procedure) ${name}\\b[\\s\\S]*?(?=^(?:function|procedure|//) |(?![\\s\\S]))`,
+        'm',
+      ).exec(code);
+      return match?.[0] ?? '';
+    }
+
+    it('calls stop --for-update of the installed resellr through resellr-node.exe and waits for its end', () => {
+      const stop = routine('StopResellr');
+
+      expect(stop).toContain(
+        "Exec(ExpandConstant('{app}\\resellr-node.exe'), '\"' + ExpandConstant('{app}\\app\\launcher.mjs') + '\" stop --for-update',",
+      );
+      expect(stop).toContain('ewWaitUntilTerminated');
+    });
+
+    it('goes on with exit code 0 or when the call cannot be started, and stops on any other exit code', () => {
+      const stop = routine('StopResellr');
+
+      // `Exec` returns False when resellr-node.exe is missing: no resellr runs from the folder.
+      expect(stop).toMatch(/if not Exec\([\s\S]*?then\s+begin\s+Result := True;\s+exit;\s+end;/);
+      expect(stop).toMatch(/Result := ResultCode = 0;/);
+    });
+
+    it('DER-105-03 stops before the update replaces files and aborts it without change, with the message', () => {
+      const prepare = routine('PrepareToInstall');
+
+      expect(prepare).toMatch(
+        /if StopResellr\(\) then\s+Result := ''\s+else\s+Result := StopFailedMessage\(\);/,
+      );
+      expect(routine('StopFailedMessage')).toContain(
+        "'resellr konnte nicht beendet werden. Bitte sp' + #$00E4 + 'ter erneut versuchen.'",
+      );
+    });
+
+    it('DER-105-05 stops after the question and before removing anything, and aborts with the suppressible message', () => {
+      const uninstall = routine('CurUninstallStepChanged');
+
+      expect(uninstall).toMatch(/\(CurUninstallStep = usAppMutexCheck\) and not StopResellr\(\)/);
+      expect(uninstall).toMatch(
+        /SuppressibleMsgBox\(StopFailedMessage\(\), mbError, MB_OK, IDOK\);\s+Abort;/,
+      );
+    });
+
+    it('never ends Chrome or other processes itself during the uninstallation', () => {
+      expect(code).not.toMatch(/chrome|taskkill|CloseApplications/i);
+      expect(setup().CloseApplications).toBeUndefined();
+    });
   });
 });

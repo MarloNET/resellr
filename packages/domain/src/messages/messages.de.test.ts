@@ -1,6 +1,13 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { ERROR_MESSAGES, type ErrorMessageUsage, FIXED_TEXTS, MESSAGES } from './messages.de.ts';
+import {
+  CONFIRMATION_TITLES,
+  ERROR_MESSAGES,
+  type ErrorMessageUsage,
+  FIELD_MESSAGES,
+  FIXED_TEXTS,
+  MESSAGES,
+} from './messages.de.ts';
 
 // Table "Meldungstexte" in Technical Specification 8.2; M-05 to M-13 per field as in the
 // message catalog of the design (docs/ux/meldungskatalog.md), which 8.2 refers to.
@@ -27,11 +34,19 @@ const MESSAGE_TABLE: [string, string][] = [
   ['M-21', 'Zeile: höchstens 1.000 Zeichen'],
   ['M-22', 'Excel-Datei: höchstens 10 MB'],
   ['M-24', 'Prüfdatum und prüfende Stelle erforderlich'],
+  ['M-25', 'Herstellernummer: höchstens 40 Zeichen'],
+  ['M-26', 'Herstellernummer: nur Buchstaben, Ziffern und die Zeichen - / . erlaubt'],
+  ['M-30', 'Name: 1 bis 100 Zeichen'],
+  ['M-31', 'Prüfende Stelle: höchstens 100 Zeichen'],
 ];
 
 const EXPECTED_KEYS = [
   ...Array.from({ length: 22 }, (_, i) => `M-${String(i + 1).padStart(2, '0')}`),
   'M-24',
+  'M-25',
+  'M-26',
+  'M-30',
+  'M-31',
 ];
 
 describe('message catalog (E1)', () => {
@@ -45,7 +60,7 @@ describe('message catalog (E1)', () => {
     );
   });
 
-  it('has exactly the keys M-01 to M-22 and M-24', () => {
+  it('has exactly the keys M-01 to M-22, M-24 to M-26, M-30 and M-31', () => {
     expect(Object.keys(MESSAGES)).toEqual(EXPECTED_KEYS);
   });
 
@@ -70,6 +85,213 @@ describe('message catalog (E1)', () => {
 
   it('uses M-15 for not_found', () => {
     expect(ERROR_MESSAGES['not_found.default']).toBe('Dieser Eintrag ist nicht mehr vorhanden.');
+  });
+
+  it('has one text of the logo for a too large file and a wrong type (2.2, UI-026)', () => {
+    expect(ERROR_MESSAGES['file_too_large.logo']).toBe('Logo: nur PNG oder JPEG bis 5 MB');
+    expect(ERROR_MESSAGES['unsupported_media_type.logo']).toBe('Logo: nur PNG oder JPEG bis 5 MB');
+  });
+
+  it('has the text of name_taken for device types (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['name_taken.device_type']).toBe('Name ist bereits vergeben');
+  });
+
+  it('has the field text of a missing device type (UI-007, Nachtrag MAR-925)', () => {
+    expect(FIELD_MESSAGES.deviceTypeMissing).toBe('Geräteart fehlt');
+  });
+
+  it('has the field text of the device type name (UI-027)', () => {
+    expect(FIELD_MESSAGES.deviceTypeName).toBe('Name: 1 bis 50 Zeichen');
+  });
+
+  it('has the text of name_taken for manufacturers (2.0.6, UI-031, DER-37-04)', () => {
+    expect(ERROR_MESSAGES['name_taken.manufacturer']).toBe('Name ist bereits vergeben');
+  });
+
+  it('names the deactivated manufacturer in manufacturer_deactivated (2.0.6, UI-008)', () => {
+    expect(ERROR_MESSAGES['manufacturer_deactivated.default']('Lenovo')).toBe(
+      'Hersteller Lenovo ist deaktiviert',
+    );
+  });
+
+  it('DER-38-11 names the deactivated supplier and condition suggestion of a condition code entry (2.0.6, 8.2, UI-033)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.condition_code']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+    expect(
+      ERROR_MESSAGES['pick_list_value_deactivated.condition_suggestion']('Stark gebraucht'),
+    ).toBe('Vorschlag Zustand Stark gebraucht ist deaktiviert');
+  });
+
+  it('DER-38-12 has the texts of a choice after a rejection for deactivation (2.0.11, 8.2, UI-033)', () => {
+    expect(FIELD_MESSAGES.conditionCodeSupplierNotChosen).toBe(
+      'Lieferant: Lieferanten oder „alle“ wählen',
+    );
+    expect(FIXED_TEXTS.deactivatedChoice('Lieferant West')).toBe('Lieferant West (deaktiviert)');
+  });
+
+  it('names the deactivated device type and manufacturer of a model template (2.0.6, 2.0.11, UI-007)', () => {
+    expect(ERROR_MESSAGES['device_type_deactivated.model_template']('Monitor')).toBe(
+      'Geräteart Monitor ist deaktiviert',
+    );
+    expect(ERROR_MESSAGES['manufacturer_deactivated.model_template']('Fujitsu')).toBe(
+      'Hersteller Fujitsu ist deaktiviert',
+    );
+  });
+
+  it('DER-54-15 names the deactivated supplier of a new device (2.0.6, 8.2, UI-003)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.device']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+  });
+
+  it('AC-REQ-012-02 names the existing device and its model listing in wi_nr_taken (2.0.6, UI-003 v0.6.9)', () => {
+    expect(ERROR_MESSAGES['wi_nr_taken.listing']('626198', 'ThinkPad T14 Gen 2, 16 GB')).toBe(
+      'WI-Nr bereits vergeben: Gerät 626198 in ThinkPad T14 Gen 2, 16 GB',
+    );
+    expect(ERROR_MESSAGES['wi_nr_taken.unassigned']('626198')).toBe(
+      'WI-Nr bereits vergeben: Gerät 626198 (nicht zugeordnet)',
+    );
+  });
+
+  it('has the field texts of the WI-Nr and the model template of a new device (2.5, UI-003)', () => {
+    expect(FIELD_MESSAGES.wiNr).toBe(
+      'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)',
+    );
+    expect(FIELD_MESSAGES.modelTemplateMissing).toBe('Bitte eine Modellvorlage wählen');
+  });
+
+  it('names attribute and value of a deactivated pick list value (2.0.6, 8.2, UI-007)', () => {
+    expect(
+      ERROR_MESSAGES['pick_list_value_deactivated.attribute']('Tastaturlayout', 'Ungarisch'),
+    ).toBe('Tastaturlayout: Ungarisch ist deaktiviert');
+  });
+
+  it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
+    expect(FIELD_MESSAGES.manufacturerName).toBe('Name: 1 bis 50 Zeichen');
+  });
+
+  it('DER-40-02 has the field text of a check date in the future (UI-030, 2.2)', () => {
+    expect(FIELD_MESSAGES.legalCheckedOnFuture).toBe('Prüfdatum darf nicht in der Zukunft liegen');
+  });
+
+  it('has the text of name_taken for attributes (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['name_taken.attribute']).toBe(
+      'Bezeichnung ist bei dieser Geräteart bereits vergeben',
+    );
+  });
+
+  it('has the field texts of the attribute panel (UI-027, 8.2)', () => {
+    expect(FIELD_MESSAGES.attributeUnit).toBe('Einheit: höchstens 20 Zeichen');
+    expect(FIELD_MESSAGES.attributeMinAboveMax).toBe(
+      'Mindestwert darf nicht größer als Höchstwert sein',
+    );
+    expect(FIELD_MESSAGES.attributePickListMissing).toBe('Auswahlliste fehlt');
+    expect(FIELD_MESSAGES.attributeMinValueNumber).toBe('Mindestwert: Zahl');
+    expect(FIELD_MESSAGES.attributeMinValueInteger).toBe('Mindestwert: ganze Zahl');
+    expect(FIELD_MESSAGES.attributeMaxValueNumber).toBe('Höchstwert: Zahl');
+    expect(FIELD_MESSAGES.attributeMaxValueInteger).toBe('Höchstwert: ganze Zahl');
+  });
+
+  it('has the texts of the attribute values (2.5, 8.2)', () => {
+    expect(FIELD_MESSAGES.attributeValueMissing('RAM')).toBe('RAM fehlt');
+    expect(FIELD_MESSAGES.attributeValueNumber('RAM', 'integer', '1', '1024')).toBe(
+      'RAM: ganze Zahl von 1 bis 1024',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('Takt', 'decimal', '0,5', null)).toBe(
+      'Takt: Zahl ab 0,5',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('Takt', 'decimal', null, '6')).toBe(
+      'Takt: Zahl bis 6',
+    );
+    expect(FIELD_MESSAGES.attributeValueNumber('RAM', 'integer', null, null)).toBe(
+      'RAM: ganze Zahl',
+    );
+    expect(FIELD_MESSAGES.attributeValueTextLength('Farbe')).toBe('Farbe: höchstens 200 Zeichen');
+    expect(FIELD_MESSAGES.attributeValuePortCount('Anschlüsse')).toBe(
+      'Anschlüsse: Anzahl als ganze Zahl ab 1',
+    );
+    expect(FIELD_MESSAGES.attributeValuePortType('Anschlüsse')).toBe('Anschlüsse: Typ fehlt');
+  });
+
+  it('has the texts of attribute_has_values for data type and level (2.0.6, UI-027)', () => {
+    expect(ERROR_MESSAGES['attribute_has_values.data_type']).toBe(
+      'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+    expect(ERROR_MESSAGES['attribute_has_values.level']).toBe(
+      'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+  });
+
+  it('DER-34-11 names the model listings in variant_flag_would_merge_listings (2.0.6, UI-027)', () => {
+    expect(
+      ERROR_MESSAGES['variant_flag_would_merge_listings.flag'](
+        'ThinkPad T14: „A“ (A-1), „B“ (A-2)',
+      ),
+    ).toBe(
+      'Änderung nicht möglich: Modell-Inserate ThinkPad T14: „A“ (A-1), „B“ (A-2) würden gleiche ' +
+        'Variantenangaben haben',
+    );
+  });
+
+  it('has the text of name_taken for suppliers (2.0.6, UI-032)', () => {
+    expect(ERROR_MESSAGES['name_taken.supplier']).toBe('Name ist bereits vergeben');
+  });
+
+  it('has the field text of the supplier name (UI-032)', () => {
+    expect(FIELD_MESSAGES.supplierName).toBe('Name: 1 bis 100 Zeichen');
+  });
+
+  it('has the field text of the datasheet layout (UI-039)', () => {
+    expect(FIELD_MESSAGES.headerLabel).toBe('Kopfzeilentext: höchstens 50 Zeichen');
+  });
+
+  it('has the field texts of the merchant profile (UI-026)', () => {
+    expect(FIELD_MESSAGES.brandName).toBe('Name: 1 bis 100 Zeichen');
+    expect(FIELD_MESSAGES.contactText).toBe('Kontaktangaben: höchstens 500 Zeichen');
+  });
+
+  it('has the text of name_taken for pick list values (2.0.6, UI-028)', () => {
+    expect(ERROR_MESSAGES['name_taken.pick_list_value']).toBe(
+      'Wert gibt es in dieser Liste bereits',
+    );
+  });
+
+  it('has the field texts of the pick list values (UI-028)', () => {
+    expect(FIELD_MESSAGES.batteryPresentMissing).toBe('Kennzeichen ‚Akku vorhanden‘ fehlt');
+    expect(FIELD_MESSAGES.pickListValueLabel).toBe('Wert: 1 bis 100 Zeichen');
+  });
+
+  it('has the text of name_taken for condition codes (2.0.6, UI-033)', () => {
+    expect(ERROR_MESSAGES['name_taken.condition_code']).toBe(
+      'Diesen Code gibt es für diesen Lieferanten bereits',
+    );
+  });
+
+  it('has the field texts of the condition codes (UI-033, design v0.6.2 O-2)', () => {
+    expect(FIELD_MESSAGES.conditionCode).toBe('Zustandscode: 1 bis 20 Zeichen');
+    expect(FIELD_MESSAGES.conditionCodePlainText).toBe('Klartext: 1 bis 500 Zeichen');
+    expect(FIELD_MESSAGES.visualGrade).toBe('Optik-Note: ganze Zahl von 1 bis 5');
+  });
+
+  it('has the texts of the text block (2.0.6, UI-030, M-30, MAR-493)', () => {
+    expect(ERROR_MESSAGES['name_taken.text_block']).toBe('Name ist bereits vergeben');
+    expect(ERROR_MESSAGES['placeholder_not_allowed.unknown']('{Garantiezeit}')).toBe(
+      'Unbekannter Platzhalter {Garantiezeit}',
+    );
+    expect(ERROR_MESSAGES['placeholder_not_allowed.text_block']).toBe(
+      '{Baustein:Name} ist im Textbaustein nicht zulässig',
+    );
+    expect(FIELD_MESSAGES.textBlockBody).toBe('Text: 1 bis 5.000 Zeichen');
+  });
+
+  it('has title and text of M-27 under confirmation_required.possible_duplicate (8.2)', () => {
+    expect(CONFIRMATION_TITLES['confirmation_required.possible_duplicate']).toBe(
+      'Mögliche Dublette',
+    );
+    expect(ERROR_MESSAGES['confirmation_required.possible_duplicate']).toBe(
+      'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+    );
   });
 
   it('derives the usages of a code from the catalog keys', () => {

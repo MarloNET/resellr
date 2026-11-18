@@ -8,6 +8,38 @@ export const queryKeys = {
     status: () => ['ops', 'status'] as const,
     health: () => ['ops', 'health'] as const,
   },
+  settings: {
+    all: ['settings'] as const,
+    deviceTypes: () => ['settings', 'device-types'] as const,
+    attributes: (deviceTypeId: number) => ['settings', 'attributes', deviceTypeId] as const,
+    manufacturers: () => ['settings', 'manufacturers'] as const,
+    suppliers: () => ['settings', 'suppliers'] as const,
+    textBlocks: () => ['settings', 'text-blocks'] as const,
+    merchantProfile: () => ['settings', 'merchant-profile'] as const,
+    datasheetLayout: () => ['settings', 'datasheet-layout'] as const,
+    conditionCodes: () => ['settings', 'condition-codes'] as const,
+    pickLists: () => ['settings', 'pick-lists'] as const,
+    pickListValues: (pickListId: number) => ['settings', 'pick-list-values', pickListId] as const,
+  },
+  channels: {
+    all: ['channels'] as const,
+    channels: () => ['channels', 'channels'] as const,
+  },
+  catalog: {
+    all: ['catalog'] as const,
+    /** Prefix of all lists of `modelTemplates`, to reload them after a write. */
+    modelTemplateLists: () => ['catalog', 'model-templates'] as const,
+    modelTemplates: (filter: { q?: string; deviceTypeId?: number }) =>
+      ['catalog', 'model-templates', filter] as const,
+    modelTemplate: (id: number) => ['catalog', 'model-template', id] as const,
+  },
+  inventory: {
+    all: ['inventory'] as const,
+    device: (id: number) => ['inventory', 'device', id] as const,
+    devicePrefill: (modelTemplateId: number) =>
+      ['inventory', 'device-prefill', modelTemplateId] as const,
+    deviceSearch: (wiNr: string) => ['inventory', 'devices', { wiNr }] as const,
+  },
 } as const;
 
 /**

@@ -1,12 +1,21 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { RuntimePaths } from '@resellr/runtime-shared/paths';
+import type { RuntimeEnv, RuntimePaths } from '@resellr/runtime-shared/paths';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAKE_REF_NO, FAKE_SERVER } from '../../test/fake-programs.ts';
-import { classifyServerExit, SERVER_ENTRY, startServerProcess } from './server-process.ts';
+import {
+  classifyServerExit,
+  SERVER_ENTRY,
+  START_LIMIT_MS,
+  startServerProcess,
+  TEST_START_TIMEOUTS_ENV,
+  testStartTimeouts,
+} from './server-process.ts';
 
 /** How long the fake server may take to report; the test limit leaves room above it. */
 const FAKE_POLL = { timeout: 10_000 };
@@ -116,6 +125,75 @@ describe('server process (CU-264)', () => {
     FAKE_START_MS,
   );
 
+  describe('start limit (K-07)', () => {
+    /** Starts the fake server with a start limit of `limitMs`. */
+    const startWithLimit = (behaviour: string, limitMs: number, env: RuntimeEnv = {}) =>
+      startServerProcess({
+        paths,
+        startId: 'start-1',
+        env: {
+          ...globalThis.process.env,
+          ...env,
+          FAKE_SERVER_DIR: root,
+          FAKE_SERVER_RUNS: behaviour,
+        },
+        serverEntry: FAKE_SERVER,
+        limitMs,
+        onReady: vi.fn(),
+      });
+
+    /** Process id of the only start so far. */
+    const startedPid = async () => {
+      await expect.poll(() => existsSync(join(root, 'starts.jsonl')), FAKE_POLL).toBe(true);
+      return (starts()[0] as unknown as { pid: number }).pid;
+    };
+
+    it(
+      'DER-103-06 ends a start without ready at the limit, also one that ignores SIGTERM, and sorts it as start_limit',
+      async () => {
+        const server = startWithLimit('hang', 3000);
+        const pid = await startedPid();
+        let ended = false;
+        void server.ended.then(() => (ended = true));
+
+        // Well before the limit the hanging start still runs.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        expect(ended).toBe(false);
+        expect(isRunning(pid)).toBe(true);
+
+        await expect(server.ended).resolves.toEqual({ kind: 'start_limit' });
+        expect(isRunning(pid)).toBe(false);
+      },
+      FAKE_START_MS,
+    );
+
+    it(
+      'leaves a server running that reported ready within the limit',
+      async () => {
+        const port = await freePort();
+        writeFileSync(join(paths.dataDir, 'config.json'), JSON.stringify({ port }));
+        const server = startWithLimit('ready', 1500);
+        const pid = await startedPid();
+
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        expect(isRunning(pid)).toBe(true);
+        process.kill(pid, 'SIGKILL');
+        await expect(server.ended).resolves.toMatchObject({ kind: 'crashed', signal: 'SIGKILL' });
+      },
+      FAKE_START_MS,
+    );
+
+    it('takes the limit from the test hook RESELLR_TEST_START_TIMEOUTS', () => {
+      expect(testStartTimeouts({ [TEST_START_TIMEOUTS_ENV]: '2000,6000' })).toEqual({
+        timeoutMs: 2000,
+        limitMs: 6000,
+      });
+      for (const value of [undefined, '', '2000', '2000,x', '-1,6000', '2000,6000,1'])
+        expect(testStartTimeouts({ [TEST_START_TIMEOUTS_ENV]: value })).toBeNull();
+      expect(START_LIMIT_MS).toBe(10 * 60 * 1000);
+    });
+  });
+
   it.each([
     ['exit-11', { kind: 'already_running' }],
     ['exit-12', { kind: 'crashed', exitCode: 12, signal: null }],
@@ -142,3 +220,22 @@ describe('classifyServerExit', () => {
     });
   });
 });
+
+/** Whether a process with this id still runs. */
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A port on 127.0.0.1 that was free a moment ago. */
+async function freePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  await new Promise((resolve) => server.close(resolve));
+  return port;
+}

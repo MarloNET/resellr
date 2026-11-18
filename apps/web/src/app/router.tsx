@@ -1,10 +1,24 @@
 import { createBrowserRouter, Link, Navigate, type RouteObject } from 'react-router';
 
 import { buttonClassName } from '../components/ui/Button.tsx';
+import { DeviceIntakePage } from '../features/devices/DeviceIntakePage.tsx';
+import { DevicePage } from '../features/devices/DevicePage.tsx';
+import { DevicesPage } from '../features/devices/DevicesPage.tsx';
+import { ModelLibraryPage } from '../features/models/ModelLibraryPage.tsx';
+import { ModelTemplatePage } from '../features/models/ModelTemplatePage.tsx';
 import {
   LastSettingsSectionRedirect,
   SettingsLayout,
 } from '../features/settings/SettingsLayout.tsx';
+import { ConditionCodesPage } from '../features/settings/condition-codes/ConditionCodesPage.tsx';
+import { DatasheetLayoutPage } from '../features/settings/datasheet-layout/DatasheetLayoutPage.tsx';
+import { DeviceTypesPage } from '../features/settings/device-types/DeviceTypesPage.tsx';
+import { ManufacturersPage } from '../features/settings/manufacturers/ManufacturersPage.tsx';
+import { MerchantProfilePage } from '../features/settings/merchant/MerchantProfilePage.tsx';
+import { SuppliersPage } from '../features/settings/suppliers/SuppliersPage.tsx';
+import { TextBlocksPage } from '../features/settings/text-blocks/TextBlocksPage.tsx';
+import { PickListsPage } from '../features/settings/pick-lists/PickListsPage.tsx';
+import { TerminatedPage } from '../features/shutdown/TerminatedPage.tsx';
 import { AppFrame } from './AppFrame.tsx';
 
 /**
@@ -32,12 +46,19 @@ function ListingOverviewPlaceholder() {
  * are not built, and `router.test.tsx` checks the table for such paths.
  */
 export const routes: RouteObject[] = [
+  // UI-046 after "resellr beenden" replaces the frame (CU-256, Technical Specification 2.17).
+  { path: '/beendet', element: <TerminatedPage /> },
   {
     path: '/',
     element: <AppFrame />,
     children: [
       { index: true, element: <Navigate to="/inserate" replace /> },
       { path: 'inserate', element: <ListingOverviewPlaceholder /> },
+      { path: 'modelle', element: <ModelLibraryPage /> },
+      { path: 'modelle/neu', element: <ModelTemplatePage /> },
+      { path: 'geraete', element: <DevicesPage /> },
+      { path: 'geraete/neu', element: <DeviceIntakePage /> },
+      { path: 'geraete/:deviceId', element: <DevicePage /> },
       {
         // UI-025 (CU-093) with its 14 sections; a section without its own screen keeps an
         // empty content area until the task that builds its screen sets `element`.
@@ -45,20 +66,20 @@ export const routes: RouteObject[] = [
         element: <SettingsLayout />,
         children: [
           { index: true, element: <LastSettingsSectionRedirect /> },
-          { path: 'haendlermarke', element: null },
-          { path: 'geraetearten', element: null },
-          { path: 'auswahllisten', element: null },
+          { path: 'haendlermarke', element: <MerchantProfilePage /> },
+          { path: 'geraetearten', element: <DeviceTypesPage /> },
+          { path: 'auswahllisten', element: <PickListsPage /> },
           { path: 'titelmuster', element: null },
-          { path: 'textbausteine', element: null },
-          { path: 'hersteller', element: null },
-          { path: 'lieferanten', element: null },
-          { path: 'code-uebersetzung', element: null },
+          { path: 'textbausteine', element: <TextBlocksPage /> },
+          { path: 'hersteller', element: <ManufacturersPage /> },
+          { path: 'lieferanten', element: <SuppliersPage /> },
+          { path: 'code-uebersetzung', element: <ConditionCodesPage /> },
           { path: 'zustandszuordnung', element: null },
           { path: 'kategoriezuordnung', element: null },
           { path: 'merkmalszuordnung', element: null },
           { path: 'beschreibungsvorlagen', element: null },
           { path: 'kanaele', element: null },
-          { path: 'datenblatt-layout', element: null },
+          { path: 'datenblatt-layout', element: <DatasheetLayoutPage /> },
         ],
       },
       { path: '*', element: null },

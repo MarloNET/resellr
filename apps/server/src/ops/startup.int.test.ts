@@ -68,6 +68,7 @@ function start(overrides: Partial<StartupOptions> = {}) {
         startId: 's-1',
       }),
       now: clock.now,
+      clock,
       exit: () => {},
     }),
     ...overrides,
@@ -83,6 +84,19 @@ async function freePort(): Promise<number> {
   await new Promise((resolve) => server.close(resolve));
   return port;
 }
+
+/**
+ * The app listens on a free port whatever `config.json` says, so a test of the standard port 4310
+ * does not occupy 4310 (#329).
+ */
+const listeningOnFreePort =
+  (buildApp: StartupOptions['buildApp']): StartupOptions['buildApp'] =>
+  (deps) => {
+    const app = buildApp(deps);
+    const listen = app.listen.bind(app);
+    app.listen = ((options: object) => listen({ ...options, port: 0 })) as typeof app.listen;
+    return app;
+  };
 
 const writeConfig = (values: object) =>
   writeFileSync(join(paths.dataDir, 'config.json'), JSON.stringify(values));
@@ -104,14 +118,19 @@ const appliedMigrations = () => {
 };
 
 describe('startup sequence (CU-040)', () => {
-  it('E3 first start in an empty data folder creates config.json with port 4310 and migrates to 0001', async () => {
-    result = await start().run();
+  it('E3 first start in an empty data folder creates config.json with port 4310 and applies all shipped migrations', async () => {
+    const { options } = start();
+
+    result = await runStartup({ ...options, buildApp: listeningOnFreePort(options.buildApp) });
 
     expect(JSON.parse(readFileSync(join(paths.dataDir, 'config.json'), 'utf8'))).toEqual({
       port: 4310,
     });
     // The static list CU-308 is what the startup sequence passes to the migration run.
-    expect(appliedMigrations()).toEqual(['20261110_0001_initial_schema']);
+    expect(appliedMigrations()).toEqual([
+      '20261110_0001_initial_schema',
+      '20261110_0002_seed_initial_settings',
+    ]);
   });
 
   it('E5 health reports starting during the migration and ready after the startup sequence', async () => {

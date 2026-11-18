@@ -2,58 +2,131 @@
 # and the AC coverage check (CU-284). REQ-079 is checked in two places: the unit tests check
 # the dependency list of apps/server and the security headers, the E2E suite starts the
 # server in its test mode and fails on any outbound connection to another destination than
-# 127.0.0.1 and on any browser request to another host.
+# 127.0.0.1 and on any browser request to another host. REQ-106 is checked in the E2E project
+# `write-paths`: it runs the server under strace along a complete run and fails on any write
+# outside the data, log, handover and update-copy folder.
 name: CI
 
 on:
   push:
     branches: [main]
+    # Documentation only (list D, Technical Specification 10.2, addendum MAR-787).
+    # Keep equal to the list in the step "Detect documentation-only change".
+    paths-ignore:
+      - 'docs/architecture/**'
+      - 'docs/requirements/**'
+      - 'docs/product/**'
+      - 'docs/ux/flows/**'
+      - 'docs/ux/screens/**'
+      - 'docs/ux/launcher-pages/**'
+      - 'docs/ux/uiux-design.md'
+      - 'docs/ux/meldungskatalog.md'
+      - 'docs/ux/stitch-log.md'
+      - '.paperclip/**'
   pull_request:
+  # Manual run for any branch or tag, always complete (addendum MAR-826). Its check has its own
+  # name, so it never stands in for the required check of a pull request.
+  workflow_dispatch:
+    inputs:
+      e2e_workers:
+        description: 'Playwright workers for the E2E tests (config = value of playwright.config.ts)'
+        type: choice
+        options: [config, '2', '4']
+        default: config
 
 permissions:
   contents: read
 
+# Pull requests: one group per pull request, a newer push cancels the older run. push and
+# workflow_dispatch: one group per run, so every state of main gets its own complete run
+# (Technical Specification 10.2, addendum MAR-826).
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || format('ci-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux:
-    name: Lint, type check, tests (Linux)
+    # `Lint, type check, tests (Linux)` is the required check of the ruleset on main; keep it
+    # unchanged. A manual run reports under its own name (addendum MAR-826).
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Lint, type check, tests (Linux, manual)' || 'Lint, type check, tests (Linux)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      # A pull request that changes only documentation (list D, Technical Specification 10.2,
+      # addendum MAR-787) skips every following step; the check still appears and passes.
+      # push and workflow_dispatch always run completely (addendum MAR-826).
+      # Keep the list equal to `on.push.paths-ignore`.
+      - name: Detect documentation-only change
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          docs_only=false
+          if [ "$EVENT_NAME" = pull_request ]; then
+            # HEAD is the merge commit of the pull request, HEAD^1 the tip of the base branch.
+            files=$(git diff --name-only --no-renames HEAD^1 HEAD)
+            if [ -n "$files" ]; then
+              docs_only=true
+              while IFS= read -r file; do
+                case "$file" in
+                  docs/architecture/* | docs/requirements/* | docs/product/* | \
+                  docs/ux/flows/* | docs/ux/screens/* | docs/ux/launcher-pages/* | \
+                  docs/ux/uiux-design.md | docs/ux/meldungskatalog.md | docs/ux/stitch-log.md | \
+                  .paperclip/*) ;;
+                  *) docs_only=false ;;
+                esac
+              done <<< "$files"
+            fi
+          fi
+          if [ "$docs_only" = true ]; then
+            echo "::notice::Only documentation changed; lint, type check and tests are skipped (MAR-787)."
+          fi
+          echo "Event $EVENT_NAME: docs_only=$docs_only"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v7
+        if: steps.changes.outputs.docs_only != 'true'
         with:
           node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm ci
 
       - name: Audit shipped dependencies (TH-07)
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm audit --omit=dev --audit-level=high
 
       - name: Audit all dependencies including dev tooling (TH-07)
-        run: npm audit --audit-level=high
+        if: steps.changes.outputs.docs_only != 'true'
+        run: node tools/qa/check-audit.mjs
 
       - name: Lint
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm run lint
 
       - name: Type check
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm run typecheck
 
       # The integration test of AC-REQ-001-07 tries to reach resellr over the other addresses of
       # the runner in place of a second device; the log shows which ones it had.
       - name: Network addresses of the runner (AC-REQ-001-07)
+        if: steps.changes.outputs.docs_only != 'true'
         run: ip -brief address
 
       - name: Unit and integration tests (incl. REQ-079 dependency list and security headers)
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm test
 
       - name: AC coverage of the completed build steps (CU-284)
+        if: steps.changes.outputs.docs_only != 'true'
         run: node tools/qa/check-ac-coverage.mjs
 
       # Evidence of REQ-068 and REQ-069 (Technical Specification 2.20, 5): schema test over all
@@ -61,6 +134,7 @@ jobs:
       # in `npm test`; this step names the evidence and fails if an evidence file is missing or
       # one of them has no passing test whose name carries REQ-068 or REQ-069.
       - name: No credentials and no personal data (REQ-068, REQ-069)
+        if: steps.changes.outputs.docs_only != 'true'
         env:
           EVIDENCE_FILES: >-
             apps/server/src/db/schema.int.test.ts
@@ -96,7 +170,27 @@ jobs:
       # The E2E suite runs in Google Chrome (channel `chrome`, Technical Specification 6.1),
       # which the Ubuntu runner image provides; Playwright downloads no browser.
       - name: Google Chrome version
+        if: steps.changes.outputs.docs_only != 'true'
         run: google-chrome --version
 
-      - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7, REQ-079 connections)
-        run: npm run e2e
+      # The E2E project `write-paths` observes every write operation of the server with strace
+      # (REQ-106, Technical Specification 6.2); without strace it fails.
+      - name: Install strace (REQ-106)
+        if: steps.changes.outputs.docs_only != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends strace
+          strace -V | head -n 1
+
+      - name: E2E tests (Playwright, window-size matrix FM-1 to FM-7, REQ-079 connections, REQ-106 write paths)
+        if: steps.changes.outputs.docs_only != 'true'
+        env:
+          E2E_WORKERS: ${{ inputs.e2e_workers }}
+        run: |
+          set -euo pipefail
+          echo "CPUs: $(nproc)"
+          if [ -n "${E2E_WORKERS:-}" ] && [ "$E2E_WORKERS" != config ]; then
+            npm run e2e -- --workers="$E2E_WORKERS"
+          else
+            npm run e2e
+          fi

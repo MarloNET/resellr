@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Badge } from './Badge.tsx';
 import { Button } from './Button.tsx';
+import { Checkbox } from './Checkbox.tsx';
 import {
   Dialog,
   DialogBody,
@@ -13,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from './Dialog.tsx';
+import { RadioGroup } from './RadioGroup.tsx';
+import { Select } from './Select.tsx';
 import { Sheet, SheetContent, SheetTrigger } from './Sheet.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './Table.tsx';
 
@@ -255,7 +258,35 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('Table scrolls horizontally in its own container with a fixed first column', () => {
+  it('Sheet opened via `open` returns the focus to the element that had it after Esc', async () => {
+    function Screen() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            RAM
+          </button>
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetContent title="Merkmal bearbeiten" width={360}>
+              <input aria-label="Bezeichnung" />
+            </SheetContent>
+          </Sheet>
+        </>
+      );
+    }
+    render(<Screen />);
+    const opener = screen.getByRole('button', { name: 'RAM' });
+    opener.focus();
+    fireEvent.click(opener);
+    const sheet = screen.getByRole('dialog', { name: 'Merkmal bearbeiten' });
+    await waitFor(() => expect(sheet.contains(document.activeElement)).toBe(true));
+
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it('Table scrolls horizontally in its own container with a first column fixed only in a wide enough container', () => {
     render(
       <Table>
         <TableHeader>
@@ -276,8 +307,11 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     const table = screen.getByRole('table');
     expect(table.parentElement?.className).toContain('overflow-x-auto');
     expect(table.parentElement?.className).toContain('min-w-0');
-    expect(table.className).toContain('[&_tr>*:first-child]:sticky');
-    expect(table.className).toContain('[&_tr>*:first-child]:left-0');
+    // Bug #372: a fixed column wider than a narrow container would cover all other columns.
+    expect(table.parentElement?.className).toContain('@container');
+    expect(table.className).toContain('@sm:[&_tr>*:first-child]:sticky');
+    expect(table.className).toContain('@sm:[&_tr>*:first-child]:left-0');
+    expect(table.className).not.toMatch(/(^|\s)\[&_tr>\*:first-child\]:sticky/);
     expect(table.className).toContain('tabular-nums');
   });
 
@@ -294,5 +328,86 @@ describe('UI building blocks (Technical Specification 2.0.10)', () => {
     expect(button.className).toContain('bg-primary');
     expect(button.className).toContain('rounded-control');
     expect(screen.getByText('Veröffentlicht').className).toContain('rounded-chip');
+  });
+
+  it('Select passes the control attributes of CU-057 and reports the new value', () => {
+    const onChange = vi.fn();
+    render(
+      <Select
+        id="level"
+        aria-required="true"
+        aria-invalid="true"
+        aria-describedby="level-error"
+        value="model"
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="model">Modell</option>
+        <option value="device">Gerät</option>
+      </Select>,
+    );
+
+    const select = screen.getByRole<HTMLSelectElement>('combobox');
+    expect(select.id).toBe('level');
+    expect(select.getAttribute('aria-required')).toBe('true');
+    expect(select.getAttribute('aria-invalid')).toBe('true');
+    expect(select.getAttribute('aria-describedby')).toBe('level-error');
+    expect(select.className).toContain('aria-invalid:border-error');
+    fireEvent.change(select, { target: { value: 'device' } });
+    expect(onChange).toHaveBeenCalledWith('device');
+  });
+
+  it('Select can be disabled', () => {
+    render(
+      <Select disabled value="a" onChange={() => {}}>
+        <option value="a">A</option>
+      </Select>,
+    );
+
+    expect(screen.getByRole<HTMLSelectElement>('combobox').disabled).toBe(true);
+  });
+
+  it('Checkbox reports the new state and can be disabled', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <Checkbox label="Pflichtmerkmal" checked={false} onChange={onChange} />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Pflichtmerkmal'));
+    expect(onChange).toHaveBeenCalledWith(true);
+
+    rerender(<Checkbox label="Pflichtmerkmal" checked={false} disabled onChange={onChange} />);
+    expect(screen.getByLabelText<HTMLInputElement>('Pflichtmerkmal').disabled).toBe(true);
+  });
+
+  it('RadioGroup reports the chosen value, groups its options and can be disabled', () => {
+    const onChange = vi.fn();
+    const options = [
+      { value: 'true', label: 'Mit Leerzeichen' },
+      { value: 'false', label: 'Ohne Leerzeichen' },
+    ];
+    const { rerender } = render(
+      <RadioGroup legend="Schreibweise" value="true" options={options} onChange={onChange} />,
+    );
+
+    const group = screen.getByRole('group', { name: 'Schreibweise' });
+    const [first, second] = screen.getAllByRole<HTMLInputElement>('radio');
+    expect(group.contains(first ?? null)).toBe(true);
+    expect(first?.checked).toBe(true);
+    expect(first?.name).toBe(second?.name);
+    fireEvent.click(screen.getByLabelText('Ohne Leerzeichen'));
+    expect(onChange).toHaveBeenCalledWith('false');
+
+    rerender(
+      <RadioGroup
+        legend="Schreibweise"
+        value="true"
+        options={options}
+        disabled
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getAllByRole<HTMLInputElement>('radio').every((radio) => radio.disabled)).toBe(
+      true,
+    );
   });
 });

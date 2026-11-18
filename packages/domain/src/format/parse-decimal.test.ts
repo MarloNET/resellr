@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseDecimal } from './parse-decimal.ts';
+import { compareDecimal, parseDecimal } from './parse-decimal.ts';
 
 describe('decimal input (E3)', () => {
   it.each([
@@ -60,5 +60,20 @@ describe('decimal input (E3)', () => {
     const start = performance.now();
     expect(parseDecimal(input)).toBe(expected);
     expect(performance.now() - start).toBeLessThan(500);
+  });
+});
+
+describe('comparison of canonical decimals', () => {
+  it.each([
+    ['10', '60', -1],
+    ['60', '10', 1],
+    ['13.3', '13.30', 0],
+    ['9.99', '10', -1],
+    ['-2.5', '-2.4', -1],
+    ['-1', '0.5', -1],
+    ['0.5', '0.25', 1],
+    ['123456789012345678901', '123456789012345678902', -1],
+  ])('compares %j with %j as %d', (left, right, expected) => {
+    expect(compareDecimal(left, right)).toBe(expected);
   });
 });

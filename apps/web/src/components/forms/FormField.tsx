@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useId, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 
 /** Attributes the field passes to its control (`Input`, select, text area). */
 export interface FormFieldControlProps {
@@ -12,32 +22,41 @@ export interface FormFieldProps {
   label: string;
   /** Required field: "*" after the label (DESIGN.md "Formulare"). */
   required?: boolean;
-  /** Error text of the field (`fields[].message` or the Zod check in the browser). */
-  error?: string;
+  /**
+   * Error text of the field (`fields[].message` or the Zod check in the browser); a node where
+   * the text holds a link, e.g. to the device of `wi_nr_taken` in UI-003.
+   */
+  error?: ReactNode;
+  /** Shown at the end of the label line, e.g. the review mark of a prefilled value (CU-111). */
+  aside?: ReactNode;
   children: (control: FormFieldControlProps) => ReactNode;
 }
 
 /**
  * Form field (CU-057, design chapter 5 "Validierung", DESIGN.md "Formulare"): label above the
- * control, "*" for required fields, the error text below the control in error with a symbol,
+ * control with an optional element at the end of its line, "*" for required fields, the error text below the control in error with a symbol,
  * linked to the control with `aria-describedby`.
  */
-export function FormField({ label, required = false, error, children }: FormFieldProps) {
+export function FormField({ label, required = false, error, aside, children }: FormFieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
+  const hasError = error !== undefined && error !== null && error !== '' && error !== false;
 
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-label font-semibold text-text">
-        {label}
-        {required && <span aria-hidden="true">*</span>}
-      </label>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <label htmlFor={id} className="text-label font-semibold text-text">
+          {label}
+          {required && <span aria-hidden="true">*</span>}
+        </label>
+        {aside}
+      </div>
       {children({
         id,
         ...(required && { 'aria-required': true }),
-        ...(error && { 'aria-invalid': true, 'aria-describedby': errorId }),
+        ...(hasError && { 'aria-invalid': true, 'aria-describedby': errorId }),
       })}
-      {error && (
+      {hasError && (
         <p className="flex items-start gap-1 text-label text-error">
           <svg
             aria-hidden="true"
@@ -60,14 +79,95 @@ export function FormField({ label, required = false, error, children }: FormFiel
  * Focus on the first faulty field (design chapter 5, Technical Specification 2.0.7
  * `.validation`): the returned function moves the focus to the first control marked invalid in
  * the container after the next render, so the screen can call it right after setting the errors.
+ * The focus moves in the commit that shows the errors (layout effect), not after it: a passive
+ * effect would leave the error on screen without focus for a moment, longer on a slow machine
+ * (#388).
  */
 export function useFocusFirstError(containerRef: RefObject<HTMLElement | null>): () => void {
   const [request, setRequest] = useState(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (request === 0) return;
     containerRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [request, containerRef]);
 
   return useCallback(() => setRequest((count) => count + 1), []);
+}
+
+/** Check on leaving a field that waits for a click in the form (`useDeferredBlurCheck`). */
+export interface DeferredBlurCheck {
+  /** For `onPointerDown` of the element around all controls a new error line could move. */
+  pressPointer: () => void;
+  /** For `onBlur`: runs `check` at once, or after the click if a pointer is pressed. */
+  checkOnBlur: (check: () => void) => void;
+  /** Drops the waiting check, e.g. before saving, on changing the entry or on "Abbrechen". */
+  cancel: () => void;
+}
+
+/**
+ * Check of a field on leaving it (Technical Specification 2.0.7 `.validation`; addendum
+ * MAR-555, FIND-324). During a click in the form the check waits until after the click: a new
+ * or vanished error line would move the button between `mousedown` and `mouseup`, and the
+ * browser would drop the click. At most one check waits; unmounting drops it. The returned
+ * object is stable.
+ */
+export function useDeferredBlurCheck(): DeferredBlurCheck {
+  const pointerPressed = useRef(false);
+  const cancelWaiting = useRef(() => {});
+  const releasePointer = useRef(() => {});
+
+  useEffect(
+    () => () => {
+      cancelWaiting.current();
+      releasePointer.current();
+    },
+    [],
+  );
+
+  return useMemo(() => {
+    const cancel = () => {
+      cancelWaiting.current();
+      cancelWaiting.current = () => {};
+    };
+
+    return {
+      pressPointer() {
+        releasePointer.current();
+        pointerPressed.current = true;
+        const release = () => {
+          pointerPressed.current = false;
+          window.removeEventListener('pointerup', release);
+          window.removeEventListener('pointercancel', release);
+        };
+        window.addEventListener('pointerup', release);
+        window.addEventListener('pointercancel', release);
+        releasePointer.current = release;
+      },
+      checkOnBlur(check: () => void) {
+        cancel();
+        if (!pointerPressed.current) {
+          check();
+          return;
+        }
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const run = () => {
+          window.removeEventListener('pointerup', run);
+          window.removeEventListener('pointercancel', run);
+          // `click` follows `pointerup` in the same task, so the timeout runs after it.
+          timer = setTimeout(() => {
+            cancelWaiting.current = () => {};
+            check();
+          });
+        };
+        window.addEventListener('pointerup', run);
+        window.addEventListener('pointercancel', run);
+        cancelWaiting.current = () => {
+          window.removeEventListener('pointerup', run);
+          window.removeEventListener('pointercancel', run);
+          clearTimeout(timer);
+        };
+      },
+      cancel,
+    };
+  }, []);
 }

@@ -9,7 +9,7 @@ Bisherige WI-Nr; Hinweis „Die Artikelnummer des Modell-Inserats ändert sich n
 ## Eingaben und Validierung
 | Feld | Typ | Pflicht | Regel | Fehlermeldung |
 |---|---|---|---|---|
-| Neue WI-Nr | Text | ja | wie UI-003 | „WI-Nr bereits vergeben: Gerät <WI-Nr> in <Modell-Inserat>“; „WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)“ |
+| Neue WI-Nr | Text | ja | wie UI-003 | „WI-Nr bereits vergeben: Gerät <WI-Nr> in <Anzeigetitel>“ bzw. „… Gerät <WI-Nr> (nicht zugeordnet)“, mit Link auf das Gerät (Wortlaut und Link wie UI-003, v0.6.9); „WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)“ |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |

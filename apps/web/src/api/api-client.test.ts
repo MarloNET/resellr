@@ -82,6 +82,18 @@ describe('api-client', () => {
     expect(new Headers(init?.headers).get('Content-Type')).toBe('application/json');
   });
 
+  it('sends an upload as multipart/form-data, the browser sets the boundary', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { version: 2 }));
+    const form = new FormData();
+    form.append('version', '1');
+
+    await client().put('/api/merchant-profile/logo', form);
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init?.body).toBe(form);
+    expect(new Headers(init?.headers).has('Content-Type')).toBe(false);
+  });
+
   describe('E3 classifies responses into the states of Technical Specification 2.0.7', () => {
     const cases: Array<[string, number, unknown, 'read' | 'write', ApiErrorKind]> = [
       [

@@ -1,0 +1,512 @@
+import type {
+  Attribute,
+  AttributeCreateInput,
+  AttributeList,
+  AttributeOrder,
+  AttributeUpdateInput,
+} from '@resellr/domain/schemas/attribute.schema';
+import type {
+  ConditionCodeCreate,
+  ConditionCodeEntry,
+  ConditionCodeList,
+  ConditionCodeUpdate,
+} from '@resellr/domain/schemas/condition-code.schema';
+import type {
+  DatasheetLayout,
+  DatasheetLayoutUpdate,
+} from '@resellr/domain/schemas/datasheet-layout.schema';
+import type {
+  DeviceType,
+  DeviceTypeCreate,
+  DeviceTypeList,
+  DeviceTypeUpdate,
+} from '@resellr/domain/schemas/device-type.schema';
+import type {
+  Manufacturer,
+  ManufacturerCreate,
+  ManufacturerCreateResult,
+  ManufacturerList,
+  ManufacturerUpdate,
+  ManufacturerUpdateResult,
+} from '@resellr/domain/schemas/manufacturer.schema';
+import type {
+  MerchantProfile,
+  MerchantProfileUpdate,
+} from '@resellr/domain/schemas/merchant-profile.schema';
+import type {
+  PickList,
+  PickListList,
+  PickListValue,
+  PickListValueCreate,
+  PickListValueList,
+  PickListValueOrder,
+  PickListValueUpdate,
+} from '@resellr/domain/schemas/pick-list.schema';
+import type {
+  Supplier,
+  SupplierCreate,
+  SupplierList,
+  SupplierUpdate,
+} from '@resellr/domain/schemas/supplier.schema';
+import type {
+  TextBlockCreate,
+  TextBlockList,
+  TextBlockSaveResult,
+  TextBlockUpdate,
+  TextBlockUpdateResult,
+} from '@resellr/domain/schemas/text-block.schema';
+import {
+  queryOptions,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
+
+import { apiClient, type ApiError } from './api-client.ts';
+import { queryKeys } from './query-keys.ts';
+
+// Hooks of the settings of F-01 and F-02 (CU-092, Technical Specification 2.1, 2.2).
+
+/**
+ * Largest page of a list (2.0.1); UI-027 shows all device types, UI-028 all lists and all values
+ * of a list at once, UI-033 all entries of the condition code table.
+ */
+const ALL = 'limit=200';
+
+/** Largest page of a list (2.0.1); UI-032 shows all suppliers, active and deactivated. */
+const ALL_SUPPLIERS = '/api/suppliers?includeInactive=true&limit=200';
+
+/** Largest page of a list (2.0.1); UI-031 shows all manufacturers, active and deactivated. */
+const ALL_MANUFACTURERS = '/api/manufacturers?includeInactive=true&limit=200';
+
+/** Largest page of a list (2.0.1); UI-030 shows all text blocks, active and deactivated. */
+const ALL_TEXT_BLOCKS = `/api/text-blocks?${ALL}`;
+
+/**
+ * Takes the saved entry into the cached list at once and loads the list again in the
+ * background (2.0.7 "Wartezustand bei Folgeanfragen").
+ */
+function storeSaved<T extends { id: number }>(
+  queryClient: QueryClient,
+  queryKey: readonly unknown[],
+  saved: T,
+) {
+  queryClient.setQueryData<{ items: T[]; total: number }>(queryKey, (list) => {
+    if (list === undefined) return list;
+    const known = list.items.some((item) => item.id === saved.id);
+    return known
+      ? { ...list, items: list.items.map((item) => (item.id === saved.id ? saved : item)) }
+      : { items: [...list.items, saved], total: list.total + 1 };
+  });
+  void queryClient.invalidateQueries({ queryKey });
+}
+
+/** Device types of UI-027, active and deactivated (`GET /api/device-types`). */
+export function useDeviceTypesQuery() {
+  return useQuery<DeviceTypeList, ApiError>({
+    queryKey: queryKeys.settings.deviceTypes(),
+    queryFn: ({ signal }) => apiClient.get<DeviceTypeList>(`/api/device-types?${ALL}`, { signal }),
+  });
+}
+
+/** "Geräteart speichern" for a new device type (`POST /api/device-types`). */
+export function useCreateDeviceTypeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeviceType, ApiError, DeviceTypeCreate>({
+    mutationFn: (body) => apiClient.post<DeviceType>('/api/device-types', body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.deviceTypes(), saved),
+  });
+}
+
+/** "Geräteart speichern" for an existing device type (`PATCH /api/device-types/{id}`). */
+export function useUpdateDeviceTypeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeviceType, ApiError, DeviceTypeUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) => apiClient.patch<DeviceType>(`/api/device-types/${id}`, body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.deviceTypes(), saved),
+  });
+}
+
+/** Suppliers of UI-032, active and deactivated (`GET /api/suppliers?includeInactive=true`). */
+export function useSuppliersQuery() {
+  return useQuery<SupplierList, ApiError>({
+    queryKey: queryKeys.settings.suppliers(),
+    queryFn: ({ signal }) => apiClient.get<SupplierList>(ALL_SUPPLIERS, { signal }),
+  });
+}
+
+/** "Speichern" for a new supplier (`POST /api/suppliers`). */
+export function useCreateSupplierMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Supplier, ApiError, SupplierCreate>({
+    mutationFn: (body) => apiClient.post<Supplier>('/api/suppliers', body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.suppliers(), saved),
+  });
+}
+
+/** "Speichern" for an existing supplier (`PATCH /api/suppliers/{id}`). */
+export function useUpdateSupplierMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Supplier, ApiError, SupplierUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) => apiClient.patch<Supplier>(`/api/suppliers/${id}`, body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.suppliers(), saved),
+  });
+}
+
+/** Text blocks of UI-030, active and deactivated (`GET /api/text-blocks`). */
+export function useTextBlocksQuery() {
+  return useQuery<TextBlockList, ApiError>({
+    queryKey: queryKeys.settings.textBlocks(),
+    queryFn: ({ signal }) => apiClient.get<TextBlockList>(ALL_TEXT_BLOCKS, { signal }),
+  });
+}
+
+/** "Speichern" for a new text block (`POST /api/text-blocks`). */
+export function useCreateTextBlockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<TextBlockSaveResult, ApiError, TextBlockCreate>({
+    mutationFn: (body) => apiClient.post<TextBlockSaveResult>('/api/text-blocks', body),
+    onSuccess: ({ textBlock }) =>
+      storeSaved(queryClient, queryKeys.settings.textBlocks(), textBlock),
+  });
+}
+
+/** "Speichern" and "Deaktivieren" of UI-030 (`PATCH /api/text-blocks/{id}`). */
+export function useUpdateTextBlockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<TextBlockUpdateResult, ApiError, TextBlockUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) =>
+      apiClient.patch<TextBlockUpdateResult>(`/api/text-blocks/${id}`, body),
+    onSuccess: ({ textBlock }) =>
+      storeSaved(queryClient, queryKeys.settings.textBlocks(), textBlock),
+  });
+}
+
+/** Merchant profile of UI-026 (`GET /api/merchant-profile`). */
+export function useMerchantProfileQuery() {
+  return useQuery<MerchantProfile, ApiError>({
+    queryKey: queryKeys.settings.merchantProfile(),
+    queryFn: ({ signal }) => apiClient.get<MerchantProfile>('/api/merchant-profile', { signal }),
+  });
+}
+
+/** "Speichern" of UI-026 (`PUT /api/merchant-profile`); the answer is the saved profile. */
+export function useSaveMerchantProfileMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, MerchantProfileUpdate>({
+    mutationFn: (body) => apiClient.put<MerchantProfile>('/api/merchant-profile', body),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
+  });
+}
+
+/** Datasheet layout of UI-039 (`GET /api/datasheet-layout`). */
+export function useDatasheetLayoutQuery() {
+  return useQuery<DatasheetLayout, ApiError>({
+    queryKey: queryKeys.settings.datasheetLayout(),
+    queryFn: ({ signal }) => apiClient.get<DatasheetLayout>('/api/datasheet-layout', { signal }),
+  });
+}
+
+/** "Speichern" of UI-039 (`PUT /api/datasheet-layout`); the answer is the saved layout. */
+export function useSaveDatasheetLayoutMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DatasheetLayout, ApiError, DatasheetLayoutUpdate>({
+    mutationFn: (body) => apiClient.put<DatasheetLayout>('/api/datasheet-layout', body),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.datasheetLayout(), saved),
+  });
+}
+
+/**
+ * "Logo ersetzen" of UI-026 (`PUT /api/merchant-profile/logo`, multipart with the field
+ * `version` before the file, 2.2); the answer is the saved profile.
+ */
+export function useReplaceLogoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, { version: number; file: File }>({
+    mutationFn: ({ version, file }) => {
+      const form = new FormData();
+      form.append('version', String(version));
+      form.append('file', file);
+      return apiClient.put<MerchantProfile>('/api/merchant-profile/logo', form);
+    },
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
+  });
+}
+
+/** "Logo entfernen" of UI-026 (`DELETE /api/merchant-profile/logo?version=`). */
+export function useRemoveLogoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<MerchantProfile, ApiError, { version: number }>({
+    mutationFn: ({ version }) =>
+      apiClient.delete<MerchantProfile>(`/api/merchant-profile/logo?version=${version}`, {}),
+    onSuccess: (saved) => queryClient.setQueryData(queryKeys.settings.merchantProfile(), saved),
+  });
+}
+
+/** Manufacturers of UI-031, active and deactivated (`GET /api/manufacturers?includeInactive=true`). */
+export function useManufacturersQuery() {
+  return useQuery<ManufacturerList, ApiError>({
+    queryKey: queryKeys.settings.manufacturers(),
+    queryFn: ({ signal }) => apiClient.get<ManufacturerList>(ALL_MANUFACTURERS, { signal }),
+  });
+}
+
+/**
+ * "Hersteller anlegen" of UI-008 (`POST /api/manufacturers`): the new manufacturer, or the active
+ * one with the same name and `existing: true` (AC-REQ-100-02).
+ */
+export function useCreateManufacturerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ManufacturerCreateResult, ApiError, ManufacturerCreate>({
+    mutationFn: (body) => apiClient.post<ManufacturerCreateResult>('/api/manufacturers', body),
+    onSuccess: ({ id, name, active, gpsrComplete, gpsrMissing, gpsr, version }) =>
+      storeSaved<Manufacturer>(queryClient, queryKeys.settings.manufacturers(), {
+        id,
+        name,
+        active,
+        gpsrComplete,
+        gpsrMissing,
+        gpsr,
+        version,
+      }),
+  });
+}
+
+/** "Speichern" and "Deaktivieren" of UI-031 (`PATCH /api/manufacturers/{id}`). */
+export function useUpdateManufacturerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ManufacturerUpdateResult, ApiError, ManufacturerUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) =>
+      apiClient.patch<ManufacturerUpdateResult>(`/api/manufacturers/${id}`, body),
+    onSuccess: ({ manufacturer }) =>
+      storeSaved(queryClient, queryKeys.settings.manufacturers(), manufacturer),
+  });
+}
+
+/** Attributes of a device type in UI-027 (`GET /api/device-types/{id}/attributes`). */
+export function useAttributesQuery(deviceTypeId: number | null) {
+  return useQuery<AttributeList, ApiError>({
+    queryKey: queryKeys.settings.attributes(deviceTypeId ?? 0),
+    queryFn: ({ signal }) =>
+      apiClient.get<AttributeList>(`/api/device-types/${deviceTypeId}/attributes`, { signal }),
+    enabled: deviceTypeId !== null,
+  });
+}
+
+/**
+ * Takes the saved attribute into the cache at once (`hasValues` of the row stays) and loads the
+ * attributes and the device types, with their `attributeCount`, again in the background
+ * (2.0.7 "Wartezustand bei Folgeanfragen").
+ */
+function storeAttribute(queryClient: QueryClient, saved: Attribute) {
+  const key = queryKeys.settings.attributes(saved.deviceTypeId);
+  queryClient.setQueryData<AttributeList>(key, (list) => {
+    if (list === undefined) return list;
+    const known = list.items.find((item) => item.id === saved.id);
+    return known
+      ? {
+          ...list,
+          items: list.items.map((item) => (item.id === saved.id ? { ...item, ...saved } : item)),
+        }
+      : { items: [...list.items, { ...saved, hasValues: false }], total: list.total + 1 };
+  });
+  void queryClient.invalidateQueries({ queryKey: key });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.settings.deviceTypes() });
+}
+
+/** "Merkmal speichern" for a new attribute (`POST /api/device-types/{id}/attributes`). */
+export function useCreateAttributeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Attribute, ApiError, AttributeCreateInput & { deviceTypeId: number }>({
+    mutationFn: ({ deviceTypeId, ...body }) =>
+      apiClient.post<Attribute>(`/api/device-types/${deviceTypeId}/attributes`, body),
+    onSuccess: (saved) => storeAttribute(queryClient, saved),
+  });
+}
+
+/**
+ * "Merkmal speichern" for an existing attribute and "Merkmal deaktivieren"
+ * (`PATCH /api/attributes/{id}`). Fields left `undefined` are not sent, so they stay unchanged.
+ */
+export function useUpdateAttributeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Attribute, ApiError, AttributeUpdateInput & { id: number }>({
+    mutationFn: ({ id, ...body }) => apiClient.patch<Attribute>(`/api/attributes/${id}`, body),
+    onSuccess: (saved) => storeAttribute(queryClient, saved),
+  });
+}
+
+/** New order of the attributes (`PUT /api/device-types/{id}/attribute-order`, DER-34-06). */
+export function useReorderAttributesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeviceType, ApiError, AttributeOrder & { deviceTypeId: number }>({
+    mutationFn: ({ deviceTypeId, ...body }) =>
+      apiClient.put<DeviceType>(`/api/device-types/${deviceTypeId}/attribute-order`, body),
+    onSuccess: (saved, { deviceTypeId, attributeIds }) => {
+      storeSaved(queryClient, queryKeys.settings.deviceTypes(), saved);
+      const key = queryKeys.settings.attributes(deviceTypeId);
+      queryClient.setQueryData<AttributeList>(key, (list) => {
+        if (list === undefined) return list;
+        const byId = new Map(list.items.map((item) => [item.id, item]));
+        const items = attributeIds.flatMap((id, index) => {
+          const item = byId.get(id);
+          return item ? [{ ...item, sortOrder: index + 1 }] : [];
+        });
+        return { ...list, items };
+      });
+      void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/** Entries of the condition code table of UI-033 (`GET /api/condition-codes`). */
+export function useConditionCodesQuery() {
+  return useQuery<ConditionCodeList, ApiError>({
+    queryKey: queryKeys.settings.conditionCodes(),
+    queryFn: ({ signal }) =>
+      apiClient.get<ConditionCodeList>(`/api/condition-codes?${ALL}`, { signal }),
+  });
+}
+
+/** "Speichern" for a new entry (`POST /api/condition-codes`). */
+export function useCreateConditionCodeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ConditionCodeEntry, ApiError, ConditionCodeCreate>({
+    mutationFn: (body) => apiClient.post<ConditionCodeEntry>('/api/condition-codes', body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.conditionCodes(), saved),
+  });
+}
+
+/** "Speichern" for an existing entry (`PATCH /api/condition-codes/{id}`). */
+export function useUpdateConditionCodeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ConditionCodeEntry, ApiError, ConditionCodeUpdate & { id: number }>({
+    mutationFn: ({ id, ...body }) =>
+      apiClient.patch<ConditionCodeEntry>(`/api/condition-codes/${id}`, body),
+    onSuccess: (saved) => storeSaved(queryClient, queryKeys.settings.conditionCodes(), saved),
+  });
+}
+
+/**
+ * Deletes an entry after the confirmation P-04 (`DELETE /api/condition-codes/{id}?version=`).
+ * The body is `{}`, because every write is sent as JSON (2.0.2 G-4).
+ */
+export function useDeleteConditionCodeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<void, ApiError, { id: number; version: number }>({
+    mutationFn: ({ id, version }) =>
+      apiClient.delete<void>(`/api/condition-codes/${id}?version=${version}`, {}),
+    onSuccess: (_result, { id }) => {
+      const queryKey = queryKeys.settings.conditionCodes();
+      queryClient.setQueryData<ConditionCodeList>(queryKey, (list) =>
+        list === undefined
+          ? list
+          : { items: list.items.filter((item) => item.id !== id), total: list.total - 1 },
+      );
+      void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+}
+
+/** The nine pick lists of UI-028 (`GET /api/pick-lists`). */
+export function usePickListsQuery() {
+  return useQuery<PickListList, ApiError>({
+    queryKey: queryKeys.settings.pickLists(),
+    queryFn: ({ signal }) => apiClient.get<PickListList>(`/api/pick-lists?${ALL}`, { signal }),
+  });
+}
+
+/** Values of one list, active and deactivated (`GET /api/pick-lists/{id}/values`). */
+export function usePickListValuesQuery(pickListId: number | null) {
+  return useQuery(pickListValuesQuery(pickListId));
+}
+
+/** The values of several pick lists at once, each in the cache of `usePickListValuesQuery`. */
+export function usePickListValuesQueries(pickListIds: readonly number[]) {
+  return useQueries({ queries: pickListIds.map((id) => pickListValuesQuery(id)) });
+}
+
+function pickListValuesQuery(pickListId: number | null) {
+  return queryOptions<PickListValueList, ApiError>({
+    queryKey: queryKeys.settings.pickListValues(pickListId ?? 0),
+    queryFn: ({ signal }) =>
+      apiClient.get<PickListValueList>(`/api/pick-lists/${pickListId}/values?${ALL}`, { signal }),
+    enabled: pickListId !== null,
+  });
+}
+
+/**
+ * Takes the saved value into the cache at once and loads the values again in the background
+ * (2.0.7 "Wartezustand bei Folgeanfragen").
+ */
+function storeValue(queryClient: QueryClient, pickListId: number, saved: PickListValue) {
+  const key = queryKeys.settings.pickListValues(pickListId);
+  queryClient.setQueryData<PickListValueList>(key, (list) => {
+    if (list === undefined) return list;
+    const known = list.items.some((item) => item.id === saved.id);
+    return known
+      ? { ...list, items: list.items.map((item) => (item.id === saved.id ? saved : item)) }
+      : { items: [...list.items, saved], total: list.total + 1 };
+  });
+  void queryClient.invalidateQueries({ queryKey: key });
+}
+
+/** "Wert anlegen" (`POST /api/pick-lists/{id}/values`). */
+export function useCreatePickListValueMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<PickListValue, ApiError, PickListValueCreate & { pickListId: number }>({
+    mutationFn: ({ pickListId, ...body }) =>
+      apiClient.post<PickListValue>(`/api/pick-lists/${pickListId}/values`, body),
+    onSuccess: (saved, { pickListId }) => storeValue(queryClient, pickListId, saved),
+  });
+}
+
+/** Rename, flag and status of a value (`PATCH /api/pick-list-values/{id}`). */
+export function useUpdatePickListValueMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    PickListValue,
+    ApiError,
+    PickListValueUpdate & { id: number; pickListId: number }
+  >({
+    // Fields left `undefined` are not sent (`JSON.stringify`), so they stay unchanged.
+    mutationFn: ({ id, version, label, active, batteryPresent }) =>
+      apiClient.patch<PickListValue>(`/api/pick-list-values/${id}`, {
+        version,
+        label,
+        active,
+        batteryPresent,
+      }),
+    onSuccess: (saved, { pickListId }) => storeValue(queryClient, pickListId, saved),
+  });
+}
+
+/** New order of the values (`PUT /api/pick-lists/{id}/value-order`, DER-35-08). */
+export function useReorderPickListValuesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<PickList, ApiError, PickListValueOrder & { pickListId: number }>({
+    mutationFn: ({ pickListId, ...body }) =>
+      apiClient.put<PickList>(`/api/pick-lists/${pickListId}/value-order`, body),
+    onSuccess: (saved, { pickListId, valueIds }) => {
+      queryClient.setQueryData<PickListList>(queryKeys.settings.pickLists(), (lists) =>
+        lists === undefined
+          ? lists
+          : { ...lists, items: lists.items.map((item) => (item.id === saved.id ? saved : item)) },
+      );
+      const key = queryKeys.settings.pickListValues(pickListId);
+      queryClient.setQueryData<PickListValueList>(key, (list) => {
+        if (list === undefined) return list;
+        const byId = new Map(list.items.map((item) => [item.id, item]));
+        const items = valueIds.flatMap((id, index) => {
+          const item = byId.get(id);
+          return item ? [{ ...item, sortOrder: index + 1 }] : [];
+        });
+        return { ...list, items };
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.settings.pickLists() });
+      void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}

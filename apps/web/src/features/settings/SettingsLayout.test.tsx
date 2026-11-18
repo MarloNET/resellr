@@ -239,7 +239,8 @@ describe('UI-025 settings layout (CU-093)', () => {
       fireEvent.click(within(sectionList()).getByRole('link', { name: label }));
 
       const layout = await screen.findByTestId('settings-layout');
-      expect(layout.textContent).not.toMatch(/Sicherung|Hinweis|ausblenden/i);
+      // "Akku-Hinweis" is a kind of text block in UI-030 (REQ-026), not the backup notice.
+      expect(layout.textContent).not.toMatch(/Sicherung|(?<!Akku-)Hinweis|ausblenden/i);
       expect(screen.getByRole('region', { name: 'Sicherung einrichten' })).toBe(notice);
       expect(within(notice).getByTestId('backup-notice-path')).toBe(path);
     }

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { LauncherExitCode } from '@resellr/runtime-shared/exit-codes';
 import { describe, expect, it } from 'vitest';
 
@@ -42,15 +44,19 @@ describe('runCli exit codes (CU-258, CU-006)', () => {
     },
   );
 
-  // `supervise` follows with #119, `stop` with #123, `availability-report` with #116.
-  it.each([[['supervise']], [['stop', '--for-update']], [['availability-report', '2026-10']]])(
-    'ends the command %j that is not built yet with exit code 1',
+  it.each([[['open']], [['supervise']], [['stop']], [['stop', '--for-update']]])(
+    'ends %j with exit code 1 when the folders cannot be determined',
     async (args) => {
       await expect(runCli(args, env)).resolves.toBe(LauncherExitCode.Failed);
     },
   );
+});
 
-  it('ends open with exit code 1 when the data folder cannot be determined', async () => {
-    await expect(runCli(['open'], env)).resolves.toBe(LauncherExitCode.Failed);
+describe('launcher entry and its logs (CU-258, CU-296)', () => {
+  it('writes the events of runOpen through CU-296, not through DailyJsonlWriter directly (Nachtrag MAR-366)', () => {
+    const source = readFileSync(new URL('./cli.ts', import.meta.url), 'utf8');
+
+    expect(source).not.toContain('daily-jsonl-writer');
+    expect(source).toContain("from './launcher-log.ts'");
   });
 });

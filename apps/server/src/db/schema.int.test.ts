@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { openDatabase, type Database } from './database.ts';
 import { runMigrations } from './migrator.ts';
-import { migrations } from './migrations/index.ts';
+import { initialSchema } from './migrations/20261110_0001_initial_schema.ts';
 import type { DB } from './schema.ts';
 
 type SqlType<T> = [NonNullable<T>] extends [number] ? 'INTEGER' : 'TEXT';
@@ -575,7 +575,9 @@ let database: Database<DB>;
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'resellr-schema-types-'));
   database = openDatabase<DB>(join(dir, 'resellr.db'));
-  await runMigrations(database, migrations, () => new Date(NOW));
+  // Schema only: the tests write their own settings; the initial settings have their own
+  // tests (CU-071).
+  await runMigrations(database, [initialSchema], () => new Date(NOW));
 });
 
 afterEach(async () => {

@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest';
+
+import { listingCreateBodySchema, toArticleNumberKey } from './listing.schema.ts';
+
+const RULE = 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“';
+
+describe('listingCreateBodySchema (CU-116, Technical Specification 2.6)', () => {
+  it('takes a device with its version, with or without an article number', () => {
+    expect(listingCreateBodySchema.parse({ fromDeviceId: 41, deviceVersion: 1 })).toEqual({
+      fromDeviceId: 41,
+      deviceVersion: 1,
+    });
+    expect(
+      listingCreateBodySchema.parse({ fromDeviceId: 41, deviceVersion: 2, articleNumber: 'MI-A2' }),
+    ).toEqual({ fromDeviceId: 41, deviceVersion: 2, articleNumber: 'MI-A2' });
+  });
+
+  it.each(['', 'MI A', 'MI_A', 'Ä1', 'x'.repeat(31)])(
+    'rejects the article number %j with the rule of UI-004',
+    (articleNumber) => {
+      const result = listingCreateBodySchema.safeParse({
+        fromDeviceId: 41,
+        deviceVersion: 1,
+        articleNumber,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]).toMatchObject({ path: ['articleNumber'], message: RULE });
+    },
+  );
+
+  it('accepts 30 characters', () => {
+    const articleNumber = 'A-1'.repeat(10);
+    expect(
+      listingCreateBodySchema.safeParse({ fromDeviceId: 41, deviceVersion: 1, articleNumber })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects other fields', () => {
+    expect(
+      listingCreateBodySchema.safeParse({ fromDeviceId: 41, deviceVersion: 1, listingId: 9 })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe('toArticleNumberKey (3.3)', () => {
+  it('is the article number in lower case', () => {
+    expect(toArticleNumberKey('MI-A626198')).toBe('mi-a626198');
+  });
+});

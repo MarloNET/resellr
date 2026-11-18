@@ -25,3 +25,29 @@ export function parseDecimal(input: string): string | null {
   const absolute = fractionPart ? `${integerPart}.${fractionPart}` : integerPart;
   return sign && absolute !== '0' ? `-${absolute}` : absolute;
 }
+
+/**
+ * Compares two decimals in canonical form (a result of `parseDecimal`) exactly, without
+ * floating point: negative, zero or positive like `Array.prototype.sort`. Used for the rule
+ * "Mindestwert ≤ Höchstwert" and for value ranges (Technical Specification 2.1, 3.1).
+ */
+export function compareDecimal(left: string, right: string): -1 | 0 | 1 {
+  const leftNegative = left.startsWith('-');
+  const rightNegative = right.startsWith('-');
+  if (leftNegative !== rightNegative) return leftNegative ? -1 : 1;
+  const magnitude = compareMagnitude(left.replace('-', ''), right.replace('-', ''));
+  return leftNegative ? (-magnitude as -1 | 0 | 1) : magnitude;
+}
+
+function compareMagnitude(left: string, right: string): -1 | 0 | 1 {
+  const [leftInteger = '', leftFraction = ''] = left.split('.');
+  const [rightInteger = '', rightFraction = ''] = right.split('.');
+  if (leftInteger.length !== rightInteger.length) {
+    return leftInteger.length < rightInteger.length ? -1 : 1;
+  }
+  const length = Math.max(leftFraction.length, rightFraction.length);
+  const leftDigits = leftInteger + leftFraction.padEnd(length, '0');
+  const rightDigits = rightInteger + rightFraction.padEnd(length, '0');
+  if (leftDigits === rightDigits) return 0;
+  return leftDigits < rightDigits ? -1 : 1;
+}

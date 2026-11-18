@@ -1,0 +1,170 @@
+{
+  "aom": {
+    "version": "3.15.1",
+    "license": "BSD-2-Clause mit AOM-Patentlizenz 1.0",
+    "file": "aom.txt",
+    "source": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.15.1"
+  },
+  "archive": {
+    "version": "3.8.9",
+    "license": "BSD-2-Clause",
+    "file": "archive.txt",
+    "source": "https://github.com/libarchive/libarchive/tree/v3.8.9"
+  },
+  "cairo": {
+    "version": "1.18.6",
+    "license": "LGPL-2.1-only OR MPL-1.1",
+    "file": "cairo.txt",
+    "source": "https://gitlab.freedesktop.org/cairo/cairo/-/tree/1.18.6"
+  },
+  "cgif": {
+    "version": "0.5.4",
+    "license": "MIT",
+    "file": "cgif.txt",
+    "source": "https://github.com/dloebl/cgif/tree/v0.5.4"
+  },
+  "exif": {
+    "version": "0.6.26",
+    "license": "LGPL-3.0-or-later",
+    "file": null,
+    "source": "https://github.com/libexif/libexif/tree/v0.6.26"
+  },
+  "expat": {
+    "version": "2.8.5",
+    "license": "MIT",
+    "file": "expat.txt",
+    "source": "https://github.com/libexpat/libexpat/tree/R_2_8_5"
+  },
+  "ffi": {
+    "version": "3.8.0",
+    "license": "MIT",
+    "file": "ffi.txt",
+    "source": "https://github.com/libffi/libffi/tree/v3.8.0"
+  },
+  "fontconfig": {
+    "version": "2.18.3",
+    "license": "fontconfig-Lizenz (MIT-artig)",
+    "file": "fontconfig.txt",
+    "source": "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/tree/2.18.3"
+  },
+  "freetype": {
+    "version": "2.14.3",
+    "license": "FTL",
+    "file": "freetype.txt",
+    "source": "https://gitlab.freedesktop.org/freetype/freetype/-/tree/VER-2-14-3"
+  },
+  "fribidi": {
+    "version": "1.0.17",
+    "license": "LGPL-3.0-or-later",
+    "file": null,
+    "source": "https://github.com/fribidi/fribidi/tree/v1.0.17"
+  },
+  "glib": {
+    "version": "2.90.0",
+    "license": "LGPL-3.0-or-later",
+    "file": null,
+    "source": "https://gitlab.gnome.org/GNOME/glib/-/tree/2.90.0"
+  },
+  "harfbuzz": {
+    "version": "14.5.0",
+    "license": "MIT",
+    "file": "harfbuzz.txt",
+    "source": "https://github.com/harfbuzz/harfbuzz/tree/14.5.0"
+  },
+  "heif": {
+    "version": "1.23.5",
+    "license": "LGPL-3.0-or-later",
+    "file": null,
+    "source": "https://github.com/strukturag/libheif/tree/v1.23.5"
+  },
+  "highway": {
+    "version": "1.4.0",
+    "license": "(Apache-2.0 OR BSD-3-Clause) AND CC0-1.0",
+    "file": "highway.txt",
+    "source": "https://github.com/google/highway/tree/1.4.0"
+  },
+  "imagequant": {
+    "version": "2.4.1",
+    "license": "BSD-2-Clause",
+    "file": "imagequant.txt",
+    "source": "https://github.com/lovell/libimagequant/tree/v2.4.1"
+  },
+  "lcms": {
+    "version": "2.19.1",
+    "license": "MIT",
+    "file": "lcms.txt",
+    "source": "https://github.com/mm2/Little-CMS/tree/lcms2.19.1"
+  },
+  "mozjpeg": {
+    "version": "0826579",
+    "license": "IJG AND BSD-3-Clause AND Zlib",
+    "file": "mozjpeg.txt",
+    "source": "https://github.com/mozilla/mozjpeg/tree/08265790774cd0714832c9e675522acbe5581437"
+  },
+  "pango": {
+    "version": "1.58.2",
+    "license": "LGPL-3.0-or-later",
+    "file": null,
+    "source": "https://gitlab.gnome.org/GNOME/pango/-/tree/1.58.2"
+  },
+  "pixman": {
+    "version": "0.46.4",
+    "license": "MIT",
+    "file": "pixman.txt",
+    "source": "https://gitlab.freedesktop.org/pixman/pixman/-/tree/pixman-0.46.4"
+  },
+  "png": {
+    "version": "1.6.58",
+    "license": "libpng-2.0",
+    "file": "png.txt",
+    "source": "https://github.com/pnggroup/libpng/tree/v1.6.58"
+  },
+  "proxy-libintl": {
+    "version": "0.5",
+    "license": "LGPL-3.0-or-later",
+    "file": null,
+    "source": "https://github.com/frida/proxy-libintl/tree/0.5"
+  },
+  "rsvg": {
+    "version": "2.63.2",
+    "license": "LGPL-3.0-or-later",
+    "file": null,
+    "source": "https://gitlab.gnome.org/GNOME/librsvg/-/tree/2.63.2"
+  },
+  "tiff": {
+    "version": "4.7.2",
+    "license": "libtiff",
+    "file": "tiff.txt",
+    "source": "https://gitlab.com/libtiff/libtiff/-/tree/v4.7.2"
+  },
+  "uhdr": {
+    "version": "2.0.2",
+    "license": "MIT AND Apache-2.0",
+    "file": "uhdr.txt",
+    "source": "https://github.com/google/libultrahdr/tree/v2.0.2"
+  },
+  "vips": {
+    "version": "8.18.7",
+    "license": "LGPL-3.0-or-later",
+    "file": "vips.txt",
+    "source": "https://github.com/libvips/libvips/tree/v8.18.7"
+  },
+  "webp": {
+    "version": "1.6.0",
+    "license": "BSD-3-Clause mit Patentgewährung",
+    "file": "webp.txt",
+    "source": "https://github.com/webmproject/libwebp/tree/v1.6.0"
+  },
+  "xml2": {
+    "version": "2.15.4",
+    "license": "MIT",
+    "file": "xml2.txt",
+    "source": "https://gitlab.gnome.org/GNOME/libxml2/-/tree/v2.15.4"
+  },
+  "zlib-ng": {
+    "version": "2.3.3",
+    "license": "Zlib",
+    "file": "zlib-ng.txt",
+    "source": "https://github.com/zlib-ng/zlib-ng/tree/2.3.3"
+  }
+}

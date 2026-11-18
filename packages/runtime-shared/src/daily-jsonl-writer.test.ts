@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createDailyJsonlWriter } from './daily-jsonl-writer.ts';
+import { createDailyJsonlWriter, readDailyFiles } from './daily-jsonl-writer.ts';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -174,5 +174,43 @@ describe('daily JSON Lines writer (E6)', () => {
 
   it('rejects a kind that would not form a valid daily file name', () => {
     expect(() => createDailyJsonlWriter({ dir, kind: '../errors', now })).toThrow(/kind/);
+  });
+});
+
+describe('reading daily files (CU-008)', () => {
+  it('returns the entries of each daily file of the kind, oldest day first', () => {
+    writeFileSync(join(dir, 'availability-2026-11-09.jsonl'), '{"ts":"b","ok":false}\n');
+    writeFileSync(
+      join(dir, 'availability-2026-11-08.jsonl'),
+      '{"ts":"a1","ok":true}\n{"ts":"a2","ok":true}\n',
+    );
+    writeFileSync(join(dir, 'operations-2026-11-08.jsonl'), '{"event":"crash"}\n');
+    writeFileSync(join(dir, 'availability-days.jsonl'), '{"date":"2026-11-07"}\n');
+
+    expect(readDailyFiles({ dir, kind: 'availability' })).toEqual([
+      {
+        day: '2026-11-08',
+        entries: [
+          { ts: 'a1', ok: true },
+          { ts: 'a2', ok: true },
+        ],
+      },
+      { day: '2026-11-09', entries: [{ ts: 'b', ok: false }] },
+    ]);
+  });
+
+  it('skips lines that are no JSON object, e.g. a line cut off by a power failure', () => {
+    writeFileSync(
+      join(dir, 'operations-2026-11-09.jsonl'),
+      '{"event":"server_started"}\n[1]\n\n{"event":"serv',
+    );
+
+    expect(readDailyFiles({ dir, kind: 'operations' })).toEqual([
+      { day: '2026-11-09', entries: [{ event: 'server_started' }] },
+    ]);
+  });
+
+  it('returns no files when the folder does not exist', () => {
+    expect(readDailyFiles({ dir: join(dir, 'missing'), kind: 'operations' })).toEqual([]);
   });
 });

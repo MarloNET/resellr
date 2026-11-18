@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useRef, useState, type FormEvent } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Input } from '../ui/Input.tsx';
-import { FormField, useFocusFirstError } from './FormField.tsx';
+import { FormField, useDeferredBlurCheck, useFocusFirstError } from './FormField.tsx';
 
 type Errors = Partial<Record<'wiNr' | 'supplier' | 'note', string>>;
 
@@ -87,6 +87,18 @@ describe('FormField (CU-057, design chapter 5)', () => {
     expect(container.querySelector('.text-error')).toBeNull();
   });
 
+  it('shows an element at the end of the label line without changing the name of the field', () => {
+    render(
+      <FormField label="RAM" aside={<span>zu prüfen</span>}>
+        {(control) => <Input {...control} />}
+      </FormField>,
+    );
+
+    const field = screen.getByRole('textbox', { name: 'RAM' });
+    const aside = screen.getByText('zu prüfen');
+    expect(aside.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('E6 on an error the first faulty field receives the focus', () => {
     render(
       <DeviceForm
@@ -137,5 +149,123 @@ describe('FormField (CU-057, design chapter 5)', () => {
     const text = screen.getByText(longWord);
     expect(text.className).toContain('[overflow-wrap:anywhere]');
     expect(text.className).toContain('min-w-0');
+  });
+});
+
+/** A field checked on leaving it; a click on the button moves the button when an error shows. */
+function BlurField({ onCheck }: { onCheck: (value: string) => void }) {
+  const blurCheck = useDeferredBlurCheck();
+  const [value, setValue] = useState('');
+  return (
+    <form onPointerDown={blurCheck.pressPointer}>
+      <input
+        aria-label="Name"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => blurCheck.checkOnBlur(() => onCheck(value))}
+      />
+      <button type="button" onClick={blurCheck.cancel}>
+        Abbrechen
+      </button>
+    </form>
+  );
+}
+
+/** The field with a button outside that removes it, like "Abbrechen" of a dialog. */
+function BlurForm({ onCheck }: { onCheck: (value: string) => void }) {
+  const [shown, setShown] = useState(true);
+  return (
+    <>
+      {shown && <BlurField onCheck={onCheck} />}
+      <button type="button" onClick={() => setShown(false)}>
+        Schließen
+      </button>
+    </>
+  );
+}
+
+describe('useDeferredBlurCheck (CU-057, addendum MAR-555)', () => {
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it('checks at once when the focus leaves the field without a pointer pressed', () => {
+    const checks: string[] = [];
+    render(<BlurForm onCheck={(value) => checks.push(value)} />);
+    const name = screen.getByRole('textbox', { name: 'Name' });
+
+    fireEvent.change(name, { target: { value: 'HP' } });
+    fireEvent.blur(name);
+
+    expect(checks).toEqual(['HP']);
+  });
+
+  it('waits until after the click when the focus leaves during a click in the form', () => {
+    vi.useFakeTimers();
+    const checks: string[] = [];
+    render(<BlurForm onCheck={(value) => checks.push(value)} />);
+    const name = screen.getByRole('textbox', { name: 'Name' });
+
+    fireEvent.pointerDown(name.closest('form')!);
+    fireEvent.blur(name);
+    expect(checks).toEqual([]);
+
+    fireEvent.pointerUp(window);
+    expect(checks).toEqual([]);
+    vi.runAllTimers();
+    expect(checks).toEqual(['']);
+  });
+
+  it('runs the waiting check and releases the pointer when the pointer is cancelled', () => {
+    vi.useFakeTimers();
+    const checks: string[] = [];
+    render(<BlurForm onCheck={(value) => checks.push(value)} />);
+    const name = screen.getByRole('textbox', { name: 'Name' });
+
+    fireEvent.pointerDown(name.closest('form')!);
+    fireEvent.blur(name);
+    expect(checks).toEqual([]);
+
+    fireEvent.pointerCancel(window);
+    expect(checks).toEqual([]);
+    vi.runAllTimers();
+    expect(checks).toEqual(['']);
+
+    fireEvent.change(name, { target: { value: 'HP' } });
+    fireEvent.blur(name);
+    expect(checks).toEqual(['', 'HP']);
+  });
+
+  it('runs at most one waiting check and drops it on cancel', () => {
+    vi.useFakeTimers();
+    const checks: string[] = [];
+    render(<BlurForm onCheck={(value) => checks.push(value)} />);
+    const name = screen.getByRole('textbox', { name: 'Name' });
+    const form = name.closest('form')!;
+
+    fireEvent.pointerDown(form);
+    fireEvent.blur(name);
+    fireEvent.blur(name);
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    fireEvent.pointerUp(window);
+    vi.runAllTimers();
+
+    expect(checks).toEqual([]);
+  });
+
+  it('drops a waiting check when the form is removed', () => {
+    vi.useFakeTimers();
+    const checks: string[] = [];
+    render(<BlurForm onCheck={(value) => checks.push(value)} />);
+    const name = screen.getByRole('textbox', { name: 'Name' });
+
+    fireEvent.pointerDown(name.closest('form')!);
+    fireEvent.blur(name);
+    fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    fireEvent.pointerUp(window);
+    vi.runAllTimers();
+
+    expect(checks).toEqual([]);
   });
 });

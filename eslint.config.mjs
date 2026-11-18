@@ -57,7 +57,8 @@ const POLICIES = [
   },
   {
     from: { element: { type: 'server-db' } },
-    allow: to('server-shared', ...DOMAIN, 'runtime-shared'),
+    // The seed migration CU-071 reads the initial settings of CU-070 (3.8).
+    allow: to('server-shared', ...DOMAIN, 'runtime-shared', 'seed-data'),
   },
   { from: { element: { type: 'server-shared' } }, allow: to(...DOMAIN, 'runtime-shared') },
   {
@@ -117,6 +118,19 @@ export default defineConfig(
         'error',
         { paths: NODE_BUILTINS.map((name) => ({ name, message: 'packages/domain has no I/O.' })) },
       ],
+    },
+  },
+  {
+    // The script of the launcher pages runs in Chrome on `file://` pages (2.18).
+    files: ['tools/launcher-pages/launcher-pages.js'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        location: 'readonly',
+        setTimeout: 'readonly',
+        URLSearchParams: 'readonly',
+        window: 'readonly',
+      },
     },
   },
   prettierRecommended,

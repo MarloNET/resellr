@@ -6,6 +6,7 @@ import {
   dateSchema,
   idSchema,
   listResponseSchema,
+  pageQuerySchema,
   timestampSchema,
   versionSchema,
 } from './common.schema.ts';
@@ -68,4 +69,19 @@ describe('common schemas', () => {
     expect(schema.safeParse({ items: [] }).success).toBe(false);
     expect(schema.safeParse({ items: [], total: -1 }).success).toBe(false);
   });
+
+  it('pages a list with limit 50 and offset 0 by default (2.0.1)', () => {
+    expect(pageQuerySchema.parse({})).toEqual({ limit: 50, offset: 0 });
+    expect(pageQuerySchema.parse({ limit: '200', offset: '50' })).toEqual({
+      limit: 200,
+      offset: 50,
+    });
+  });
+
+  it.each([{ limit: '0' }, { limit: '201' }, { limit: '1.5' }, { offset: '-1' }, { other: '1' }])(
+    'rejects the page %j (2.0.1)',
+    (query) => {
+      expect(pageQuerySchema.safeParse(query).success).toBe(false);
+    },
+  );
 });

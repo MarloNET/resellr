@@ -1,0 +1,777 @@
+import { join } from 'node:path';
+
+import type { Locator, Page } from '@playwright/test';
+import Database from 'better-sqlite3';
+
+import { expect, test } from './fixtures/app-fixture.ts';
+import { expectReachable } from './fixtures/reachability.ts';
+
+/** Rows of the matrix with the full frame (FM-5 and FM-7 only check the narrow UI-019, 6.3). */
+const FRAME_ROWS = ['FM-1', 'FM-2', 'FM-3', 'FM-4', 'FM-6'];
+
+const PAGE = '/einstellungen/geraetearten';
+
+const deviceTypes = (page: Page) => page.getByRole('region', { name: 'Gerätearten' });
+const nameField = (page: Page) => page.getByRole('textbox', { name: /^Name/ });
+const saveButton = (page: Page) => page.getByRole('button', { name: 'Geräteart speichern' });
+
+/** The server keeps its data per worker: each test uses its own names. */
+function uniqueName(base: string, title: string, project: string) {
+  let hash = 0;
+  for (const char of `${title}${project}`) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return `${base} ${hash.toString(36)}`;
+}
+
+/** Creates a device type through the API like the user interface (`local-guard` G-2, G-4). */
+async function createDeviceType(page: Page, baseUrl: string, name: string) {
+  const response = await page.request.post(`${baseUrl}/api/device-types`, {
+    headers: { origin: baseUrl },
+    data: { name, active: true },
+  });
+  expect(response.status()).toBe(201);
+  return (await response.json()) as { id: number; version: number };
+}
+
+async function openDeviceType(page: Page, name: string) {
+  await page.goto(PAGE);
+  await deviceTypes(page)
+    .getByRole('button', { name: new RegExp(name) })
+    .click();
+  await expect(nameField(page)).toHaveValue(name);
+}
+
+test.describe('UI-027 device types (CU-095)', () => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(!FRAME_ROWS.includes(testInfo.project.name), 'full frame only');
+  });
+
+  test('UI-027.success AC-REQ-004-01 a new device type is saved, listed as active and every action is reachable', async ({
+    page,
+  }, testInfo) => {
+    const name = uniqueName('Monitor', testInfo.title, testInfo.project.name);
+    await page.goto(PAGE);
+    await expect(page.getByRole('heading', { name: 'Gerätearten und Merkmale' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Geräteart anlegen' }).click();
+    await nameField(page).fill(name);
+    await saveButton(page).click();
+
+    const banner = page.getByRole('status').filter({ hasText: 'Geräteart gespeichert' });
+    await expect(banner).toBeVisible();
+    const row = deviceTypes(page).getByRole('button', { name: new RegExp(name) });
+    await expect(row).toHaveAttribute('aria-current', 'true');
+    await expect(row).toContainText('aktiv');
+    await expect(page.getByRole('button', { name: /löschen/i })).toHaveCount(0);
+    // DER-33-05: the banner closes after 5 s. Only then the page is checked, so the check does
+    // not count the "×" of a banner that closes while it runs.
+    await expect(banner).toBeHidden({ timeout: 10_000 });
+    await expectReachable(page);
+  });
+
+  // QA-D2: a name of 50 characters without spaces wraps itself, not the status chip.
+  test('UI-027.default a long name without spaces keeps the status chip on one line', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const short = uniqueName('Kurz', testInfo.title, testInfo.project.name);
+    const long = uniqueName('W', testInfo.title, testInfo.project.name)
+      .replace(' ', '')
+      .padEnd(50, 'W');
+    await createDeviceType(page, server.baseUrl, short);
+    await createDeviceType(page, server.baseUrl, long);
+    await page.goto(PAGE);
+
+    const chipOf = (name: string) =>
+      deviceTypes(page)
+        .getByRole('button', { name: new RegExp(name) })
+        .getByText('aktiv', { exact: true });
+    const shortChip = await chipOf(short).boundingBox();
+    const longChip = await chipOf(long).boundingBox();
+    expect(longChip?.height).toBe(shortChip?.height);
+    expect(longChip?.width).toBe(shortChip?.width);
+  });
+
+  // QA-D1: the check on leaving the field must not move the button between `mousedown` and
+  // `mouseup`; one mouse click saves, whether the error line appears or disappears.
+  test('UI-027.validation DER-33-06 one mouse click after an invalid or corrected name saves when creating', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Klick', testInfo.title, testInfo.project.name);
+    await createDeviceType(page, server.baseUrl, `${name} vergeben`);
+    await page.goto(PAGE);
+    await page.getByRole('button', { name: 'Geräteart anlegen' }).click();
+
+    await nameField(page).fill('x'.repeat(51));
+    await saveButton(page).click();
+    await expect(page.getByText('Name: 1 bis 50 Zeichen')).toBeVisible();
+    await expect(nameField(page)).toBeFocused();
+
+    await nameField(page).fill(`${name} vergeben`);
+    await saveButton(page).click();
+    await expect(page.getByText('Name ist bereits vergeben')).toBeVisible();
+    await expect(nameField(page)).toBeFocused();
+
+    await nameField(page).fill(name);
+    await saveButton(page).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Geräteart gespeichert' }),
+    ).toBeVisible();
+  });
+
+  test('UI-027.validation DER-33-06 one mouse click after an invalid or corrected name saves when renaming', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Umbenennen', testInfo.title, testInfo.project.name);
+    await createDeviceType(page, server.baseUrl, name);
+    await openDeviceType(page, name);
+
+    await nameField(page).fill('x'.repeat(51));
+    await saveButton(page).click();
+    await expect(page.getByText('Name: 1 bis 50 Zeichen')).toBeVisible();
+    await expect(nameField(page)).toBeFocused();
+
+    await nameField(page).fill(`${name} neu`);
+    await saveButton(page).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Geräteart gespeichert' }),
+    ).toBeVisible();
+    await expect(
+      deviceTypes(page).getByRole('button', { name: new RegExp(`${name} neu`) }),
+    ).toBeVisible();
+  });
+
+  test('UI-027.conflict DER-33-08 (a) a save after a change in another window shows P-05 and keeps the input', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Konflikt', testInfo.title, testInfo.project.name);
+    const created = await createDeviceType(page, server.baseUrl, name);
+    await openDeviceType(page, name);
+    // The other window renames it, so the version of this page is outdated.
+    await page.request.patch(`${server.baseUrl}/api/device-types/${created.id}`, {
+      headers: { origin: server.baseUrl },
+      data: { version: created.version, name: `${name} B` },
+    });
+
+    await nameField(page).fill(`${name} C`);
+    await saveButton(page).click();
+
+    const banner = page.getByRole('alert').filter({ hasText: 'in einem anderen Fenster geändert' });
+    await expect(banner.getByRole('button', { name: 'Neu laden' })).toBeVisible();
+    await expect(nameField(page)).toHaveValue(`${name} C`);
+  });
+
+  test('UI-027.ausgang-unbekannt DER-33-07 a save without answer shows P-08 and locks further writes', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Abbruch', testInfo.title, testInfo.project.name);
+    await createDeviceType(page, server.baseUrl, name);
+    await openDeviceType(page, name);
+    await page.route('**/api/device-types/*', (route) =>
+      route.request().method() === 'PATCH' ? route.abort('connectionreset') : route.continue(),
+    );
+
+    await nameField(page).fill(`${name} neu`);
+    await saveButton(page).click();
+
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Ausgang unbekannt, bitte neu laden.' }),
+    ).toBeVisible();
+    await expect(saveButton(page)).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Geräteart anlegen' })).toBeDisabled();
+    await expect(nameField(page)).toHaveValue(`${name} neu`);
+  });
+
+  test('UI-027.unreachable DER-33-08 (b) the list without answer shows P-06 without replacing the page', async ({
+    page,
+  }) => {
+    await page.route('**/api/device-types?*', (route) => route.abort('connectionrefused'));
+
+    await page.goto(PAGE);
+
+    const banner = page.getByRole('alert').filter({ hasText: 'resellr ist nicht erreichbar.' });
+    await expect(banner.getByRole('button', { name: 'Erneut versuchen' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Gerätearten und Merkmale' })).toBeVisible();
+  });
+
+  test('UI-027.wird-beendet DER-33-08 (c) a save refused with 503 shutting_down shows P-07 and keeps the input', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Beenden', testInfo.title, testInfo.project.name);
+    await createDeviceType(page, server.baseUrl, name);
+    await openDeviceType(page, name);
+    // Answer of the write gate in state `stopping` (2.0.4), without ending the shared server and
+    // without sending the write: status and body of P-07, headers from a read of the same server.
+    await page.route('**/api/device-types/*', async (route) => {
+      if (route.request().method() !== 'PATCH') return route.continue();
+      const read = await route.fetch({ url: `${server.baseUrl}/api/ops/health`, method: 'GET' });
+      return route.fulfill({
+        response: read,
+        status: 503,
+        json: {
+          error: {
+            code: 'shutting_down',
+            message: '',
+            fields: [],
+            details: {},
+            referenceNumber: null,
+          },
+        },
+      });
+    });
+
+    await nameField(page).fill(`${name} neu`);
+    await saveButton(page).click();
+
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'resellr wird gerade beendet.' }),
+    ).toBeVisible();
+    await expect(nameField(page)).toHaveValue(`${name} neu`);
+  });
+});
+
+/** File of the database in the data folder (`DATABASE_FILE_NAME`, CU-040). */
+const DATABASE_FILE = 'resellr.db';
+
+const attributes = (page: Page) => page.getByRole('region', { name: 'Merkmale' });
+const attributeRow = (page: Page, label: string) =>
+  attributes(page)
+    .getByRole('row')
+    .filter({ has: page.getByRole('button', { name: label, exact: true }) });
+
+/** Whether the center of the element receives the mouse, i.e. nothing covers it. */
+function hitAtCenter(element: Element) {
+  const rect = element.getBoundingClientRect();
+  return element.contains(
+    document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
+  );
+}
+
+/**
+ * "Fokus vollständig sichtbar" (6.3, addendum MAR-834): after `focus()` without scrolling by
+ * hand, the element with 4 px of focus ring per side lies in the viewport, in the visible part
+ * of its `[data-table-scroll]` and right of a sticky first cell of its row, and its center and
+ * corners (1 px inside its rounded shape) receive the mouse.
+ */
+async function expectFocusFullyVisible(button: Locator) {
+  // Defined start: every scroll container of the element at its start. On `focus()` Chrome
+  // scrolls a partly visible element not at all or only flush with the edge, so its focus ring
+  // sticks out, e.g. "Wieder aktivieren" after a click on the narrower "Deaktivieren", or a row
+  // partly above the top of `main` after a click into a long list (#401). The test does not
+  // scroll to the element.
+  await button.evaluate((element) => {
+    if (document.activeElement === element) element.blur();
+    for (let box = element.parentElement; box; box = box.parentElement) box.scrollTo(0, 0);
+  });
+  await button.focus();
+  await expect(button).toBeFocused();
+  const problems = await button.evaluate((element) => {
+    const found: string[] = [];
+    const rect = element.getBoundingClientRect();
+    const ring = {
+      left: rect.left - 4,
+      right: rect.right + 4,
+      top: rect.top - 4,
+      bottom: rect.bottom + 4,
+    };
+    const outside = (box: { left: number; right: number; top: number; bottom: number }) =>
+      ring.left < box.left ||
+      ring.right > box.right ||
+      ring.top < box.top ||
+      ring.bottom > box.bottom;
+    if (outside({ left: 0, top: 0, right: innerWidth, bottom: innerHeight })) {
+      found.push('outside of the viewport');
+    }
+    const area = element.closest('[data-table-scroll]')!;
+    const areaRect = area.getBoundingClientRect();
+    const left = areaRect.left + area.clientLeft;
+    const top = areaRect.top + area.clientTop;
+    if (outside({ left, top, right: left + area.clientWidth, bottom: top + area.clientHeight })) {
+      found.push('outside of the scroll area');
+    }
+    const firstCell = element.closest('tr')!.firstElementChild!;
+    if (
+      getComputedStyle(firstCell).position === 'sticky' &&
+      ring.left < firstCell.getBoundingClientRect().right
+    ) {
+      found.push('under the first column');
+    }
+    // Corners 1 px inside the rounded shape: Chrome hit-tests `border-radius`.
+    const radius = parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0;
+    const inset = 1 + radius * (1 - Math.SQRT1_2);
+    const points = [
+      [rect.left + rect.width / 2, rect.top + rect.height / 2],
+      [rect.left + inset, rect.top + inset],
+      [rect.right - inset, rect.top + inset],
+      [rect.left + inset, rect.bottom - inset],
+      [rect.right - inset, rect.bottom - inset],
+    ];
+    for (const [x, y] of points) {
+      if (!element.contains(document.elementFromPoint(x!, y!))) found.push(`covered at ${x}, ${y}`);
+    }
+    return found;
+  });
+  expect(problems, await button.innerText()).toEqual([]);
+}
+
+/** Creates an attribute through the API like the user interface (`local-guard` G-2, G-4). */
+async function createAttribute(
+  page: Page,
+  baseUrl: string,
+  deviceTypeId: number,
+  change: Record<string, unknown>,
+) {
+  const response = await page.request.post(
+    `${baseUrl}/api/device-types/${deviceTypeId}/attributes`,
+    {
+      headers: { origin: baseUrl },
+      data: {
+        label: 'Merkmal',
+        dataType: 'text',
+        unit: null,
+        unitSpacing: true,
+        minValue: null,
+        maxValue: null,
+        pickListId: null,
+        level: 'device',
+        variantForming: false,
+        required: false,
+        datasheetBlock: 'technical',
+        active: true,
+        ...change,
+      },
+    },
+  );
+  expect(response.status()).toBe(201);
+  return (await response.json()) as { id: number; version: number };
+}
+
+/**
+ * A model template "MacBook Air" with the given default device values. There is no API for model
+ * templates before S3, so the test writes it into the database of the running server (WAL mode
+ * allows the second connection). `manufacturer` must be unique per test.
+ */
+function insertModelTemplate(
+  dataDir: string,
+  deviceTypeId: number,
+  manufacturer: string,
+  defaultDeviceValues: Record<string, unknown>,
+) {
+  const sqlite = new Database(join(dataDir, DATABASE_FILE));
+  try {
+    const now = new Date().toISOString();
+    const inserted = sqlite
+      .prepare(
+        `INSERT INTO manufacturer (name, name_key, active, gpsr_complete, version, created_at, updated_at)
+         VALUES (?, ?, 1, 0, 1, ?, ?)`,
+      )
+      .run(manufacturer, manufacturer.toLowerCase(), now, now);
+    return Number(
+      sqlite
+        .prepare(
+          `INSERT INTO model_template (device_type_id, manufacturer_id, model_name, model_name_key,
+             mpn_unknown, model_values, default_device_values, search_key, import_review_pending,
+             import_review_keys, version, created_at, updated_at)
+           VALUES (?, ?, 'MacBook Air', 'macbookair', 1, '{}', ?, 'macbook air', 0, '[]', 1, ?, ?)`,
+        )
+        .run(deviceTypeId, inserted.lastInsertRowid, JSON.stringify(defaultDeviceValues), now, now)
+        .lastInsertRowid,
+    );
+  } finally {
+    sqlite.close();
+  }
+}
+
+async function attributeList(page: Page, baseUrl: string, deviceTypeId: number) {
+  const response = await page.request.get(`${baseUrl}/api/device-types/${deviceTypeId}/attributes`);
+  return (
+    (await response.json()) as {
+      items: { id: number; label: string; active: boolean; variantForming: boolean }[];
+    }
+  ).items;
+}
+
+test.describe('UI-027 attributes (CU-095, REQ-005)', () => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(!FRAME_ROWS.includes(testInfo.project.name), 'full frame only');
+  });
+
+  test('UI-027.default DER-34-06 the order changes by dragging and with "Runter", each sent as the complete attribute-order', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const cpu = await createAttribute(page, server.baseUrl, deviceType.id, { label: 'Prozessor' });
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, { label: 'RAM' });
+    const ssd = await createAttribute(page, server.baseUrl, deviceType.id, { label: 'SSD' });
+    await openDeviceType(page, name);
+    await expect(attributeRow(page, 'SSD')).toBeVisible();
+    await expectReachable(page);
+
+    // Keyboard alternative: "Runter" in the row of "Prozessor".
+    const byKeyboard = page.waitForRequest(
+      (request) => request.method() === 'PUT' && request.url().endsWith('/attribute-order'),
+    );
+    await attributeRow(page, 'Prozessor').getByRole('button', { name: 'Runter' }).focus();
+    await page.keyboard.press('Enter');
+    expect(((await byKeyboard).postDataJSON() as { attributeIds: number[] }).attributeIds).toEqual([
+      ram.id,
+      cpu.id,
+      ssd.id,
+    ]);
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal gespeichert' })).toBeVisible();
+
+    // Dragging "SSD" onto the first row.
+    const byDragging = page.waitForRequest(
+      (request) => request.method() === 'PUT' && request.url().endsWith('/attribute-order'),
+    );
+    await attributeRow(page, 'SSD').dragTo(attributeRow(page, 'RAM'));
+    expect(((await byDragging).postDataJSON() as { attributeIds: number[] }).attributeIds).toEqual([
+      ssd.id,
+      ram.id,
+      cpu.id,
+    ]);
+    await expect
+      .poll(async () =>
+        (await attributeList(page, server.baseUrl, deviceType.id)).map((item) => item.label),
+      )
+      .toEqual(['SSD', 'RAM', 'Prozessor']);
+    await expect(
+      attributes(page).getByRole('button', { name: /^(Prozessor|RAM|SSD)$/ }),
+    ).toHaveText(['SSD', 'RAM', 'Prozessor']);
+
+    // An incomplete list is a state from before another window created an attribute (2.1).
+    const devices = await page.request.get(`${server.baseUrl}/api/device-types?limit=200`);
+    const { version } = (
+      (await devices.json()) as { items: { id: number; version: number }[] }
+    ).items.find((item) => item.id === deviceType.id) ?? { version: 0 };
+    const incomplete = await page.request.put(
+      `${server.baseUrl}/api/device-types/${deviceType.id}/attribute-order`,
+      { headers: { origin: server.baseUrl }, data: { version, attributeIds: [ssd.id, ram.id] } },
+    );
+    expect(incomplete.status()).toBe(409);
+  });
+
+  test('UI-027.default DER-34-07 deactivating a variant attribute answers 200, shows "deaktiviert", keeps the stored values and the variant set', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      variantForming: true,
+    });
+    const modelTemplateId = insertModelTemplate(server.paths.dataDir, deviceType.id, name, {
+      [ram.id]: 16,
+    });
+    await openDeviceType(page, name);
+
+    const response = page.waitForResponse(
+      (answer) =>
+        answer.request().method() === 'PATCH' && answer.url().endsWith(`/api/attributes/${ram.id}`),
+    );
+    await attributeRow(page, 'RAM').getByRole('button', { name: 'Deaktivieren' }).click();
+
+    const answer = await response;
+    expect(answer.status()).toBe(200);
+    expect(await answer.text()).not.toContain('variant_flag_would_merge_listings');
+    await expect(attributeRow(page, 'RAM').getByText('deaktiviert')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal gespeichert' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const [stored] = await attributeList(page, server.baseUrl, deviceType.id);
+    expect(stored).toMatchObject({ id: ram.id, active: false, variantForming: true });
+    const check = new Database(join(server.paths.dataDir, DATABASE_FILE), { readonly: true });
+    try {
+      const row = check
+        .prepare('SELECT default_device_values FROM model_template WHERE id = ?')
+        .get(modelTemplateId) as { default_device_values: string };
+      expect(JSON.parse(row.default_device_values)).toEqual({ [ram.id]: 16 });
+    } finally {
+      check.close();
+    }
+  });
+
+  test('AC-REQ-005-11 UI-027.success RAM is deactivated and activated again, the row shows "aktiv" with "Deaktivieren", "Merkmal aktiviert" and stays active after reloading', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      variantForming: true,
+      required: true,
+    });
+    await openDeviceType(page, name);
+    const ramRow = attributeRow(page, 'RAM');
+
+    await ramRow.getByRole('button', { name: 'Deaktivieren' }).click();
+    await expect(ramRow.getByText('deaktiviert')).toBeVisible();
+
+    const response = page.waitForResponse(
+      (answer) =>
+        answer.request().method() === 'PATCH' && answer.url().endsWith(`/api/attributes/${ram.id}`),
+    );
+    // Keyboard like every row action (Enter, Space).
+    await ramRow.getByRole('button', { name: 'Wieder aktivieren' }).press('Enter');
+
+    const answer = await response;
+    expect(answer.request().postDataJSON()).toEqual({ version: ram.version + 1, active: true });
+    expect(answer.status()).toBe(200);
+    await expect(ramRow.getByText('aktiv', { exact: true })).toBeVisible();
+    await expect(ramRow.getByRole('button', { name: 'Deaktivieren' })).toBeFocused();
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal aktiviert' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await page.reload();
+    await deviceTypes(page)
+      .getByRole('button', { name: new RegExp(name) })
+      .click();
+    await expect(ramRow.getByText('aktiv', { exact: true })).toBeVisible();
+    await expect(ramRow.getByRole('button', { name: 'Deaktivieren' })).toBeVisible();
+    const [stored] = await attributeList(page, server.baseUrl, deviceType.id);
+    expect(stored).toMatchObject({ id: ram.id, active: true, variantForming: true });
+  });
+
+  // Bug #372: at 1366 px the open panel left the table a scroll area narrower than its fixed
+  // first column, which covered the row actions and labels at every scroll position. The panel
+  // now overlays the table as sheet where the room beside it is too narrow (2.0.10, MAR-834).
+  for (const { width, height, panel } of [
+    { width: 1920, height: 1080, panel: 'beside' },
+    { width: 1366, height: 768, panel: 'none' },
+    { width: 1366, height: 768, panel: 'sheet' },
+  ] as const) {
+    test(`UI-027.default row actions and labels are operable by mouse with a fully visible focus at ${width} x ${height} with the panel ${panel}`, async ({
+      page,
+      server,
+    }, testInfo) => {
+      // The test sets its own viewports, so one row of the matrix suffices.
+      test.skip(testInfo.project.name !== 'FM-1', 'own viewports');
+      await page.setViewportSize({ width, height });
+      const name = uniqueName('Notebook', `${testInfo.title}`, testInfo.project.name);
+      const deviceType = await createDeviceType(page, server.baseUrl, name);
+      const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+        label: 'RAM',
+        dataType: 'integer',
+        unit: 'GB',
+        required: true,
+      });
+      await createAttribute(page, server.baseUrl, deviceType.id, { label: 'SSD' });
+      await openDeviceType(page, name);
+      const ramRow = attributeRow(page, 'RAM');
+      const ramLabel = ramRow.getByRole('button', { name: 'RAM', exact: true });
+      const deactivate = ramRow.getByRole('button', { name: 'Deaktivieren' });
+      const activate = ramRow.getByRole('button', { name: 'Wieder aktivieren' });
+      const scrollArea = attributes(page).locator('[data-table-scroll]');
+      const firstCellPosition = () =>
+        ramRow
+          .locator('td')
+          .first()
+          .evaluate((cell) => getComputedStyle(cell).position);
+      const sheet = page.getByRole('dialog', { name: 'Merkmal bearbeiten' });
+      const aside = page.getByRole('complementary', { name: 'Merkmal bearbeiten' });
+
+      // Mouse: scrolled into view, the center of every button of the table receives the click.
+      const expectOperableByMouse = async () => {
+        for (const button of await attributes(page).locator('table button:enabled').all()) {
+          await button.scrollIntoViewIfNeeded();
+          expect(await button.evaluate(hitAtCenter), await button.innerText()).toBe(true);
+        }
+        await scrollArea.evaluate((area) => {
+          area.scrollLeft = 0;
+        });
+      };
+      const toggle = async (button: typeof deactivate, active: boolean) => {
+        const answered = page.waitForResponse(
+          (answer) =>
+            answer.request().method() === 'PATCH' &&
+            answer.url().endsWith(`/api/attributes/${ram.id}`),
+        );
+        await button.click();
+        expect((await answered).status()).toBe(200);
+        await expect(
+          ramRow.getByText(active ? 'aktiv' : 'deaktiviert', { exact: true }),
+        ).toBeVisible();
+      };
+      // Both row actions: operable by mouse, the focus on each fully visible (6.3).
+      const expectRowActionsOperable = async () => {
+        await expectOperableByMouse();
+        await expectFocusFullyVisible(deactivate);
+        await toggle(deactivate, false);
+        await expectFocusFullyVisible(activate);
+        await toggle(activate, true);
+      };
+
+      if (panel === 'none') {
+        expect(await firstCellPosition()).toBe('sticky');
+        await expectRowActionsOperable();
+        // Bug #401: with a long list of device types, the click on one leaves `main` scrolled, at
+        // times with the row partly above its top edge. The check still starts at its defined start.
+        await deactivate.evaluate((button) => {
+          const main = button.closest('main')!;
+          main.style.paddingBottom = '100vh';
+          main.scrollTop +=
+            button.getBoundingClientRect().top - main.getBoundingClientRect().top + 20;
+        });
+        await expectFocusFullyVisible(deactivate);
+        await deactivate.evaluate((button) => {
+          button.closest('main')!.style.paddingBottom = '';
+        });
+        // Probe of the container query of `Table`: fixed from 24rem on only.
+        await scrollArea.evaluate((area) => {
+          area.style.width = '23.5rem';
+        });
+        expect(await firstCellPosition()).toBe('static');
+        await scrollArea.evaluate((area) => {
+          area.style.width = '24rem';
+        });
+        expect(await firstCellPosition()).toBe('sticky');
+        return;
+      }
+
+      // Taken before the sheet opens: behind it the table is `aria-hidden`.
+      const deactivateBehind = await deactivate.elementHandle();
+      await ramLabel.click();
+      if (panel === 'beside') {
+        await expect(aside).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        expect(await firstCellPosition()).toBe('sticky');
+        await expectRowActionsOperable();
+        await attributeRow(page, 'SSD').getByRole('button', { name: 'SSD', exact: true }).click();
+        await expect(aside.getByRole('textbox', { name: /^Bezeichnung/ })).toHaveValue('SSD');
+        return;
+      }
+
+      // Sheet: the focus stays in it, the table behind it receives no click.
+      await expect(sheet).toBeVisible();
+      await expect(aside).toHaveCount(0);
+      await expect(sheet.getByRole('textbox', { name: /^Bezeichnung/ })).toHaveValue('RAM');
+      for (let step = 0; step < 12; step += 1) {
+        await page.keyboard.press('Tab');
+        expect(await sheet.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(
+          true,
+        );
+      }
+      expect(await deactivateBehind!.evaluate(hitAtCenter)).toBe(false);
+      expect(
+        await deactivateBehind!.evaluate(
+          (button) => getComputedStyle(button.closest('tr')!.firstElementChild!).position,
+        ),
+      ).toBe('sticky');
+
+      // Esc: the focus returns to the label, the row actions are operable again.
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(ramLabel).toBeFocused();
+      await expectRowActionsOperable();
+
+      // "Schließen" likewise.
+      await ramLabel.click();
+      await sheet.getByRole('button', { name: 'Schließen' }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(ramLabel).toBeFocused();
+      await expectRowActionsOperable();
+
+      // DER-34-16 at 1366 px: "Wieder aktivieren" after saving the changed "Pflichtmerkmal".
+      await toggle(deactivate, false);
+      await ramLabel.click();
+      await sheet.getByRole('checkbox', { name: /^Pflichtmerkmal/ }).click();
+      await sheet.getByRole('button', { name: 'Merkmal speichern' }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(ramLabel).toBeFocused();
+      await toggle(activate, true);
+      const [stored] = await attributeList(page, server.baseUrl, deviceType.id);
+      expect(stored).toMatchObject({ id: ram.id, active: true, required: false });
+    });
+  }
+
+  test('AC-REQ-006-02 UI-027.default an attribute of the initial device type Notebook is renamed and keeps its new name after reloading', async ({
+    page,
+    server,
+  }, testInfo) => {
+    // Notebook comes with the initial settings (CU-071) and is the first device type. The
+    // server keeps its data per worker, so the test renames whatever the first attribute is
+    // called now.
+    const listResponse = await page.request.get(`${server.baseUrl}/api/device-types`);
+    const { items } = (await listResponse.json()) as { items: { id: number; name: string }[] };
+    const notebook = items.find(({ name }) => name === 'Notebook');
+    expect(notebook).toBeDefined();
+    const [first] = await attributeList(page, server.baseUrl, notebook?.id ?? 0);
+    const label = first?.label ?? '';
+    const renamed = uniqueName('Prozessor', testInfo.title, testInfo.project.name);
+
+    const openNotebook = async () => {
+      await deviceTypes(page)
+        .getByRole('button', { name: /^Notebook/ })
+        .first()
+        .click();
+      await expect(nameField(page)).toHaveValue('Notebook');
+    };
+    await page.goto(PAGE);
+    await openNotebook();
+    await attributes(page).getByRole('button', { name: label, exact: true }).click();
+    const panel = page.getByRole('form', { name: 'Merkmal bearbeiten' });
+    await panel.getByLabel(/^Bezeichnung/).fill(renamed);
+    await panel.getByRole('button', { name: 'Merkmal speichern' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Merkmal gespeichert' })).toBeVisible();
+
+    await page.reload();
+    await openNotebook();
+    await expect(
+      attributes(page).getByRole('button', { name: renamed, exact: true }),
+    ).toBeVisible();
+    await expect(attributes(page).getByRole('button', { name: label, exact: true })).toHaveCount(0);
+  });
+
+  test('UI-027.disabled DER-34-10 with stored values data type and level are locked with the reason inline, and the server rejects a change', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const name = uniqueName('Notebook', testInfo.title, testInfo.project.name);
+    const deviceType = await createDeviceType(page, server.baseUrl, name);
+    const ram = await createAttribute(page, server.baseUrl, deviceType.id, {
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      variantForming: true,
+    });
+    insertModelTemplate(server.paths.dataDir, deviceType.id, name, { [ram.id]: 16 });
+    await openDeviceType(page, name);
+
+    await attributes(page).getByRole('button', { name: 'RAM', exact: true }).click();
+    const form = page.getByRole('form', { name: 'Merkmal bearbeiten' });
+    const dataType = form.getByRole('combobox', { name: /^Datentyp/ });
+    const level = form.getByRole('combobox', { name: /^Ebene/ });
+    await expect(dataType).toBeDisabled();
+    await expect(level).toBeDisabled();
+    await expect(dataType).toHaveAccessibleDescription(
+      'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+    await expect(level).toHaveAccessibleDescription(
+      'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+    );
+    await expect(form.getByRole('textbox', { name: /^Einheit/ })).toBeEnabled();
+
+    // AC-REQ-005-08 against the running server: level device to model is rejected.
+    const rejected = await page.request.patch(`${server.baseUrl}/api/attributes/${ram.id}`, {
+      headers: { origin: server.baseUrl },
+      data: { version: ram.version, level: 'model', variantForming: false },
+    });
+    expect(rejected.status()).toBe(422);
+    expect(((await rejected.json()) as { error: { code: string } }).error.code).toBe(
+      'attribute_has_values',
+    );
+  });
+});

@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createHealthClient, HEALTH_TIMEOUT_MS } from './health-client.ts';
 
+const REF_NO = 'R-7K3M-Q9TX';
+
 type Handler = (request: IncomingMessage, body: string, response: ServerResponse) => void;
 
 let server: Server | undefined;
@@ -90,6 +92,17 @@ describe('health client (CU-266)', () => {
     expect(elapsed).toBeLessThan(HEALTH_TIMEOUT_MS + 900);
   });
 
+  it('waits for the time limit the caller gives, e.g. 2 s instead of 1 s', async () => {
+    const port = await startServer(() => {});
+
+    const started = performance.now();
+    await expect(createHealthClient({ port }).getHealth(2000)).resolves.toBeNull();
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeGreaterThanOrEqual(2000 - 50);
+    expect(elapsed).toBeLessThan(2000 + 900);
+  });
+
   it('sends POST /api/ops/shutdown as JSON without Origin and returns status and body', async () => {
     const requests: Record<string, unknown>[] = [];
     const port = await startServer((request, body, response) => {
@@ -107,6 +120,7 @@ describe('health client (CU-266)', () => {
     await expect(createHealthClient({ port }).shutdown()).resolves.toEqual({
       status: 200,
       body: { dataDirPath: 'C:\\Daten' },
+      refNo: null,
     });
     // Without Origin and Sec-Fetch-Site the request is no browser request (2.0.2, G-3).
     expect(requests).toEqual([
@@ -129,7 +143,41 @@ describe('health client (CU-266)', () => {
     await expect(createHealthClient({ port }).shutdown()).resolves.toEqual({
       status: 500,
       body: null,
+      refNo: null,
     });
+  });
+
+  it('returns the reference number of a failed shutdown from the error body', async () => {
+    const error = { code: 'internal_error', message: 'x', details: [], referenceNumber: REF_NO };
+    const port = await startServer((_request, _body, response) => json(response, 500, { error }));
+
+    await expect(createHealthClient({ port }).shutdown()).resolves.toEqual({
+      status: 500,
+      body: { error },
+      refNo: REF_NO,
+    });
+  });
+
+  it('ignores a reference number that does not match the pattern (H-11)', async () => {
+    const port = await startServer((_request, _body, response) =>
+      json(response, 500, { error: { referenceNumber: '<b>R-7K3M-Q9TX</b>' } }),
+    );
+
+    await expect(createHealthClient({ port }).shutdown()).resolves.toMatchObject({ refNo: null });
+  });
+
+  it('DER-104-02 ends POST /api/ops/shutdown with null when the signal of the caller aborts it', async () => {
+    let requested: () => void = () => {};
+    const received = new Promise<void>((resolve) => (requested = resolve));
+    // The server takes the request but never answers.
+    const port = await startServer(() => requested());
+    const abort = new AbortController();
+
+    const shutdown = createHealthClient({ port }).shutdown(abort.signal);
+    await received;
+    abort.abort();
+
+    await expect(shutdown).resolves.toBeNull();
   });
 
   it('returns null from shutdown when no server listens on the port', async () => {

@@ -22,6 +22,27 @@ export type Timestamp = z.infer<typeof timestampSchema>;
 export const centsSchema = z.int();
 export type Cents = z.infer<typeof centsSchema>;
 
+/** Counts of REQ-053 (2.8.4); `{0, 0, 0}` while there is no channel content (4.4.0). */
+export const impactSchema = z.object({
+  updated: z.int().nonnegative(),
+  rerelease: z.int().nonnegative(),
+  manualReview: z.int().nonnegative(),
+});
+export type Impact = z.infer<typeof impactSchema>;
+
+/** Largest page of a list (2.0.1). */
+export const LIST_LIMIT_MAX = 200;
+
+/**
+ * Paging of a list in the query string (2.0.1): `limit` 50 by default, at most 200, and
+ * `offset` from 0.
+ */
+export const pageQuerySchema = z.strictObject({
+  limit: z.coerce.number().pipe(z.int().min(1).max(LIST_LIMIT_MAX)).default(50),
+  offset: z.coerce.number().pipe(z.int().nonnegative()).default(0),
+});
+export type PageQuery = z.infer<typeof pageQuerySchema>;
+
 /** List response `{ items, total }`. */
 export function listResponseSchema<T extends z.ZodType>(itemSchema: T) {
   return z.object({ items: z.array(itemSchema), total: z.int().nonnegative() });
