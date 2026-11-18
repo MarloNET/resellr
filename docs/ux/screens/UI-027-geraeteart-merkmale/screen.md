@@ -12,7 +12,7 @@
 |---|---|---|---|
 | Einstellungs-Liste | 14 Bereiche (Händlermarke, Gerätearten und Merkmale, Auswahllisten, Titelmuster, Textbausteine, Hersteller und GPSR, Lieferanten, Code-Übersetzung, Zustandszuordnung, Kategoriezuordnung, Merkmalszuordnung, Beschreibungsvorlagen, Kanäle und Preisregeln, Datenblatt-Layout; „Zugangspasswort“ entfällt in Release 0.1, OD-02 Variante A) | Kap. 9.5 | zweite Navigationsspalte, 240 px |
 | Geräteart-Liste | Name, Status „aktiv“/„deaktiviert“ | REQ-004 | |
-| Merkmal-Tabelle | Reihenfolge, Bezeichnung, Datentyp, Einheit, Ebene (Modell/Gerät), variantenbildend (Ja/Nein/–), Pflicht, Datenblatt-Block, Status | REQ-005 | Reihenfolge per Ziehen oder Buttons „nach oben/unten“. Spalte „Status“ als Text „aktiv“ oder „deaktiviert“ (nie nur durch Farbe); deaktivierte Merkmale bleiben in der Tabelle an ihrem Platz in der Reihenfolge (v0.6.4, siehe „Wieder aktivieren“) |
+| Merkmal-Tabelle | Reihenfolge, Bezeichnung, Datentyp, Einheit, Ebene (Modell/Gerät), variantenbildend (Ja/Nein/–), Pflicht, Datenblatt-Block, Status | REQ-005 | Reihenfolge per Ziehen oder Buttons „nach oben/unten“; passt eine Reihenfolge nicht mehr zur Geräteart (ein anderes Fenster hat inzwischen ein Merkmal angelegt), meldet der Server `409 version_conflict` und UI-027 verfährt nach P-05 („Neu laden“; v0.6.13, MAR-548, kein neuer Zustand, kein neuer Text). Spalte „Status“ als Text „aktiv“ oder „deaktiviert“ (nie nur durch Farbe); deaktivierte Merkmale bleiben in der Tabelle an ihrem Platz in der Reihenfolge (v0.6.4, siehe „Wieder aktivieren“) |
 | Merkmal-Formular | Seitenpanel „Merkmal bearbeiten“ | | |
 
 ## Eingaben und Validierung
@@ -20,10 +20,10 @@
 |---|---|---|---|---|
 | Geräteart: Name | Text | ja | 1–50 Zeichen, eindeutig ohne Groß-/Kleinschreibung | „Name ist bereits vergeben“ / „Name: 1 bis 50 Zeichen“ |
 | Geräteart: Status | Umschalter | ja | aktiv/deaktiviert | – |
-| Merkmal: Bezeichnung | Text | ja | 1–100 Zeichen, ohne { }, nicht gleich einem festen Platzhalternamen, eindeutig je Geräteart | „Bezeichnung ist bei dieser Geräteart bereits vergeben“; „Bezeichnung: 1 bis 100 Zeichen“; „Bezeichnung darf { und } nicht enthalten“; „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ (v0.6, meldungskatalog.md M-02 bis M-04) |
+| Merkmal: Bezeichnung | Text | ja | 1–100 Zeichen, ohne { }, nicht gleich einem festen Platzhalternamen, eindeutig je Geräteart | „Bezeichnung ist bei dieser Geräteart bereits vergeben“; „Bezeichnung: 1 bis 100 Zeichen“; „Bezeichnung darf { und } nicht enthalten“; „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ (Vergleich ohne Randleerzeichen und ohne Groß-/Kleinschreibung, z. B. „stückzahl“; auch eine Bezeichnung mit Präfix „Baustein:“ wird so abgelehnt; v0.6.13, MAR-548; v0.6, meldungskatalog.md M-02 bis M-04) |
 | Datentyp | Auswahl | ja | Text, Ganzzahl, Dezimalzahl, Ja/Nein, Auswahl aus Liste, Mehrfachangabe Anzahl × Typ | – |
-| Einheit, Schreibweise | Text, Auswahl | nein | Schreibweise „mit/ohne Leerzeichen“ | – |
-| Mindest-/Höchstwert | Zahl | nein | nur bei Zahlen; Min ≤ Max | „Mindestwert darf nicht größer als Höchstwert sein“ |
+| Einheit, Schreibweise | Text, Auswahl | nein | Schreibweise „mit/ohne Leerzeichen“ | „Einheit: höchstens 20 Zeichen“ (**v0.6.12, MAR-494:** Wortlaut nach PO-Entscheidung MAR-492, Owner bestätigt mit der nächsten Freigabe; Grenze 0 bis 20 aus der Spec unverändert) |
+| Mindest-/Höchstwert | Zahl | nein | nur bei Zahlen; Min ≤ Max | „Mindestwert darf nicht größer als Höchstwert sein“; „Mindestwert: Zahl“, „Höchstwert: Zahl“, bei Datentyp Ganzzahl „Mindestwert: ganze Zahl“, „Höchstwert: ganze Zahl“ (**v0.6.13, MAR-548:** Wortlaut aus der Specification, meldungskatalog.md Ergänzung v0.6.13, Owner bestätigt mit der nächsten Freigabe) |
 | Auswahlliste | Auswahl | ja bei Datentyp „Auswahl aus Liste“ | Liste aus UI-028 | „Auswahlliste fehlt“ |
 | Ebene | Auswahl | ja | Modell/Gerät; nach gespeicherten Werten gesperrt | „Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.“ (Datentyp analog: „Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.“) |
 | Variantenbildend | Kontrollkästchen | ja bei Ebene Gerät | Akkukapazität immer „Nein“; Änderung wird abgelehnt, wenn danach zwei Modell-Inserate derselben Modellvorlage übereinstimmen | „Änderung nicht möglich: Modell-Inserate <Liste> würden gleiche Variantenangaben haben“ |
@@ -80,9 +80,21 @@
 Ein fehlender Wert eines (wieder aktivierten) Pflichtmerkmals wird erst beim Speichern in **UI-007** (Modellvorlage, REQ-010/REQ-008), **UI-010** und **UI-003** (Gerätewerte, REQ-014) und **UI-014** „Inseratswerte bearbeiten“ (REQ-088, ohne Preise und Fotos) verlangt, auch wenn die Änderung ein anderes Feld betrifft. Die Darstellung dort steht in den jeweiligen `screen.md` und im Meldungskatalog (**M-32**, „<Merkmal> fehlt“). **Preis erfassen und Fotos zuordnen (UI-014, UI-015) verlangen den Wert nicht und zeigen M-32 nicht (AC-REQ-005-12 c)**; ebenso Zuordnen, Umbuchen, Verkauf, WI-Nr-Korrektur, Storno und Freigabe (A-39).
 
 ## Fenstergröße und Bedienung
-Drei Bereiche (Geräteart-Liste, Merkmal-Tabelle, Seitenpanel) ab 1366 px; Seitenpanel überlagert bei schmaler Breite die Tabelle. Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
+Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt zusätzlich die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md). **Klarstellung v0.6.14 (MAR-836, Bug #372, Minimal; keine Änderung der Anforderung):**
+
+| Fenster | Panel | Darstellung |
+|---|---|---|
+| 1366 × 768 | geschlossen | drei Bereiche nebeneinander (Geräteart-Liste, Merkmal-Tabelle); die Tabelle hat einen eigenen waagrechten Scrollbereich; unverändert |
+| 1366 × 768 | **geöffnet** | das Seitenpanel **überlagert die Tabelle** (Fläche mit „Schließen“, Fokus bleibt im Panel, Esc schließt; R-1 (3), Spec-Nachtrag MAR-831); die Zeilenaktionen und die Bezeichnungen der Zeilen darunter sind bei offenem Panel nicht bedienbar |
+| ab 1920 × 1080 (Bruchstelle `full`) | geöffnet | das Panel steht **neben** der Tabelle, wie in `default.png`; die Tabelle bleibt bedienbar; unverändert |
+
+- **Nach „Schließen“ oder Speichern** des Panels sind die Zeilenaktionen („Deaktivieren“ / „Wieder aktivieren“) und die Bezeichnungen der Zeilen bei 1366 × 768 bedienbar; der Tastaturfokus ist vollständig sichtbar (nicht von Panel oder fixierter Spalte verdeckt).
+- **Folgerung „Wieder aktivieren“ (DER-34-16):** Bei 1366 × 768 ist die Zeilenaktion „Wieder aktivieren“ **erst nach Speichern oder Schließen des Panels bedienbar**. Der Fall „Panel offen, Pflicht geändert, dann Wieder aktivieren“ in einem Zug (Abschnitt „Wieder aktivieren“: Panel bleibt beim Aktivieren offen) gilt daher **nur ab 1920 × 1080**; bei 1366 × 768 sind es zwei Schritte: Panel speichern oder schließen, dann „Wieder aktivieren“.
+- **Ungespeicherte Eingabe beim Schließen:** Dieser Abschnitt trifft dazu keine Aussage; UI-027 beschreibt für „Schließen“ weder eine Rückfrage noch ein Verwerfen. Eine Festlegung hier wäre eine neue Regel und ist nicht Teil dieser Klarstellung (siehe Übergabe MAR-836).
 
 ## Bekannte Abweichungen im Mockup
+**v0.6.14 (MAR-836):** `default.png` zeigt den Zustand **1920 × 1080 mit Panel neben der Tabelle**. Die **Überlagerung bei 1366 × 768 mit geöffnetem Panel ist nur in `screen.md` beschrieben** (Abschnitt „Fenstergröße und Bedienung“), es gibt kein Mockup dafür (kein neues Mockup, Klassifikation Minimal).
+
 **v0.6.4:** Die Zeilenaktion „Wieder aktivieren“ und der Banner „Merkmal aktiviert“ sind **nur in `screen.md` beschrieben**, `default.png` zeigt sie nicht (kein neues Mockup, Klassifikation Minimal). „Business Portal“ (Stitch); Stitch ergänzt Kopfzähler und Statuschips „aktiv“ (aus Requirements ableitbar, übernommen); Untertitel „Konfiguration“ in der zweiten Navigation (nicht Teil des Designs); Panel zeigt „RAM“ auf Ebene Gerät als Beispiel; Hinweistext der Sperrung als Fehlerbox (maßgeblich: Inline am Feld).
 
 ## Annahmen und offene Fragen

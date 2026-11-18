@@ -12,7 +12,7 @@ Auswahl Kanal und Geräteart; Tabelle: Reihenfolge, Feldbezeichnung des Kanals, 
 | Quelle | Auswahl | ja | genau eine Quelle aus Kap. 9.11 | „Quelle fehlt“ |
 | Fester Text (Q-08) | Text | ja bei Q-08 | max. 255 | „Fester Text: höchstens 255 Zeichen“ |
 | Pflichtfeld des Kanals | Kontrollkästchen | ja | leeres Pflichtfeld verhindert Freigabe | – |
-| Wertzuordnung | Tabelle interner Wert → Kanal-Wert | nein | | – |
+| Wertzuordnung | Tabelle interner Wert → Kanal-Wert | nein | Kanal-Wert je Zeile: Pflicht, 1 bis 100 Zeichen (Spec) | Zelle rot: „Kanal-Wert: 1 bis 100 Zeichen“ (Text unverändert, steht in der Zeile „Wertzuordnung bearbeiten“; **v0.6.12, MAR-494:** hier zusätzlich in der Feldtabelle geführt) |
 
 ## Aktionen
 | Aktion | Auslöser | Voraussetzung | Ergebnis bei Erfolg | Ergebnis bei Fehler | Navigation danach |
