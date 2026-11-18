@@ -105,7 +105,7 @@ jobs:
 
       - name: Audit all dependencies including dev tooling (TH-07)
         if: steps.changes.outputs.docs_only != 'true'
-        run: npm audit --audit-level=high
+        run: node tools/qa/check-audit.mjs
 
       - name: Lint
         if: steps.changes.outputs.docs_only != 'true'

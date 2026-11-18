@@ -3,11 +3,11 @@ import { z } from 'zod';
 import { FIELD_MESSAGES, MESSAGES } from '../messages/messages.de.ts';
 import { toKey } from '../text/normalize-key.ts';
 import { isValidEan } from '../validation/ean.ts';
+import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
 import { idSchema, listResponseSchema, timestampSchema, versionSchema } from './common.schema.ts';
 
 // Model template (REQ-008 to REQ-010; Technical Specification 2.4, 3.3). The field rules for
-// changing follow with #181, the attribute values of the level model and the device defaults
-// with #178.
+// changing follow with #181.
 
 /** Shortest search term of UI-006 after trimming (REQ-009, AC-REQ-009-04). */
 export const MODEL_TEMPLATE_SEARCH_MIN = 2;
@@ -42,6 +42,19 @@ export function modelTemplateSearchKey({
 /** Device type or manufacturer of a model template in a list answer. */
 export const modelTemplateReferenceSchema = z.object({ id: idSchema, name: z.string() });
 export type ModelTemplateReference = z.infer<typeof modelTemplateReferenceSchema>;
+
+/**
+ * A model template in `details.matches[]` of `confirmation_required` (2.4): `possible_duplicate`
+ * (REQ-011) names manufacturer, model name and MPN of each hit; with MPN "unbekannt" `mpn` is
+ * null (3.3).
+ */
+export const modelTemplateMatchSchema = z.object({
+  id: idSchema,
+  manufacturer: modelTemplateReferenceSchema,
+  modelName: z.string(),
+  mpn: z.string().nullable(),
+});
+export type ModelTemplateMatch = z.infer<typeof modelTemplateMatchSchema>;
 
 /**
  * Hit of `GET /api/model-templates` (2.4): device type, manufacturer, model name, type
@@ -153,6 +166,8 @@ export const originalEanSchema = z
 /**
  * `POST /api/model-templates` (2.4): the model template without `id`. `web-ui` sends every
  * field, an empty input as `''` and no device type or manufacturer as `null` (2.0.5 rule (2));
+ * the attribute values by attribute id, checked against the attribute definitions of the device
+ * type by `modelTemplateValuesSchema` (2.4, 2.5);
  * `null` is a field error ("Geräteart und Hersteller Pflicht", Nachtrag MAR-925). With
  * "unbekannt" it sends `mpn: null`; a value together with `mpnUnknown: true`, or `null` without
  * it, is a program error of the user interface and fails without a field path, i.e.
@@ -172,6 +187,10 @@ export const modelTemplateCreateSchema = z
     mpn: mpnSchema.nullable(),
     mpnUnknown: z.boolean(),
     originalEan: originalEanSchema,
+    modelValues: storedAttributeValuesSchema,
+    defaultDeviceValues: storedAttributeValuesSchema,
+    /** "Trotzdem anlegen" of UI-007.dublette: no question about a possible duplicate (2.4). */
+    confirmDuplicate: z.boolean().optional(),
   })
   .superRefine(
     ({ mpn, mpnUnknown }, context) => {
@@ -186,3 +205,18 @@ export const modelTemplateCreateSchema = z
   );
 export type ModelTemplateCreateInput = z.input<typeof modelTemplateCreateSchema>;
 export type ModelTemplateCreate = z.output<typeof modelTemplateCreateSchema>;
+
+/**
+ * Attribute values of a model template built at run time from the attributes of its device type
+ * (2.4 "Regeln", 2.5; CU-067): `modelValues` by the attributes of the level model, an active
+ * required one without a value is "<Merkmal> fehlt" (AC-REQ-008-05); `defaultDeviceValues` by
+ * those of the level device, optional but typed. The field paths are `modelValues.<id>` and
+ * `defaultDeviceValues.<id>`. UI-007 checks the form with it, CU-105 the request.
+ */
+export function modelTemplateValuesSchema(attributes: readonly AttributeValueDefinition[]) {
+  const optional = attributes.map((attribute) => ({ ...attribute, required: false }));
+  return z.strictObject({
+    modelValues: attributeValuesSchema(attributes, 'model'),
+    defaultDeviceValues: attributeValuesSchema(optional, 'device'),
+  });
+}

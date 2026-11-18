@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
+  CONFIRMATION_TITLES,
   ERROR_MESSAGES,
   type ErrorMessageUsage,
   FIELD_MESSAGES,
@@ -113,6 +114,22 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('DER-38-11 names the deactivated supplier and condition suggestion of a condition code entry (2.0.6, 8.2, UI-033)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.condition_code']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+    expect(
+      ERROR_MESSAGES['pick_list_value_deactivated.condition_suggestion']('Stark gebraucht'),
+    ).toBe('Vorschlag Zustand Stark gebraucht ist deaktiviert');
+  });
+
+  it('DER-38-12 has the texts of a choice after a rejection for deactivation (2.0.11, 8.2, UI-033)', () => {
+    expect(FIELD_MESSAGES.conditionCodeSupplierNotChosen).toBe(
+      'Lieferant: Lieferanten oder „alle“ wählen',
+    );
+    expect(FIXED_TEXTS.deactivatedChoice('Lieferant West')).toBe('Lieferant West (deaktiviert)');
+  });
+
   it('names the deactivated device type and manufacturer of a model template (2.0.6, 2.0.11, UI-007)', () => {
     expect(ERROR_MESSAGES['device_type_deactivated.model_template']('Monitor')).toBe(
       'Geräteart Monitor ist deaktiviert',
@@ -120,6 +137,34 @@ describe('message catalog (E1)', () => {
     expect(ERROR_MESSAGES['manufacturer_deactivated.model_template']('Fujitsu')).toBe(
       'Hersteller Fujitsu ist deaktiviert',
     );
+  });
+
+  it('DER-54-15 names the deactivated supplier of a new device (2.0.6, 8.2, UI-003)', () => {
+    expect(ERROR_MESSAGES['supplier_deactivated.device']('Lieferant West')).toBe(
+      'Lieferant Lieferant West ist deaktiviert',
+    );
+  });
+
+  it('AC-REQ-012-02 names the existing device and its model listing in wi_nr_taken (2.0.6, UI-003 v0.6.9)', () => {
+    expect(ERROR_MESSAGES['wi_nr_taken.listing']('626198', 'ThinkPad T14 Gen 2, 16 GB')).toBe(
+      'WI-Nr bereits vergeben: Gerät 626198 in ThinkPad T14 Gen 2, 16 GB',
+    );
+    expect(ERROR_MESSAGES['wi_nr_taken.unassigned']('626198')).toBe(
+      'WI-Nr bereits vergeben: Gerät 626198 (nicht zugeordnet)',
+    );
+  });
+
+  it('has the field texts of the WI-Nr and the model template of a new device (2.5, UI-003)', () => {
+    expect(FIELD_MESSAGES.wiNr).toBe(
+      'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)',
+    );
+    expect(FIELD_MESSAGES.modelTemplateMissing).toBe('Bitte eine Modellvorlage wählen');
+  });
+
+  it('names attribute and value of a deactivated pick list value (2.0.6, 8.2, UI-007)', () => {
+    expect(
+      ERROR_MESSAGES['pick_list_value_deactivated.attribute']('Tastaturlayout', 'Ungarisch'),
+    ).toBe('Tastaturlayout: Ungarisch ist deaktiviert');
   });
 
   it('has the field text of the manufacturer name (UI-008, UI-031)', () => {
@@ -238,6 +283,15 @@ describe('message catalog (E1)', () => {
       '{Baustein:Name} ist im Textbaustein nicht zulässig',
     );
     expect(FIELD_MESSAGES.textBlockBody).toBe('Text: 1 bis 5.000 Zeichen');
+  });
+
+  it('has title and text of M-27 under confirmation_required.possible_duplicate (8.2)', () => {
+    expect(CONFIRMATION_TITLES['confirmation_required.possible_duplicate']).toBe(
+      'Mögliche Dublette',
+    );
+    expect(ERROR_MESSAGES['confirmation_required.possible_duplicate']).toBe(
+      'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+    );
   });
 
   it('derives the usages of a code from the catalog keys', () => {

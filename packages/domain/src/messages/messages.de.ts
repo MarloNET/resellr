@@ -44,6 +44,11 @@ export const MESSAGES = {
  */
 export const FIELD_MESSAGES = {
   /**
+   * UI-004 and UI-014 "Artikelnummer", empty or not 1–30 letters, digits and "-" (2.6, 8.2,
+   * Nachtrag MAR-1053).
+   */
+  articleNumber: 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“',
+  /**
    * Values of the attributes in the input masks (Technical Specification 2.5 "Regeln und Texte
    * je Datentyp", 8.2): `label` is the current label of the attribute, bounds are formatted with
    * a decimal comma and without thousands separators.
@@ -93,6 +98,15 @@ export const FIELD_MESSAGES = {
    * there is no "Klartext fehlt" (design v0.6.2 O-2, AC-REQ-022-04).
    */
   conditionCodePlainText: 'Klartext: 1 bis 500 Zeichen',
+  /** UI-003 "Zustandsbeschreibung", longer than 1,000 characters after trimming (2.5). */
+  conditionDescription: 'Zustandsbeschreibung: höchstens 1.000 Zeichen',
+  /** UI-003 "Zustand" without a choice (2.5). */
+  conditionMissing: 'Zustand fehlt',
+  /**
+   * UI-033 "Lieferant", "Speichern" while no supplier is chosen after a rejection for
+   * deactivation; only in the browser (2.0.11, design v0.6.8, addendum MAR-929).
+   */
+  conditionCodeSupplierNotChosen: 'Lieferant: Lieferanten oder „alle“ wählen',
   /** UI-026 "Kontaktangaben", longer than 500 characters. */
   contactText: 'Kontaktangaben: höchstens 500 Zeichen',
   /** UI-007 "Geräteart" without a choice (Design v0.6.7, Nachtrag MAR-925). */
@@ -116,6 +130,8 @@ export const FIELD_MESSAGES = {
   manufacturerName: 'Name: 1 bis 50 Zeichen',
   /** UI-007 "Modellbezeichnung", empty or longer than 100 characters after trimming. */
   modelName: 'Modellbezeichnung: 1 bis 100 Zeichen',
+  /** UI-003 "Modellvorlage" without a choice (2.5, DER-54-11). */
+  modelTemplateMissing: 'Bitte eine Modellvorlage wählen',
   /**
    * UI-007 "Herstellernummer" empty and not "unbekannt" (`mpn_required`): the wording of
    * AC-REQ-008-02 (DG-17, Technical Specification 2.4, 8.2).
@@ -151,6 +167,10 @@ export const FIELD_MESSAGES = {
   typeDesignation: 'Typbezeichnung: höchstens 50 Zeichen',
   /** UI-033 "Vorschlag Optik-Note", not a whole number from 1 to 5 (REQ-022). */
   visualGrade: 'Optik-Note: ganze Zahl von 1 bis 5',
+  /**
+   * UI-003 "WI-Nr", empty or not 1–20 letters and digits (2.5, Requirements 9.6, AC-REQ-012-03).
+   */
+  wiNr: 'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)',
 } as const;
 
 type MessageText = string | ((...args: string[]) => string);
@@ -164,10 +184,27 @@ const LOGO_FILE_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
  * text for all screens. New entries in alphabetical order (hotspot rule, 4.5).
  */
 export const ERROR_MESSAGES = {
+  /** UI-004 (M-01, AC-REQ-017-04). */
+  'already_assigned.default': MESSAGES['M-01'],
+  /** UI-004 "Neues Modell-Inserat anlegen" at the field "Artikelnummer" (2.6, DER-60-04). */
+  'article_number_taken.default': 'Artikelnummer bereits vergeben',
   'attribute_has_values.data_type':
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
+  'confirmation_required.possible_duplicate':
+    'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+  /**
+   * UI-010 "Gerätewerte speichern" of a sold or cancelled device (2.5, `UI-010.disabled`,
+   * Auslegung RQ-17).
+   */
+  'device_not_available.device_values': 'Werte schreibgeschützt',
+  /**
+   * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device: the wording of the sale
+   * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
+   */
+  'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
@@ -182,14 +219,53 @@ export const ERROR_MESSAGES = {
   'name_taken.supplier': 'Name ist bereits vergeben',
   'name_taken.text_block': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
+  /** UI-007, UI-003, UI-010, UI-014 at the field of the attribute (2.0.6, Nachtrag MAR-904). */
+  'pick_list_value_deactivated.attribute': (label: string, value: string) =>
+    `${label}: ${value} ist deaktiviert`,
+  /**
+   * UI-003, UI-010 "Zustand", a new or changed condition of a device is deactivated (2.0.11,
+   * 8.2, Nachtrag MAR-904).
+   */
+  'pick_list_value_deactivated.condition': (value: string) => `Zustand ${value} ist deaktiviert`,
+  /**
+   * UI-033 "Vorschlag Zustand", a new or changed suggestion is deactivated (2.0.11, design
+   * v0.6.8, addendum MAR-929).
+   */
+  'pick_list_value_deactivated.condition_suggestion': (value: string) =>
+    `Vorschlag Zustand ${value} ist deaktiviert`,
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
+  /** UI-033 "Lieferant", a new or changed supplier is deactivated (2.0.11, Nachtrag MAR-904). */
+  'supplier_deactivated.condition_code': (name: string) => `Lieferant ${name} ist deaktiviert`,
+  /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
+  'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
+  /** UI-004 "Neues Modell-Inserat anlegen" (2.0.6, AC-REQ-019-02): the display title of it. */
+  'variant_duplicate.new_listing': (listingTitle: string) =>
+    `Gleiche Variantenangaben wie Modell-Inserat ${listingTitle}; bitte dort zuordnen`,
   /** UI-027 "Variantenbildend": the model listings by model template (2.0.6, DER-34-11). */
   'variant_flag_would_merge_listings.flag': (listings: string) =>
     `Änderung nicht möglich: Modell-Inserate ${listings} würden gleiche Variantenangaben haben`,
+  /**
+   * UI-003 "WI-Nr" (and UI-013), the WI-Nr belongs to an available or sold device: its stored
+   * WI-Nr and the display title of its model listing, or "nicht zugeordnet" without one (2.0.6,
+   * design v0.6.9, MAR-970).
+   */
+  'wi_nr_taken.listing': (wiNr: string, listingTitle: string) =>
+    `WI-Nr bereits vergeben: Gerät ${wiNr} in ${listingTitle}`,
+  'wi_nr_taken.unassigned': (wiNr: string) =>
+    `WI-Nr bereits vergeben: Gerät ${wiNr} (nicht zugeordnet)`,
 } as const satisfies Partial<Record<`${ErrorCode}.${string}`, MessageText>>;
+
+/**
+ * Titles of the confirmation dialogs by `confirmation_required.<details.kind>` (8.2); their text
+ * is the `message` of the answer from `ERROR_MESSAGES`.
+ */
+export const CONFIRMATION_TITLES = {
+  /** UI-007.dublette (M-27, REQ-011). */
+  'confirmation_required.possible_duplicate': 'Mögliche Dublette',
+} as const;
 
 /**
  * Usages with a text in `ERROR_MESSAGES` for a code, e.g. `'default'` for `not_found`. A service
@@ -222,6 +298,11 @@ const BACKUP_NOTICE_LINES = {
  * texts of the patterns P-05 to P-08 (design chapter 5).
  */
 export const FIXED_TEXTS = {
+  /**
+   * A stored, deactivated entry in a choice of UI-003, UI-010, UI-014 and UI-033 (2.0.11, design
+   * v0.6.8, addendum MAR-929).
+   */
+  deactivatedChoice: (name: string) => `${name} (deaktiviert)`,
   backupNoticeTitle: 'Sicherung einrichten',
   ...BACKUP_NOTICE_LINES,
   backupNoticeText: (dataDirPath: string) =>

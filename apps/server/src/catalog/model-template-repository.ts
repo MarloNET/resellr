@@ -15,6 +15,9 @@ export interface ModelTemplateInsert {
   mpn: string | null;
   mpnUnknown: boolean;
   originalEan: string | null;
+  /** Attribute values by attribute id in their stored form (3.4). */
+  modelValues: Readonly<Record<string, unknown>>;
+  defaultDeviceValues: Readonly<Record<string, unknown>>;
   searchKey: string;
   at: string;
 }
@@ -86,6 +89,20 @@ export function createModelTemplateRepository(db: Kysely<DB>) {
         .execute();
     },
 
+    /**
+     * `id` and `model_name` of the given model templates, by `id` (for CU-108); unknown ids are
+     * left out. Without ids there is no query, as `in ()` is invalid in SQLite.
+     */
+    async listByIds(ids: readonly number[]) {
+      if (ids.length === 0) return [];
+      return db
+        .selectFrom('model_template')
+        .select(['id', 'model_name'])
+        .where('id', 'in', ids)
+        .orderBy('id')
+        .execute();
+    },
+
     async findById(id: number): Promise<ModelTemplateRow | undefined> {
       return db.selectFrom('model_template').selectAll().where('id', '=', id).executeTakeFirst();
     },
@@ -100,8 +117,8 @@ export function createModelTemplateRepository(db: Kysely<DB>) {
     },
 
     /**
-     * Stores a new model template with version 1, without attribute values and without import
-     * review (3.3; the values follow with #178); returns its id.
+     * Stores a new model template with version 1 and its attribute values, without import
+     * review (3.3); returns its id.
      */
     async insert(template: ModelTemplateInsert): Promise<number> {
       const { id } = await db
@@ -115,8 +132,8 @@ export function createModelTemplateRepository(db: Kysely<DB>) {
           mpn: template.mpn,
           mpn_unknown: template.mpnUnknown ? 1 : 0,
           original_ean: template.originalEan,
-          model_values: '{}',
-          default_device_values: '{}',
+          model_values: JSON.stringify(template.modelValues),
+          default_device_values: JSON.stringify(template.defaultDeviceValues),
           search_key: template.searchKey,
           import_review_pending: 0,
           import_review_keys: '[]',

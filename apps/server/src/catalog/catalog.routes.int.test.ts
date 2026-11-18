@@ -5,6 +5,7 @@ import {
   insertManufacturer,
   insertModelTemplate,
 } from '../../test/model-templates.ts';
+import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import { runMigrations } from '../db/migrator.ts';
@@ -195,6 +196,8 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
     mpn: '20TD002MGE',
     mpnUnknown: false,
     originalEan: '',
+    modelValues: {},
+    defaultDeviceValues: {},
   });
 
   const post = (body: unknown) =>
@@ -526,6 +529,419 @@ describe('POST /api/model-templates (CU-109, CU-105, Technical Specification 2.4
 
       expect(fields.map(({ path }) => path)).toEqual(['originalEan']);
       expect(count()).toBe(1);
+    });
+  });
+
+  describe('attribute values and their pick list values (2.4, 2.5, 2.0.11, Nachtrag MAR-904)', () => {
+    /** Attribute ids of the notebook; the order of the attributes differs from their ids. */
+    const A = {
+      processor: 11,
+      display: 12,
+      surface: 13,
+      ports: 14,
+      keyboard: 15,
+      ram: 21,
+      os: 22,
+      deviceKeyboard: 23,
+    };
+    /** Pick list value ids. */
+    const V = { matt: 61, glossy: 62, german: 31, hungarian: 32, win11: 71, usbC: 81, back: 91 };
+
+    beforeEach(() => {
+      const { sqlite } = t.database;
+      insertPickLists(sqlite);
+      const value = sqlite.prepare(
+        'INSERT INTO pick_list_value (id, pick_list_id, label, label_key, sort_order, active, version) VALUES (?, ?, ?, ?, ?, 1, 1)',
+      );
+      value.run(V.matt, pickListId('display_surface'), 'matt', 'matt', 1);
+      value.run(V.glossy, pickListId('display_surface'), 'glänzend', 'glänzend', 2);
+      value.run(V.german, pickListId('keyboard_layout'), 'Deutsch', 'deutsch', 1);
+      value.run(V.hungarian, pickListId('keyboard_layout'), 'Ungarisch', 'ungarisch', 2);
+      value.run(V.win11, pickListId('operating_system'), 'Windows 11 Pro', 'windows 11 pro', 1);
+      value.run(V.usbC, pickListId('port_type'), 'USB-C', 'usb-c', 1);
+      value.run(V.back, pickListId('port_position'), 'hinten', 'hinten', 1);
+      const attribute = sqlite.prepare(
+        `INSERT INTO attribute (id, device_type_id, label, label_key, data_type, system_role, unit,
+           unit_spacing, min_value, max_value, pick_list_id, level, variant_forming, required,
+           datasheet_block, sort_order, active, version, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?, 0, ?, 'technical', ?, 1, 1, '', '')`,
+      );
+      const add = (
+        id: number,
+        label: string,
+        dataType: string,
+        level: 'model' | 'device',
+        sortOrder: number,
+        rule: {
+          required?: boolean;
+          pickList?: number;
+          min?: string;
+          max?: string;
+          role?: string;
+        } = {},
+      ) =>
+        attribute.run(
+          id,
+          ids.notebook,
+          label,
+          label.toLowerCase(),
+          dataType,
+          rule.role ?? null,
+          rule.min ?? null,
+          rule.max ?? null,
+          rule.pickList ?? null,
+          level,
+          rule.required ? 1 : 0,
+          sortOrder,
+        );
+      // Keyboard layout comes first in the order of the attributes, though its id is the highest.
+      add(A.keyboard, 'Tastaturlayout', 'pick', 'model', 1, {
+        pickList: pickListId('keyboard_layout'),
+        role: 'keyboard_layout',
+      });
+      add(A.processor, 'Prozessor', 'text', 'model', 2, { required: true });
+      add(A.display, 'Displaygröße', 'decimal', 'model', 3, { min: '10', max: '20' });
+      add(A.surface, 'Display-Oberfläche', 'pick', 'model', 4, {
+        pickList: pickListId('display_surface'),
+      });
+      add(A.ports, 'Anschlüsse', 'ports', 'model', 5);
+      add(A.ram, 'RAM', 'integer', 'device', 6, { required: true, min: '1', max: '1024' });
+      add(A.os, 'Betriebssystem', 'pick', 'device', 7, {
+        required: true,
+        pickList: pickListId('operating_system'),
+      });
+      add(A.deviceKeyboard, 'Tastatur Gerät', 'pick', 'device', 8, {
+        pickList: pickListId('keyboard_layout'),
+      });
+    });
+
+    const deactivateValue = (id: number) =>
+      t.database.sqlite.prepare('UPDATE pick_list_value SET active = 0 WHERE id = ?').run(id);
+
+    const WITH_VALUES = () => ({
+      ...NEW(),
+      modelValues: {
+        [A.keyboard]: V.german,
+        [A.processor]: 'Intel Core i5-1135G7',
+        [A.display]: '14,01',
+        [A.surface]: V.matt,
+        [A.ports]: [{ count: '2', typeId: V.usbC, positionId: V.back }],
+      },
+      defaultDeviceValues: { [A.ram]: '16', [A.os]: V.win11, [A.deviceKeyboard]: V.german },
+    });
+
+    it('stores the attribute values of the level model and the device defaults in their stored form', async () => {
+      const response = await post(WITH_VALUES());
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        modelValues: {
+          [A.keyboard]: V.german,
+          [A.processor]: 'Intel Core i5-1135G7',
+          [A.display]: '14.01',
+          [A.surface]: V.matt,
+          [A.ports]: [{ count: 2, typeId: V.usbC, positionId: V.back }],
+        },
+        defaultDeviceValues: { [A.ram]: 16, [A.os]: V.win11, [A.deviceKeyboard]: V.german },
+      });
+      expect(count()).toBe(2);
+    });
+
+    it('AC-REQ-008-05 rejects a missing required attribute of the level model and names it, stores nothing', async () => {
+      const body = WITH_VALUES();
+      body.modelValues[A.processor] = '  ';
+
+      const fields = fieldsOf(await post(body));
+
+      expect(fields).toEqual([
+        { path: `modelValues.${A.processor}`, code: 'value_missing', message: 'Prozessor fehlt' },
+      ]);
+      expect(count()).toBe(1);
+    });
+
+    it('DER-50-10 takes the device defaults as optional, so required attributes of the level device may stay empty', async () => {
+      const response = await post({ ...WITH_VALUES(), defaultDeviceValues: { [A.ram]: null } });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().defaultDeviceValues).toEqual({});
+    });
+
+    it('DER-50-10 checks the type of a device default and reports it at its field', async () => {
+      const fields = fieldsOf(
+        await post({ ...WITH_VALUES(), defaultDeviceValues: { [A.ram]: '3 bis 4' } }),
+      );
+
+      expect(fields).toEqual([
+        {
+          path: `defaultDeviceValues.${A.ram}`,
+          code: 'value_integer',
+          message: 'RAM: ganze Zahl von 1 bis 1024',
+        },
+      ]);
+      expect(count()).toBe(1);
+    });
+
+    it('rejects a value of an attribute the device type does not have as bad_request', async () => {
+      const response = await post({ ...WITH_VALUES(), defaultDeviceValues: { 999: 'x' } });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('DER-50-20 T6 rejects a deactivated pick list value in modelValues with 422 pick_list_value_deactivated at the attribute, stores and logs nothing', async () => {
+      deactivateValue(V.matt);
+
+      const response = await post(WITH_VALUES());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'pick_list_value_deactivated',
+        message: 'Display-Oberfläche: matt ist deaktiviert',
+        fields: [],
+        details: { path: `modelValues.${A.surface}`, id: V.matt },
+        referenceNumber: null,
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('DER-50-20 T6 rejects a deactivated pick list value in defaultDeviceValues with its path', async () => {
+      deactivateValue(V.win11);
+
+      const response = await post(WITH_VALUES());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'pick_list_value_deactivated',
+        message: 'Betriebssystem: Windows 11 Pro ist deaktiviert',
+        details: { path: `defaultDeviceValues.${A.os}`, id: V.win11 },
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('DER-50-20 T6 rejects a deactivated port type in a value of data type ports', async () => {
+      deactivateValue(V.usbC);
+
+      const response = await post(WITH_VALUES());
+
+      expect(response.json().error).toMatchObject({
+        code: 'pick_list_value_deactivated',
+        message: 'Anschlüsse: USB-C ist deaktiviert',
+        details: { path: `modelValues.${A.ports}`, id: V.usbC },
+      });
+    });
+
+    it('DER-50-20 T6 reports only the hit in modelValues if the same value is deactivated in both objects', async () => {
+      deactivateValue(V.german);
+
+      const response = await post(WITH_VALUES());
+
+      expect(response.json().error).toMatchObject({
+        code: 'pick_list_value_deactivated',
+        message: 'Tastaturlayout: Deutsch ist deaktiviert',
+        details: { path: `modelValues.${A.keyboard}`, id: V.german },
+      });
+    });
+
+    it('DER-50-20 T6 reports of two deactivated values in modelValues the one of the first attribute in their order', async () => {
+      deactivateValue(V.matt);
+      deactivateValue(V.german);
+
+      const response = await post(WITH_VALUES());
+
+      // Tastaturlayout comes before Display-Oberfläche, though its id is higher.
+      expect(response.json().error.details).toEqual({
+        path: `modelValues.${A.keyboard}`,
+        id: V.german,
+      });
+    });
+
+    it('DER-50-20 T6 reports only device_type_deactivated if the device type and a pick list value are deactivated', async () => {
+      deactivateValue(V.matt);
+      t.database.sqlite.prepare('UPDATE device_type SET active = 0 WHERE id = ?').run(ids.notebook);
+
+      const response = await post(WITH_VALUES());
+
+      expect(response.json().error).toMatchObject({
+        code: 'device_type_deactivated',
+        details: { path: 'deviceTypeId', id: ids.notebook },
+      });
+      expect(count()).toBe(1);
+    });
+
+    it.each([
+      ['an unknown pick list value', { [A.surface]: 999 }],
+      ['a value of the list of another attribute', { [A.surface]: V.german }],
+      [
+        'a port type from the list of positions',
+        { [A.ports]: [{ count: 1, typeId: V.back, positionId: null }] },
+      ],
+      [
+        'a port position from the list of types',
+        { [A.ports]: [{ count: 1, typeId: V.usbC, positionId: V.usbC }] },
+      ],
+    ])('DER-50-20 T6 rejects %s with 400 bad_request, never 500', async (_case, change) => {
+      const body = WITH_VALUES();
+      const response = await post({ ...body, modelValues: { ...body.modelValues, ...change } });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toMatchObject({ code: 'bad_request', referenceNumber: null });
+      expect(count()).toBe(1);
+    });
+
+    it('DER-50-20 T6 checks existing ids before active entries: an unknown id wins over a deactivated value before it', async () => {
+      deactivateValue(V.german);
+      const body = WITH_VALUES();
+
+      const response = await post({
+        ...body,
+        defaultDeviceValues: { ...body.defaultDeviceValues, [A.os]: 999 },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('checks the active pick list values before the other attribute rules', async () => {
+      deactivateValue(V.matt);
+      const body = WITH_VALUES();
+      body.modelValues[A.processor] = '';
+
+      const response = await post(body);
+
+      expect(response.json().error.code).toBe('pick_list_value_deactivated');
+    });
+
+    it('checks the attribute values before the question about a possible duplicate (2.4 "Prüfreihenfolge")', async () => {
+      const likeMvA = { ...WITH_VALUES(), manufacturerId: ids.apple, modelName: 'MacBook Pro 13' };
+      deactivateValue(V.matt);
+      const deactivated = await post(likeMvA);
+      likeMvA.modelValues = { ...likeMvA.modelValues, [A.surface]: V.glossy, [A.processor]: '' };
+      const missing = fieldsOf(await post(likeMvA));
+
+      expect(deactivated.json().error.code).toBe('pick_list_value_deactivated');
+      expect(missing).toEqual([
+        { path: `modelValues.${A.processor}`, code: 'value_missing', message: 'Prozessor fehlt' },
+      ]);
+      expect(count()).toBe(1);
+    });
+  });
+
+  describe('possible duplicate (CU-107, 2.4 "Mögliche Dublette", REQ-011)', () => {
+    /** MV-A's manufacturer and model name with other spaces and case (AC-REQ-011-01). */
+    const LIKE_MV_A = () => ({
+      ...NEW(),
+      manufacturerId: ids.apple,
+      modelName: 'MacBook  pro 13',
+      typeDesignation: '',
+      mpn: 'MNEH3D/A',
+    });
+
+    const MV_A_MATCH = () => ({
+      id: ids.mvA,
+      manufacturer: { id: ids.apple, name: 'Apple' },
+      modelName: 'MacBook Pro 13',
+      mpn: 'MHGT3D/A',
+    });
+
+    const deactivate = (table: 'device_type' | 'manufacturer', id: number) =>
+      t.database.sqlite.prepare(`UPDATE ${table} SET active = 0 WHERE id = ?`).run(id);
+
+    it('AC-REQ-011-01 DER-53-01 answers 422 confirmation_required possible_duplicate with MV-A in details.matches and stores nothing', async () => {
+      const response = await post(LIKE_MV_A());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toEqual({
+        code: 'confirmation_required',
+        message:
+          'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+        fields: [],
+        details: { kind: 'possible_duplicate', matches: [MV_A_MATCH()] },
+        referenceNumber: null,
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('AC-REQ-011-01 lists every model template of the same manufacturer and model name key, MPN "unbekannt" as null', async () => {
+      const second = insertModelTemplate(t.database.sqlite, {
+        deviceTypeId: ids.monitor,
+        manufacturerId: ids.apple,
+        modelName: 'macbook pro13',
+        mpn: null,
+      });
+
+      const response = await post(LIKE_MV_A());
+
+      expect(response.json().error.details.matches).toEqual([
+        MV_A_MATCH(),
+        {
+          id: second,
+          manufacturer: { id: ids.apple, name: 'Apple' },
+          modelName: 'macbook pro13',
+          mpn: null,
+        },
+      ]);
+    });
+
+    it('AC-REQ-011-02 stores without a hint when no model template has the same manufacturer and model name', async () => {
+      const otherManufacturer = await post({ ...LIKE_MV_A(), manufacturerId: ids.lenovo });
+      const otherModelName = await post({ ...LIKE_MV_A(), modelName: 'MacBook Pro 14' });
+
+      expect(otherManufacturer.statusCode).toBe(201);
+      expect(otherModelName.statusCode).toBe(201);
+      expect(count()).toBe(3);
+    });
+
+    it('DER-53-03 stores the model template with confirmDuplicate: true', async () => {
+      const response = await post({ ...LIKE_MV_A(), confirmDuplicate: true });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        manufacturerId: ids.apple,
+        modelName: 'MacBook  pro 13',
+      });
+      expect(count()).toBe(2);
+    });
+
+    it('still asks with confirmDuplicate: false', async () => {
+      const response = await post({ ...LIKE_MV_A(), confirmDuplicate: false });
+
+      expect(response.json().error).toMatchObject({ code: 'confirmation_required' });
+      expect(count()).toBe(1);
+    });
+
+    it('DER-53-01 a field rule comes before the question: a duplicate with the MPN "ABC#123" gives validation_failed (2.4 "Prüfreihenfolge")', async () => {
+      const fields = fieldsOf(await post({ ...LIKE_MV_A(), mpn: 'ABC#123' }));
+
+      expect(fields).toEqual([{ path: 'mpn', code: 'mpn_invalid_chars', message: MPN_INVALID }]);
+      expect(count()).toBe(1);
+    });
+
+    it('DER-53-04 T3 a deactivated manufacturer comes before the question: manufacturer_deactivated, nothing stored', async () => {
+      deactivate('manufacturer', ids.apple);
+
+      const response = await post(LIKE_MV_A());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'manufacturer_deactivated',
+        details: { path: 'manufacturerId', id: ids.apple },
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('DER-53-04 T3 a deactivated device type comes before the question: device_type_deactivated, nothing stored', async () => {
+      deactivate('device_type', ids.notebook);
+
+      const response = await post(LIKE_MV_A());
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toMatchObject({
+        code: 'device_type_deactivated',
+        details: { path: 'deviceTypeId', id: ids.notebook },
+      });
+      expect(count()).toBe(1);
+    });
+
+    it('rejects confirmDuplicate that is not a boolean as bad_request', async () => {
+      expect((await post({ ...LIKE_MV_A(), confirmDuplicate: 'yes' })).statusCode).toBe(400);
     });
   });
 });
