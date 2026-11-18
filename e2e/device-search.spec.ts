@@ -135,4 +135,24 @@ test.describe('UI-009 Geräte and UI-010 Gerät (CU-136, CU-137)', () => {
     await expect(page).toHaveURL(new RegExp(`/geraete/${id}$`));
     await expect(page.getByRole('heading', { level: 1, name: `Gerät ${wiNr}` })).toBeVisible();
   });
+
+  test('UI-010.success DER-56-01 the changed visual grade is saved with "Gerätewerte speichern" and stays after a reload', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const { id } = await createDevice(page, server.baseUrl, hash);
+    await page.goto(`/geraete/${id}`);
+
+    const grade = page.getByRole('textbox', { name: 'Optik-Note' });
+    await expect(grade).toHaveValue('2');
+    await expect(page.getByRole('textbox', { name: 'WI-Nr' })).toHaveCount(0);
+    await grade.fill('4');
+    await page.getByRole('button', { name: 'Gerätewerte speichern' }).click();
+
+    await expect(page.getByText('Gerät gespeichert')).toBeVisible();
+    await expectReachable(page);
+    await page.reload();
+    await expect(page.getByRole('textbox', { name: 'Optik-Note' })).toHaveValue('4');
+  });
 });

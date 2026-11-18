@@ -115,6 +115,42 @@ export function deviceCreateSchema(
 }
 export type DeviceCreate = z.output<ReturnType<typeof deviceCreateSchema>>;
 
+/**
+ * Shape of `PATCH /api/devices/{id}` for the device values of UI-010 (2.5) as the route checks
+ * it: a missing field stays unchanged, `values` holds changes (a key overwrites, `null` removes;
+ * `mergeAttributeValues`). The rules apply to the state after the change (`deviceValuesSchema`).
+ * The decisions on a deviation follow with #191.
+ */
+export const deviceUpdateBodySchema = z.strictObject({
+  version: versionSchema,
+  conditionValueId: idSchema.nullable().optional(),
+  visualGrade: z.union([z.number(), z.string()]).nullable().optional(),
+  conditionDescription: z.string().optional(),
+  values: anyValuesSchema.optional(),
+  confirmedKeys: z.array(z.string()),
+});
+export type DeviceUpdateInput = z.input<typeof deviceUpdateBodySchema>;
+
+/**
+ * Rules of the device values (2.5) on the complete state of a device after a change: condition,
+ * visual grade, condition description and the values of the level device by the attributes of
+ * its device type (CU-067), the battery capacity by the values of the list battery. UI-010
+ * checks its form with it, CU-121 the state after `PATCH /api/devices/{id}`.
+ */
+export function deviceValuesSchema(
+  attributes: readonly AttributeValueDefinition[],
+  { batteryValues = [] }: { batteryValues?: readonly BatteryValueFlag[] } = {},
+) {
+  return z.strictObject({
+    conditionValueId: requiredChoice(FIELD_MESSAGES.conditionMissing),
+    visualGrade: visualGradeSchema,
+    conditionDescription: conditionDescriptionSchema,
+    values: attributeValuesSchema(attributes, 'device', { batteryValues }),
+  });
+}
+export type DeviceValues = z.output<ReturnType<typeof deviceValuesSchema>>;
+export type DeviceValuesInput = z.input<ReturnType<typeof deviceValuesSchema>>;
+
 /** Inventory status of a device (3.5). */
 export const STOCK_STATUSES = ['available', 'sold', 'cancelled'] as const;
 /** Capture status: `review_pending` while review flags remain (REQ-013). */

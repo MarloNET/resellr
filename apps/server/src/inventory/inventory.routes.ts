@@ -7,6 +7,7 @@ import {
   deviceSchema,
   deviceSearchResultSchema,
   deviceSearchQuerySchema,
+  deviceUpdateBodySchema,
   toWiNrKey,
 } from '@resellr/domain/schemas/device.schema';
 import { listingCreateBodySchema, listingSchema } from '@resellr/domain/schemas/listing.schema';
@@ -35,12 +36,12 @@ const idParams = z.strictObject({ id: z.coerce.number().pipe(idSchema) });
 
 /**
  * Inventory routes (CU-130, Technical Specification 2.5): `POST /api/devices`,
- * `GET /api/devices?wiNr=`, `GET /api/devices/{id}` and
- * `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` (2.6); changing
- * (#190), the unassigned devices (#258), assigning (#194) and the other model listing routes
- * follow. The reading routes read through the repositories CU-122 and CU-125, the catalog reader
- * CU-108 and the query CU-293 with the outer `db`, the writing ones go through the services CU-121
- * and CU-123 and their unit of work (2.0.4).
+ * `GET /api/devices?wiNr=`, `GET /api/devices/{id}`, `PATCH /api/devices/{id}` for the device
+ * values and `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` (2.6);
+ * the unassigned devices (#258), assigning (#194) and the other model listing routes follow. The
+ * reading routes read through the repositories CU-122 and CU-125, the catalog reader CU-108 and
+ * the query CU-293 with the outer `db`, the writing ones go through the services CU-121 and CU-123
+ * and their unit of work (2.0.4).
  */
 export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = async (
   app,
@@ -59,6 +60,14 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
     '/api/devices',
     { schema: { body: deviceCreateBodySchema, response: { 201: deviceSchema } } },
     async (request, reply) => reply.code(201).send(await deviceService.create(request.body)),
+  );
+
+  // The device values of UI-010 (2.5): the shape here (`400`), the rules on the state after the
+  // change by the service, so all field errors come in one `422`.
+  app.patch(
+    '/api/devices/:id',
+    { schema: { params: idParams, body: deviceUpdateBodySchema, response: { 200: deviceSchema } } },
+    async (request) => deviceService.update(request.params.id, request.body),
   );
 
   /**

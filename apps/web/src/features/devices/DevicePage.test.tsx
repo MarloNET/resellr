@@ -41,7 +41,10 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 
 type DeviceHandler = (init: RequestInit | undefined) => Promise<Response> | Response;
 
-/** `fetch` of the page: the frame's status, the health check of P-06 and the device. */
+/**
+ * `fetch` of the page: the frame's status, the health check of P-06 and the device; the reads of
+ * the card "Gerätewerte" (#190) answer without attributes and lists.
+ */
 function mockApi(device: DeviceHandler) {
   const requests: string[] = [];
   vi.stubGlobal(
@@ -50,6 +53,12 @@ function mockApi(device: DeviceHandler) {
       const url = new URL(String(input), 'http://127.0.0.1');
       if (url.pathname === '/api/ops/status') return Response.json(OPS_STATUS);
       if (url.pathname === '/api/ops/health') return Response.json({ state: 'ready' });
+      if (url.pathname === '/api/model-templates/7') {
+        return Response.json({ id: 7, deviceTypeId: 1, modelValues: {}, defaultDeviceValues: {} });
+      }
+      if (url.pathname === '/api/device-types/1/attributes' || url.pathname === '/api/pick-lists') {
+        return Response.json({ items: [], total: 0 });
+      }
       if (url.pathname.startsWith('/api/devices/')) {
         requests.push(url.pathname);
         return device(init);

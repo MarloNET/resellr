@@ -4,6 +4,7 @@ import type {
   DeviceDetail,
   DevicePrefillAnswer,
   DeviceSearchResult,
+  DeviceUpdateInput,
 } from '@resellr/domain/schemas/device.schema';
 import type { Listing, ListingCreateInput } from '@resellr/domain/schemas/listing.schema';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,8 +13,8 @@ import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
 
 // Hooks of the devices of F-05 and the model listings of F-06 (CU-131, Technical Specification
-// 2.5, 2.6). Changing (#190), the unassigned devices (#258), assigning (#194) and the other model
-// listing hooks follow.
+// 2.5, 2.6). The unassigned devices (#258), assigning (#194) and the other model listing hooks
+// follow.
 
 /**
  * Hits of the device search of UI-009 (`GET /api/devices?wiNr=`, REQ-016): the first page of
@@ -73,5 +74,24 @@ export function useCreateListingMutation() {
   return useMutation<Listing, ApiError, ListingCreateInput>({
     mutationFn: (body) => apiClient.post<Listing>('/api/listings', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
+  });
+}
+
+/**
+ * "Gerätewerte speichern" of UI-010 (`PATCH /api/devices/{id}`, 2.5): on success the device of
+ * the page takes the answer, and the hit lists of the search are read again (capture status).
+ */
+export function useUpdateDeviceMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation<Device, ApiError, DeviceUpdateInput>({
+    mutationFn: (body) => apiClient.patch<Device>(`/api/devices/${id}`, body),
+    onSuccess: (device) => {
+      queryClient.setQueryData<DeviceDetail>(queryKeys.inventory.device(id), (previous) =>
+        previous === undefined ? previous : { ...previous, ...device },
+      );
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.inventory.deviceSearch('').slice(0, -1),
+      });
+    },
   });
 }
