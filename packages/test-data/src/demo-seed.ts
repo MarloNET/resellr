@@ -408,6 +408,25 @@ export const seedDevices: SeedArea = async (api) => {
 };
 
 /**
+ * Model listings (S4, UI-004 "Neues Modell-Inserat anlegen", #197): one from the demo device
+ * "626198" with its WI-Nr as article number; the other demo devices stay unassigned for UI-004.
+ */
+export const DEMO_LISTINGS = [{ fromWiNr: '626198' }] as const;
+
+export const seedListings: SeedArea = async (api) => {
+  for (const { fromWiNr } of DEMO_LISTINGS) {
+    const { items } = await api.request<{ items: { id: number; wiNr: string }[] }>(
+      'GET',
+      `/api/devices?${new URLSearchParams({ wiNr: fromWiNr })}`,
+    );
+    const hit = items.find(({ wiNr }) => wiNr === fromWiNr);
+    if (hit === undefined) throw new Error(`Demo data: device ${fromWiNr} is missing`);
+    const { version } = await api.request<{ version: number }>('GET', `/api/devices/${hit.id}`);
+    await api.request('POST', '/api/listings', { fromDeviceId: hit.id, deviceVersion: version });
+  }
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
@@ -421,6 +440,7 @@ export const SEED_AREAS: readonly SeedArea[] = [
   seedDatasheetLayout,
   seedModelTemplates,
   seedDevices,
+  seedListings,
 ];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */

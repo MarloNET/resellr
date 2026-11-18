@@ -8,6 +8,7 @@ import {
   SEED_AREAS,
   seedDatasheetLayout,
   seedDevices,
+  seedListings,
   seedDeviceTypes,
   seedDemoData,
   seedManufacturers,
@@ -118,7 +119,7 @@ describe('seedDemoData', () => {
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout, S3 model templates, then S4 devices', () => {
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout, S3 model templates, then S4 devices and model listings', () => {
     expect(SEED_AREAS).toEqual([
       seedDeviceTypes,
       seedSuppliers,
@@ -128,7 +129,45 @@ describe('seedDemoData', () => {
       seedDatasheetLayout,
       seedModelTemplates,
       seedDevices,
+      seedListings,
     ]);
+  });
+
+  it('creates the demo model listing through POST /api/listings from device "626198" on the version read', async () => {
+    const requests: unknown[][] = [];
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (method: string, path: string, body?: unknown) => {
+        requests.push([method, path, body]);
+        if (path === '/api/devices?wiNr=626198') {
+          return {
+            items: [
+              { id: 7, wiNr: '6261980' },
+              { id: 5, wiNr: '626198' },
+            ],
+          } as never;
+        }
+        if (path === '/api/devices/5') return { id: 5, version: 3 } as never;
+        return { id: 9 } as never;
+      },
+    };
+
+    await seedListings(recording);
+
+    expect(requests).toEqual([
+      ['GET', '/api/devices?wiNr=626198', undefined],
+      ['GET', '/api/devices/5', undefined],
+      ['POST', '/api/listings', { fromDeviceId: 5, deviceVersion: 3 }],
+    ]);
+  });
+
+  it('stops with the WI-Nr when the demo device is missing', async () => {
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async () => ({ items: [] }) as never,
+    };
+
+    await expect(seedListings(recording)).rejects.toThrow('Demo data: device 626198 is missing');
   });
 
   it('captures the demo devices through POST /api/devices with the ids of model template, supplier, condition and pick list values', async () => {
