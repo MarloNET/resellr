@@ -35,6 +35,15 @@ describe('comparison rule of variant data (CU-119, Requirements 6.0)', () => {
     expect(variantsMatch(spec(), other, [RAM, OS])).toBe(false);
   });
 
+  // Basis of the new model listing in AC-REQ-019-06 (#197): the keyboard layout is a variant attribute.
+  it('reports only the keyboard layout for a device that differs from MI-A only there', () => {
+    const KEYBOARD = 16;
+    const miA = spec({ values: { [RAM]: 16, [OS]: 7, [KEYBOARD]: 40 } });
+    const hungarian = spec({ values: { [RAM]: 16, [OS]: 7, [KEYBOARD]: 41 } });
+
+    expect(variantDifferences(hungarian, miA, [RAM, OS, KEYBOARD])).toEqual([String(KEYBOARD)]);
+  });
+
   it('compares only the attributes of the given variant set', () => {
     const other = spec({ values: { [RAM]: 8, [OS]: 7 } });
 

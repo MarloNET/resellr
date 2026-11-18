@@ -196,17 +196,17 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
     await expect(reader.resolveConditionCode('  ', null)).resolves.toBeUndefined();
   });
 
-  it('lists the attributes of a device type in their order with level, rules and status', async () => {
+  it('lists the attributes of a device type in their order with level, rules, flag and status', async () => {
     const { sqlite } = database;
     const notebook = insertDeviceType(sqlite, 'Notebook');
     const insert = sqlite.prepare(
       `INSERT INTO attribute (id, device_type_id, label, label_key, data_type, system_role, unit,
          unit_spacing, min_value, max_value, pick_list_id, level, variant_forming, required,
          datasheet_block, sort_order, active, version, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, NULL, NULL, 1, ?, ?, NULL, ?, 0, ?, 'technical', ?, ?, 1, '', '')`,
+       VALUES (?, ?, ?, ?, ?, NULL, NULL, 1, ?, ?, NULL, ?, ?, ?, 'technical', ?, ?, 1, '', '')`,
     );
-    insert.run(2, notebook, 'RAM', 'ram', 'integer', '1', '1024', 'device', 1, 2, 0);
-    insert.run(1, notebook, 'Prozessor', 'prozessor', 'text', null, null, 'model', 1, 1, 1);
+    insert.run(2, notebook, 'RAM', 'ram', 'integer', '1', '1024', 'device', 1, 1, 2, 0);
+    insert.run(1, notebook, 'Prozessor', 'prozessor', 'text', null, null, 'model', 0, 1, 1, 1);
     const reader = createSettingsReader(database.db);
 
     await expect(reader.listAttributes(notebook)).resolves.toEqual([
@@ -221,6 +221,7 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
         level: 'model',
         required: true,
         active: true,
+        variantForming: false,
       },
       {
         id: 2,
@@ -233,6 +234,7 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
         level: 'device',
         required: true,
         active: false,
+        variantForming: true,
       },
     ]);
   });

@@ -4,9 +4,12 @@
  * (hotspot rule, Technical Specification 4.5).
  */
 export const ERROR_CODES = {
+  already_assigned: 422,
+  article_number_taken: 422,
   attribute_has_values: 422,
   bad_request: 400,
   confirmation_required: 422,
+  device_not_available: 422,
   device_type_deactivated: 422,
   file_too_large: 413,
   forbidden_host: 403,
@@ -24,6 +27,7 @@ export const ERROR_CODES = {
   supplier_deactivated: 422,
   unsupported_media_type: 415,
   validation_failed: 422,
+  variant_duplicate: 422,
   variant_flag_would_merge_listings: 422,
   version_conflict: 409,
   wi_nr_taken: 422,

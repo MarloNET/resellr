@@ -14,11 +14,13 @@ import {
   type ModelTemplateListItem,
   modelTemplateSearchTermSchema,
 } from '@resellr/domain/schemas/model-template.schema';
-import type { PickList } from '@resellr/domain/schemas/pick-list.schema';
+import type { PickList, PickListValueList } from '@resellr/domain/schemas/pick-list.schema';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
+import { queryKeys } from '../../api/query-keys.ts';
 import { useModelTemplateQuery, useModelTemplatesQuery } from '../../api/catalog.api.ts';
 import {
   type DevicePrefillRequest,
@@ -39,15 +41,25 @@ import { useWritesLocked } from '../../api/write-outcome-store.ts';
 import {
   AttributeFieldsForm,
   type AttributeInputs,
+  attributeListChoices,
   attributeRequestValues,
   attributesOfLevel,
+  type PortListIds,
+  withoutPickListValues,
 } from '../../components/forms/AttributeFieldsForm.tsx';
 import {
   attributeInputOf,
   type AttributeInputValue,
   emptyAttributeInput,
 } from '../../components/forms/AttributeInput.tsx';
-import { type ChoiceItem, findMissingChoices } from '../../components/forms/deactivated-choice.ts';
+import {
+  type ChoiceItem,
+  findMissingChoices,
+  findMissingListChoices,
+  type ListChoice,
+  type MissingChoice,
+  type ReloadedList,
+} from '../../components/forms/deactivated-choice.ts';
 import {
   FormField,
   useDeferredBlurCheck,
@@ -76,8 +88,8 @@ import {
 } from './device-intake-draft.ts';
 
 // Texts of UI-003 `screen.md` and its mockup (UI/UX design v0.6.1; v0.6.8 for the choice after a
-// rejection for deactivation, v0.6.9 for `wi_nr_taken`).
-const TEXTS = {
+// rejection for deactivation, v0.6.9 for `wi_nr_taken`). UI-010 shows the same form (DER-56-01).
+export const TEXTS = {
   title: 'Gerät einbuchen',
   requiredHint: 'Felder mit * sind Pflicht.',
   device: 'Gerät',
@@ -242,10 +254,10 @@ interface PrefillTask extends DevicePrefillRequest {
 }
 
 /** The path of the value of an attribute in the request and its field errors (2.0.5). */
-const valuePath = (attributeId: number) => `values.${attributeId}`;
+export const valuePath = (attributeId: number) => `values.${attributeId}`;
 
 /** The attributes of the device type with their values of the list battery, as the form uses them. */
-interface DeviceAttributes {
+export interface DeviceAttributes {
   attributes: readonly Attribute[];
   batteryValues: readonly BatteryValueFlag[];
 }
@@ -254,7 +266,7 @@ interface DeviceAttributes {
  * Whether the field "Akkukapazität" shows: only while the chosen value of the active attribute
  * with the role `battery` carries "Akku vorhanden" (UI-003 "Eingaben", 2.5, FIND-353).
  */
-function batteryCapacityShown(
+export function batteryCapacityShown(
   { attributes, batteryValues }: DeviceAttributes,
   values: AttributeInputs,
 ): boolean {
@@ -270,13 +282,154 @@ function batteryCapacityShown(
  * battery capacity only while the battery value carries "Akku vorhanden" and then required with
  * "*" (DER-54-01, UI-003 "Eingaben"; the schema of CU-067 checks it from the battery value).
  */
-function shownAttributes(device: DeviceAttributes, values: AttributeInputs): Attribute[] {
+export function shownAttributes(device: DeviceAttributes, values: AttributeInputs): Attribute[] {
   const withCapacity = batteryCapacityShown(device, values);
   return attributesOfLevel(device.attributes, 'device').flatMap((attribute) => {
     if (attribute.systemRole !== 'battery_capacity') return [attribute];
     return withCapacity ? [{ ...attribute, required: true }] : [];
   });
 }
+
+/** The attribute with the role `battery_capacity` the form asks for, if the device type has it. */
+export const capacityAttribute = (device: DeviceAttributes) =>
+  attributesOfLevel(device.attributes, 'device').find(
+    ({ systemRole }) => systemRole === 'battery_capacity',
+  );
+
+/**
+ * The inputs with the battery capacity emptied while its field is not shown: it goes with its
+ * value when the battery value changes or is emptied (UI-003 "Eingaben", 2.0.11 "Abhängige
+ * Eingaben"), so it shows empty when it appears again.
+ */
+export function withCapacityOfBattery(
+  device: DeviceAttributes,
+  values: AttributeInputs,
+): AttributeInputs {
+  const capacity = capacityAttribute(device);
+  if (capacity === undefined || batteryCapacityShown(device, values)) return values;
+  return { ...values, [capacity.id]: emptyAttributeInput(capacity) };
+}
+
+/** The inputs of the card "Gerätewerte" with a pick list value (2.0.11). */
+export interface ChosenDeviceValues {
+  conditionValueId: number | null;
+  values: AttributeInputs;
+}
+
+/**
+ * The pick list values chosen in the card "Gerätewerte" in form order: the condition, then the
+ * attributes of the level device (2.0.11 "Betroffene Felder"); with `stored` (UI-010) a value of
+ * the stored device is marked stored, so it is never missing.
+ */
+export function deviceValueChoices(
+  device: DeviceAttributes,
+  chosen: ChosenDeviceValues,
+  {
+    conditionListId,
+    ports,
+    stored,
+  }: {
+    conditionListId: number | null;
+    ports: PortListIds;
+    stored?: { conditionValueId: number; values: Readonly<Record<string, unknown>> };
+  },
+): ListChoice[] {
+  const { conditionValueId } = chosen;
+  return [
+    ...(conditionValueId === null
+      ? []
+      : [
+          {
+            path: 'conditionValueId',
+            id: conditionValueId,
+            stored: conditionValueId === stored?.conditionValueId,
+            list: String(conditionListId),
+            message: ERROR_MESSAGES['pick_list_value_deactivated.condition'],
+          },
+        ]),
+    ...attributeListChoices(device.attributes, 'device', chosen.values, {
+      prefix: 'values',
+      ports,
+      stored: stored?.values,
+    }),
+  ];
+}
+
+/**
+ * The inputs without the missing choices (2.0.11 "Anzeige"): each emptied (value `null`, the
+ * count of a port entry kept); without the battery value the battery capacity goes too.
+ */
+export function withoutMissingChoices<T extends ChosenDeviceValues>(
+  device: DeviceAttributes,
+  chosen: T,
+  missing: readonly MissingChoice[],
+): T {
+  const idsAt = (path: string) =>
+    new Set(missing.filter((choice) => choice.path === path).map(({ id }) => id));
+  const values = Object.fromEntries(
+    Object.entries(chosen.values).map(([key, input]) => {
+      const attribute = device.attributes.find(({ id }) => String(id) === key);
+      const ids = idsAt(`values.${key}`);
+      return [key, attribute === undefined ? input : withoutPickListValues(attribute, input, ids)];
+    }),
+  );
+  return {
+    ...chosen,
+    conditionValueId: idsAt('conditionValueId').size > 0 ? null : chosen.conditionValueId,
+    values: withCapacityOfBattery(device, values),
+  };
+}
+
+/** Ids of the lists `port_type` and `port_position` from `GET /api/pick-lists`. */
+export function portListIds(lists: readonly PickList[] | undefined): PortListIds {
+  return { type: listIdOf(lists, 'port_type'), position: listIdOf(lists, 'port_position') };
+}
+
+const asItems = (list: PickListValueList | undefined): ChoiceItem[] =>
+  (list?.items ?? []).map(({ id, label, active }) => ({ id, label, active }));
+
+/**
+ * Reads every pick list of the page again (2.0.11 "die Auswahllisten werden neu geladen") and
+ * returns each list before and after by its id; `after` is `null` if the read failed.
+ */
+export async function reloadPickListValues(
+  queryClient: QueryClient,
+): Promise<Record<string, ReloadedList>> {
+  const prefix = queryKeys.settings.pickListValues(0).slice(0, -1);
+  const before = queryClient
+    .getQueriesData<PickListValueList>({ queryKey: prefix })
+    .map(([key, list]) => [Number(key.at(-1)), list] as const);
+  await queryClient.refetchQueries({ queryKey: prefix });
+  return Object.fromEntries(
+    before.map(([listId, list]) => {
+      const state = queryClient.getQueryState<PickListValueList>(
+        queryKeys.settings.pickListValues(listId),
+      );
+      return [
+        String(listId),
+        { before: asItems(list), after: state?.status === 'error' ? null : asItems(state?.data) },
+      ];
+    }),
+  );
+}
+
+/** The ids of a list that could not be read again and held the rejected entry (2.0.11). */
+export function droppedAfterReload(
+  lists: Readonly<Record<string, ReloadedList>>,
+  rejectedId: number,
+): number[] {
+  return Object.values(lists).some(
+    ({ before, after }) => after === null && before.some(({ id }) => id === rejectedId),
+  )
+    ? [rejectedId]
+    : [];
+}
+
+/** Whether a rejection for a deactivated pick list value belongs to a field of the card. */
+export const isDeactivatedValueAt = (code: string | undefined, path: unknown): path is string =>
+  code === 'pick_list_value_deactivated' &&
+  typeof path === 'string' &&
+  (path === 'conditionValueId' || /^values\.\d+$/.test(path));
 
 /**
  * Request body of `POST /api/devices`: every field, nothing chosen as `null`, and every attribute
@@ -352,7 +505,7 @@ function fieldValue(draft: Draft, path: string): unknown {
 }
 
 /** The field errors of the attribute fields by attribute id, as CU-111 shows them. */
-function attributeErrors(errors: FieldErrors): Record<string, string | undefined> {
+export function attributeErrors(errors: FieldErrors): Record<string, string | undefined> {
   return Object.fromEntries(
     Object.entries(errors)
       .filter(([path, error]) => path.startsWith('values.') && typeof error === 'string')
@@ -360,14 +513,11 @@ function attributeErrors(errors: FieldErrors): Record<string, string | undefined
   );
 }
 
-/** No pick list value is dropped in UI-003 yet; the choice after a rejection follows with #190. */
-const NO_DROPPED_VALUES: ReadonlySet<number> = new Set();
-
 /**
  * Chip "zu prüfen" and link "Bestätigen" of a prefilled field (DER-55-02, DESIGN.md
  * "Prüfmarkierung"). After confirming, the focus goes to the control of the field.
  */
-function ReviewMark({
+export function ReviewMark({
   field,
   disabled,
   onConfirm,
@@ -397,8 +547,8 @@ function ReviewMark({
   );
 }
 
-const optionValue = (id: number | null) => (id === null ? '' : String(id));
-const idOf = (value: string) => (value === '' ? null : Number(value));
+export const optionValue = (id: number | null) => (id === null ? '' : String(id));
+export const idOf = (value: string) => (value === '' ? null : Number(value));
 
 /** The search term the hit list is asked for: from 2 characters after trimming (2.4). */
 function searchTermOf(input: string): string | undefined {
@@ -535,7 +685,7 @@ function modelDataPickListIds(rows: readonly Attribute[], lists: readonly PickLi
  * chosen model template, in the order of the attributes, without review flag (DER-54-02). The
  * page reads the same queries and shows their errors (2.0.7).
  */
-function ModelDataPanel({
+export function ModelDataPanel({
   templateId,
   deviceTypeId,
 }: {
@@ -574,9 +724,10 @@ function ModelDataPanel({
   );
 }
 
-const CARD = 'flex min-w-0 flex-col gap-4 rounded-control border border-border bg-surface p-6';
-const CARD_HEADING = 'm-0 text-section font-semibold';
-const TEXT_AREA_CLASS = cn(
+export const CARD =
+  'flex min-w-0 flex-col gap-4 rounded-control border border-border bg-surface p-6';
+export const CARD_HEADING = 'm-0 text-section font-semibold';
+export const TEXT_AREA_CLASS = cn(
   'w-full min-w-0 rounded-control bg-surface px-2 py-1 ring-1 ring-border-input ring-inset',
   'text-body text-text aria-invalid:ring-error disabled:bg-bg',
 );
@@ -589,7 +740,8 @@ const TEXT_AREA_CLASS = cn(
  * und zuordnen" (Ctrl+Enter). States: default (focus in WI-Nr), validation with the error summary
  * at the top and `wi_nr_taken` at the WI-Nr, success, error, ausgang-unbekannt (P-08), conflict
  * (P-05), unreachable (P-06) for the reads and wird-beendet (P-07). After
- * `supplier_deactivated` the supplier is emptied with its text (2.0.11, design v0.6.8). The card
+ * `supplier_deactivated` or `pick_list_value_deactivated` every choice whose entry is missing
+ * after the reload is emptied with its text (2.0.11, design v0.6.8, DER-54-16, DER-56-10). The card
  * "Gerätewerte" holds a field per attribute of the level device (CU-111), the battery capacity
  * only while the battery value carries "Akku vorhanden". After the choice of a model template the
  * card loads the prefill (loading, DER-55-01) and marks each prefilled field with "zu prüfen" and
@@ -616,6 +768,7 @@ export function DeviceIntakePage() {
   const writesLocked = useWritesLocked();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   // The draft left for UI-007, read once on opening and then removed (CU-133, DER-54-07).
   const [restored] = useState(() => readDeviceIntakeDraft<Draft>());
@@ -707,10 +860,11 @@ export function DeviceIntakePage() {
   const [summaryShown, setSummaryShown] = useState(false);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   const [savedWiNr, setSavedWiNr] = useState<string | null>(null);
-  // The supplier shows the text of a rejection until the next choice in the field (v0.6.8).
-  const [supplierRejected, setSupplierRejected] = useState(false);
-  // A rejected supplier whose list could not be read again counts as missing (2.0.11).
+  // Choices that show the text of a rejection until the next choice in the field (v0.6.8).
+  const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
+  // A rejected entry whose list could not be read again counts as missing (2.0.11).
   const [droppedSupplier, setDroppedSupplier] = useState<number | null>(null);
+  const [droppedValues, setDroppedValues] = useState<ReadonlySet<number>>(new Set());
   const [reloading, setReloading] = useState(false);
   // The inputs of the last request the server rejected with field errors.
   const answeredDraftRef = useRef<Draft | null>(null);
@@ -738,7 +892,9 @@ export function DeviceIntakePage() {
   const activeSuppliers = (suppliers.data?.items ?? []).filter(
     ({ id, active }) => active && id !== droppedSupplier,
   );
-  const activeConditions = (conditions.data?.items ?? []).filter(({ active }) => active);
+  const activeConditions = (conditions.data?.items ?? []).filter(
+    ({ id, active }) => active && !droppedValues.has(id),
+  );
 
   const saving = createMutation.isPending;
   // Until the suppliers are read again after a rejection, a save could send the rejected id;
@@ -753,9 +909,16 @@ export function DeviceIntakePage() {
     setErrors((previous) => ({ ...previous, [path]: error }));
   }
 
+  /** A new choice in a field ends the text of a rejection there (v0.6.8). */
+  function endRejection(path: string) {
+    if (!rejectionShown[path]) return;
+    setError(path, undefined);
+    setRejectionShown((previous) => ({ ...previous, [path]: false }));
+  }
+
   /** Checks the field `path` (a fixed field or `values.<id>`) on leaving it. */
   function checkOnBlur(path: string) {
-    if (path === 'supplierId' && supplierRejected) return;
+    if (rejectionShown[path]) return;
     const current = draftRef.current;
     // An error of the server (e.g. `wi_nr_taken`) the browser cannot check stays until the
     // value changes.
@@ -769,24 +932,17 @@ export function DeviceIntakePage() {
    * value and error go with it, so it shows empty when it appears again (2.0.11, 2.5).
    */
   function changeAttribute(attributeId: number, input: AttributeInputValue) {
-    const values: Record<string, AttributeInputValue> = {
-      ...draftRef.current.values,
-      [attributeId]: input,
-    };
-    const capacity =
-      device === null
-        ? undefined
-        : attributesOfLevel(device.attributes, 'device').find(
-            ({ systemRole }) => systemRole === 'battery_capacity',
-          );
+    const entered = { ...draftRef.current.values, [attributeId]: input };
+    const values = device === null ? entered : withCapacityOfBattery(device, entered);
     // Changing a value lifts its review flag (DER-55-04), also of the capacity that goes.
     const changed = [String(attributeId)];
-    if (capacity !== undefined && device !== null && !batteryCapacityShown(device, values)) {
-      values[String(capacity.id)] = emptyAttributeInput(capacity);
+    const capacity = device === null ? undefined : capacityAttribute(device);
+    if (capacity !== undefined && values !== entered) {
       setError(valuePath(capacity.id), undefined);
       changed.push(String(capacity.id));
     }
     change({ values, ...withConfirmed(draftRef.current, changed) });
+    endRejection(valuePath(attributeId));
   }
 
   /** "Bestätigen" lifts the review flag of a field with its value unchanged (AC-REQ-013-02). */
@@ -804,7 +960,7 @@ export function DeviceIntakePage() {
   function chooseSupplier(value: string) {
     change({ supplierId: idOf(value) });
     setError('supplierId', undefined);
-    setSupplierRejected(false);
+    setRejectionShown((previous) => ({ ...previous, supplierId: false }));
   }
 
   /**
@@ -923,43 +1079,60 @@ export function DeviceIntakePage() {
       showServerErrors({ wiNr: wiNrTakenError(error) });
       return;
     }
-    // A supplier deactivated in another window: the text stands at the field and in the
-    // summary, the suppliers are read again without it (2.0.11, design v0.6.8).
+    // A supplier, condition or pick list value deactivated in another window: the text stands
+    // at the field of `details.path` and in the summary, the choices are read again (2.0.11,
+    // design v0.6.8).
     const { path, id } = error.error?.details ?? {};
-    if (error.kind === 'rejected' && code === 'supplier_deactivated' && path === 'supplierId') {
+    const deactivatedAt =
+      (code === 'supplier_deactivated' && path === 'supplierId') ||
+      isDeactivatedValueAt(code, path);
+    if (error.kind === 'rejected' && deactivatedAt && typeof path === 'string') {
       const text = error.error?.message;
-      showServerErrors({ supplierId: text });
-      setSupplierRejected(true);
-      // The condition code is resolved again without supplier; condition, visual grade,
-      // condition description and their flags stay (2.0.11 "Lieferant in UI-003", DER-57-04).
-      const code = conditionCodeOf(draftRef.current);
-      if (code !== null) setResolvedCode({ code, supplierId: null });
-      if (typeof id === 'number') void reloadAfterRejection(id, text);
+      showServerErrors({ [path]: text });
+      setRejectionShown({ [path]: true });
+      if (path === 'supplierId') {
+        // The condition code is resolved again without supplier; condition, visual grade,
+        // condition description and their flags stay (2.0.11 "Lieferant in UI-003", DER-57-04).
+        const code = conditionCodeOf(draftRef.current);
+        if (code !== null) setResolvedCode({ code, supplierId: null });
+      }
+      if (typeof id === 'number') void reloadAfterRejection(path, id, text);
       return;
     }
     setNotice(noticeOf(error));
   }
 
   /**
-   * Reads the suppliers again and checks the supplier of the form at the end of the reload, also a
-   * choice made meanwhile (2.0.11 "Erkennen nach dem Neuladen", 2.4 "Wahl während des Neuladens",
-   * addendum MAR-963, DER-54-16). A choice the new list no longer offers is emptied (optional
-   * field: the empty choice, value `null`) and carries the text of its usage with the name before
-   * the reload, so its id is never sent; an empty field is not checked. If the read fails, only
-   * the rejected id counts as missing, and it leaves the choice. The condition and the attributes
-   * are checked the same way with #190.
+   * Reads the suppliers and the pick lists again and checks every choice of the form at the end of
+   * the reload, also one made meanwhile (2.0.11 "Erkennen nach dem Neuladen", 2.4 "Wahl während
+   * des Neuladens", addendum MAR-963, DER-54-16, DER-56-10): supplier, condition and the pick
+   * list values of the attributes, each against its own list. A choice the new list no longer
+   * offers is emptied (required field: "Bitte wählen", optional field: the empty choice, value
+   * `null`; without the battery value the battery capacity goes too) and carries the text of its
+   * usage with the name before the reload, so its id is never sent; an empty field is not
+   * checked. If the list of the rejected entry cannot be read, only the rejected id counts as
+   * missing, and it leaves the choice. The focus goes to the first marked field.
    */
-  async function reloadAfterRejection(rejectedId: number, rejectedText: ReactNode) {
+  async function reloadAfterRejection(
+    rejectedPath: string,
+    rejectedId: number,
+    rejectedText: string | undefined,
+  ) {
     setReloading(true);
     const toItems = (list: typeof suppliers.data): ChoiceItem[] | undefined =>
       list?.items.map(({ id, name, active }) => ({ id, label: name, active }));
     const before = toItems(suppliers.data) ?? [];
-    const reloaded = await suppliers.refetch();
-    const chosen = draftRef.current.supplierId;
-    if (reloaded.isError) setDroppedSupplier(rejectedId);
-    const missing = reloaded.isError
-      ? chosen === rejectedId
-        ? [{ path: 'supplierId', message: rejectedText }]
+    const [reloaded, lists] = await Promise.all([
+      suppliers.refetch(),
+      reloadPickListValues(queryClient),
+    ]);
+    const current = draftRef.current;
+    const chosen = current.supplierId;
+    const supplierRejected = rejectedPath === 'supplierId';
+    if (reloaded.isError && supplierRejected) setDroppedSupplier(rejectedId);
+    const supplierMissing = reloaded.isError
+      ? supplierRejected && chosen === rejectedId
+        ? [{ path: 'supplierId', id: rejectedId, message: rejectedText ?? '' }]
         : []
       : findMissingChoices(
           [
@@ -973,11 +1146,43 @@ export function DeviceIntakePage() {
           ],
           { supplierId: toItems(reloaded.data) },
         );
-    const [supplierMissing] = missing;
-    if (supplierMissing !== undefined) {
-      change({ supplierId: null });
-      setError('supplierId', supplierMissing.message);
-      setSupplierRejected(true);
+    const device = deviceRef.current;
+    const valuesMissing =
+      device === null
+        ? []
+        : findMissingListChoices(
+            deviceValueChoices(device, current, {
+              conditionListId,
+              ports: portListIds(pickLists.data?.items),
+            }),
+            lists,
+            { path: rejectedPath, id: rejectedId },
+          );
+    const dropped = droppedAfterReload(lists, rejectedId);
+    if (dropped.length > 0) setDroppedValues((previous) => new Set([...previous, ...dropped]));
+
+    const texts: FieldErrors = {};
+    for (const { path, message } of [...supplierMissing, ...valuesMissing]) texts[path] ??= message;
+    if (Object.keys(texts).length > 0) {
+      const next =
+        device === null ? current : withoutMissingChoices(device, current, valuesMissing);
+      // The error of a battery capacity that went with its battery value goes with it.
+      const capacity = device === null ? undefined : capacityAttribute(device);
+      if (capacity !== undefined && device !== null && !batteryCapacityShown(device, next.values)) {
+        texts[valuePath(capacity.id)] = undefined;
+      }
+      change({
+        ...(supplierMissing.length > 0 && { supplierId: null }),
+        conditionValueId: next.conditionValueId,
+        values: next.values,
+      });
+      setErrors((previous) => ({ ...previous, ...texts }));
+      setRejectionShown((previous) => ({
+        ...previous,
+        ...Object.fromEntries(
+          Object.entries(texts).flatMap(([path, text]) => (text ? [[path, true]] : [])),
+        ),
+      }));
       focusFirstError();
     }
     setReloading(false);
@@ -991,7 +1196,7 @@ export function DeviceIntakePage() {
     const current = draftRef.current;
     const found = checkAll(current, deviceRef.current);
     answeredDraftRef.current = null;
-    setSupplierRejected(false);
+    setRejectionShown({});
     if (inFormOrder(found).length > 0) {
       showFieldErrors(found);
       return;
@@ -1363,6 +1568,10 @@ export function DeviceIntakePage() {
                                 ...withConfirmed(draftRef.current, ['condition']),
                               });
                               setError('conditionValueId', undefined);
+                              setRejectionShown((previous) => ({
+                                ...previous,
+                                conditionValueId: false,
+                              }));
                             }}
                             onBlur={() => checkOnBlur('conditionValueId')}
                           >
@@ -1407,7 +1616,7 @@ export function DeviceIntakePage() {
                           inputs={draft.values}
                           errors={attributeErrors(errors)}
                           withRequired
-                          dropped={NO_DROPPED_VALUES}
+                          dropped={droppedValues}
                           disabled={saving}
                           onChange={changeAttribute}
                           onBlur={(attributeId) => checkOnBlur(valuePath(attributeId))}
