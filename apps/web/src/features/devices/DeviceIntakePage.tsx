@@ -16,7 +16,7 @@ import {
 } from '@resellr/domain/schemas/model-template.schema';
 import type { PickList } from '@resellr/domain/schemas/pick-list.schema';
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
 import { useModelTemplateQuery, useModelTemplatesQuery } from '../../api/catalog.api.ts';
@@ -28,6 +28,8 @@ import {
 import {
   useAttributesQuery,
   useConditionCodeResolutionQuery,
+  useDeviceTypesQuery,
+  useManufacturersQuery,
   usePickListsQuery,
   usePickListValuesQueries,
   usePickListValuesQuery,
@@ -61,9 +63,17 @@ import {
 import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.tsx';
 import { Badge } from '../../components/ui/Badge.tsx';
 import { Button } from '../../components/ui/Button.tsx';
+import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import { cn } from '../../components/ui/cn.ts';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
+import type { SavedNoticeState } from '../models/ModelTemplatePage.tsx';
+import {
+  clearDeviceIntakeDraft,
+  FROM_DEVICE_INTAKE,
+  readDeviceIntakeDraft,
+  storeDeviceIntakeDraft,
+} from './device-intake-draft.ts';
 
 // Texts of UI-003 `screen.md` and its mockup (UI/UX design v0.6.1; v0.6.8 for the choice after a
 // rejection for deactivation, v0.6.9 for `wi_nr_taken`).
@@ -79,6 +89,8 @@ const TEXTS = {
   modelTemplate: 'Modellvorlage',
   modelTemplateSearch: 'Modellvorlage suchen',
   otherModelTemplate: 'Andere Modellvorlage wählen',
+  newModelTemplate: 'Neue Modellvorlage anlegen',
+  nextDevice: 'Weiteres Gerät derselben Modellvorlage',
   deviceValues: 'Gerätewerte',
   modelData: 'Modelldaten (nur lesen)',
   loadingValues: 'Lade Gerätewerte …',
@@ -103,6 +115,9 @@ const TEXTS = {
   allReviewed: 'Alle Werte geprüft.',
   reviewFirst: 'Erst Werte prüfen',
 } as const;
+
+/** UI-007 for a new model template (2.0.1 "Routen der Oberfläche"). */
+const MODEL_TEMPLATE_NEW_PATH = '/modelle/neu';
 
 /** Wait after the last keystroke before the model templates are searched (as in UI-006). */
 const SEARCH_DELAY_MS = 300;
@@ -401,6 +416,29 @@ function templateLine(template: ModelTemplateListItem): string {
   );
 }
 
+/**
+ * The model template UI-007 handed back, as the hit list names it: the names of device type and
+ * manufacturer from their lists, which hold inactive entries too (DER-54-07, DER-54-14).
+ */
+function listItemOf(
+  template: ModelTemplate,
+  deviceTypes: readonly { id: number; name: string }[],
+  manufacturers: readonly { id: number; name: string }[],
+): ModelTemplateListItem | null {
+  const deviceType = deviceTypes.find(({ id }) => id === template.deviceTypeId);
+  const manufacturer = manufacturers.find(({ id }) => id === template.manufacturerId);
+  if (deviceType === undefined || manufacturer === undefined) return null;
+  return {
+    id: template.id,
+    deviceType: { id: deviceType.id, name: deviceType.name },
+    manufacturer: { id: manufacturer.id, name: manufacturer.name },
+    modelName: template.modelName,
+    typeDesignation: template.typeDesignation,
+    mpn: template.mpn,
+    mpnUnknown: template.mpnUnknown,
+  };
+}
+
 /** The text of `wi_nr_taken` with "Gerät <WI-Nr>" as link to the device (design v0.6.9). */
 function wiNrTakenError(error: ApiError): ReactNode {
   const message = error.error?.message ?? '';
@@ -556,11 +594,17 @@ const TEXT_AREA_CLASS = cn(
  * only while the battery value carries "Akku vorhanden". After the choice of a model template the
  * card loads the prefill (loading, DER-55-01) and marks each prefilled field with "zu prüfen" and
  * "Bestätigen"; the status line counts the open flags and "Speichern und zuordnen" stays
- * deactivated while one is open (disabled, DER-55-02 to DER-55-04). The condition code (at most
- * 20 characters) takes effect on leaving its field: UI-003 shows "Klartext übernommen: <Text>" or
- * "Zustandscode unbekannt" and takes the plain text and the suggestions with the prefill (REQ-015,
- * DER-57-01 to DER-57-03); after `supplier_deactivated` the code is resolved again without
- * supplier (DER-57-04). The draft for UI-007 (#186) and the dialog UI-004 (#189) follow.
+ * deactivated while one is open (disabled, DER-55-02 to DER-55-04). "Neue Modellvorlage anlegen"
+ * keeps the inputs in the draft (CU-133), the condition code with them, and opens UI-007; on the
+ * return the inputs are restored and the model template UI-007 hands back is chosen, while the
+ * card "Gerätewerte" shows loading (DER-54-07, DER-54-14), with the banner "Modellvorlage
+ * gespeichert" after a save in UI-007. With "Weiteres Gerät derselben Modellvorlage" (on by
+ * default) "Gerät speichern" empties the form when no value is left to review and keeps the model
+ * template (DER-54-08). The condition code (at most 20 characters) takes effect on leaving its
+ * field: UI-003 shows "Klartext übernommen: <Text>" or "Zustandscode unbekannt" and takes the
+ * plain text and the suggestions with the prefill (REQ-015, DER-57-01 to DER-57-03); after
+ * `supplier_deactivated` the code is resolved again without supplier (DER-57-04). The dialog
+ * UI-004 (#189) follows.
  */
 export function DeviceIntakePage() {
   const suppliers = useSuppliersQuery();
@@ -570,8 +614,26 @@ export function DeviceIntakePage() {
   const conditions = usePickListValuesQuery(conditionListId);
   const createMutation = useCreateDeviceMutation();
   const writesLocked = useWritesLocked();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  // The draft left for UI-007, read once on opening and then removed (CU-133, DER-54-07).
+  const [restored] = useState(() => readDeviceIntakeDraft<Draft>());
+  useEffect(() => clearDeviceIntakeDraft(), []);
+  // A field the stored inputs lack starts empty.
+  const [draft, setDraft] = useState<Draft>(() => ({ ...EMPTY_DRAFT, ...restored?.form }));
+  // The model template UI-007 handed back, chosen once it is read (DER-54-07, DER-54-14).
+  const [returnedTemplateId, setReturnedTemplateId] = useState(restored?.modelTemplateId ?? null);
+  // The success banner of UI-007 after "Modellvorlage speichern", taken from the history entry
+  // once, as UI-006 does (UI-007 "Aktionen": calling page).
+  const [templateSavedNotice, setTemplateSavedNotice] = useState(
+    () => (location.state as SavedNoticeState | null)?.savedNotice ?? null,
+  );
+  useEffect(() => {
+    if (location.state !== null) void navigate('.', { replace: true, state: null });
+  }, [location.state, navigate]);
+  // "Weiteres Gerät derselben Modellvorlage", on by default; only state of the page (2.5).
+  const [nextDevice, setNextDevice] = useState(true);
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const template = draft.modelTemplate;
@@ -603,18 +665,27 @@ export function DeviceIntakePage() {
   }, [prefillTask, prefilledTask, prefillQuery.data, attributesQuery.data]);
   // The condition code as it took effect and the supplier it is resolved for; UI-003 shows its
   // plain text or "Zustandscode unbekannt" (DER-57-01). After `supplier_deactivated` it is
-  // resolved again without supplier (2.0.11 "Lieferant in UI-003", DER-57-04).
+  // resolved again without supplier (2.0.11 "Lieferant in UI-003", DER-57-04). A code restored
+  // from the draft took effect before UI-007 opened, so its plain text shows again.
   const [resolvedCode, setResolvedCode] = useState<{
     code: string;
     supplierId: number | null;
-  } | null>(null);
+  } | null>(() => {
+    const code = draft.conditionCode.trim();
+    return code === '' ? null : { code, supplierId: draft.supplierId };
+  });
   const codeResolution = useConditionCodeResolutionQuery(
     resolvedCode?.code ?? null,
     resolvedCode?.supplierId ?? null,
   );
   const codeHintId = useId();
-  // The reads of the panel "Modelldaten", here for their errors (2.0.7).
-  const templateQuery = useModelTemplateQuery(template?.id ?? null);
+  // The reads of the panel "Modelldaten", here for their errors (2.0.7); before, the model
+  // template handed back by UI-007 with the lists that name it.
+  const templateQuery = useModelTemplateQuery(returnedTemplateId ?? template?.id ?? null);
+  const deviceTypes = useDeviceTypesQuery();
+  const manufacturers = useManufacturersQuery();
+  // Also replaces a model template chosen before UI-007 opened.
+  const returning = returnedTemplateId !== null;
   const modelDataLists = usePickListValuesQueries(
     modelDataPickListIds(
       modelDataRows(attributesQuery.data?.items, templateQuery.data),
@@ -670,8 +741,9 @@ export function DeviceIntakePage() {
   const activeConditions = (conditions.data?.items ?? []).filter(({ active }) => active);
 
   const saving = createMutation.isPending;
-  // Until the suppliers are read again after a rejection, a save could send the rejected id.
-  const canSave = !saving && !writesLocked && !reloading;
+  // Until the suppliers are read again after a rejection, a save could send the rejected id;
+  // until the model template of UI-007 is chosen, it would be missing.
+  const canSave = !saving && !writesLocked && !reloading && !returning;
 
   function change(next: Partial<Draft>) {
     setDraft((previous) => ({ ...previous, ...next }));
@@ -759,7 +831,14 @@ export function DeviceIntakePage() {
 
   function chooseTemplate(chosen: ModelTemplateListItem) {
     const current = draftRef.current;
-    change({ modelTemplate: chosen, values: {}, reviewKeys: [], confirmedKeys: [] });
+    // The values of the attributes stay only with the same device type (DER-54-07).
+    const sameType = current.modelTemplate?.deviceType.id === chosen.deviceType.id;
+    change({
+      modelTemplate: chosen,
+      ...(!sameType && { values: {} }),
+      reviewKeys: [],
+      confirmedKeys: [],
+    });
     // The prefill and the plain text shown follow the code and the supplier of the form (2.5).
     const code = conditionCodeOf(current);
     setResolvedCode(code === null ? null : { code, supplierId: current.supplierId });
@@ -772,6 +851,40 @@ export function DeviceIntakePage() {
     setErrors((previous) => ({ ...withoutValueErrors(previous), modelTemplateId: undefined }));
     setSearchInput('');
     setSearchTerm(undefined);
+    setReturnFailed(null);
+  }
+
+  // The model template handed back by UI-007 is chosen like a hit once it and the names of its
+  // device type and manufacturer are read; the other inputs stay (DER-54-07, DER-54-14).
+  const chooseTemplateRef = useRef(chooseTemplate);
+  chooseTemplateRef.current = chooseTemplate;
+  useEffect(() => {
+    if (returnedTemplateId === null || templateQuery.data?.id !== returnedTemplateId) return;
+    if (deviceTypes.data === undefined || manufacturers.data === undefined) return;
+    const item = listItemOf(templateQuery.data, deviceTypes.data.items, manufacturers.data.items);
+    if (item === null) return;
+    chooseTemplateRef.current(item);
+    setReturnedTemplateId(null);
+  }, [returnedTemplateId, templateQuery.data, deviceTypes.data, manufacturers.data]);
+  // If one of these reads fails (`.error`), the return is given up: the search and the choice
+  // show again and the error banner stays until a model template is chosen; the inputs stay.
+  // When the server is unreachable, "Erneut versuchen" reads them again (2.0.7).
+  const [returnFailed, setReturnFailed] = useState<ApiError | null>(null);
+  const returnError = returning
+    ? [templateQuery.error, deviceTypes.error, manufacturers.error].find(
+        (error) => error !== null && error.kind !== 'unreachable',
+      )
+    : undefined;
+  useEffect(() => {
+    if (returnError === undefined) return;
+    setReturnFailed(returnError);
+    setReturnedTemplateId(null);
+  }, [returnError]);
+
+  /** "Neue Modellvorlage anlegen": the inputs stay in the draft while UI-007 is open (2.5). */
+  function openNewModelTemplate() {
+    blurCheck.cancel();
+    storeDeviceIntakeDraft(draftRef.current);
   }
 
   /** Arrow down from the search field moves to the first hit, up and down between the hits. */
@@ -870,7 +983,8 @@ export function DeviceIntakePage() {
     setReloading(false);
   }
 
-  function save() {
+  /** "Gerät speichern", or with `assign` "Speichern und zuordnen" (UI-004 follows with #189). */
+  function save({ assign = false } = {}) {
     // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
     if (!canSave) return;
@@ -889,10 +1003,53 @@ export function DeviceIntakePage() {
       onSuccess: (device) => {
         setSavedWiNr(device.wiNr);
         setNotice({ kind: 'success' });
+        // Only "Gerät speichern" empties the form, once no value is left to review; the answer
+        // counts, as the server builds the review flags again (DER-54-08, 2.0.11, 2.5).
+        if (!assign && nextDeviceRef.current && device.captureStatus === 'checked') {
+          emptyForNextDevice();
+        }
       },
       onError: onFailed,
     });
   }
+
+  // The choice at the time of the answer counts, so the check box is read through a ref.
+  const nextDeviceRef = useRef(nextDevice);
+  nextDeviceRef.current = nextDevice;
+
+  /**
+   * After "Gerät speichern" with "Weiteres Gerät derselben Modellvorlage": the form is emptied,
+   * the model template stays chosen for the next device, and the focus goes to WI-Nr (DER-54-08).
+   */
+  function emptyForNextDevice() {
+    const { modelTemplate } = draftRef.current;
+    setDraft({ ...EMPTY_DRAFT, modelTemplate });
+    // The next device gets the prefill of the model template again (REQ-013); the condition code
+    // is emptied with the form.
+    setResolvedCode(null);
+    setPrefillTask(
+      modelTemplate === null
+        ? null
+        : {
+            modelTemplateId: modelTemplate.id,
+            conditionCode: null,
+            supplierId: null,
+            scope: 'template',
+          },
+    );
+    setErrors({});
+    setSummaryShown(false);
+    answeredDraftRef.current = null;
+    setFocusWiNr(true);
+  }
+
+  // The fields are locked while the save runs, so WI-Nr takes the focus once it is over.
+  const [focusWiNr, setFocusWiNr] = useState(false);
+  useEffect(() => {
+    if (!focusWiNr || saving) return;
+    deviceCardRef.current?.querySelector('input')?.focus();
+    setFocusWiNr(false);
+  }, [focusWiNr, saving]);
 
   // Ctrl+S saves the device, Ctrl+Enter saves and assigns (UI-003 "Aktionen").
   const saveRef = useRef(save);
@@ -904,7 +1061,7 @@ export function DeviceIntakePage() {
       event.preventDefault();
       // "Speichern und zuordnen" waits while values are to be reviewed (UI-003.disabled).
       if (event.key === 'Enter' && openReviewKeys(draftRef.current).length > 0) return;
-      saveRef.current();
+      saveRef.current({ assign: event.key === 'Enter' });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -920,6 +1077,8 @@ export function DeviceIntakePage() {
     templateQuery.error,
     prefillQuery.error,
     codeResolution.error,
+    ...(returning ? [deviceTypes.error, manufacturers.error] : []),
+    returnFailed,
     ...modelDataLists.map(({ error }) => error),
     search.error,
   ];
@@ -933,6 +1092,7 @@ export function DeviceIntakePage() {
     prefillQuery.error === null &&
     attributesQuery.error === null;
   const valuesLoading =
+    (returning && templateQuery.error === null) ||
     (conditions.isPending && conditionListId !== null) ||
     (attributesQuery.isPending && attributesQuery.error === null) ||
     prefillPending;
@@ -957,6 +1117,27 @@ export function DeviceIntakePage() {
         : TEXTS.conditionCodeUnknown;
   const reviewHintId = useId();
 
+  // Opens UI-007 with UI-003 as calling page; the inputs stay in the draft (UI-003 "Aktionen").
+  // Locked like the other triggers while the save runs (P-08, 2.0.7 `.speichert`).
+  const newTemplateLink = saving ? (
+    <a
+      role="link"
+      aria-disabled="true"
+      className="self-start cursor-not-allowed text-body text-text-secondary"
+    >
+      {TEXTS.newModelTemplate}
+    </a>
+  ) : (
+    <Link
+      to={MODEL_TEMPLATE_NEW_PATH}
+      state={FROM_DEVICE_INTAKE}
+      className="self-start text-body text-primary no-underline"
+      onClick={openNewModelTemplate}
+    >
+      {TEXTS.newModelTemplate}
+    </Link>
+  );
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
@@ -966,6 +1147,11 @@ export function DeviceIntakePage() {
         </div>
 
         <OutcomeUnknownBanner />
+        {templateSavedNotice !== null && (
+          <PageBanner variant="success" onClose={() => setTemplateSavedNotice(null)}>
+            {templateSavedNotice}
+          </PageBanner>
+        )}
         {unreachable && <UnreachableBanner />}
         {readFailed && (
           <PageBanner variant="error" error={readFailed}>
@@ -1078,7 +1264,7 @@ export function DeviceIntakePage() {
 
             <section aria-label={TEXTS.modelTemplate} className={CARD}>
               <h2 className={CARD_HEADING}>{TEXTS.modelTemplate}</h2>
-              {template === null ? (
+              {returning ? null : template === null ? (
                 <div className="flex flex-col gap-2" onKeyDown={onHitsKeyDown}>
                   <FormField
                     label={TEXTS.modelTemplateSearch}
@@ -1115,6 +1301,7 @@ export function DeviceIntakePage() {
                       ))}
                     </ul>
                   )}
+                  {newTemplateLink}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -1124,28 +1311,32 @@ export function DeviceIntakePage() {
                   >
                     {templateLine(template)}
                   </p>
-                  <button
-                    type="button"
-                    className="cursor-pointer self-start text-body text-primary"
-                    disabled={saving}
-                    onClick={() => {
-                      change({
-                        modelTemplate: null,
-                        values: {},
-                        reviewKeys: [],
-                        confirmedKeys: [],
-                      });
-                      setPrefillTask(null);
-                      setErrors(withoutValueErrors);
-                    }}
-                  >
-                    {TEXTS.otherModelTemplate}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <button
+                      type="button"
+                      className="cursor-pointer text-body text-primary"
+                      disabled={saving}
+                      onClick={() => {
+                        change({
+                          modelTemplate: null,
+                          values: {},
+                          reviewKeys: [],
+                          confirmedKeys: [],
+                        });
+                        setPrefillTask(null);
+                        setErrors(withoutValueErrors);
+                      }}
+                    >
+                      {TEXTS.otherModelTemplate}
+                    </button>
+                    <span aria-hidden="true" className="h-4 border-l border-border" />
+                    {newTemplateLink}
+                  </div>
                 </div>
               )}
             </section>
 
-            {template !== null && (
+            {(template !== null || returning) && (
               <section aria-label={TEXTS.deviceValues} className={CARD}>
                 <h2 className={CARD_HEADING}>{TEXTS.deviceValues}</h2>
                 {valuesLoading ? (
@@ -1278,6 +1469,12 @@ export function DeviceIntakePage() {
             )}
           </div>
         )}
+        <Checkbox
+          label={TEXTS.nextDevice}
+          checked={nextDevice}
+          disabled={saving}
+          onChange={setNextDevice}
+        />
         <Button type="submit" form={formId} disabled={!canSave}>
           {saving ? TEXTS.saving : TEXTS.save}
         </Button>
@@ -1288,7 +1485,7 @@ export function DeviceIntakePage() {
             disabled={!canSave || openKeys.length > 0}
             title={openKeys.length > 0 ? TEXTS.reviewFirst : undefined}
             aria-describedby={reviewShown && openKeys.length > 0 ? reviewHintId : undefined}
-            onClick={save}
+            onClick={() => save({ assign: true })}
           >
             {TEXTS.saveAndAssign}
           </Button>
