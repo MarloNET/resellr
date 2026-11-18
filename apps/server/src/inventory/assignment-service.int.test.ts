@@ -402,6 +402,58 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe('bad_request');
   });
+
+  describe('order of the checks: the first matching stage wins (2.6, Nachtrag MAR-1053)', () => {
+    it('checks the request schema before the device', async () => {
+      const response = await createListing({
+        fromDeviceId: 999,
+        deviceVersion: 1,
+        articleNumber: 'ab_1',
+      });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error.code).toBe('validation_failed');
+    });
+
+    it('checks the device version before the stock status', async () => {
+      const deviceId = await captureDevice('626198');
+      t.database.sqlite
+        .prepare("UPDATE device SET stock_status = 'sold' WHERE id = ?")
+        .run(deviceId);
+
+      const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 2 });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error.code).toBe('version_conflict');
+    });
+
+    it('checks the stock status before the variant data', async () => {
+      await createListing({ fromDeviceId: await captureDevice('626198'), deviceVersion: 1 });
+      const deviceId = await captureDevice('626199');
+      t.database.sqlite
+        .prepare("UPDATE device SET stock_status = 'cancelled' WHERE id = ?")
+        .run(deviceId);
+
+      const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
+
+      expect(response.json().error.code).toBe('device_not_available');
+      expect(count('listing')).toBe(1);
+    });
+
+    it('checks the variant data before the article number', async () => {
+      await createListing({
+        fromDeviceId: await captureDevice('626198'),
+        deviceVersion: 1,
+        articleNumber: '626199',
+      });
+      const deviceId = await captureDevice('626199');
+
+      const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
+
+      expect(response.json().error.code).toBe('variant_duplicate');
+      expect(count('listing')).toBe(1);
+    });
+  });
 });
 
 describe('createFromDevice events (CU-123, CU-128; Technical Specification 2.0.4, 2.6)', () => {

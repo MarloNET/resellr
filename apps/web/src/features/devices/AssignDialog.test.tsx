@@ -203,6 +203,19 @@ describe('UI-004 "Neues Modell-Inserat anlegen" (CU-134, #197)', () => {
     expect(articleNumberInput()).toBeNull();
   });
 
+  it('UI-004.error shows device_not_available.new_listing with its text in the dialog; the dialog stays open', async () => {
+    const message = 'Gerät ist bereits verkauft oder storniert';
+    mockApi(() => Response.json(errorBody('device_not_available', { message }), { status: 422 }));
+    const router = renderDialog();
+
+    fireEvent.click(createButton());
+
+    const alert = await within(dialog()).findByRole('alert');
+    expect(alert.textContent).toBe(message);
+    expect(router.state.location.pathname).toBe('/geraete/41');
+    expect(articleNumberInput()).toBeNull();
+  });
+
   it('UI-004.error shows "Zuordnung fehlgeschlagen. Referenz: <Nr>" for a server error', async () => {
     mockApi(() =>
       Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
