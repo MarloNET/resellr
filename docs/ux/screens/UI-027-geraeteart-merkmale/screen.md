@@ -22,7 +22,7 @@
 | Geräteart: Status | Umschalter | ja | aktiv/deaktiviert | – |
 | Merkmal: Bezeichnung | Text | ja | 1–100 Zeichen, ohne { }, nicht gleich einem festen Platzhalternamen, eindeutig je Geräteart | „Bezeichnung ist bei dieser Geräteart bereits vergeben“; „Bezeichnung: 1 bis 100 Zeichen“; „Bezeichnung darf { und } nicht enthalten“; „Bezeichnung ist für einen festen Platzhalter vergeben: <Name>“ (v0.6, meldungskatalog.md M-02 bis M-04) |
 | Datentyp | Auswahl | ja | Text, Ganzzahl, Dezimalzahl, Ja/Nein, Auswahl aus Liste, Mehrfachangabe Anzahl × Typ | – |
-| Einheit, Schreibweise | Text, Auswahl | nein | Schreibweise „mit/ohne Leerzeichen“ | – |
+| Einheit, Schreibweise | Text, Auswahl | nein | Schreibweise „mit/ohne Leerzeichen“ | „Einheit: höchstens 20 Zeichen“ (**v0.6.12, MAR-494:** Wortlaut nach PO-Entscheidung MAR-492, Owner bestätigt mit der nächsten Freigabe; Grenze 0 bis 20 aus der Spec unverändert) |
 | Mindest-/Höchstwert | Zahl | nein | nur bei Zahlen; Min ≤ Max | „Mindestwert darf nicht größer als Höchstwert sein“ |
 | Auswahlliste | Auswahl | ja bei Datentyp „Auswahl aus Liste“ | Liste aus UI-028 | „Auswahlliste fehlt“ |
 | Ebene | Auswahl | ja | Modell/Gerät; nach gespeicherten Werten gesperrt | „Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.“ (Datentyp analog: „Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.“) |
