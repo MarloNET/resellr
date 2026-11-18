@@ -80,9 +80,21 @@
 Ein fehlender Wert eines (wieder aktivierten) Pflichtmerkmals wird erst beim Speichern in **UI-007** (Modellvorlage, REQ-010/REQ-008), **UI-010** und **UI-003** (Gerätewerte, REQ-014) und **UI-014** „Inseratswerte bearbeiten“ (REQ-088, ohne Preise und Fotos) verlangt, auch wenn die Änderung ein anderes Feld betrifft. Die Darstellung dort steht in den jeweiligen `screen.md` und im Meldungskatalog (**M-32**, „<Merkmal> fehlt“). **Preis erfassen und Fotos zuordnen (UI-014, UI-015) verlangen den Wert nicht und zeigen M-32 nicht (AC-REQ-005-12 c)**; ebenso Zuordnen, Umbuchen, Verkauf, WI-Nr-Korrektur, Storno und Freigabe (A-39).
 
 ## Fenstergröße und Bedienung
-Drei Bereiche (Geräteart-Liste, Merkmal-Tabelle, Seitenpanel) ab 1366 px; Seitenpanel überlagert bei schmaler Breite die Tabelle. Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md).
+Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt zusätzlich die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md). **Klarstellung v0.6.14 (MAR-836, Bug #372, Minimal; keine Änderung der Anforderung):**
+
+| Fenster | Panel | Darstellung |
+|---|---|---|
+| 1366 × 768 | geschlossen | drei Bereiche nebeneinander (Geräteart-Liste, Merkmal-Tabelle); die Tabelle hat einen eigenen waagrechten Scrollbereich; unverändert |
+| 1366 × 768 | **geöffnet** | das Seitenpanel **überlagert die Tabelle** (Fläche mit „Schließen“, Fokus bleibt im Panel, Esc schließt; R-1 (3), Spec-Nachtrag MAR-831); die Zeilenaktionen und die Bezeichnungen der Zeilen darunter sind bei offenem Panel nicht bedienbar |
+| ab 1920 × 1080 (Bruchstelle `full`) | geöffnet | das Panel steht **neben** der Tabelle, wie in `default.png`; die Tabelle bleibt bedienbar; unverändert |
+
+- **Nach „Schließen“ oder Speichern** des Panels sind die Zeilenaktionen („Deaktivieren“ / „Wieder aktivieren“) und die Bezeichnungen der Zeilen bei 1366 × 768 bedienbar; der Tastaturfokus ist vollständig sichtbar (nicht von Panel oder fixierter Spalte verdeckt).
+- **Folgerung „Wieder aktivieren“ (DER-34-16):** Bei 1366 × 768 ist die Zeilenaktion „Wieder aktivieren“ **erst nach Speichern oder Schließen des Panels bedienbar**. Der Fall „Panel offen, Pflicht geändert, dann Wieder aktivieren“ in einem Zug (Abschnitt „Wieder aktivieren“: Panel bleibt beim Aktivieren offen) gilt daher **nur ab 1920 × 1080**; bei 1366 × 768 sind es zwei Schritte: Panel speichern oder schließen, dann „Wieder aktivieren“.
+- **Ungespeicherte Eingabe beim Schließen:** Dieser Abschnitt trifft dazu keine Aussage; UI-027 beschreibt für „Schließen“ weder eine Rückfrage noch ein Verwerfen. Eine Festlegung hier wäre eine neue Regel und ist nicht Teil dieser Klarstellung (siehe Übergabe MAR-836).
 
 ## Bekannte Abweichungen im Mockup
+**v0.6.14 (MAR-836):** `default.png` zeigt den Zustand **1920 × 1080 mit Panel neben der Tabelle**. Die **Überlagerung bei 1366 × 768 mit geöffnetem Panel ist nur in `screen.md` beschrieben** (Abschnitt „Fenstergröße und Bedienung“), es gibt kein Mockup dafür (kein neues Mockup, Klassifikation Minimal).
+
 **v0.6.4:** Die Zeilenaktion „Wieder aktivieren“ und der Banner „Merkmal aktiviert“ sind **nur in `screen.md` beschrieben**, `default.png` zeigt sie nicht (kein neues Mockup, Klassifikation Minimal). „Business Portal“ (Stitch); Stitch ergänzt Kopfzähler und Statuschips „aktiv“ (aus Requirements ableitbar, übernommen); Untertitel „Konfiguration“ in der zweiten Navigation (nicht Teil des Designs); Panel zeigt „RAM“ auf Ebene Gerät als Beispiel; Hinweistext der Sperrung als Fehlerbox (maßgeblich: Inline am Feld).
 
 ## Annahmen und offene Fragen
