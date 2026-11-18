@@ -515,6 +515,63 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
     expect((await get('/api/devices?wiNr=999')).json()).toEqual({ items: [] });
   });
 
+  it('AC-REQ-016-01 the search for "6160" lists the device "616027" with model template, model listing, inventory and capture status', async () => {
+    const device = (await post(body({ wiNr: '616027' }))).json();
+    const unassigned = (await post(body({ wiNr: '616028' }))).json();
+    await post(body({ wiNr: '626198' }));
+    const listingId = insertListing('iPhone 13, iOS', 'MI-1');
+    t.database.sqlite
+      .prepare('UPDATE device SET listing_id = ? WHERE id = ?')
+      .run(listingId, device.id);
+
+    const response = await get('/api/devices?wiNr=6160');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        {
+          id: device.id,
+          wiNr: '616027',
+          modelTemplateLabel: 'iPhone 13',
+          listing: { id: listingId, title: 'iPhone 13, iOS' },
+          stockStatus: 'available',
+          captureStatus: 'checked',
+        },
+        {
+          id: unassigned.id,
+          wiNr: '616028',
+          modelTemplateLabel: 'iPhone 13',
+          listing: null,
+          stockStatus: 'available',
+          captureStatus: 'checked',
+        },
+      ],
+    });
+  });
+
+  it('AC-REQ-016-02 the search without a matching WI-Nr answers an empty list', async () => {
+    await post(body({ wiNr: '616027' }));
+
+    const response = await get('/api/devices?wiNr=7777');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ items: [] });
+  });
+
+  it('DER-87-03 a cancelled device appears in the hits of a part of its WI-Nr with the inventory status "cancelled"', async () => {
+    const cancelled = (await post(body({ wiNr: '616027' }))).json();
+    cancel(cancelled.id);
+
+    const response = await get('/api/devices?wiNr=1602');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        expect.objectContaining({ id: cancelled.id, wiNr: '616027', stockStatus: 'cancelled' }),
+      ],
+    });
+  });
+
   it.each([
     ['without wiNr', '/api/devices'],
     ['with an empty wiNr', '/api/devices?wiNr='],

@@ -155,4 +155,28 @@ test.describe('UI-009 Geräte and UI-010 Gerät (CU-136, CU-137)', () => {
     await page.reload();
     await expect(page.getByRole('textbox', { name: 'Optik-Note' })).toHaveValue('4');
   });
+
+  test('DER-87-02 Enter in the search field opens the only hit', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const { id, wiNr } = await createDevice(page, server.baseUrl, hash);
+    await page.goto('/geraete');
+
+    await page.getByRole('searchbox', { name: 'WI-Nr' }).fill(wiNr);
+    await page.keyboard.press('Enter');
+
+    await expect(page).toHaveURL(new RegExp(`/geraete/${id}$`));
+    await expect(page.getByRole('heading', { level: 1, name: `Gerät ${wiNr}` })).toBeVisible();
+  });
+
+  test('DER-87-05 the button "Gerät einbuchen" opens UI-003', async ({ page }) => {
+    await page.goto('/geraete');
+
+    await page.getByRole('main').getByRole('link', { name: 'Gerät einbuchen' }).click();
+
+    await expect(page).toHaveURL(/\/geraete\/neu$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Gerät einbuchen' })).toBeVisible();
+});
 });

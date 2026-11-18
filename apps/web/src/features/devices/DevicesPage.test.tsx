@@ -43,7 +43,10 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
   error: { code, message: '', fields: [], details: {}, referenceNumber: null, ...extra },
 });
 
-type SearchHandler = (params: URLSearchParams) => Promise<Response> | Response;
+type SearchHandler = (
+  params: URLSearchParams,
+  init: RequestInit | undefined,
+) => Promise<Response> | Response;
 
 /** `fetch` of the page: the frame's status and the device search; records the searches. */
 function mockApi({
@@ -55,9 +58,10 @@ function mockApi({
     vi.fn<typeof fetch>(async (input, init) => {
       const url = new URL(String(input), 'http://127.0.0.1');
       if (url.pathname === '/api/ops/status') return Response.json(OPS_STATUS);
+      if (url.pathname === '/api/ops/health') return Response.json({ state: 'ready' });
       if (url.pathname === '/api/devices') {
         searches.push(url.search);
-        return search(url.searchParams);
+        return search(url.searchParams, init);
       }
       if (url.pathname.startsWith('/api/devices/')) return new Promise<Response>(() => {});
       throw new Error(`unexpected request ${init?.method ?? 'GET'} ${url.pathname}`);
@@ -103,11 +107,12 @@ function expectAccessiblePage() {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
-  it('UI-009.default DER-54-09 has the focus in the search field, the tab "Suche" and "Gerät einbuchen", without a search', async () => {
+  it('UI-009.default DER-54-09 DER-87-02 has the focus in the search field, the tab "Suche" and "Gerät einbuchen", without a search', async () => {
     const { searches } = mockApi();
 
     await openPage();
@@ -122,7 +127,7 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     expectAccessiblePage();
   });
 
-  it('UI-009.default shows the tab "Suche" also with ?reiter=suche and an unknown tab', async () => {
+  it('UI-009.default DER-87-02 shows the tab "Suche" also with ?reiter=suche and an unknown tab', async () => {
     mockApi();
 
     await openPage('/geraete?reiter=suche');
@@ -173,7 +178,7 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     expectAccessiblePage();
   });
 
-  it('UI-009.loading DER-54-09 shows "Suche …" while the search runs', async () => {
+  it('UI-009.loading DER-54-09 DER-87-01 shows "Suche …" while the search runs', async () => {
     mockApi({ search: pending });
     await openPage();
 
@@ -184,7 +189,7 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     expectAccessiblePage();
   });
 
-  it('UI-009.empty (Suche) DER-54-09 shows "Kein Gerät mit dieser WI-Nr" without a hit', async () => {
+  it('AC-REQ-016-02 UI-009.empty (Suche) DER-54-09 shows "Kein Gerät mit dieser WI-Nr" without a hit', async () => {
     mockApi({ search: () => Response.json({ items: [] }) });
     await openPage();
 
@@ -195,7 +200,7 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     expectAccessiblePage();
   });
 
-  it('UI-009.error DER-54-09 shows "Suche fehlgeschlagen. Referenz: <Nr>" on 500 internal_error, keeping the input', async () => {
+  it('UI-009.error DER-54-09 DER-87-01 shows "Suche fehlgeschlagen. Referenz: <Nr>" on 500 internal_error, keeping the input', async () => {
     mockApi({
       search: () =>
         Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
@@ -224,7 +229,7 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     expect(searches).toEqual(['?wiNr=6336']);
   });
 
-  it('DER-54-10 a click on a row opens UI-010 with this device', async () => {
+  it('DER-54-10 DER-87-02 a click on a row opens UI-010 with this device', async () => {
     mockApi();
     const router = await openPage();
     type('6336');
@@ -235,7 +240,7 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     expect(router.state.location.pathname).toBe('/geraete/5');
   });
 
-  it('DER-54-10 each WI-Nr is a link to UI-010, so Enter on it opens the device', async () => {
+  it('DER-54-10 DER-87-02 each WI-Nr is a link to UI-010, so Enter on it opens the device', async () => {
     mockApi();
     await openPage();
     type('6336');
@@ -248,5 +253,106 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
       '/geraete/5',
       '/geraete/6',
     ]);
+  });
+
+  it('DER-87-02 Enter in the search field opens the first row when there is exactly one hit', async () => {
+    const { searches } = mockApi({ search: () => Response.json({ items: [SOLD] }) });
+    const router = await openPage();
+
+    type('A6336');
+    fireEvent.submit(searchField());
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/6'));
+    expect(searches).toEqual(['?wiNr=A6336']);
+  });
+
+  it('DER-87-02 Enter after the hits have arrived opens the only hit', async () => {
+    mockApi({ search: () => Response.json({ items: [SOLD] }) });
+    const router = await openPage();
+    type('A6336');
+    await screen.findByRole('table', { name: 'Treffer' });
+
+    fireEvent.submit(searchField());
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/6'));
+  });
+
+  it('DER-87-02 Enter with more than one hit stays in the hit list', async () => {
+    mockApi();
+    const router = await openPage();
+    type('6336');
+    await screen.findByRole('table', { name: 'Treffer' });
+
+    fireEvent.submit(searchField());
+
+    await screen.findByRole('table', { name: 'Treffer' });
+    expect(router.state.location.pathname).toBe('/geraete');
+    expect(within(hitList()).getAllByRole('row')).toHaveLength(4);
+  });
+
+  it('DER-87-02 Enter without a hit shows "Kein Gerät mit dieser WI-Nr" and stays on the page', async () => {
+    mockApi({ search: () => Response.json({ items: [] }) });
+    const router = await openPage();
+    type('999');
+
+    fireEvent.submit(searchField());
+
+    expect(await screen.findByText('Kein Gerät mit dieser WI-Nr')).toBeTruthy();
+    expect(router.state.location.pathname).toBe('/geraete');
+  });
+
+  it('UI-009.unreachable DER-87-04 shows P-06 with "Erneut versuchen" above the page when the search gets no answer; it disappears after an answer', async () => {
+    let reachable = false;
+    mockApi({
+      search: () => {
+        if (!reachable) throw new TypeError('Failed to fetch');
+        return Response.json({ items: [SOLD] });
+      },
+    });
+    await openPage();
+    type('A6336');
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
+    expect(banner.textContent).not.toContain('Suche fehlgeschlagen');
+    expect(searchField().value).toBe('A6336');
+    expectAccessiblePage();
+
+    reachable = true;
+    fireEvent.click(within(banner).getByRole('button', { name: 'Erneut versuchen' }));
+
+    await screen.findByRole('table', { name: 'Treffer' });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('UI-009.unreachable DER-87-04 shows P-06 when the search takes longer than 5 s', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockApi({
+      search: (_params, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        }),
+    });
+    await openPage();
+    type('A6336');
+    await screen.findByRole('status');
+
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'resellr ist nicht erreichbar.',
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Geräte' })).toBeTruthy();
+  });
+
+  it('DER-87-05 the button "Gerät einbuchen" opens UI-003', async () => {
+    mockApi();
+    const router = await openPage();
+
+    fireEvent.click(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Gerät einbuchen' }),
+    );
+
+    expect(router.state.location.pathname).toBe('/geraete/neu');
   });
 });
