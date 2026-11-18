@@ -722,3 +722,126 @@ describe('review flags of POST /api/devices (CU-121, CU-118, Technical Specifica
     expect(response.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
   });
 });
+
+/**
+ * "ThinkPad T14" of 2.5 "Nur aktive Merkmale": a notebook with the default RAM 16 GB, and a
+ * request with its values unchanged and the other required values of the level device.
+ */
+function insertT14() {
+  const { sqlite } = t.database;
+  const one = <T>(sql: string, ...params: unknown[]) => sqlite.prepare(sql).get(...params) as T;
+  const notebook = one<{ id: number }>("SELECT id FROM device_type WHERE name = 'Notebook'").id;
+  const attributeId = (label: string) =>
+    one<{ id: number }>(
+      'SELECT id FROM attribute WHERE device_type_id = ? AND label = ?',
+      notebook,
+      label,
+    ).id;
+  const valueId = (label: string) =>
+    one<{ id: number }>('SELECT id FROM pick_list_value WHERE label = ?', label).id;
+  const ram = attributeId('RAM');
+  const t14 = insertModelTemplate(sqlite, {
+    deviceTypeId: notebook,
+    manufacturerId: insertManufacturer(sqlite, 'Lenovo'),
+    modelName: 'ThinkPad T14',
+    mpn: '20W0S0CN00',
+    defaultDeviceValues: { [ram]: 16 },
+  });
+  const t14Body = (wiNr: string) =>
+    body({
+      wiNr,
+      modelTemplateId: t14,
+      values: {
+        [ram]: 16,
+        [attributeId('Speicherkapazität')]: 512,
+        [attributeId('Tastaturlayout')]: valueId('Deutsch (QWERTZ)'),
+        [attributeId('Betriebssystem')]: valueId('Windows 11 Pro'),
+        [attributeId('Netzteil')]: valueId('mit Netzteil (original)'),
+        [attributeId('Akku')]: ids.withBattery,
+        [attributeId('Akkukapazität')]: { percent: 90 },
+      },
+    });
+  return { t14, ram, t14Body };
+}
+
+/** Deactivates or activates an attribute through `PATCH /api/attributes/{id}` (UI-027). */
+async function setAttributeActive(id: number, active: boolean) {
+  const { version } = t.database.sqlite
+    .prepare('SELECT version FROM attribute WHERE id = ?')
+    .get(id) as { version: number };
+  const response = await t.app.inject({
+    method: 'PATCH',
+    url: `/api/attributes/${id}`,
+    headers: SAME_ORIGIN_WRITE,
+    payload: { version, active },
+  });
+  expect(response.statusCode).toBe(200);
+}
+
+describe('prefill only of active attributes (CU-117, CU-293, CU-121; Technical Specification 2.5)', () => {
+  it('DER-34-21 the prefill of "ThinkPad T14" has neither RAM 16 GB nor its review flag while RAM is deactivated, again after activating', async () => {
+    const { t14, ram } = insertT14();
+    await setAttributeActive(ram, false);
+
+    const deactivated = await get(`/api/model-templates/${t14}/device-prefill`);
+
+    expect(deactivated.statusCode).toBe(200);
+    expect(deactivated.json()).toMatchObject({ values: {}, reviewKeys: [] });
+    const stored = t.database.sqlite
+      .prepare('SELECT default_device_values FROM model_template WHERE id = ?')
+      .get(t14) as { default_device_values: string };
+    expect(JSON.parse(stored.default_device_values)).toEqual({ [ram]: 16 });
+
+    await setAttributeActive(ram, true);
+    const again = (await get(`/api/model-templates/${t14}/device-prefill`)).json();
+    expect(again.values).toEqual({ [ram]: 16 });
+    expect(again.reviewKeys).toEqual([String(ram)]);
+  });
+
+  it('DER-34-21 saving a device forms the prefill with the same attributes, so a deactivated RAM gets no review flag', async () => {
+    const { ram, t14Body } = insertT14();
+    await setAttributeActive(ram, false);
+
+    // UI-003 no longer asks for RAM; a value sent anyway equals the default and is not flagged.
+    const deactivated = await post(t14Body('700001'));
+    expect(deactivated.statusCode).toBe(201);
+    expect(deactivated.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
+
+    await setAttributeActive(ram, true);
+    const again = await post(t14Body('700002'));
+    expect(again.statusCode).toBe(201);
+    expect(again.json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+  });
+
+  it('DER-34-21 deactivating and activating an attribute leaves the stored review flags of a device unchanged', async () => {
+    const { ram, t14Body } = insertT14();
+    const created = await post(t14Body('700003'));
+    expect(created.json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+    const { id } = created.json() as { id: number };
+    const storedRow = () =>
+      t.database.sqlite
+        .prepare('SELECT review_keys, capture_status, version FROM device WHERE id = ?')
+        .get(id);
+    const before = storedRow();
+
+    await setAttributeActive(ram, false);
+    expect(storedRow()).toEqual(before);
+    expect((await get(`/api/devices/${id}`)).json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+
+    await setAttributeActive(ram, true);
+    expect(storedRow()).toEqual(before);
+    expect((await get(`/api/devices/${id}`)).json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+  });
+});
