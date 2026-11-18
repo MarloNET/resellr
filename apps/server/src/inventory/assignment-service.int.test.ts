@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
-import { createTestApp, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
+import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { migrations } from '../db/migrations/index.ts';
 import { runMigrations } from '../db/migrator.ts';
 import type { DB } from '../db/schema.ts';
@@ -10,15 +10,18 @@ import { createClock } from '../shared/clock.ts';
 import type { ChangeEvent } from '../shared/events.ts';
 import { createAssignmentService } from './assignment-service.ts';
 
-// Integration and API tests of `POST /api/listings` (CU-123, CU-125, CU-128, CU-130; Technical
+// Integration and API tests of `POST /api/listings`, `GET /api/model-templates/{id}/listings`
+// and `POST /api/devices/{id}/assignment` (CU-123, CU-125, CU-128, CU-130, CU-294; Technical
 // Specification 2.6) on the initial settings of the seed migration: MV-A is an Apple MacBook Pro
 // 13 (A1989), a notebook with RAM, storage, storage type, keyboard layout, operating system,
-// power supply and battery as variant attributes (Requirements 9.3).
+// power supply and battery as variant attributes (Requirements 9.3); MV-B is a notebook of
+// another model.
 
 type TestApp = ReturnType<typeof createTestApp>;
 let t: TestApp;
 let ids: Record<
   | 'mvA'
+  | 'mvB'
   | 'used'
   | 'ram'
   | 'storage'
@@ -52,13 +55,21 @@ beforeEach(async () => {
       notebook,
       label,
     ).id;
+  const apple = insertManufacturer(sqlite, 'Apple');
   ids = {
     mvA: insertModelTemplate(sqlite, {
       deviceTypeId: notebook,
-      manufacturerId: insertManufacturer(sqlite, 'Apple'),
+      manufacturerId: apple,
       modelName: 'MacBook Pro 13',
       typeDesignation: 'A1989',
       mpn: 'MR9Q2D/A',
+    }),
+    mvB: insertModelTemplate(sqlite, {
+      deviceTypeId: notebook,
+      manufacturerId: apple,
+      modelName: 'MacBook Air 13',
+      typeDesignation: 'A2337',
+      mpn: 'MGN63D/A',
     }),
     used: valueId('gebraucht'),
     ram: attributeId('RAM'),
@@ -101,7 +112,12 @@ const values = (change: Record<string, unknown> = {}) => ({
 /** Captures a checked device of MV-A through the API; returns its id. */
 async function captureDevice(
   wiNr: string,
-  change: { visualGrade?: string; conditionDescription?: string; values?: object } = {},
+  change: {
+    visualGrade?: string;
+    conditionDescription?: string;
+    values?: object;
+    modelTemplateId?: number;
+  } = {},
 ): Promise<number> {
   const response = await t.app.inject({
     method: 'POST',
@@ -110,7 +126,7 @@ async function captureDevice(
     payload: {
       wiNr,
       supplierId: null,
-      modelTemplateId: ids.mvA,
+      modelTemplateId: change.modelTemplateId ?? ids.mvA,
       conditionValueId: ids.used,
       visualGrade: change.visualGrade ?? '2',
       conditionDescription: change.conditionDescription ?? '',
@@ -515,6 +531,345 @@ describe('createFromDevice events (CU-123, CU-128; Technical Specification 2.0.4
     ).rejects.toThrow('channel contents failed');
     expect(count('listing')).toBe(0);
     expect(rows('SELECT listing_id, version FROM device')).toEqual([
+      { listing_id: null, version: 1 },
+    ]);
+  });
+});
+
+const assign = (deviceId: number, payload: Record<string, unknown>) =>
+  t.app.inject({
+    method: 'POST',
+    url: `/api/devices/${deviceId}/assignment`,
+    headers: SAME_ORIGIN_WRITE,
+    payload,
+  });
+
+/** MI-A: a model listing of MV-A from the device "626198" with quantity 1; returns its id. */
+async function createMiA(): Promise<number> {
+  const response = await createListing({
+    fromDeviceId: await captureDevice('626198'),
+    deviceVersion: 1,
+  });
+  expect(response.statusCode).toBe(201);
+  return response.json<{ id: number }>().id;
+}
+
+const quantityOf = (listingId: number) =>
+  rows<{ quantity: number }>('SELECT quantity FROM listing WHERE id = ?', listingId)[0]?.quantity;
+
+describe('GET /api/model-templates/{id}/listings (CU-294, Technical Specification 2.6)', () => {
+  const choice = (modelTemplateId: number) =>
+    t.app.inject({
+      method: 'GET',
+      url: `/api/model-templates/${modelTemplateId}/listings`,
+      headers: { host: HOST },
+    });
+
+  it('DER-58-01 lists each model listing of the model template with its title, variant data and quantity by id', async () => {
+    const miA = await createMiA();
+    const miB = (
+      await createListing({
+        fromDeviceId: await captureDevice('626199', {
+          visualGrade: '4',
+          conditionDescription: 'Display gebrochen',
+          values: values({ [ids.ram]: 8 }),
+        }),
+        deviceVersion: 1,
+      })
+    ).json<{ id: number }>().id;
+    // A model listing of another model template is no choice.
+    await createListing({
+      fromDeviceId: await captureDevice('626200', { modelTemplateId: ids.mvB }),
+      deviceVersion: 1,
+    });
+
+    const response = await choice(ids.mvA);
+
+    expect(response.statusCode).toBe(200);
+    const variantValues = (ram: string) => [
+      { label: 'RAM', value: ram },
+      { label: 'Speicherkapazität', value: '512' },
+      { label: 'Speichertyp', value: 'SSD (NVMe)' },
+      { label: 'Tastaturlayout', value: 'Deutsch (QWERTZ)' },
+      { label: 'Betriebssystem', value: 'macOS' },
+      { label: 'Netzteil', value: 'mit Netzteil (original)' },
+      { label: 'Akku', value: 'mit Akku' },
+    ];
+    expect(response.json()).toEqual({
+      items: [
+        {
+          id: miA,
+          displayTitle: 'MacBook Pro 13',
+          variantSummary: {
+            conditionLabel: 'gebraucht',
+            visualGrade: 2,
+            conditionDescription: '',
+            variantValues: variantValues('16'),
+          },
+          quantity: 1,
+        },
+        {
+          id: miB,
+          displayTitle: 'MacBook Pro 13',
+          variantSummary: {
+            conditionLabel: 'gebraucht',
+            visualGrade: 4,
+            conditionDescription: 'Display gebrochen',
+            variantValues: variantValues('8'),
+          },
+          quantity: 1,
+        },
+      ],
+    });
+  });
+
+  it('AC-REQ-017-03 answers an empty list for a model template without model listing', async () => {
+    const response = await choice(ids.mvA);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ items: [] });
+  });
+
+  it('answers not_found for an unknown model template', async () => {
+    const response = await choice(999);
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('not_found');
+  });
+});
+
+describe('POST /api/devices/{id}/assignment (CU-123, Technical Specification 2.6)', () => {
+  it('AC-REQ-017-01 assigns a checked, unassigned device without deviation to MI-A, whose quantity rises from 1 to 2', async () => {
+    const miA = await createMiA();
+    expect(quantityOf(miA)).toBe(1);
+    // Other WI-Nr, battery capacity and operating system version: no variant data (2.6).
+    const deviceId = await captureDevice('626199', {
+      values: values({ [ids.batteryCapacity]: { percent: 70 }, [ids.osVersion]: 'macOS 15' }),
+    });
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      device: { id: deviceId, wiNr: '626199', listingId: miA, version: 2 },
+      listing: { id: miA, quantity: 2 },
+      // Until S5 no handler reports channels (4.4.0).
+      adjustStockChannels: [],
+    });
+    expect(quantityOf(miA)).toBe(2);
+    expect(
+      rows(
+        'SELECT listing_id, assigned_at IS NOT NULL AS assigned, version FROM device WHERE id = ?',
+        deviceId,
+      ),
+    ).toEqual([{ listing_id: miA, assigned: 1, version: 2 }]);
+    const [stored] = rows<{ stock_json: string }>(
+      'SELECT stock_json FROM listing WHERE id = ?',
+      miA,
+    );
+    expect(JSON.parse(stored?.stock_json ?? '')).toMatchObject({ quantity: 2 });
+  });
+
+  it('AC-REQ-017-01 writes the audit entry of the assignment', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199');
+
+    await assign(deviceId, { version: 1, listingId: miA });
+
+    const entries = rows<Record<string, unknown>>(
+      `SELECT object_type, object_category, object_id, object_label, action, old_value, new_value
+         FROM audit_entry WHERE object_id = ? AND action = 'assigned'`,
+      deviceId,
+    );
+    expect(entries).toEqual([
+      {
+        object_type: 'device',
+        object_category: 'device',
+        object_id: deviceId,
+        object_label: 'Gerät 626199',
+        action: 'assigned',
+        old_value: null,
+        new_value: JSON.stringify({ 'Modell-Inserat': 'MacBook Pro 13' }),
+      },
+    ]);
+  });
+
+  it('AC-REQ-017-02 rejects a device of another model template with other_model_template; nothing is stored', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { modelTemplateId: ids.mvB });
+    const auditEntries = count('audit_entry');
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'other_model_template',
+      message: 'Gerät gehört zu anderer Modellvorlage',
+    });
+    expect(quantityOf(miA)).toBe(1);
+    expect(count('audit_entry')).toBe(auditEntries);
+    expect(rows('SELECT listing_id, version FROM device WHERE id = ?', deviceId)).toEqual([
+      { listing_id: null, version: 1 },
+    ]);
+  });
+
+  it('AC-REQ-017-04 rejects a device assigned to MI-A with already_assigned; it stays assigned to MI-A', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { visualGrade: '4' });
+    const miB = (await createListing({ fromDeviceId: deviceId, deviceVersion: 1 })).json<{
+      id: number;
+    }>().id;
+    const assigned = rows<{ id: number }>('SELECT id FROM device WHERE listing_id = ?', miA)[0];
+    if (assigned === undefined) throw new Error('MI-A has no device');
+
+    const response = await assign(assigned.id, { version: 2, listingId: miB });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'already_assigned',
+      message: 'Gerät ist bereits einem Modell-Inserat zugeordnet',
+    });
+    expect(rows('SELECT listing_id, version FROM device WHERE id = ?', assigned.id)).toEqual([
+      { listing_id: miA, version: 2 },
+    ]);
+    expect([quantityOf(miA), quantityOf(miB)]).toEqual([1, 1]);
+  });
+
+  it('rejects a sold device with device_not_available', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199');
+    t.database.sqlite.prepare("UPDATE device SET stock_status = 'sold' WHERE id = ?").run(deviceId);
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'device_not_available',
+      message: 'Gerät ist bereits verkauft oder storniert',
+    });
+    expect(quantityOf(miA)).toBe(1);
+  });
+
+  it('rejects an outdated device version with 409 version_conflict; nothing is stored', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199');
+
+    const response = await assign(deviceId, { version: 2, listingId: miA });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('version_conflict');
+    expect(quantityOf(miA)).toBe(1);
+  });
+
+  it('answers not_found for an unknown device', async () => {
+    const miA = await createMiA();
+
+    const response = await assign(999, { version: 1, listingId: miA });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe('not_found');
+  });
+
+  it('rejects an unknown model listing as a program error of the user interface (400)', async () => {
+    const deviceId = await captureDevice('626199');
+
+    const response = await assign(deviceId, { version: 1, listingId: 999 });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+  });
+
+  it('rejects a request without model listing as a program error of the user interface (400)', async () => {
+    const deviceId = await captureDevice('626199');
+
+    const response = await assign(deviceId, { version: 1 });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+  });
+
+  describe('order of the checks: the first matching stage wins (2.6)', () => {
+    it('checks the device version before the stock status', async () => {
+      const miA = await createMiA();
+      const deviceId = await captureDevice('626199');
+      t.database.sqlite
+        .prepare("UPDATE device SET stock_status = 'sold' WHERE id = ?")
+        .run(deviceId);
+
+      const response = await assign(deviceId, { version: 2, listingId: miA });
+
+      expect(response.json().error.code).toBe('version_conflict');
+    });
+
+    it('checks the stock status before the assignment', async () => {
+      const miA = await createMiA();
+      const [device] = rows<{ id: number }>('SELECT id FROM device WHERE listing_id = ?', miA);
+      t.database.sqlite
+        .prepare("UPDATE device SET stock_status = 'sold' WHERE id = ?")
+        .run(device?.id);
+
+      const response = await assign(device?.id ?? 0, { version: 2, listingId: miA });
+
+      expect(response.json().error.code).toBe('device_not_available');
+    });
+
+    it('checks the assignment before the model template', async () => {
+      await createMiA();
+      const deviceId = await captureDevice('626200', { modelTemplateId: ids.mvB });
+      const miOfB = (await createListing({ fromDeviceId: deviceId, deviceVersion: 1 })).json<{
+        id: number;
+      }>().id;
+      const miA = rows<{ id: number }>(
+        'SELECT id FROM listing WHERE model_template_id = ?',
+        ids.mvA,
+      )[0]?.id;
+
+      const response = await assign(deviceId, { version: 2, listingId: miA });
+
+      expect(response.json().error.code).toBe('already_assigned');
+      expect(quantityOf(miOfB)).toBe(1);
+    });
+  });
+});
+
+describe('assign events (CU-123, CU-128; Technical Specification 2.0.4, 2.6)', () => {
+  it('reports StockChanged of the model listing and answers the channels of its report', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199');
+    const seen: ChangeEvent[] = [];
+    const uow = createUnitOfWork<DB>(t.database.db, {
+      change: {
+        StockChanged: async (event) => {
+          seen.push(event);
+          return { ...emptyChangeReport(), adjustStockChannels: [2] };
+        },
+      },
+    });
+    const service = createAssignmentService({ uow, clock: createClock() });
+
+    const result = await service.assign(deviceId, { version: 1, listingId: miA });
+
+    expect(seen).toEqual([{ type: 'StockChanged', listingId: miA }]);
+    expect(result).toMatchObject({ listing: { id: miA, quantity: 2 }, adjustStockChannels: [2] });
+  });
+
+  it('stores nothing when a handler of StockChanged fails', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199');
+    const uow = createUnitOfWork<DB>(t.database.db, {
+      change: {
+        StockChanged: async () => {
+          throw new Error('stock flags failed');
+        },
+      },
+    });
+    const service = createAssignmentService({ uow, clock: createClock() });
+
+    await expect(service.assign(deviceId, { version: 1, listingId: miA })).rejects.toThrow(
+      'stock flags failed',
+    );
+    expect(quantityOf(miA)).toBe(1);
+    expect(rows('SELECT listing_id, version FROM device WHERE id = ?', deviceId)).toEqual([
       { listing_id: null, version: 1 },
     ]);
   });

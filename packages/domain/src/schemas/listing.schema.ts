@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
 import { idSchema, versionSchema } from './common.schema.ts';
+import { deviceSchema } from './device.schema.ts';
 
-// Model listing (REQ-019, REQ-088; Technical Specification 2.6, 2.7, 3.3). The detail of
-// UI-014 follows with #198, changing with #200.
+// Model listing (REQ-017, REQ-019, REQ-088; Technical Specification 2.6, 2.7, 3.3). The detail
+// of UI-014 follows with #198, changing with #200.
 
 /** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
 const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
@@ -58,3 +59,56 @@ export const listingSchema = z.object({
   version: versionSchema,
 });
 export type Listing = z.infer<typeof listingSchema>;
+
+/**
+ * The variant data of a model listing as UI-004 lists them (2.6, 2.14 `variantSummary`):
+ * condition, visual grade, condition description and the variant attributes with their readable
+ * values in the order of the attributes.
+ */
+export const variantSummarySchema = z.object({
+  conditionLabel: z.string(),
+  visualGrade: z.int(),
+  conditionDescription: z.string(),
+  variantValues: z.array(z.object({ label: z.string(), value: z.string() })),
+});
+export type VariantSummary = z.infer<typeof variantSummarySchema>;
+
+/**
+ * `GET /api/model-templates/{id}/listings` (2.6, CU-294): the model listings of a model template
+ * to choose from in UI-004, by `id`. The deviations to a device (`deviceId`) follow with #196.
+ */
+export const listingChoiceSchema = z.object({
+  items: z.array(
+    z.object({
+      id: idSchema,
+      displayTitle: z.string(),
+      variantSummary: variantSummarySchema,
+      quantity: z.int().min(0),
+    }),
+  ),
+});
+export type ListingChoice = z.infer<typeof listingChoiceSchema>;
+export type ListingChoiceItem = ListingChoice['items'][number];
+
+/**
+ * `POST /api/devices/{id}/assignment` (2.6, REQ-017): the version of the device the user saw and
+ * the chosen model listing; `confirmDeviation` confirms deviating variant data (REQ-018, #196).
+ */
+export const deviceAssignmentBodySchema = z.strictObject({
+  version: versionSchema,
+  listingId: idSchema,
+  confirmDeviation: z.boolean().default(false),
+});
+export type DeviceAssignmentInput = z.input<typeof deviceAssignmentBodySchema>;
+
+/**
+ * The answer of an assignment (2.6): the device, the new quantity of its model listing and the
+ * channels whose published content now carries "Bestand auf Kanal anpassen" (channel ids,
+ * Nachtrag MAR-263; empty until S5).
+ */
+export const deviceAssignmentSchema = z.object({
+  device: deviceSchema,
+  listing: z.object({ id: idSchema, quantity: z.int().min(0) }),
+  adjustStockChannels: z.array(idSchema),
+});
+export type DeviceAssignment = z.infer<typeof deviceAssignmentSchema>;

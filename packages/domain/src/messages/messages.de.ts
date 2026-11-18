@@ -175,6 +175,9 @@ export const FIELD_MESSAGES = {
 
 type MessageText = string | ((...args: string[]) => string);
 
+/** A device that is no longer available, as at the sale (2.0.6, AC-REQ-021-04). */
+const DEVICE_SOLD_OR_CANCELLED = 'Gerät ist bereits verkauft oder storniert';
+
 /** UI-026 "Logo": one text for a too large file and a wrong type (AC-REQ-028-02). */
 const LOGO_FILE_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
 
@@ -195,6 +198,8 @@ export const ERROR_MESSAGES = {
   /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+  /** UI-004 "Zuordnen" of a sold or cancelled device: the wording of the sale (2.0.6). */
+  'device_not_available.assignment': DEVICE_SOLD_OR_CANCELLED,
   /**
    * UI-010 "Gerätewerte speichern" of a sold or cancelled device (2.5, `UI-010.disabled`,
    * Auslegung RQ-17).
@@ -204,7 +209,7 @@ export const ERROR_MESSAGES = {
    * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device: the wording of the sale
    * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
    */
-  'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
+  'device_not_available.new_listing': DEVICE_SOLD_OR_CANCELLED,
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
@@ -219,6 +224,8 @@ export const ERROR_MESSAGES = {
   'name_taken.supplier': 'Name ist bereits vergeben',
   'name_taken.text_block': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
+  /** UI-004 "Zuordnen" to a model listing of another model template (2.0.6, AC-REQ-017-02). */
+  'other_model_template.default': 'Gerät gehört zu anderer Modellvorlage',
   /** UI-007, UI-003, UI-010, UI-014 at the field of the attribute (2.0.6, Nachtrag MAR-904). */
   'pick_list_value_deactivated.attribute': (label: string, value: string) =>
     `${label}: ${value} ist deaktiviert`,
