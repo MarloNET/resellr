@@ -301,6 +301,48 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     expect(router.state.location.pathname).toBe('/geraete');
   });
 
+  it('DER-87-02 changing the input after Enter drops the Enter, also when it returns to the same term', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const { searches } = mockApi({
+      search: async (params) => {
+        await gate;
+        return Response.json({ items: params.get('wiNr') === 'A6336' ? [SOLD] : [] });
+      },
+    });
+    const router = await openPage();
+    type('A6336');
+    fireEvent.submit(searchField());
+
+    type('A63369');
+    await vi.waitFor(() => expect(searches).toContain('?wiNr=A63369'));
+    type('A6336');
+    await vi.waitFor(() => expect(searches.filter((s) => s === '?wiNr=A6336').length).toBe(2));
+    release();
+
+    await screen.findByRole('table', { name: 'Treffer' });
+    expect(router.state.location.pathname).toBe('/geraete');
+  });
+
+  it('DER-87-02 DER-87-04 Enter while "Erneut versuchen" runs opens the only hit once the search answers', async () => {
+    let reachable = false;
+    mockApi({
+      search: () => {
+        if (!reachable) throw new TypeError('Failed to fetch');
+        return Response.json({ items: [SOLD] });
+      },
+    });
+    const router = await openPage();
+    type('A6336');
+    const banner = await screen.findByRole('alert');
+
+    reachable = true;
+    fireEvent.click(within(banner).getByRole('button', { name: 'Erneut versuchen' }));
+    fireEvent.submit(searchField());
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/geraete/6'));
+  });
+
   it('UI-009.unreachable DER-87-04 shows P-06 with "Erneut versuchen" above the page when the search gets no answer; it disappears after an answer', async () => {
     let reachable = false;
     mockApi({

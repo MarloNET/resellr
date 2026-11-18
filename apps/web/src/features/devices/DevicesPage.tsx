@@ -70,6 +70,7 @@ function SearchTab() {
   const [input, setInput] = useState('');
   const [searchTerm, setSearchTerm] = useState<string | undefined>(undefined);
   // The term of the last Enter: its hits open the device when there is exactly one (DER-87-02).
+  // A changed input drops it; an error keeps it until "Erneut versuchen" brings an answer.
   const [openTerm, setOpenTerm] = useState<string | undefined>(undefined);
   const query = useDeviceSearchQuery(searchTerm);
 
@@ -88,11 +89,11 @@ function SearchTab() {
 
   useEffect(() => {
     if (openTerm === undefined || openTerm !== searchTerm) return;
-    if (!data && !query.isError) return;
+    if (query.isFetching || query.isError || !data) return;
     setOpenTerm(undefined);
-    const [only, ...others] = data?.items ?? [];
-    if (!query.isError && only && others.length === 0) void navigate(`/geraete/${only.id}`);
-  }, [openTerm, searchTerm, data, query.isError, navigate]);
+    const [only, ...others] = data.items;
+    if (only && others.length === 0) void navigate(`/geraete/${only.id}`);
+  }, [openTerm, searchTerm, data, query.isFetching, query.isError, navigate]);
 
   const unreachable = query.isError && query.error.kind === 'unreachable';
   const failed = query.isError && !unreachable ? query.error : null;
@@ -123,7 +124,10 @@ function SearchTab() {
                 {...control}
                 type="search"
                 value={input}
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) => {
+                  setInput(event.target.value);
+                  setOpenTerm(undefined);
+                }}
               />
             )}
           </FormField>
