@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
@@ -345,7 +345,7 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
       )
       .run(STAMP, id);
 
-  const insertListing = (title: string, articleNumber: string) =>
+  const insertListing = (title: string, articleNumber: string, modelTemplateId = ids.mvA) =>
     Number(
       t.database.sqlite
         .prepare(
@@ -355,8 +355,15 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
              stock_hash, version, created_at, updated_at)
            VALUES (?, ?, 3, '', '', '{}', '{}', ?, ?, 'original', ?, 0, '{}', '', 1, ?, ?)`,
         )
-        .run(ids.mvA, ids.used, articleNumber, articleNumber.toLowerCase(), title, STAMP, STAMP)
-        .lastInsertRowid,
+        .run(
+          modelTemplateId,
+          ids.used,
+          articleNumber,
+          articleNumber.toLowerCase(),
+          title,
+          STAMP,
+          STAMP,
+        ).lastInsertRowid,
     );
 
   it('AC-REQ-012-05 after the cancellation of the device "633641" a new device "633641" is stored, and the search for "633641" shows both with their inventory status', async () => {
@@ -410,6 +417,87 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
     const both = (await get('/api/devices?wiNr=63760')).json();
     expect(both.items.map((item: { id: number }) => item.id)).toEqual([assigned.id, unassigned.id]);
     expect(both.items[1].listing).toBeNull();
+  });
+
+  /** The answer to `GET url` and the statements prepared on the connection for it, as SQL text. */
+  const getCounted = async (url: string) => {
+    const prepare = vi.spyOn(t.database.sqlite, 'prepare');
+    try {
+      const response = await get(url);
+      return { response, statements: prepare.mock.calls.map(([sql]) => sql) };
+    } finally {
+      prepare.mockRestore();
+    }
+  };
+  const readsOf = (statements: string[], table: 'listing' | 'model_template') =>
+    statements.filter((sql) => sql.includes(`from "${table}"`)).length;
+
+  it('names model template and model listing of each hit over two model templates and two model listings with one query each (Nachtrag MAR-1030)', async () => {
+    const mvB = insertModelTemplate(t.database.sqlite, {
+      deviceTypeId: t.database.sqlite
+        .prepare("SELECT id FROM device_type WHERE name = 'Smartphone'")
+        .pluck()
+        .get() as number,
+      manufacturerId: insertManufacturer(t.database.sqlite, 'Samsung'),
+      modelName: 'Galaxy S21',
+      mpn: 'SM-G991B',
+    });
+    const a1 = (await post(body({ wiNr: '700001' }))).json();
+    const b1 = (await post(body({ wiNr: '700002', modelTemplateId: mvB }))).json();
+    const a2 = (await post(body({ wiNr: '700003' }))).json();
+    const b2 = (await post(body({ wiNr: '700004', modelTemplateId: mvB }))).json();
+    const listingA = insertListing('iPhone 13, iOS', 'MI-1');
+    const listingB = insertListing('Galaxy S21, Android', 'MI-2', mvB);
+    const assign = t.database.sqlite.prepare('UPDATE device SET listing_id = ? WHERE id = ?');
+    assign.run(listingA, a1.id);
+    assign.run(listingB, b1.id);
+    assign.run(listingA, a2.id);
+
+    const { response, statements } = await getCounted('/api/devices?wiNr=7000');
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      response
+        .json()
+        .items.map((item: Record<string, unknown>) => [
+          item.id,
+          item.modelTemplateLabel,
+          item.listing,
+        ]),
+    ).toEqual([
+      [a1.id, 'iPhone 13', { id: listingA, title: 'iPhone 13, iOS' }],
+      [b1.id, 'Galaxy S21', { id: listingB, title: 'Galaxy S21, Android' }],
+      [a2.id, 'iPhone 13', { id: listingA, title: 'iPhone 13, iOS' }],
+      [b2.id, 'Galaxy S21', null],
+    ]);
+    expect(readsOf(statements, 'listing')).toBe(1);
+    expect(readsOf(statements, 'model_template')).toBe(1);
+  });
+
+  it('reads neither model listings nor model templates for an empty page (Nachtrag MAR-1030)', async () => {
+    await post(body({ wiNr: '626198' }));
+
+    const { response, statements } = await getCounted('/api/devices?wiNr=999');
+
+    expect(response.json()).toEqual({ items: [] });
+    expect(readsOf(statements, 'listing')).toBe(0);
+    expect(readsOf(statements, 'model_template')).toBe(0);
+  });
+
+  it('answers 500 internal_error with a reference number if the model name of a hit is missing (Nachtrag MAR-1030)', async () => {
+    await post(body({ wiNr: '626198' }));
+    const { sqlite } = t.database;
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.prepare('DELETE FROM model_template WHERE id = ?').run(ids.mvA);
+    sqlite.pragma('foreign_keys = ON');
+
+    const response = await get('/api/devices?wiNr=626198');
+
+    expect(response.statusCode).toBe(500);
+    const { error } = response.json();
+    expect(error.code).toBe('internal_error');
+    expect(error.referenceNumber).toMatch(/^R-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(t.readErrorLog()).toEqual([expect.objectContaining({ refNo: error.referenceNumber })]);
   });
 
   it('pages the hits with limit and offset (2.0.1)', async () => {
