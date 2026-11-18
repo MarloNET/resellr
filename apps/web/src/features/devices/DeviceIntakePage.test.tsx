@@ -738,6 +738,10 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     mockApi();
     const router = await openPage();
     await fillValid();
+    // Without "Weiteres Gerät derselben Modellvorlage" the inputs stay (DER-54-08).
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Weiteres Gerät derselben Modellvorlage' }),
+    );
 
     fireEvent.click(saveButton());
 
@@ -752,6 +756,10 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     const { sent } = mockApi();
     await openPage();
     await fillValid();
+    // The form is saved three times, so it is not emptied after the save (DER-54-08).
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Weiteres Gerät derselben Modellvorlage' }),
+    );
 
     fireEvent.keyDown(window, { key: 's', ctrlKey: true });
     await vi.waitFor(() => expect(sent).toHaveLength(1));
