@@ -80,7 +80,7 @@
 Ein fehlender Wert eines (wieder aktivierten) Pflichtmerkmals wird erst beim Speichern in **UI-007** (Modellvorlage, REQ-010/REQ-008), **UI-010** und **UI-003** (Gerätewerte, REQ-014) und **UI-014** „Inseratswerte bearbeiten“ (REQ-088, ohne Preise und Fotos) verlangt, auch wenn die Änderung ein anderes Feld betrifft. Die Darstellung dort steht in den jeweiligen `screen.md` und im Meldungskatalog (**M-32**, „<Merkmal> fehlt“). **Preis erfassen und Fotos zuordnen (UI-014, UI-015) verlangen den Wert nicht und zeigen M-32 nicht (AC-REQ-005-12 c)**; ebenso Zuordnen, Umbuchen, Verkauf, WI-Nr-Korrektur, Storno und Freigabe (A-39).
 
 ## Fenstergröße und Bedienung
-Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt zusätzlich die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md). **Klarstellung v0.6.5 (MAR-836, Bug #372, Minimal; keine Änderung der Anforderung):**
+Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom, schmaleres Fenster) gilt zusätzlich die Reflow-Regel R-1 (uiux-design.md Kap. 5, DESIGN.md). **Klarstellung v0.6.14 (MAR-836, Bug #372, Minimal; keine Änderung der Anforderung):**
 
 | Fenster | Panel | Darstellung |
 |---|---|---|
@@ -93,7 +93,7 @@ Hoch/Runter-Buttons als Tastaturalternative zum Ziehen. Unter 1366 CSS-px (Zoom,
 - **Ungespeicherte Eingabe beim Schließen:** Dieser Abschnitt trifft dazu keine Aussage; UI-027 beschreibt für „Schließen“ weder eine Rückfrage noch ein Verwerfen. Eine Festlegung hier wäre eine neue Regel und ist nicht Teil dieser Klarstellung (siehe Übergabe MAR-836).
 
 ## Bekannte Abweichungen im Mockup
-**v0.6.5 (MAR-836):** `default.png` zeigt den Zustand **1920 × 1080 mit Panel neben der Tabelle**. Die **Überlagerung bei 1366 × 768 mit geöffnetem Panel ist nur in `screen.md` beschrieben** (Abschnitt „Fenstergröße und Bedienung“), es gibt kein Mockup dafür (kein neues Mockup, Klassifikation Minimal).
+**v0.6.14 (MAR-836):** `default.png` zeigt den Zustand **1920 × 1080 mit Panel neben der Tabelle**. Die **Überlagerung bei 1366 × 768 mit geöffnetem Panel ist nur in `screen.md` beschrieben** (Abschnitt „Fenstergröße und Bedienung“), es gibt kein Mockup dafür (kein neues Mockup, Klassifikation Minimal).
 
 **v0.6.4:** Die Zeilenaktion „Wieder aktivieren“ und der Banner „Merkmal aktiviert“ sind **nur in `screen.md` beschrieben**, `default.png` zeigt sie nicht (kein neues Mockup, Klassifikation Minimal). „Business Portal“ (Stitch); Stitch ergänzt Kopfzähler und Statuschips „aktiv“ (aus Requirements ableitbar, übernommen); Untertitel „Konfiguration“ in der zweiten Navigation (nicht Teil des Designs); Panel zeigt „RAM“ auf Ebene Gerät als Beispiel; Hinweistext der Sperrung als Fehlerbox (maßgeblich: Inline am Feld).
 
