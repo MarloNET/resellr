@@ -119,7 +119,7 @@ function ListingValues({
         {TEXTS.values}
       </h2>
       <p className="m-0 text-body text-text-secondary">{TEXTS.modelDataHint}</p>
-      <dl className="m-0 grid grid-cols-1 gap-x-12 @3xl:grid-cols-2">
+      <dl className="m-0 grid grid-cols-1 gap-x-12 full:grid-cols-2">
         <ValueRow label={TEXTS.condition}>
           <PickListLabel
             pickListId={listIdOf(lists.data?.items, 'condition')}
@@ -240,7 +240,7 @@ export function ListingPage() {
   const ready = listing !== undefined && attributes.data !== undefined && deviceType !== undefined;
 
   return (
-    <div className="@container flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6">
       {unreachable && <UnreachableBanner />}
       {notFound && (
         <div role="alert" className={bannerClassName('error')}>
