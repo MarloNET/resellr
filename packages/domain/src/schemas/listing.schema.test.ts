@@ -145,7 +145,6 @@ describe('listingDetailSchema (CU-116, Technical Specification 2.7)', () => {
   });
 
   it('rejects a detail without its devices', () => {
-    const { devices: _devices, ...withoutDevices } = detail;
-    expect(listingDetailSchema.safeParse(withoutDevices).success).toBe(false);
+    expect(listingDetailSchema.safeParse({ ...detail, devices: undefined }).success).toBe(false);
   });
 });

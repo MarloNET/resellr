@@ -608,13 +608,19 @@ function wiNrTakenError(error: ApiError): ReactNode {
 }
 
 /** The label of a value of a pick list, read from its list. */
-function PickListLabel({ pickListId, valueId }: { pickListId: number | null; valueId: number }) {
+export function PickListLabel({
+  pickListId,
+  valueId,
+}: {
+  pickListId: number | null;
+  valueId: number;
+}) {
   const values = usePickListValuesQuery(pickListId);
   return <>{values.data?.items.find(({ id }) => id === valueId)?.label ?? ''}</>;
 }
 
 /** The id of a pick list by its key, e.g. `port_type`. */
-function listIdOf(lists: readonly PickList[] | undefined, key: string) {
+export function listIdOf(lists: readonly PickList[] | undefined, key: string) {
   return lists?.find((list) => list.key === key)?.id ?? null;
 }
 
@@ -641,7 +647,7 @@ function PortsLabel({ entries }: { entries: readonly PortEntry[] }) {
 }
 
 /** A stored value of the level model as the panel shows it, read only. */
-function ModelValue({ attribute, value }: { attribute: Attribute; value: unknown }) {
+export function ModelValue({ attribute, value }: { attribute: Attribute; value: unknown }) {
   const withUnit = (text: string) =>
     formatWithUnit(text, attribute.unit ?? '', attribute.unitSpacing);
   switch (attribute.dataType) {
