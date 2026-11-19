@@ -787,6 +787,8 @@ export function DeviceIntakePage() {
   const [savedWiNr, setSavedWiNr] = useState<string | null>(null);
   // The device saved with "Speichern und zuordnen" while UI-004 is open for it (DER-55-05).
   const [assigning, setAssigning] = useState<AssignDialogDevice | null>(null);
+  // Element that triggered "Speichern und zuordnen": the button, or a field for Ctrl+Enter.
+  const assignTriggerRef = useRef<HTMLElement | null>(null);
   // Choices that show the text of a rejection until the next choice in the field (v0.6.8).
   const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
   // A rejected entry whose list could not be read again counts as missing (2.0.11).
@@ -1094,6 +1096,12 @@ export function DeviceIntakePage() {
     setErrors({});
     setSummaryShown(false);
     setNotice(null);
+    // The save locks the button and the fields, so the browser moves their focus to `<body>`
+    // before UI-004 opens; closing UI-004 returns it to the trigger instead (CU-058).
+    if (assign) {
+      assignTriggerRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     createMutation.mutate(bodyOf(current, deviceRef.current), {
       onSuccess: (device) => {
         setSavedWiNr(device.wiNr);
@@ -1562,6 +1570,7 @@ export function DeviceIntakePage() {
           open
           device={assigning}
           fieldLabel={fieldOf}
+          returnFocusRef={assignTriggerRef}
           onOpenChange={(open) => {
             if (!open) setAssigning(null);
           }}

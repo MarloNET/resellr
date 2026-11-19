@@ -815,6 +815,39 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expect(screen.getByRole('dialog', { name: 'Modell-Inserat wählen' })).toBeTruthy();
   });
 
+  it('CU-058 Esc and "Abbrechen" in UI-004 return the focus to "Speichern und zuordnen", Ctrl+Enter to the field it came from', async () => {
+    mockApi();
+    await openPage();
+    await fillValid();
+    // A browser moves the focus of a control that gets disabled to `<body>`, as the save locks
+    // the button and the fields until UI-004 opens; jsdom does not, so the test does it.
+    const blurWhileSaving = () =>
+      vi.waitFor(() => {
+        expect(saveAndAssignButton().disabled).toBe(true);
+        (document.activeElement as HTMLElement).blur();
+      });
+
+    saveAndAssignButton().focus();
+    fireEvent.click(saveAndAssignButton());
+    await blurWhileSaving();
+    fireEvent.keyDown(await screen.findByRole('dialog'), { key: 'Escape' });
+    await vi.waitFor(() => expect(document.activeElement).toBe(saveAndAssignButton()));
+
+    saveAndAssignButton().focus();
+    fireEvent.click(saveAndAssignButton());
+    await blurWhileSaving();
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Abbrechen' }),
+    );
+    await vi.waitFor(() => expect(document.activeElement).toBe(saveAndAssignButton()));
+
+    textbox('Optik-Note').focus();
+    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    await blurWhileSaving();
+    fireEvent.keyDown(await screen.findByRole('dialog'), { key: 'Escape' });
+    await vi.waitFor(() => expect(document.activeElement).toBe(textbox('Optik-Note')));
+  });
+
   it('DER-55-05 a rejected save of "Speichern und zuordnen" keeps UI-003 without UI-004', async () => {
     mockApi({
       create: () =>

@@ -5,7 +5,7 @@ import {
   type ListingChoiceItem,
   type VariantSummary,
 } from '@resellr/domain/schemas/listing.schema';
-import { useRef, useState } from 'react';
+import { type RefObject, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
@@ -116,6 +116,11 @@ export interface AssignDialogProps {
    * `assignedText` with the new quantity (UI-004.success, DER-58-04).
    */
   onAssigned: (assignment: DeviceAssignment) => void;
+  /**
+   * Focus target after closing when the dialog opens only after a write of the calling screen,
+   * which moved the focus to `<body>` meanwhile (CU-058, "Speichern und zuordnen" in UI-003).
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /** The variant data of a model listing in one line (UI-004 "Liste Modell-Inserate"). */
@@ -166,6 +171,7 @@ export function AssignDialog({
   device,
   fieldLabel,
   onAssigned,
+  returnFocusRef,
 }: AssignDialogProps) {
   const createMutation = useCreateListingMutation();
   const assignMutation = useAssignDeviceMutation();
@@ -179,7 +185,7 @@ export function AssignDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* The content mounts per opening, so each opening starts without choice and field. */}
-      <DialogContent width={WIDTH} dismissible={!locked}>
+      <DialogContent width={WIDTH} dismissible={!locked} returnFocusRef={returnFocusRef}>
         <AssignForm
           device={device}
           fieldLabel={fieldLabel}
