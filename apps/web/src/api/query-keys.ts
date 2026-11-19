@@ -39,6 +39,8 @@ export const queryKeys = {
     devicePrefill: (modelTemplateId: number) =>
       ['inventory', 'device-prefill', modelTemplateId] as const,
     deviceSearch: (wiNr: string) => ['inventory', 'devices', { wiNr }] as const,
+    listingChoice: (modelTemplateId: number) =>
+      ['inventory', 'listing-choice', modelTemplateId] as const,
   },
 } as const;
 
