@@ -222,7 +222,11 @@ export function ListingPage() {
   const id = listingIdOf(useParams().listingId);
   const [includeCancelled, setIncludeCancelled] = useState(false);
   const query = useListingQuery(id, { includeCancelled });
-  const listing = query.data;
+  // A failed later read (the filter "auch stornierte" without an answer) keeps the last loaded
+  // state of this model listing, so P-06 stands above the page and never replaces it (7.3).
+  const [lastLoaded, setLastLoaded] = useState<ListingDetail>();
+  if (query.data !== undefined && query.data !== lastLoaded) setLastLoaded(query.data);
+  const listing = query.data ?? (lastLoaded?.id === id ? lastLoaded : undefined);
   const template = useModelTemplateQuery(listing?.modelTemplateId ?? null);
   const deviceTypeId = template.data?.deviceTypeId ?? null;
   const deviceTypes = useDeviceTypesQuery();

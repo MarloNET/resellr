@@ -409,6 +409,35 @@ describe('UI-014 Modell-Inserat (CU-138)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('UI-014.unreachable DER-60-06 keeps the loaded page under P-06 when the filter "auch stornierte" gets no answer; it disappears after an answer', async () => {
+    let reachable = false;
+    mockApi((url) => {
+      if (url.searchParams.get('includeCancelled') !== 'true') return Response.json(LISTING);
+      if (!reachable) throw new TypeError('Failed to fetch');
+      return Response.json({ ...LISTING, devices: [...LISTING.devices, CANCELLED] });
+    });
+    renderPage();
+    await screen.findByRole('heading', { level: 1, name: 'MacBook Pro 13' });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'auch stornierte' }));
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
+    expect(screen.getByRole('heading', { level: 1, name: 'MacBook Pro 13' })).toBeTruthy();
+    expect(screen.getByText('Notebook · Stückzahl 1 · Artikelnummer 626198')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Inseratswerte' })).toBeTruthy();
+    expect(deviceRows().map(([wiNr]) => wiNr)).toEqual(['626198', '626199']);
+    expect(screen.getByRole('checkbox', { name: 'auch stornierte' })).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+    expectAccessiblePage('MacBook Pro 13');
+
+    reachable = true;
+    fireEvent.click(within(banner).getByRole('button', { name: 'Erneut versuchen' }));
+
+    expect(await screen.findByText('626200')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('UI-014.unreachable DER-60-06 shows P-06 when GET /api/listings/{id} takes longer than 5 s', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockApi(
