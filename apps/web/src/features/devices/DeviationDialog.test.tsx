@@ -239,6 +239,8 @@ describe('UI-005 Kontext A "Abweichungen bei Zuordnung" (CU-135, #196, REQ-018)'
     fireEvent.click(button('Trotzdem zuordnen'));
 
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    // UI-005 closes itself as well; the test host keeps UI-004 open.
+    expect(queryDialog()).toBeNull();
     expect(sent).toEqual([
       { version: 1, listingId: 9, confirmDeviation: false },
       { version: 1, listingId: 9, confirmDeviation: true },

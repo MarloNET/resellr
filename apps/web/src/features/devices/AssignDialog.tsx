@@ -418,7 +418,10 @@ function AssignForm({
           device={device}
           listingId={listingId}
           onClose={() => setDeviations(null)}
-          onAssigned={onAssigned}
+          onAssigned={(assignment) => {
+            setDeviations(null);
+            onAssigned(assignment);
+          }}
         />
       )}
     </form>

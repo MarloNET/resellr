@@ -223,33 +223,36 @@ function DeviationContent({
           </p>
         )}
         {rows.length > 0 && (
-          <Table aria-label={TEXTS.hint}>
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">{TEXTS.attribute}</TableHead>
-                <TableHead scope="col">{TEXTS.deviceValue}</TableHead>
-                <TableHead scope="col">{TEXTS.listingValue}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((deviation) => (
-                <TableRow key={deviation.key}>
-                  <TableHead scope="row" className="text-text">
-                    {deviation.label}
-                  </TableHead>
-                  <TableCell>{deviation.deviceValue}</TableCell>
-                  <TableCell>{deviation.listingValue}</TableCell>
+          // The scroll container of the table must not shrink in the scrolling body (FM-4).
+          <div className="shrink-0">
+            <Table aria-label={TEXTS.hint}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">{TEXTS.attribute}</TableHead>
+                  <TableHead scope="col">{TEXTS.deviceValue}</TableHead>
+                  <TableHead scope="col">{TEXTS.listingValue}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((deviation) => (
+                  <TableRow key={deviation.key}>
+                    <TableHead scope="row" className="text-text">
+                      {deviation.label}
+                    </TableHead>
+                    <TableCell>{deviation.deviceValue}</TableCell>
+                    <TableCell>{deviation.listingValue}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
         {description && (
           <section aria-label={TEXTS.conditionDescription} className="flex flex-col gap-2">
             <h3 className="m-0 text-label font-semibold uppercase text-text-secondary">
               {TEXTS.conditionDescription}
             </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 full:grid-cols-2">
               {[
                 [TEXTS.device, description.deviceValue],
                 [TEXTS.listing, description.listingValue],
