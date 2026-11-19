@@ -100,7 +100,7 @@ describe('prefill of a device (CU-117, REQ-013; Technical Specification 2.5)', (
     expect(prefill.reviewKeys).toEqual([String(RAM)]);
   });
 
-  it('flags condition and visual grade suggested by the condition code, not its plain text', () => {
+  it('DER-57-02 flags condition and visual grade suggested by the condition code, not its plain text', () => {
     const prefill = buildDevicePrefill(input({ defaultDeviceValues: {}, code: DGS }));
 
     expect(prefill).toEqual({
@@ -113,16 +113,29 @@ describe('prefill of a device (CU-117, REQ-013; Technical Specification 2.5)', (
     });
   });
 
-  it('flags only what the code entry suggests', () => {
+  it('AC-REQ-015-04 prefills the suggested visual grade 4 with a review flag, and flags only what the entry suggests', () => {
     const prefill = buildDevicePrefill(
       input({
         defaultDeviceValues: {},
-        code: { plainText: 'Neu', suggestedConditionValueId: null, suggestedVisualGrade: 1 },
+        code: { plainText: 'Neu', suggestedConditionValueId: null, suggestedVisualGrade: 4 },
       }),
     );
 
     expect(prefill.conditionValueId).toBeNull();
+    expect(prefill.visualGrade).toBe(4);
     expect(prefill.reviewKeys).toEqual(['visualGrade']);
+  });
+
+  it('AC-REQ-015-03 takes no text and no suggestion for an unknown code', () => {
+    const prefill = buildDevicePrefill(input({ defaultDeviceValues: {}, code: null }));
+
+    expect(prefill).toMatchObject({
+      conditionValueId: null,
+      visualGrade: null,
+      conditionDescription: '',
+      reviewKeys: [],
+      codeResult: { found: false, plainText: null },
+    });
   });
 
   it('takes defaults only of active attributes', () => {

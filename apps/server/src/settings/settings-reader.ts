@@ -5,9 +5,11 @@ import type {
 } from '@resellr/domain/schemas/attribute.schema';
 import type { AttributeValueDefinition } from '@resellr/domain/schemas/attribute-values.schema';
 import type { BatteryValueFlag, PickListKey } from '@resellr/domain/schemas/pick-list.schema';
+import { toKey } from '@resellr/domain/text/normalize-key';
 import type { Kysely } from 'kysely';
 
 import type { DB } from '../db/schema.ts';
+import { createConditionCodeRepository } from './condition-code-repository.ts';
 import { createDeviceTypeRepository } from './device-type-repository.ts';
 import { createManufacturerRepository } from './manufacturer-repository.ts';
 import { createPickListRepository } from './pick-list-repository.ts';
@@ -27,6 +29,15 @@ export interface PickListValueEntry {
   pickListKey: PickListKey;
   label: string;
   active: boolean;
+}
+
+/** The entry of the code translation a condition code resolves to (2.2, REQ-015). */
+export interface ConditionCodeTranslationEntry {
+  /** The code as the entry spells it (3.1). */
+  code: string;
+  plainText: string;
+  suggestedConditionValueId: number | null;
+  suggestedVisualGrade: number | null;
 }
 
 /**
@@ -51,15 +62,17 @@ const toEntry = (row: { id: number; name: string; active: number }): SettingsEnt
  * Read interface of the settings for other components (CU-086; Technical Specification 4.1,
  * 2.0.11, Nachtrag MAR-904): device type and manufacturer for the model template service
  * (CU-105), with #178 the attribute definitions of a device type and the pick list values, with
- * #185 the supplier and the values of the list battery for the device service (CU-121); each
- * further method follows with the first task that calls it. Inside an action pass `tx.db`, so
- * the check sees the state of the writing transaction.
+ * #185 the supplier and the values of the list battery for the device service (CU-121), with #193
+ * the entry of a condition code for the prefill (CU-293, CU-121); each further method follows
+ * with the first task that calls it. Inside an action pass `tx.db`, so the check sees the state
+ * of the writing transaction.
  */
 export function createSettingsReader(db: Kysely<DB>) {
   const deviceTypes = createDeviceTypeRepository(db);
   const manufacturers = createManufacturerRepository(db);
   const suppliers = createSupplierRepository(db);
   const pickLists = createPickListRepository(db);
+  const conditionCodes = createConditionCodeRepository(db);
   return {
     /** The device type with name and status, active or not; `undefined` if unknown. */
     async findDeviceType(id: number): Promise<SettingsEntry | undefined> {
@@ -116,6 +129,28 @@ export function createSettingsReader(db: Kysely<DB>) {
         label: row.label,
         active: row.active === 1,
       }));
+    },
+
+    /**
+     * The entry a condition code resolves to (2.2 "Auflösen eines Codes", REQ-015): the one of
+     * the supplier before the one without supplier, without a supplier only the one without; the
+     * code without regard to case. `undefined` for an unknown or empty code.
+     */
+    async resolveConditionCode(
+      code: string,
+      supplierId: number | null,
+    ): Promise<ConditionCodeTranslationEntry | undefined> {
+      const codeKey = toKey(code);
+      if (codeKey === '') return undefined;
+      const row = await conditionCodes.resolve(codeKey, supplierId);
+      return (
+        row && {
+          code: row.code,
+          plainText: row.plain_text,
+          suggestedConditionValueId: row.suggested_condition_value_id,
+          suggestedVisualGrade: row.suggested_visual_grade,
+        }
+      );
     },
 
     /**

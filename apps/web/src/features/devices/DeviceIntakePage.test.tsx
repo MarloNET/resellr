@@ -180,6 +180,16 @@ const MV_A_PREFILL = {
   reviewKeys: ['16', '18', '19'],
 };
 
+/** Answers of `GET /api/condition-codes/resolve` (2.2). */
+const UNKNOWN_CODE = {
+  found: false,
+  plainText: null,
+  suggestedConditionValueId: null,
+  suggestedVisualGrade: null,
+};
+const DGS_TEXT = 'Display- und Gehäuseschaden';
+const DGS = { ...UNKNOWN_CODE, found: true, plainText: DGS_TEXT };
+
 const WI_NR_RULE = 'WI-Nr darf nur Buchstaben und Ziffern enthalten (1–20 Zeichen)';
 const CAPACITY_RULE = 'Akkukapazität: ganze Zahl von 0 bis 100 oder „nicht ermittelbar“';
 const WEST_DEACTIVATED = 'Lieferant Lieferant West ist deaktiviert';
@@ -211,6 +221,7 @@ function mockApi({
   modelTemplate = () => Response.json(MODEL_TEMPLATE),
   portTypes = () => list(PORT_TYPES),
   prefill = () => Response.json(NO_PREFILL),
+  resolve = () => Response.json(UNKNOWN_CODE),
 }: {
   create?: Route;
   suppliers?: Route;
@@ -218,9 +229,12 @@ function mockApi({
   modelTemplate?: Route;
   portTypes?: Route;
   prefill?: Route;
+  resolve?: (url: URL) => Response;
 } = {}) {
   const sent: Record<string, unknown>[] = [];
   const reads = { suppliers: 0 };
+  /** The query strings of the prefill and of the resolution of the condition code. */
+  const asked = { prefill: [] as string[], resolve: [] as string[] };
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://127.0.0.1');
     const method = init?.method ?? 'GET';
@@ -240,7 +254,14 @@ function mockApi({
     if (route === 'GET /api/pick-lists/12/values') return list(POWER_SUPPLIES);
     if (route === 'GET /api/model-templates') return search(init);
     if (route === 'GET /api/model-templates/7') return modelTemplate(init);
-    if (route === 'GET /api/model-templates/7/device-prefill') return prefill(init);
+    if (route === 'GET /api/model-templates/7/device-prefill') {
+      asked.prefill.push(url.search);
+      return prefill(init);
+    }
+    if (route === 'GET /api/condition-codes/resolve') {
+      asked.resolve.push(url.search);
+      return resolve(url);
+    }
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
     if (route === 'POST /api/devices') {
       sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
@@ -249,7 +270,7 @@ function mockApi({
     throw new Error(`unexpected request ${route}`);
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { sent, reads };
+  return { sent, reads, asked };
 }
 
 function renderPage() {
@@ -520,6 +541,299 @@ describe('UI-003 prefill and review flags (CU-132, REQ-013; Technical Specificat
   });
 });
 
+describe('UI-003 condition code (CU-132, CU-092, REQ-015; Technical Specification 2.5, 2.2, 2.0.11)', () => {
+  const codeBox = () => textbox('Zustandscode');
+  const chipOf = (field: string) =>
+    within(form()).queryByRole('button', { name: `${field} bestätigen` });
+  /** The hint below the field "Zustandscode", linked with `aria-describedby`. */
+  const codeHint = () => errorOf(codeBox());
+
+  function enterCode(code: string) {
+    fireEvent.change(codeBox(), { target: { value: code } });
+    fireEvent.blur(codeBox());
+  }
+
+  /** The prefill of MV-A with the code "DGS": its plain text, and the suggestions given. */
+  const dgsPrefill = (change: Record<string, unknown> = {}) => ({
+    ...MV_A_PREFILL,
+    conditionDescription: DGS_TEXT,
+    codeResult: { found: true, plainText: DGS_TEXT },
+    ...change,
+  });
+
+  it('UI-003.default DER-57-01 shows "Klartext übernommen: <Text>" after leaving the field, resolved for the chosen supplier', async () => {
+    const { asked } = mockApi({ resolve: () => Response.json(DGS) });
+    await openPage();
+    fireEvent.change(select('Lieferant'), { target: { value: '4' } });
+
+    fireEvent.change(codeBox(), { target: { value: 'DGS' } });
+    expect(asked.resolve).toEqual([]);
+    expect(codeHint()).toBeNull();
+    fireEvent.blur(codeBox());
+
+    await vi.waitFor(() => expect(codeHint()).toBe(`Klartext übernommen: ${DGS_TEXT}`));
+    expect(asked.resolve).toEqual(['?code=DGS&supplierId=4']);
+    expect(codeBox().maxLength).toBe(20);
+    expectAccessiblePage();
+  });
+
+  it('UI-003.default the hook of CU-092 resolves without supplierId when no supplier is chosen', async () => {
+    const { asked } = mockApi({ resolve: () => Response.json(DGS) });
+    await openPage();
+
+    enterCode('dgs');
+
+    await vi.waitFor(() => expect(codeHint()).toBe(`Klartext übernommen: ${DGS_TEXT}`));
+    expect(asked.resolve).toEqual(['?code=dgs']);
+  });
+
+  it('UI-003.default AC-REQ-015-01 DER-57-02 takes the plain text of "dgs" into the condition description without review flag and sends the code', async () => {
+    const { sent, asked } = mockApi({
+      resolve: () => Response.json(DGS),
+      prefill: () => Response.json(dgsPrefill()),
+    });
+    await openPage();
+    enterCode('dgs');
+    await fillValid();
+
+    await vi.waitFor(() => expect(textbox('Zustandsbeschreibung').value).toBe(DGS_TEXT));
+    expect(asked.prefill).toContain('?conditionCode=dgs');
+    expect(chipOf('Zustandsbeschreibung')).toBeNull();
+    expect(chipOf('Zustand')).toBeNull();
+    expect(codeHint()).toBe(`Klartext übernommen: ${DGS_TEXT}`);
+
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ conditionCode: 'dgs', conditionDescription: DGS_TEXT });
+    expectAccessiblePage();
+  });
+
+  it('UI-003.default AC-REQ-015-03 code "XYZ" shows "Zustandscode unbekannt", takes no text and lets the user write the description', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    enterCode('XYZ');
+    await vi.waitFor(() => expect(codeHint()).toBe('Zustandscode unbekannt'));
+    await fillValid();
+
+    expect(textbox('Zustandsbeschreibung').value).toBe('');
+    fireEvent.change(textbox('Zustandsbeschreibung'), { target: { value: 'Kratzer am Deckel' } });
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({
+      conditionCode: 'XYZ',
+      conditionDescription: 'Kratzer am Deckel',
+    });
+    expectAccessiblePage();
+  });
+
+  it('UI-003.default AC-REQ-015-04 prefills the suggested visual grade 4 with "zu prüfen"', async () => {
+    mockApi({
+      resolve: () => Response.json({ ...DGS, suggestedVisualGrade: 4 }),
+      prefill: () =>
+        Response.json(
+          dgsPrefill({ visualGrade: 4, reviewKeys: ['visualGrade', '16', '18', '19'] }),
+        ),
+    });
+    await openPage();
+    enterCode('DGS');
+    await chooseModelTemplate();
+
+    await vi.waitFor(() => expect(textbox('Optik-Note').value).toBe('4'));
+    expect(chipOf('Optik-Note')?.textContent).toBe('Bestätigen');
+    expect(screen.getByText(/^Noch 4 Werte zu prüfen\./)).toBeTruthy();
+  });
+
+  it('UI-003.default DER-57-03 with the suggestion "refurbished" deactivated the condition stays empty without "zu prüfen", the visual grade is flagged', async () => {
+    // The server leaves the deactivated suggestion out of the prefill (CU-117).
+    mockApi({
+      resolve: () =>
+        Response.json({ ...DGS, suggestedConditionValueId: 2, suggestedVisualGrade: 4 }),
+      prefill: () =>
+        Response.json(
+          dgsPrefill({
+            values: {},
+            visualGrade: 4,
+            reviewKeys: ['visualGrade'],
+          }),
+        ),
+    });
+    await openPage();
+    enterCode('DGS');
+    await chooseModelTemplate();
+
+    await vi.waitFor(() => expect(textbox('Optik-Note').value).toBe('4'));
+    expect(select('Zustand').value).toBe('');
+    expect(chipOf('Zustand')).toBeNull();
+    expect(chipOf('Optik-Note')).toBeTruthy();
+    expect(textbox('Zustandsbeschreibung').value).toBe(DGS_TEXT);
+    expect(optionTexts(select('Zustand'))).not.toContain('refurbished');
+  });
+
+  it('UI-003.default a code entered after the model template takes its text and suggestions, the values and flags of the attributes stay', async () => {
+    let withCode = false;
+    const { asked } = mockApi({
+      resolve: () =>
+        Response.json({ ...DGS, suggestedConditionValueId: 1, suggestedVisualGrade: 4 }),
+      prefill: () =>
+        Response.json(
+          withCode
+            ? dgsPrefill({
+                conditionValueId: 1,
+                visualGrade: 4,
+                reviewKeys: ['condition', 'visualGrade', '16', '18', '19'],
+              })
+            : MV_A_PREFILL,
+        ),
+    });
+    await openPage();
+    fireEvent.change(select('Lieferant'), { target: { value: '4' } });
+    await chooseModelTemplate();
+    await vi.waitFor(() => expect(within(form()).queryAllByText('zu prüfen')).toHaveLength(3));
+    fireEvent.click(chipOf('Akku') as HTMLElement);
+    await choose('Netzteil', 121);
+
+    withCode = true;
+    enterCode('DGS');
+
+    await vi.waitFor(() => expect(textbox('Zustandsbeschreibung').value).toBe(DGS_TEXT));
+    expect(asked.prefill.at(-1)).toBe('?conditionCode=DGS&supplierId=4');
+    expect(select('Zustand').value).toBe('1');
+    expect(textbox('Optik-Note').value).toBe('4');
+    expect(select('Netzteil').value).toBe('121');
+    expect(chipOf('Zustand')).toBeTruthy();
+    expect(chipOf('Optik-Note')).toBeTruthy();
+    expect(chipOf('Akku')).toBeNull();
+    expect(screen.getByText(/^Noch 4 Werte zu prüfen\./)).toBeTruthy();
+    expect(screen.queryByText('Lade Gerätewerte …')).toBeNull();
+  });
+
+  it('UI-003.loading AC-REQ-013-01 a code entered while the prefill of the model template loads keeps the values of the model template (FIND-1068-01)', async () => {
+    let answerFirst: (response: Response) => void = () => {};
+    const { asked } = mockApi({
+      resolve: () => Response.json(DGS),
+      prefill: () =>
+        asked.prefill.length === 1
+          ? new Promise<Response>((resolve) => {
+              answerFirst = resolve;
+            })
+          : Response.json(dgsPrefill()),
+    });
+    await openPage();
+    fireEvent.change(searchBox(), { target: { value: 'T14' } });
+    fireEvent.click(await screen.findByRole('button', { name: MV_A_LINE }));
+    await screen.findByText('Lade Gerätewerte …');
+
+    enterCode('DGS');
+    answerFirst(Response.json(MV_A_PREFILL));
+
+    await vi.waitFor(() => expect(textbox('Zustandsbeschreibung').value).toBe(DGS_TEXT));
+    expect(asked.prefill).toEqual(['', '?conditionCode=DGS']);
+    expect(select('Tastaturlayout').value).toBe('111');
+    expect(select('Akku').value).toBe(String(WITH_BATTERY));
+    expect(chipOf('Tastaturlayout')).toBeTruthy();
+    expect(chipOf('Akku')).toBeTruthy();
+    expect(screen.queryByText('Lade Gerätewerte …')).toBeNull();
+    expectAccessiblePage();
+  });
+
+  describe('after supplier_deactivated (2.0.11 "Lieferant in UI-003", design v0.6.8)', () => {
+    const suppliersAfter = () => {
+      let calls = 0;
+      return () => {
+        calls += 1;
+        return calls === 1 ? list([OST, WEST]) : list([OST, { ...WEST, active: false }]);
+      };
+    };
+    /** "DGS" exists only for "Lieferant West" unless `withoutSupplier` is set. */
+    const resolveFor =
+      ({ withoutSupplier = false } = {}) =>
+      (url: URL) =>
+        Response.json(
+          url.searchParams.get('supplierId') === String(WEST.id)
+            ? { ...DGS, plainText: 'Display gebrochen (West)', suggestedVisualGrade: 4 }
+            : withoutSupplier
+              ? DGS
+              : UNKNOWN_CODE,
+        );
+    const westPrefill = () =>
+      Response.json(
+        dgsPrefill({
+          conditionDescription: 'Display gebrochen (West)',
+          codeResult: { found: true, plainText: 'Display gebrochen (West)' },
+          visualGrade: 4,
+          reviewKeys: ['visualGrade', '16', '18', '19'],
+        }),
+      );
+
+    async function rejectWest() {
+      fireEvent.change(select('Lieferant'), { target: { value: String(WEST.id) } });
+      enterCode('DGS');
+      await vi.waitFor(() =>
+        expect(codeHint()).toBe('Klartext übernommen: Display gebrochen (West)'),
+      );
+      fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
+      await chooseModelTemplate();
+      await vi.waitFor(() => expect(textbox('Optik-Note').value).toBe('4'));
+      fireEvent.change(select('Zustand'), { target: { value: '1' } });
+      await choose('Netzteil', 121);
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(errorOf(select('Lieferant'))).toBe(WEST_DEACTIVATED));
+    }
+
+    it('UI-003.validation DER-57-04 resolves "DGS" again without supplierId and shows "Zustandscode unbekannt"; condition, visual grade, description and flags stay', async () => {
+      const { asked } = mockApi({
+        create: supplierDeactivated,
+        suppliers: suppliersAfter(),
+        resolve: resolveFor(),
+        prefill: westPrefill,
+      });
+      await openPage();
+      await rejectWest();
+
+      await vi.waitFor(() => expect(codeHint()).toBe('Zustandscode unbekannt'));
+      expect(asked.resolve).toEqual([`?code=DGS&supplierId=${WEST.id}`, '?code=DGS']);
+      expect(select('Zustand').value).toBe('1');
+      expect(textbox('Optik-Note').value).toBe('4');
+      expect(chipOf('Optik-Note')).toBeTruthy();
+      expect(textbox('Zustandsbeschreibung').value).toBe('Display gebrochen (West)');
+      expect(within(form()).queryAllByText('zu prüfen')).toHaveLength(4);
+      expect(codeBox().value).toBe('DGS');
+      expectAccessiblePage();
+    });
+
+    it('DER-57-04 shows "Klartext übernommen: <Text>" when the code exists without supplier, values unchanged', async () => {
+      mockApi({
+        create: supplierDeactivated,
+        suppliers: suppliersAfter(),
+        resolve: resolveFor({ withoutSupplier: true }),
+        prefill: westPrefill,
+      });
+      await openPage();
+      await rejectWest();
+
+      await vi.waitFor(() => expect(codeHint()).toBe(`Klartext übernommen: ${DGS_TEXT}`));
+      expect(textbox('Zustandsbeschreibung').value).toBe('Display gebrochen (West)');
+      expect(textbox('Optik-Note').value).toBe('4');
+    });
+
+    it('DER-57-04 resolves nothing again without a condition code', async () => {
+      const { asked } = mockApi({ create: supplierDeactivated, suppliers: suppliersAfter() });
+      await openPage();
+      await fillValid({ supplierId: String(WEST.id) });
+
+      fireEvent.click(saveButton());
+      await vi.waitFor(() => expect(errorOf(select('Lieferant'))).toBe(WEST_DEACTIVATED));
+
+      await vi.waitFor(() =>
+        expect(optionTexts(select('Lieferant'))).toEqual(['', 'Lieferant Ost']),
+      );
+      expect(asked.resolve).toEqual([]);
+      expect(codeHint()).toBeNull();
+    });
+  });
+});
+
 describe('UI-003 Gerät einbuchen (CU-132)', () => {
   it('UI-003.default DER-54-01 focuses WI-Nr, shows the values card only after the model template and keeps the field order', async () => {
     mockApi();
@@ -537,6 +851,7 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expect(labels()).toEqual([
       'WI-Nr',
       'Lieferant',
+      'Zustandscode',
       'Zustand',
       'Optik-Note',
       'Tastaturlayout',
@@ -692,6 +1007,7 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expect(sent[0]).toEqual({
       wiNr: '626198',
       supplierId: 4,
+      conditionCode: null,
       modelTemplateId: 7,
       conditionValueId: 1,
       visualGrade: '3',
