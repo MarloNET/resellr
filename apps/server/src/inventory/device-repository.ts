@@ -94,6 +94,42 @@ export function createDeviceRepository(db: Kysely<DB>) {
     },
 
     /**
+     * The devices of a model listing for UI-014 (2.7), by `assigned_at` and `id`: the assigned
+     * ones and, with `includeCancelled`, the ones cancelled from it (`cancelled_from_listing_id`,
+     * 3.5).
+     */
+    async listForListingDetail(
+      listingId: number,
+      { includeCancelled }: { includeCancelled: boolean },
+    ) {
+      return db
+        .selectFrom('device')
+        .select([
+          'id',
+          'wi_nr',
+          'stock_status',
+          'sold_channel_id',
+          'sold_on',
+          'device_values',
+          'captured_on',
+        ])
+        .where((eb) =>
+          includeCancelled
+            ? eb.or([
+                eb('listing_id', '=', listingId),
+                eb.and([
+                  eb('stock_status', '=', 'cancelled'),
+                  eb('cancelled_from_listing_id', '=', listingId),
+                ]),
+              ])
+            : eb('listing_id', '=', listingId),
+        )
+        .orderBy('assigned_at')
+        .orderBy('id')
+        .execute();
+    },
+
+    /**
      * Assigns a device to a model listing at `at` (2.6: `assigned_at` orders the WI-Nrs of
      * `{WI-Nr}`) and raises its version (2.0.3).
      */

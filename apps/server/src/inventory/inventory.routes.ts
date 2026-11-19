@@ -15,6 +15,8 @@ import {
   deviceAssignmentSchema,
   listingChoiceSchema,
   listingCreateBodySchema,
+  listingDetailQuerySchema,
+  listingDetailSchema,
   listingSchema,
 } from '@resellr/domain/schemas/listing.schema';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -31,6 +33,7 @@ import { createDevicePrefillQuery } from './device-prefill-query.ts';
 import { createDeviceRepository } from './device-repository.ts';
 import { createDeviceService, toDevice } from './device-service.ts';
 import { createListingChoiceQuery } from './listing-choice-query.ts';
+import { createListingDetailQuery } from './listing-detail-query.ts';
 import { createListingRepository } from './listing-repository.ts';
 
 export interface InventoryRoutesOptions {
@@ -61,10 +64,10 @@ const prefillQuerystring = z.strictObject({
  * Inventory routes (CU-130, Technical Specification 2.5): `POST /api/devices`,
  * `GET /api/devices?wiNr=`, `GET /api/devices/{id}`, `PATCH /api/devices/{id}` for the device
  * values and `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` and with
- * #194 `GET /api/model-templates/{id}/listings` and `POST /api/devices/{id}/assignment` (2.6); the
- * unassigned devices (#258) and the other model listing routes follow. The reading routes read
- * through the repositories CU-122 and CU-125, the catalog reader CU-108 and the queries CU-293 and
- * CU-294 with the outer `db`, the writing ones go through the services CU-121 and CU-123 and their
+ * #194 `GET /api/model-templates/{id}/listings` and `POST /api/devices/{id}/assignment` (2.6) and
+ * with #198 `GET /api/listings/{id}` (2.7); the unassigned devices (#258) and the other model
+ * listing routes follow. The reading routes read through the repositories CU-122 and CU-125, the
+ * catalog reader CU-108 and the queries CU-292, CU-293 and CU-294 with the outer `db`, the writing ones go through the services CU-121 and CU-123 and their
  * unit of work (2.0.4).
  */
 export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = async (
@@ -78,6 +81,7 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
   const assignmentService = createAssignmentService({ uow, clock });
   const prefillQuery = createDevicePrefillQuery(db);
   const listingChoiceQuery = createListingChoiceQuery(db);
+  const listingDetailQuery = createListingDetailQuery(db);
 
   // `201` with the new device (2.0.1). The shape is checked here (`400`), every rule a user can
   // violate by the service, so all field errors come in one `422` (2.5).
@@ -166,6 +170,19 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
     { schema: { body: listingCreateBodySchema, response: { 201: listingSchema } } },
     async (request, reply) =>
       reply.code(201).send(await assignmentService.createFromDevice(request.body)),
+  );
+
+  // UI-014 (2.7): the model listing with stock data, prices, devices and delivery scope.
+  app.get(
+    '/api/listings/:id',
+    {
+      schema: {
+        params: idParams,
+        querystring: listingDetailQuerySchema,
+        response: { 200: listingDetailSchema },
+      },
+    },
+    async (request) => listingDetailQuery.find(request.params.id, request.query),
   );
 
   // `200` with the device and the new quantity of its model listing (2.6, REQ-017): "Zuordnen" in

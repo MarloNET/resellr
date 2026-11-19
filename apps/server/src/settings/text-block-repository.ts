@@ -68,6 +68,16 @@ export function createTextBlockRepository(db: Kysely<DB>) {
       return db.selectFrom('text_block').selectAll().where('id', '=', id).executeTakeFirst();
     },
 
+    /** Name and status of the text blocks with these ids; unknown ids are left out. */
+    async findNamesByIds(ids: readonly number[]) {
+      return db
+        .selectFrom('text_block')
+        .select(['id', 'name', 'active'])
+        .where('id', 'in', ids)
+        .orderBy('id')
+        .execute();
+    },
+
     /** The text block that already has this name key, active or not (2.2). */
     async findIdByNameKey(nameKey: string): Promise<number | undefined> {
       const row = await db
