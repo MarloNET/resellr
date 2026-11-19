@@ -1148,11 +1148,15 @@ export function DeviceIntakePage() {
   // Ctrl+S saves the device, Ctrl+Enter saves and assigns (UI-003 "Aktionen").
   const saveRef = useRef(save);
   saveRef.current = save;
+  const assigningRef = useRef(assigning);
+  assigningRef.current = assigning;
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       const ctrl = event.ctrlKey || event.metaKey;
       if (!ctrl || (event.key.toLowerCase() !== 's' && event.key !== 'Enter')) return;
       event.preventDefault();
+      // The device is saved once UI-004 is open; the shortcuts of UI-003 wait (DER-55-05).
+      if (assigningRef.current !== null) return;
       // "Speichern und zuordnen" waits while values are to be reviewed (UI-003.disabled).
       if (event.key === 'Enter' && openReviewKeys(draftRef.current).length > 0) return;
       saveRef.current({ assign: event.key === 'Enter' });

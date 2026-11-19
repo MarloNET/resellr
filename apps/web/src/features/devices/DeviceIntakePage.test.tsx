@@ -795,6 +795,26 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     ).toBeTruthy();
   });
 
+  it('DER-55-05 Ctrl+S and Ctrl+Enter send no further POST /api/devices while UI-004 is open', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    await fillValid();
+
+    fireEvent.click(saveAndAssignButton());
+    const dialog = await screen.findByRole('dialog', { name: 'Modell-Inserat wählen' });
+    expect(sent).toHaveLength(1);
+
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    fireEvent.keyDown(dialog, { key: 's', ctrlKey: true });
+    fireEvent.keyDown(dialog, { key: 'Enter', ctrlKey: true });
+
+    // Give a wrongly sent request the time to arrive.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sent).toHaveLength(1);
+    expect(screen.getByRole('dialog', { name: 'Modell-Inserat wählen' })).toBeTruthy();
+  });
+
   it('DER-55-05 a rejected save of "Speichern und zuordnen" keeps UI-003 without UI-004', async () => {
     mockApi({
       create: () =>
