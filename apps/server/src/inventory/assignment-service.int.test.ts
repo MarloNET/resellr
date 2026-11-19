@@ -151,6 +151,28 @@ function flagForReview(deviceId: number, keys: string[]) {
 const createListing = (payload: Record<string, unknown>) =>
   t.app.inject({ method: 'POST', url: '/api/listings', headers: SAME_ORIGIN_WRITE, payload });
 
+const patchDevice = (deviceId: number, payload: Record<string, unknown>) =>
+  t.app.inject({
+    method: 'PATCH',
+    url: `/api/devices/${deviceId}`,
+    headers: SAME_ORIGIN_WRITE,
+    payload: { confirmedKeys: [], ...payload },
+  });
+
+/**
+ * MI-A with quantity 3: created from "626198", then "626199" and "626200" assigned; returns its id
+ * and the id of "626200" (version 2).
+ */
+async function miAWithThreeDevices(): Promise<{ miA: number; deviceId: number }> {
+  const miA = await createMiA();
+  let deviceId = 0;
+  for (const wiNr of ['626199', '626200']) {
+    deviceId = await captureDevice(wiNr);
+    expect((await assign(deviceId, { version: 1, listingId: miA })).statusCode).toBe(200);
+  }
+  return { miA, deviceId };
+}
+
 const rows = <T>(sql: string, ...params: unknown[]) =>
   t.database.sqlite.prepare(sql).all(...params) as T[];
 const count = (table: string) =>
@@ -425,22 +447,78 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
     expect(count('listing')).toBe(0);
   });
 
-  it('rejects an assigned device with already_assigned until it can leave its model listing (#199)', async () => {
-    const deviceId = await captureDevice('626198');
-    await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
+  it('AC-REQ-019-07 creates a model listing from a device of MI-A (quantity 3) whose visual grade changed to 4; MI-A has quantity 2 and the new model listing quantity 1', async () => {
+    const { miA, deviceId } = await miAWithThreeDevices();
+    expect(quantityOf(miA)).toBe(3);
+    expect((await patchDevice(deviceId, { version: 2, visualGrade: '4' })).statusCode).toBe(200);
 
-    const response = await createListing({
-      fromDeviceId: deviceId,
-      deviceVersion: 2,
-      articleNumber: 'MI-B',
+    const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 3 });
+
+    // No longer `422 already_assigned` (2.6, Nachtrag MAR-1053).
+    expect(response.statusCode).toBe(201);
+    const listing = response.json<{ id: number; visualGrade: number; quantity: number }>();
+    expect(listing).toMatchObject({ visualGrade: 4, quantity: 1 });
+    expect(quantityOf(miA)).toBe(2);
+    expect(quantityOf(listing.id)).toBe(1);
+    expect(rows('SELECT listing_id, version FROM device WHERE id = ?', deviceId)).toEqual([
+      { listing_id: listing.id, version: 4 },
+    ]);
+    // Both stock data are formed anew from the devices (2.8.2, 3.3).
+    for (const [id, quantity] of [
+      [miA, 2],
+      [listing.id, 1],
+    ] as const) {
+      const [stored] = rows<{ stock_json: string }>(
+        'SELECT stock_json FROM listing WHERE id = ?',
+        id,
+      );
+      expect(JSON.parse(stored?.stock_json ?? '')).toMatchObject({ quantity });
+    }
+  });
+
+  it('AC-REQ-019-07 writes the audit entries for the creation and the change of the assignment from MI-A', async () => {
+    const { deviceId } = await miAWithThreeDevices();
+    await patchDevice(deviceId, { version: 2, visualGrade: '4' });
+    const before = rows<{ id: number }>('SELECT MAX(id) AS id FROM audit_entry')[0]?.id ?? 0;
+
+    const { id } = (await createListing({ fromDeviceId: deviceId, deviceVersion: 3 })).json<{
+      id: number;
+    }>();
+
+    const entries = rows<Record<string, unknown>>(
+      `SELECT object_type, object_id, action, old_value, new_value
+         FROM audit_entry WHERE id > ? ORDER BY id`,
+      before,
+    );
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ object_type: 'listing', object_id: id, action: 'created' });
+    // Until S5 the display title of both model listings is the model name (4.4.0).
+    expect(entries[1]).toMatchObject({
+      object_type: 'device',
+      object_id: deviceId,
+      action: 'assigned',
+      old_value: JSON.stringify({ 'Modell-Inserat': 'MacBook Pro 13' }),
+      new_value: JSON.stringify({ 'Modell-Inserat': 'MacBook Pro 13' }),
     });
+  });
+
+  it('rejects an unchanged device of MI-A with variant_duplicate and a reference to MI-A; it stays assigned to MI-A', async () => {
+    const { miA, deviceId } = await miAWithThreeDevices();
+    const auditEntries = count('audit_entry');
+
+    const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 2 });
 
     expect(response.statusCode).toBe(422);
     expect(response.json().error).toMatchObject({
-      code: 'already_assigned',
-      message: 'Gerät ist bereits einem Modell-Inserat zugeordnet',
+      code: 'variant_duplicate',
+      details: { listingId: miA },
     });
     expect(count('listing')).toBe(1);
+    expect(count('audit_entry')).toBe(auditEntries);
+    expect(quantityOf(miA)).toBe(3);
+    expect(rows('SELECT listing_id, version FROM device WHERE id = ?', deviceId)).toEqual([
+      { listing_id: miA, version: 2 },
+    ]);
   });
 
   it('AC-REQ-013-03 rejects a device with open review flags with review_pending and the flagged keys; nothing is created', async () => {
@@ -563,6 +641,28 @@ describe('createFromDevice events (CU-123, CU-128; Technical Specification 2.0.4
     expect(seen).toEqual([
       { type: 'ListingCreated', listingId: listing.id },
       { type: 'StockChanged', listingId: listing.id },
+    ]);
+  });
+
+  it('AC-REQ-019-07 reports StockChanged of the new model listing and of MI-A, which the device left', async () => {
+    const { miA, deviceId } = await miAWithThreeDevices();
+    await patchDevice(deviceId, { version: 2, visualGrade: '4' });
+    const seen: ChangeEvent[] = [];
+    const record = vi.fn(async (event: ChangeEvent): Promise<ChangeReport> => {
+      seen.push(event);
+      return emptyChangeReport();
+    });
+    const uow = createUnitOfWork<DB>(t.database.db, {
+      change: { ListingCreated: record, StockChanged: record },
+    });
+    const service = createAssignmentService({ uow, clock: createClock() });
+
+    const listing = await service.createFromDevice({ fromDeviceId: deviceId, deviceVersion: 3 });
+
+    expect(seen).toEqual([
+      { type: 'ListingCreated', listingId: listing.id },
+      { type: 'StockChanged', listingId: listing.id },
+      { type: 'StockChanged', listingId: miA },
     ]);
   });
 

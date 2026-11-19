@@ -209,6 +209,62 @@ test.describe('UI-003 Gerät einbuchen (CU-132)', () => {
     expect(await answer.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
   });
 
+  test('AC-REQ-015-01 AC-REQ-015-04 a condition code takes its plain text and flags the suggested visual grade, the code is stored as the entry spells it', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const wiNr = `C${hash}`.slice(0, 20);
+    const code = `DGS${hash}`.slice(0, 20).toUpperCase();
+    const plainText = `Display- und Gehäuseschaden ${hash}`;
+    const { modelName, manufacturer } = await createNotebookTemplate(page, server.baseUrl, hash);
+    const entry = await page.request.post(`${server.baseUrl}/api/condition-codes`, {
+      headers: { origin: server.baseUrl },
+      data: { code, plainText, suggestedVisualGrade: 4 },
+    });
+    expect(entry.status()).toBe(201);
+    await page.goto('/geraete/neu');
+    await field(page, 'WI-Nr').fill(wiNr);
+
+    await field(page, 'Zustandscode').fill(code.toLowerCase());
+    await field(page, 'Zustandscode').press('Tab');
+    await expect(field(page, 'Zustandscode')).toHaveAccessibleDescription(
+      `Klartext übernommen: ${plainText}`,
+    );
+    await form(page)
+      .getByRole('searchbox', { name: /^Modellvorlage suchen/ })
+      .fill(modelName);
+    await page.getByRole('button', { name: new RegExp(`^${manufacturer} ${modelName}`) }).click();
+
+    await expect(field(page, 'Zustandsbeschreibung')).toHaveValue(plainText);
+    await expect(field(page, 'Optik-Note')).toHaveValue('4');
+    await expect(page.getByRole('button', { name: 'Optik-Note bestätigen' })).toBeVisible();
+    await expect(form(page).getByText('zu prüfen')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Optik-Note bestätigen' }).click();
+
+    await field(page, 'Zustand').selectOption({ label: 'gebraucht' });
+    await field(page, 'RAM').fill('16');
+    await field(page, 'Speicherkapazität').fill('512');
+    await field(page, 'Tastaturlayout').selectOption({ label: 'Deutsch (QWERTZ)' });
+    await field(page, 'Betriebssystem').selectOption({ label: 'Windows 11 Pro' });
+    await field(page, 'Netzteil').selectOption({ label: 'mit Netzteil (original)' });
+    await field(page, 'Akku').selectOption({ label: 'ohne Akku' });
+    await expectReachable(page);
+    const created = page.waitForResponse(
+      (answer) => answer.request().method() === 'POST' && answer.url().endsWith('/api/devices'),
+    );
+    await saveButton(page).click();
+
+    const answer = await created;
+    expect(answer.status()).toBe(201);
+    expect(await answer.json()).toMatchObject({
+      conditionCode: code,
+      conditionDescription: plainText,
+      visualGrade: 4,
+      captureStatus: 'checked',
+    });
+  });
+
   test('R-1 below 1366 px the form stacks into one column and every field and action stays reachable (FM-3, FM-4)', async ({
     page,
   }, testInfo) => {
