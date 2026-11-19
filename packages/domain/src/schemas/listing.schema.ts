@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
-import { idSchema, versionSchema } from './common.schema.ts';
-import { deviceSchema } from './device.schema.ts';
+import { centsSchema, dateSchema, idSchema, versionSchema } from './common.schema.ts';
+import { deviceSchema, STOCK_STATUSES } from './device.schema.ts';
 
-// Model listing (REQ-017, REQ-019, REQ-088; Technical Specification 2.6, 2.7, 3.3). The detail
-// of UI-014 follows with #198, changing with #200.
+// Model listing (REQ-017, REQ-019, REQ-088; Technical Specification 2.6, 2.7, 3.3). Changing
+// follows with #200 and #206.
 
 /** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
 const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
@@ -40,7 +40,7 @@ const valuesSchema = z.record(z.string(), z.unknown());
  * A model listing in the answer of `POST /api/listings` and `PATCH /api/listings/{id}` (2.6, 3.3,
  * Nachtrag MAR-1053): the fields of the `PATCH` request with the display title, the quantity and
  * the version; the delivery scope as text block ids in their order, empty after creating. Prices,
- * devices and stock data come with `GET /api/listings/{id}` (#198).
+ * devices and stock data come with `GET /api/listings/{id}` (`listingDetailSchema`).
  */
 export const listingSchema = z.object({
   id: idSchema,
@@ -112,3 +112,60 @@ export const deviceAssignmentSchema = z.object({
   adjustStockChannels: z.array(idSchema),
 });
 export type DeviceAssignment = z.infer<typeof deviceAssignmentSchema>;
+/** `?includeCancelled=true` adds the cancelled devices of the model listing (2.7, UI-014). */
+export const listingDetailQuerySchema = z.strictObject({
+  includeCancelled: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+});
+
+/** Source of a price (2.7): entered by the user or derived by a price rule (from S5). */
+export const PRICE_SOURCES = ['manual', 'rule'] as const;
+
+/** The stored battery capacity of a device (3.4): a percentage or "nicht ermittelbar". */
+const batteryCapacitySchema = z.union([
+  z.object({ percent: z.int().min(0).max(100) }),
+  z.object({ notDeterminable: z.literal(true) }),
+]);
+
+/**
+ * A device in the list "Geräte" of UI-014 (2.7): WI-Nr, inventory status with channel and date of
+ * a sale, battery capacity (`null` without value) and capture date.
+ */
+export const listingDeviceSchema = z.object({
+  id: idSchema,
+  wiNr: z.string(),
+  stockStatus: z.enum(STOCK_STATUSES),
+  soldChannelId: idSchema.nullable(),
+  soldOn: dateSchema.nullable(),
+  batteryCapacity: batteryCapacitySchema.nullable(),
+  capturedOn: dateSchema,
+});
+export type ListingDevice = z.infer<typeof listingDeviceSchema>;
+
+/**
+ * `GET /api/listings/{id}` (2.7, CU-292): the model listing with its stock data (2.8.2), its
+ * prices by channel, its devices (the cancelled ones only with `includeCancelled`) and its delivery
+ * scope as text blocks with their names in their order. Channel contents and photos have reads of
+ * their own (FIND-202).
+ */
+export const listingDetailSchema = listingSchema.extend({
+  stock: z.object({
+    quantity: z.int().min(0),
+    wiNrs: z.array(z.string()),
+    batteryText: z.string(),
+    stockHash: z.string(),
+  }),
+  prices: z.array(
+    z.object({
+      channelId: idSchema,
+      amountCents: centsSchema,
+      vb: z.boolean(),
+      source: z.enum(PRICE_SOURCES),
+    }),
+  ),
+  devices: z.array(listingDeviceSchema),
+  deliveryScope: z.array(z.object({ id: idSchema, name: z.string() })),
+});
+export type ListingDetail = z.infer<typeof listingDetailSchema>;
