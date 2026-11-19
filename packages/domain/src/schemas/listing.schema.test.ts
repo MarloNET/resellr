@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { listingCreateBodySchema, toArticleNumberKey } from './listing.schema.ts';
+import {
+  deviceAssignmentBodySchema,
+  listingCreateBodySchema,
+  toArticleNumberKey,
+} from './listing.schema.ts';
 
 const RULE = 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“';
 
@@ -48,5 +52,27 @@ describe('listingCreateBodySchema (CU-116, Technical Specification 2.6)', () => 
 describe('toArticleNumberKey (3.3)', () => {
   it('is the article number in lower case', () => {
     expect(toArticleNumberKey('MI-A626198')).toBe('mi-a626198');
+  });
+});
+
+describe('deviceAssignmentBodySchema (CU-116, Technical Specification 2.6)', () => {
+  it('takes the version of the device and the chosen model listing, without confirmation by default', () => {
+    expect(deviceAssignmentBodySchema.parse({ version: 1, listingId: 9 })).toEqual({
+      version: 1,
+      listingId: 9,
+      confirmDeviation: false,
+    });
+    expect(
+      deviceAssignmentBodySchema.parse({ version: 2, listingId: 9, confirmDeviation: true }),
+    ).toEqual({ version: 2, listingId: 9, confirmDeviation: true });
+  });
+
+  it.each([
+    { listingId: 9 },
+    { version: 1 },
+    { version: 1, listingId: 0 },
+    { version: 1, listingId: 9, targetListingId: 3 },
+  ])('rejects %j', (body) => {
+    expect(deviceAssignmentBodySchema.safeParse(body).success).toBe(false);
   });
 });

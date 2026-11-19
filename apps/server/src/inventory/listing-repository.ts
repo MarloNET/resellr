@@ -17,8 +17,9 @@ export type ListingStockColumns = Pick<ListingRow, 'quantity' | 'stock_json' | '
 export function createListingRepository(db: Kysely<DB>) {
   return {
     /**
-     * The variant data of the model listings of the given model templates, by model template and
-     * `id` (2.1, for CU-290). Without ids there is no query, as `in ()` is invalid in SQLite.
+     * The variant data of the model listings of the given model templates with their quantity, by
+     * model template and `id` (2.1, for CU-290 and CU-294). Without ids there is no query, as
+     * `in ()` is invalid in SQLite.
      */
     async listVariantData(modelTemplateIds: readonly number[]) {
       if (modelTemplateIds.length === 0) return [];
@@ -34,6 +35,7 @@ export function createListingRepository(db: Kysely<DB>) {
           'other_device_values',
           'display_title',
           'article_number',
+          'quantity',
         ])
         .where('model_template_id', 'in', modelTemplateIds)
         .orderBy('model_template_id')

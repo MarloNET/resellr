@@ -43,6 +43,8 @@ export const queryKeys = {
       code: { conditionCode: string | null; supplierId: number | null },
     ) => ['inventory', 'device-prefill', modelTemplateId, code] as const,
     deviceSearch: (wiNr: string) => ['inventory', 'devices', { wiNr }] as const,
+    listingChoice: (modelTemplateId: number) =>
+      ['inventory', 'listing-choice', modelTemplateId] as const,
   },
 } as const;
 

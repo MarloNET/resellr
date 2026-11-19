@@ -6,14 +6,20 @@ import type {
   DeviceSearchResult,
   DeviceUpdateInput,
 } from '@resellr/domain/schemas/device.schema';
-import type { Listing, ListingCreateInput } from '@resellr/domain/schemas/listing.schema';
+import type {
+  DeviceAssignment,
+  DeviceAssignmentInput,
+  Listing,
+  ListingChoice,
+  ListingCreateInput,
+} from '@resellr/domain/schemas/listing.schema';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
 
 // Hooks of the devices of F-05 and the model listings of F-06 (CU-131, Technical Specification
-// 2.5, 2.6). The unassigned devices (#258), assigning (#194) and the other model listing hooks
+// 2.5, 2.6). The unassigned devices (#258) and the other model listing hooks
 // follow.
 
 /**
@@ -113,4 +119,31 @@ export function useUpdateDeviceMutation(id: number) {
       });
     },
   });
+}
+
+/**
+ * The model listings of a model template to choose from in UI-004
+ * (`GET /api/model-templates/{id}/listings`, 2.6).
+ */
+export function useListingChoiceQuery(modelTemplateId: number) {
+  return useQuery<ListingChoice, ApiError>({
+    queryKey: queryKeys.inventory.listingChoice(modelTemplateId),
+    queryFn: ({ signal }) =>
+      apiClient.get<ListingChoice>(`/api/model-templates/${modelTemplateId}/listings`, { signal }),
+  });
+}
+
+/**
+ * "Zuordnen" of UI-004 (`POST /api/devices/{id}/assignment`, 2.6): the device and the quantity
+ * of its model listing change, so the cached devices and model listings are read again.
+ */
+export function useAssignDeviceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeviceAssignment, ApiError, { deviceId: number; body: DeviceAssignmentInput }>(
+    {
+      mutationFn: ({ deviceId, body }) =>
+        apiClient.post<DeviceAssignment>(`/api/devices/${deviceId}/assignment`, body),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
+    },
+  );
 }

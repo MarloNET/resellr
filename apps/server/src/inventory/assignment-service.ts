@@ -5,6 +5,9 @@ import {
 } from '@resellr/domain/inventory/compare-variants';
 import type { AttributeValues } from '@resellr/domain/schemas/attribute-values.schema';
 import {
+  type DeviceAssignment,
+  type DeviceAssignmentInput,
+  deviceAssignmentBodySchema,
   type Listing,
   type ListingCreateInput,
   listingCreateBodySchema,
@@ -17,9 +20,14 @@ import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import { type AttributeEntry, createSettingsReader } from '../settings/index.ts';
 import type { Clock } from '../shared/clock.ts';
-import { BadRequestError, ConflictError, RuleViolation } from '../shared/domain-error.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  RuleViolation,
+} from '../shared/domain-error.ts';
 import { createDeviceRepository } from './device-repository.ts';
-import { readableValues } from './device-service.ts';
+import { readableValues, toDevice } from './device-service.ts';
 import { createListingRepository, type ListingRow } from './listing-repository.ts';
 import { createListingStockUpdater } from './listing-stock-updater.ts';
 
@@ -71,11 +79,61 @@ function splitDeviceValues(attributes: readonly AttributeEntry[], values: Attrib
 /**
  * Assignment service (CU-123, REQ-017 to REQ-020; Technical Specification 2.6): the only place
  * that assigns devices, creates a model listing from a device and rebooks. With #197 creating a
- * model listing from a checked, available device; assigning (#194), rebooking (#202), the check
- * of the review flags (#189) and leaving a previous model listing (#199) follow.
+ * model listing from a checked, available device, with #194 assigning a device to an existing
+ * model listing of its model template; the deviation check (#196), rebooking (#202), the check of
+ * the review flags (#189) and leaving a previous model listing (#199) follow.
  */
 export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
   return {
+    /**
+     * `POST /api/devices/{id}/assignment` (REQ-017): assigns the device to the model listing at
+     * `assigned_at` = now, forms the stock of the model listing anew (CU-128, `StockChanged`) and
+     * writes the audit entry. Order of the checks: the device (`not_found`), the model listing
+     * (`400`, a program error of the user interface), the version (`version_conflict`), then the
+     * preconditions of 2.6: available (`device_not_available`), not assigned
+     * (`already_assigned`), the same model template (`other_model_template`); the first matching
+     * stage wins and nothing is stored. `review_pending` (#189) and `variant_deviation` (#196)
+     * follow. `adjustStockChannels` is the report of the `StockChanged` handlers, empty until S5.
+     */
+    async assign(deviceId: number, input: DeviceAssignmentInput): Promise<DeviceAssignment> {
+      const request = deviceAssignmentBodySchema.parse(input);
+      const { result, report } = await uow.run(async (tx) => {
+        const devices = createDeviceRepository(tx.db);
+        const listings = createListingRepository(tx.db);
+
+        const device = await devices.findById(deviceId);
+        if (device === undefined) throw new NotFoundError();
+        const listing = await listings.findById(request.listingId);
+        if (listing === undefined) throw new BadRequestError('listingId unknown');
+        if (device.version !== request.version) throw new ConflictError('version_conflict');
+        if (device.stock_status !== 'available') {
+          throw new RuleViolation('device_not_available', { usage: 'assignment' });
+        }
+        if (device.listing_id !== null) throw new RuleViolation('already_assigned');
+        if (device.model_template_id !== listing.model_template_id) {
+          throw new RuleViolation('other_model_template');
+        }
+
+        const at = clock.now().toISOString();
+        await devices.assign(device.id, listing.id, at);
+        const quantity = await createListingStockUpdater(tx).update(listing.id);
+
+        await createAuditWriter({ db: tx.db, clock }).write({
+          objectType: 'device',
+          objectId: device.id,
+          objectLabel: `Gerät ${device.wi_nr}`,
+          action: 'assigned',
+          oldValue: null,
+          newValue: { 'Modell-Inserat': listing.display_title },
+        });
+
+        const stored = await devices.findById(device.id);
+        if (stored === undefined) throw new Error(`device ${device.id} vanished in its action`);
+        return { device: toDevice(stored), listing: { id: listing.id, quantity } };
+      });
+      return { ...result, adjustStockChannels: report.adjustStockChannels };
+    },
+
     /**
      * `POST /api/listings` (REQ-019): a model listing with the variant data and the other listed
      * values of the device, the article number (the WI-Nr unless `articleNumber` is set), the EAN

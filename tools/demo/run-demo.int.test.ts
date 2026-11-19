@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { INITIAL_DEVICE_TYPES } from '@resellr/seed-data/initial-settings';
 import {
+  DEMO_ASSIGNMENTS,
   DEMO_DATASHEET_BLOCK_ORDER,
   DEMO_DEVICE_TYPES,
   DEMO_DEVICES,
@@ -104,7 +105,7 @@ describe('startDemo (CU-004)', () => {
       // The initial settings of the seed migration CU-071 and the demo data written through the
       // API on top of them (CU-061): the device types, suppliers, manufacturers, the merchant
       // profile, the text blocks and the datasheet layout of S2, the model templates of S3 and the
-      // devices and the model listing of S4 with their audit entries.
+      // devices, the model listing and the assignment of S4 with their audit entries.
       expect(filled.sort()).toEqual([
         'attribute',
         'attribute_mapping',
@@ -162,7 +163,8 @@ describe('startDemo (CU-004)', () => {
           mpn_unknown: mpn === null ? 1 : 0,
         })),
       );
-      // The demo model listing comes from device "626198", the other devices stay unassigned.
+      // The demo model listing comes from device "626198"; device "626200" is assigned to it
+      // (quantity 2), the other devices stay unassigned.
       const listings = db
         .prepare('SELECT id, article_number, quantity FROM listing ORDER BY id')
         .all() as { id: number; article_number: string; quantity: number }[];
@@ -170,15 +172,19 @@ describe('startDemo (CU-004)', () => {
         DEMO_LISTINGS.map(({ fromWiNr }) => ({
           id: expect.any(Number),
           article_number: fromWiNr,
-          quantity: 1,
+          quantity: 1 + DEMO_ASSIGNMENTS.filter((a) => a.listingOfWiNr === fromWiNr).length,
         })),
       );
+      const listingOf = (wiNr: string) =>
+        wiNr === '626198' || DEMO_ASSIGNMENTS.some(({ device }) => device.wiNr === wiNr)
+          ? listings[0]?.id
+          : null;
       expect(
         db.prepare('SELECT wi_nr, listing_id, stock_status FROM device ORDER BY id').all(),
       ).toEqual(
-        DEMO_DEVICES.map(({ wiNr }) => ({
+        [...DEMO_DEVICES, ...DEMO_ASSIGNMENTS.map(({ device }) => device)].map(({ wiNr }) => ({
           wi_nr: wiNr,
-          listing_id: wiNr === '626198' ? listings[0]?.id : null,
+          listing_id: listingOf(wiNr),
           stock_status: 'available',
         })),
       );

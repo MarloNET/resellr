@@ -12,8 +12,7 @@ import {
 import { CONDITION_CODE_MAX } from './condition-code.schema.ts';
 import type { BatteryValueFlag } from './pick-list.schema.ts';
 
-// Device (REQ-012 to REQ-015; Technical Specification 2.5, 3.3, 3.4). Changing a device follows
-// with #190.
+// Device (REQ-012 to REQ-015; Technical Specification 2.5, 3.3, 3.4).
 
 /** WI-Nr: 1–20 letters and digits, nothing else, not even spaces (Requirements 9.6, 2.5). */
 const WI_NR_PATTERN = /^[A-Za-z0-9]{1,20}$/;

@@ -102,6 +102,7 @@ describe('listing repository (CU-125, Technical Specification 2.1, Nachtrag MAR-
       other_device_values: '{"2":"silber"}',
       display_title: 'Listing 626198',
       article_number: '626198',
+      quantity: 1,
     });
   });
 
