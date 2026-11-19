@@ -83,8 +83,9 @@ function splitDeviceValues(attributes: readonly AttributeEntry[], values: Attrib
  * Assignment service (CU-123, REQ-017 to REQ-020; Technical Specification 2.6): the only place
  * that assigns devices, creates a model listing from a device and rebooks. With #197 creating a
  * model listing from a checked, available device, with #194 assigning a device to an existing
- * model listing of its model template, with #196 the deviation check of the assignment; rebooking
- * (#202), the check of the review flags (#189) and leaving a previous model listing (#199) follow.
+ * model listing of its model template, with #199 leaving the previous model listing on creating,
+ * with #196 the deviation check of the assignment; rebooking (#202) and the check of the review
+ * flags (#189) follow.
  */
 export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
   return {
@@ -170,10 +171,12 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
      * `POST /api/listings` (REQ-019): a model listing with the variant data and the other listed
      * values of the device, the article number (the WI-Nr unless `articleNumber` is set), the EAN
      * marking `original`, without delivery scope, prices and photos, and the device assigned to it
-     * (quantity 1). Order of the checks (2.0.11): the device and its version, available, not
-     * assigned, then the variant data against every model listing of the model template
-     * (`variant_duplicate`, AC-REQ-019-02) and the article number (`article_number_taken`).
-     * `ListingCreated` and `StockChanged` have no handler until S5 (4.4.0).
+     * (quantity 1). An assigned device leaves its previous model listing, whose stock is formed
+     * anew with `StockChanged` as well (AC-REQ-019-07). Order of the checks (2.0.11): the device
+     * and its version, available, then the variant data against every model listing of the model
+     * template (`variant_duplicate`, AC-REQ-019-02) and the article number
+     * (`article_number_taken`). `ListingCreated` and `StockChanged` have no handler until S5
+     * (4.4.0).
      */
     async createFromDevice(input: ListingCreateInput): Promise<Listing> {
       const request = listingCreateBodySchema.parse(input);
@@ -189,10 +192,6 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
         if (device.stock_status !== 'available') {
           throw new RuleViolation('device_not_available', { usage: 'new_listing' });
         }
-        // Leaving the previous model listing follows with #199 (AC-REQ-019-07); until then the
-        // stock of that listing would no longer match its devices (MAR-1053).
-        if (device.listing_id !== null) throw new RuleViolation('already_assigned');
-
         // A device always has its model template (`NOT NULL`, `ON DELETE RESTRICT`).
         const template = await catalog.findModelTemplate(device.model_template_id);
         if (template === undefined) {
@@ -270,8 +269,13 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
         });
         tx.emit({ type: 'ListingCreated', listingId });
 
+        // An assigned device leaves its previous model listing, whose stock is formed anew in
+        // the same transaction (AC-REQ-019-07, 2.8.2).
+        const previous =
+          device.listing_id === null ? undefined : await listings.findById(device.listing_id);
         await devices.assign(device.id, listingId, at);
         await stock.update(listingId);
+        if (previous !== undefined) await stock.update(previous.id);
 
         const readable = await readableValues(settings, attributes, device.condition_value_id, {
           ...other,
@@ -301,7 +305,7 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
           objectId: device.id,
           objectLabel: `Gerät ${device.wi_nr}`,
           action: 'assigned',
-          oldValue: null,
+          oldValue: previous === undefined ? null : { 'Modell-Inserat': previous.display_title },
           newValue: { 'Modell-Inserat': displayTitle },
         });
 
