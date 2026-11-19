@@ -42,6 +42,22 @@ export interface InventoryRoutesOptions {
 const idParams = z.strictObject({ id: z.coerce.number().pipe(idSchema) });
 
 /**
+ * `GET …/device-prefill?conditionCode=&supplierId=` (2.5): without a code no code result, without
+ * `supplierId` (or empty) only the entry of the code without supplier applies (2.2).
+ */
+const prefillQuerystring = z.strictObject({
+  conditionCode: z
+    .string()
+    .optional()
+    .transform((code) => (code === undefined || code.trim() === '' ? null : code)),
+  supplierId: z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined || value === '' ? null : Number(value)))
+    .pipe(idSchema.nullable()),
+});
+
+/**
  * Inventory routes (CU-130, Technical Specification 2.5): `POST /api/devices`,
  * `GET /api/devices?wiNr=`, `GET /api/devices/{id}`, `PATCH /api/devices/{id}` for the device
  * values and `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` and with
@@ -173,10 +189,17 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
     async (request) => listingChoiceQuery.list(request.params.id),
   );
 
-  // The prefill of UI-003 after the choice of a model template, with its review flags (2.5).
+  // The prefill of UI-003 after the choice of a model template or the input of a condition code,
+  // with its review flags (2.5).
   app.get(
     '/api/model-templates/:id/device-prefill',
-    { schema: { params: idParams, response: { 200: devicePrefillSchema } } },
-    async (request) => prefillQuery.find(request.params.id),
+    {
+      schema: {
+        params: idParams,
+        querystring: prefillQuerystring,
+        response: { 200: devicePrefillSchema },
+      },
+    },
+    async (request) => prefillQuery.find(request.params.id, request.query),
   );
 };

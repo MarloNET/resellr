@@ -9,6 +9,7 @@ import type {
   ConditionCodeCreate,
   ConditionCodeEntry,
   ConditionCodeList,
+  ConditionCodeResolution,
   ConditionCodeUpdate,
 } from '@resellr/domain/schemas/condition-code.schema';
 import type {
@@ -358,6 +359,25 @@ export function useReorderAttributesMutation() {
       });
       void queryClient.invalidateQueries({ queryKey: key });
     },
+  });
+}
+
+/**
+ * The entry a condition code resolves to (`GET /api/condition-codes/resolve?code=&supplierId=`,
+ * 2.2): with a supplier its own entry before the one without, without a supplier only the entry
+ * without (UI-003 after `supplier_deactivated`, 2.0.11). No request without a code.
+ */
+export function useConditionCodeResolutionQuery(code: string | null, supplierId: number | null) {
+  return useQuery<ConditionCodeResolution, ApiError>({
+    queryKey: queryKeys.settings.conditionCodeResolution(code ?? '', supplierId),
+    queryFn: ({ signal }) => {
+      const query = new URLSearchParams({ code: code ?? '' });
+      if (supplierId !== null) query.set('supplierId', String(supplierId));
+      return apiClient.get<ConditionCodeResolution>(`/api/condition-codes/resolve?${query}`, {
+        signal,
+      });
+    },
+    enabled: code !== null,
   });
 }
 
