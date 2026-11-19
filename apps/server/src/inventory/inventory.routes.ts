@@ -13,6 +13,7 @@ import {
 import {
   deviceAssignmentBodySchema,
   deviceAssignmentSchema,
+  listingChoiceQuerySchema,
   listingChoiceSchema,
   listingCreateBodySchema,
   listingSchema,
@@ -166,11 +167,18 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
     async (request) => assignmentService.assign(request.params.id, request.body),
   );
 
-  // The model listings of a model template to choose from in UI-004 (2.6).
+  // The model listings of a model template to choose from in UI-004, with `deviceId` each with
+  // its deviations to that device (2.6, UI-005).
   app.get(
     '/api/model-templates/:id/listings',
-    { schema: { params: idParams, response: { 200: listingChoiceSchema } } },
-    async (request) => listingChoiceQuery.list(request.params.id),
+    {
+      schema: {
+        params: idParams,
+        querystring: listingChoiceQuerySchema,
+        response: { 200: listingChoiceSchema },
+      },
+    },
+    async (request) => listingChoiceQuery.list(request.params.id, request.query.deviceId),
   );
 
   // The prefill of UI-003 after the choice of a model template, with its review flags (2.5).

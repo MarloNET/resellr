@@ -74,8 +74,26 @@ export const variantSummarySchema = z.object({
 export type VariantSummary = z.infer<typeof variantSummarySchema>;
 
 /**
+ * A deviating item of the variant data of a device from a model listing with formatted values
+ * (CU-119, REQ-018; 2.6), e.g. `RAM`, `8GB`, `16GB`; "–" for a missing value.
+ */
+export const variantDeviationSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  deviceValue: z.string(),
+  listingValue: z.string(),
+});
+export type VariantDeviationItem = z.infer<typeof variantDeviationSchema>;
+
+/** `?deviceId=` of `GET /api/model-templates/{id}/listings` (2.6): the device to compare with. */
+export const listingChoiceQuerySchema = z.strictObject({
+  deviceId: z.coerce.number().pipe(idSchema).optional(),
+});
+
+/**
  * `GET /api/model-templates/{id}/listings` (2.6, CU-294): the model listings of a model template
- * to choose from in UI-004, by `id`. The deviations to a device (`deviceId`) follow with #196.
+ * to choose from in UI-004, by `id`; with `deviceId` each with its deviations to that device
+ * (UI-004, UI-005; empty = matches).
  */
 export const listingChoiceSchema = z.object({
   items: z.array(
@@ -84,6 +102,7 @@ export const listingChoiceSchema = z.object({
       displayTitle: z.string(),
       variantSummary: variantSummarySchema,
       quantity: z.int().min(0),
+      deviations: z.array(variantDeviationSchema).optional(),
     }),
   ),
 });
@@ -92,7 +111,7 @@ export type ListingChoiceItem = ListingChoice['items'][number];
 
 /**
  * `POST /api/devices/{id}/assignment` (2.6, REQ-017): the version of the device the user saw and
- * the chosen model listing; `confirmDeviation` confirms deviating variant data (REQ-018, #196).
+ * the chosen model listing; `confirmDeviation` confirms deviating variant data (REQ-018).
  */
 export const deviceAssignmentBodySchema = z.strictObject({
   version: versionSchema,
@@ -100,6 +119,15 @@ export const deviceAssignmentBodySchema = z.strictObject({
   confirmDeviation: z.boolean().default(false),
 });
 export type DeviceAssignmentInput = z.input<typeof deviceAssignmentBodySchema>;
+
+/**
+ * `details` of `422 confirmation_required` with `kind: variant_deviation` (2.6, REQ-018): the
+ * deviations of the device from the chosen model listing that UI-005 shows.
+ */
+export const variantDeviationDetailsSchema = z.object({
+  kind: z.literal('variant_deviation'),
+  deviations: z.array(variantDeviationSchema),
+});
 
 /**
  * The answer of an assignment (2.6): the device, the new quantity of its model listing and the

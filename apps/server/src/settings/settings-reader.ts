@@ -36,6 +36,9 @@ export interface PickListValueEntry {
 export interface AttributeEntry extends AttributeValueDefinition {
   pickListId: number | null;
   variantForming: boolean;
+  /** Unit of a number value and whether a space precedes it ("16GB", "13,3 Zoll"; 2.1). */
+  unit: string | null;
+  unitSpacing: boolean;
 }
 
 const toEntry = (row: { id: number; name: string; active: number }): SettingsEntry => ({
@@ -94,6 +97,8 @@ export function createSettingsReader(db: Kysely<DB>) {
         required: row.required === 1,
         active: row.active === 1,
         variantForming: row.variant_forming === 1,
+        unit: row.unit,
+        unitSpacing: row.unit_spacing === 1,
       }));
     },
 
