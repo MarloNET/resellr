@@ -6,12 +6,14 @@ import type {
   DeviceSearchResult,
   DeviceUpdateInput,
 } from '@resellr/domain/schemas/device.schema';
-import type {
-  DeviceAssignment,
-  DeviceAssignmentInput,
-  Listing,
-  ListingChoice,
-  ListingCreateInput,
+import {
+  type DeviceAssignment,
+  type DeviceAssignmentInput,
+  type Listing,
+  type ListingChoice,
+  type ListingCreateInput,
+  variantDeviationDetailsSchema,
+  type VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -115,8 +117,34 @@ export function useListingChoiceQuery(modelTemplateId: number) {
 }
 
 /**
- * "Zuordnen" of UI-004 (`POST /api/devices/{id}/assignment`, 2.6): the device and the quantity
- * of its model listing change, so the cached devices and model listings are read again.
+ * The model listings of a model template with their deviations to a device for UI-005
+ * (`GET /api/model-templates/{id}/listings?deviceId=`, 2.6).
+ */
+export function useListingDeviationsQuery(modelTemplateId: number, deviceId: number) {
+  return useQuery<ListingChoice, ApiError>({
+    queryKey: queryKeys.inventory.listingDeviations(modelTemplateId, deviceId),
+    queryFn: ({ signal }) =>
+      apiClient.get<ListingChoice>(
+        `/api/model-templates/${modelTemplateId}/listings?${new URLSearchParams({ deviceId: String(deviceId) })}`,
+        { signal },
+      ),
+  });
+}
+
+/**
+ * The deviations of deviating variant data (`422 confirmation_required`, `details.kind:
+ * variant_deviation`, REQ-018; 2.6) from a failed assignment; `null` for any other error.
+ */
+export function variantDeviationsOf(error: ApiError): VariantDeviationItem[] | null {
+  if (error.kind !== 'confirmation-required') return null;
+  const details = variantDeviationDetailsSchema.safeParse(error.error?.details);
+  return details.success ? details.data.deviations : null;
+}
+
+/**
+ * "Zuordnen" of UI-004 and "Trotzdem zuordnen" of UI-005 (`POST /api/devices/{id}/assignment`,
+ * 2.6): the device and the quantity of its model listing change, so the cached devices and model
+ * listings are read again.
  */
 export function useAssignDeviceMutation() {
   const queryClient = useQueryClient();

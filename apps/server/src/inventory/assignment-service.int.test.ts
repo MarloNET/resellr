@@ -1061,7 +1061,8 @@ describe('assignment with deviating variant data (CU-123, CU-119, REQ-018; Techn
       payload: { version: 1, active: false },
     });
     expect(deactivated.statusCode).toBe(200);
-    const { [ids.ram]: _ram, ...withoutRam } = values();
+    const withoutRam: Record<string, unknown> = values();
+    delete withoutRam[ids.ram];
     const deviceId = await captureDevice('626199', { values: withoutRam });
 
     const response = await assign(deviceId, { version: 1, listingId: miA });

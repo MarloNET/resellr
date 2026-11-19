@@ -41,6 +41,8 @@ export const queryKeys = {
     deviceSearch: (wiNr: string) => ['inventory', 'devices', { wiNr }] as const,
     listingChoice: (modelTemplateId: number) =>
       ['inventory', 'listing-choice', modelTemplateId] as const,
+    listingDeviations: (modelTemplateId: number, deviceId: number) =>
+      ['inventory', 'listing-choice', modelTemplateId, { deviceId }] as const,
   },
 } as const;
 
