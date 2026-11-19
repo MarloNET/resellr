@@ -73,8 +73,21 @@ const DIALOG_REJECTIONS = new Set([
   'variant_duplicate',
   'device_not_available',
   'already_assigned',
+  'review_pending',
   'other_model_template',
 ]);
+
+/**
+ * Text of a rejection in the dialog; `review_pending` names the flagged values of `details.keys`
+ * after "Erst Werte prüfen" (2.0.6, 7.3, AC-REQ-013-03), as UI-003 names them.
+ */
+function rejectionText(error: NonNullable<ApiError['error']>, fieldLabel: (key: string) => string) {
+  const keys = error.details.keys;
+  if (error.code !== 'review_pending' || !Array.isArray(keys) || keys.length === 0) {
+    return error.message;
+  }
+  return `${error.message}: ${keys.map((key) => fieldLabel(String(key))).join(', ')}`;
+}
 
 /** The checked device the dialog works on (UI-004 "Gerät": WI-Nr and model template). */
 export interface AssignDialogDevice {
@@ -93,6 +106,11 @@ export interface AssignDialogProps {
   /** Called with `false` on "Abbrechen" and Esc: the device stays unassigned. */
   onOpenChange: (open: boolean) => void;
   device: AssignDialogDevice;
+  /**
+   * Label of a review key (`condition`, `visualGrade` or an attribute ID) as the calling screen
+   * names the field; names the flagged values of `review_pending` (AC-REQ-013-03).
+   */
+  fieldLabel: (key: string) => string;
   /**
    * After "Zuordnen" (`200`), before the dialog closes: the calling screen shows
    * `assignedText` with the new quantity (UI-004.success, DER-58-04).
@@ -138,10 +156,17 @@ function checkArticleNumber(articleNumber: string): string | undefined {
  * template yet, only "Neues Modell-Inserat anlegen"), disabled ("Zuordnen" without a choice),
  * validation (field "Artikelnummer" after `article_number_taken`, DER-60-04), error, success
  * (`onAssigned`, UI-014), conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
- * ausgang-unbekannt (P-08). The deviation dialog (#196), the rejection with open review flags
- * (#189) and the mode "umbuchen" (#202) follow.
+ * ausgang-unbekannt (P-08). A device with open review flags is rejected with "Erst Werte prüfen"
+ * and the flagged values in the dialog (#189). The deviation dialog (#196) and the mode
+ * "umbuchen" (#202) follow.
  */
-export function AssignDialog({ open, onOpenChange, device, onAssigned }: AssignDialogProps) {
+export function AssignDialog({
+  open,
+  onOpenChange,
+  device,
+  fieldLabel,
+  onAssigned,
+}: AssignDialogProps) {
   const createMutation = useCreateListingMutation();
   const assignMutation = useAssignDeviceMutation();
   const writesLocked = useWritesLocked();
@@ -157,6 +182,7 @@ export function AssignDialog({ open, onOpenChange, device, onAssigned }: AssignD
       <DialogContent width={WIDTH} dismissible={!locked}>
         <AssignForm
           device={device}
+          fieldLabel={fieldLabel}
           pending={pending}
           writesLocked={writesLocked}
           onCancel={() => onOpenChange(false)}
@@ -200,6 +226,7 @@ interface Callbacks<T> {
 
 interface AssignFormProps {
   device: AssignDialogDevice;
+  fieldLabel: (key: string) => string;
   pending: boolean;
   writesLocked: boolean;
   onCancel: () => void;
@@ -212,6 +239,7 @@ interface AssignFormProps {
 /** Content of the dialog; mounted per opening. */
 function AssignForm({
   device,
+  fieldLabel,
   pending,
   writesLocked,
   onCancel,
@@ -239,8 +267,8 @@ function AssignForm({
   const busy = pending || writesLocked;
 
   function showRejection(error: ApiError) {
-    if (error.kind === 'rejected' && DIALOG_REJECTIONS.has(error.error?.code ?? '')) {
-      setRejection(error.error?.message ?? '');
+    if (error.kind === 'rejected' && error.error && DIALOG_REJECTIONS.has(error.error.code)) {
+      setRejection(rejectionText(error.error, fieldLabel));
       return;
     }
     setNotice(noticeOf(error));

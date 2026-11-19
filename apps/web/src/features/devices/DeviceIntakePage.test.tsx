@@ -242,6 +242,8 @@ function mockApi({
     if (route === 'GET /api/model-templates/7') return modelTemplate(init);
     if (route === 'GET /api/model-templates/7/device-prefill') return prefill(init);
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
+    // UI-004 after "Speichern und zuordnen" lists the model listings of MV-A (#189).
+    if (route === 'GET /api/model-templates/7/listings') return Response.json({ items: [] });
     if (route === 'POST /api/devices') {
       sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return create(init);
@@ -766,10 +768,47 @@ describe('UI-003 Gerät einbuchen (CU-132)', () => {
     await vi.waitFor(() => expect(saveButton().disabled).toBe(false));
     fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
     await vi.waitFor(() => expect(sent).toHaveLength(2));
+    // The save opens UI-004 (DER-55-05); "Abbrechen" leaves the device unassigned.
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Abbrechen' }),
+    );
     await vi.waitFor(() => expect(saveAndAssignButton().disabled).toBe(false));
     fireEvent.click(saveAndAssignButton());
 
     await vi.waitFor(() => expect(sent).toHaveLength(3));
+  });
+
+  it('DER-55-05 "Speichern und zuordnen" sends POST /api/devices and opens UI-004 for the saved device', async () => {
+    const { sent } = mockApi();
+    await openPage();
+    await fillValid();
+
+    fireEvent.click(saveAndAssignButton());
+
+    const dialog = await screen.findByRole('dialog', { name: 'Modell-Inserat wählen' });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ wiNr: '626198', modelTemplateId: 7 });
+    expect(dialog.textContent).toContain('Gerät626198');
+    expect(dialog.textContent).toContain('ModellvorlageThinkPad T14 Gen 2');
+    expect(
+      await within(dialog).findByText('Für diese Modellvorlage gibt es noch kein Modell-Inserat.'),
+    ).toBeTruthy();
+  });
+
+  it('DER-55-05 a rejected save of "Speichern und zuordnen" keeps UI-003 without UI-004', async () => {
+    mockApi({
+      create: () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+          status: 500,
+        }),
+    });
+    await openPage();
+    await fillValid();
+
+    fireEvent.click(saveAndAssignButton());
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Referenz: R-7K2M-9QX4');
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('UI-003.error DER-54-04 shows the banner with the reference number on 500 and keeps the inputs', async () => {

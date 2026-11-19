@@ -74,6 +74,7 @@ import { cn } from '../../components/ui/cn.ts';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
 import type { SavedNoticeState } from '../models/ModelTemplatePage.tsx';
+import { AssignDialog, type AssignDialogDevice } from './AssignDialog.tsx';
 import {
   clearDeviceIntakeDraft,
   FROM_DEVICE_INTAKE,
@@ -784,6 +785,8 @@ export function DeviceIntakePage() {
   const [summaryShown, setSummaryShown] = useState(false);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   const [savedWiNr, setSavedWiNr] = useState<string | null>(null);
+  // The device saved with "Speichern und zuordnen" while UI-004 is open for it (DER-55-05).
+  const [assigning, setAssigning] = useState<AssignDialogDevice | null>(null);
   // Choices that show the text of a rejection until the next choice in the field (v0.6.8).
   const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
   // A rejected entry whose list could not be read again counts as missing (2.0.11).
@@ -1075,7 +1078,7 @@ export function DeviceIntakePage() {
     setReloading(false);
   }
 
-  /** "Gerät speichern", or with `assign` "Speichern und zuordnen" (UI-004 follows with #189). */
+  /** "Gerät speichern", or with `assign` "Speichern und zuordnen", which then opens UI-004. */
   function save({ assign = false } = {}) {
     // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
@@ -1099,6 +1102,17 @@ export function DeviceIntakePage() {
         // counts, as the server builds the review flags again (DER-54-08, 2.0.11, 2.5).
         if (!assign && nextDeviceRef.current && device.captureStatus === 'checked') {
           emptyForNextDevice();
+        }
+        // UI-004 for the saved device (DER-55-05, 7.3); it rejects a device the server still
+        // flags with "Erst Werte prüfen" (AC-REQ-013-03).
+        if (assign && current.modelTemplate !== null) {
+          setAssigning({
+            id: device.id,
+            version: device.version,
+            wiNr: device.wiNr,
+            modelTemplateId: device.modelTemplateId,
+            modelTemplateLabel: current.modelTemplate.modelName,
+          });
         }
       },
       onError: onFailed,
@@ -1539,6 +1553,19 @@ export function DeviceIntakePage() {
           </Button>
         </span>
       </div>
+      {assigning !== null && (
+        <AssignDialog
+          open
+          device={assigning}
+          fieldLabel={fieldOf}
+          onOpenChange={(open) => {
+            if (!open) setAssigning(null);
+          }}
+          // The banner "Gerät <WI-Nr> zugeordnet (Stückzahl n)" and the form for the next device
+          // follow with #433 (DER-58-04).
+          onAssigned={() => {}}
+        />
+      )}
     </div>
   );
 }

@@ -26,7 +26,7 @@ import {
   NotFoundError,
   RuleViolation,
 } from '../shared/domain-error.ts';
-import { createDeviceRepository } from './device-repository.ts';
+import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
 import { readableValues, toDevice } from './device-service.ts';
 import { createListingRepository, type ListingRow } from './listing-repository.ts';
 import { createListingStockUpdater } from './listing-stock-updater.ts';
@@ -77,11 +77,23 @@ function splitDeviceValues(attributes: readonly AttributeEntry[], values: Attrib
 }
 
 /**
+ * Assigning a device and creating a model listing from it require all review flags lifted
+ * (`captureStatus = checked`, REQ-013, AC-REQ-013-03): else `review_pending` with the flagged
+ * keys in `details.keys`, which UI-004 names.
+ */
+function checkReviewed(device: Pick<DeviceRow, 'capture_status' | 'review_keys'>) {
+  if (device.capture_status === 'checked') return;
+  throw new RuleViolation('review_pending', {
+    details: { keys: JSON.parse(device.review_keys) as string[] },
+  });
+}
+
+/**
  * Assignment service (CU-123, REQ-017 to REQ-020; Technical Specification 2.6): the only place
  * that assigns devices, creates a model listing from a device and rebooks. With #197 creating a
  * model listing from a checked, available device, with #194 assigning a device to an existing
- * model listing of its model template; the deviation check (#196), rebooking (#202), the check of
- * the review flags (#189) and leaving a previous model listing (#199) follow.
+ * model listing of its model template, with #189 both only for a checked device; the deviation
+ * check (#196), rebooking (#202) and leaving a previous model listing (#199) follow.
  */
 export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
   return {
@@ -91,9 +103,10 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
      * writes the audit entry. Order of the checks: the device (`not_found`), the model listing
      * (`400`, a program error of the user interface), the version (`version_conflict`), then the
      * preconditions of 2.6: available (`device_not_available`), not assigned
-     * (`already_assigned`), the same model template (`other_model_template`); the first matching
-     * stage wins and nothing is stored. `review_pending` (#189) and `variant_deviation` (#196)
-     * follow. `adjustStockChannels` is the report of the `StockChanged` handlers, empty until S5.
+     * (`already_assigned`), checked (`review_pending`), the same model template
+     * (`other_model_template`); the first matching stage wins and nothing is stored.
+     * `variant_deviation` (#196) follows. `adjustStockChannels` is the report of the
+     * `StockChanged` handlers, empty until S5.
      */
     async assign(deviceId: number, input: DeviceAssignmentInput): Promise<DeviceAssignment> {
       const request = deviceAssignmentBodySchema.parse(input);
@@ -110,6 +123,7 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
           throw new RuleViolation('device_not_available', { usage: 'assignment' });
         }
         if (device.listing_id !== null) throw new RuleViolation('already_assigned');
+        checkReviewed(device);
         if (device.model_template_id !== listing.model_template_id) {
           throw new RuleViolation('other_model_template');
         }
@@ -139,8 +153,9 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
      * values of the device, the article number (the WI-Nr unless `articleNumber` is set), the EAN
      * marking `original`, without delivery scope, prices and photos, and the device assigned to it
      * (quantity 1). Order of the checks (2.0.11): the device and its version, available, not
-     * assigned, then the variant data against every model listing of the model template
-     * (`variant_duplicate`, AC-REQ-019-02) and the article number (`article_number_taken`).
+     * assigned, checked (`review_pending`), then the variant data against every model listing of
+     * the model template (`variant_duplicate`, AC-REQ-019-02) and the article number
+     * (`article_number_taken`).
      * `ListingCreated` and `StockChanged` have no handler until S5 (4.4.0).
      */
     async createFromDevice(input: ListingCreateInput): Promise<Listing> {
@@ -160,6 +175,7 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
         // Leaving the previous model listing follows with #199 (AC-REQ-019-07); until then the
         // stock of that listing would no longer match its devices (MAR-1053).
         if (device.listing_id !== null) throw new RuleViolation('already_assigned');
+        checkReviewed(device);
 
         // A device always has its model template (`NOT NULL`, `ON DELETE RESTRICT`).
         const template = await catalog.findModelTemplate(device.model_template_id);

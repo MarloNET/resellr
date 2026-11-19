@@ -149,6 +149,8 @@ function mockApi({
     if (route === 'GET /api/model-templates/7') return modelTemplate();
     if (route === 'GET /api/model-templates/7/device-prefill') return prefill();
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
+    // UI-004 after "Speichern und zuordnen" lists the model listings (#189).
+    if (route === 'GET /api/model-templates/7/listings') return Response.json({ items: [] });
     if (route === 'POST /api/devices') {
       sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return create();
@@ -444,6 +446,10 @@ describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, #186)', () =>
     fireEvent.click(screen.getByRole('button', { name: 'Speichern und zuordnen' }));
 
     await vi.waitFor(() => expect(sent).toHaveLength(1));
+    // The save opens UI-004 (DER-55-05); behind it the form keeps its inputs.
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Abbrechen' }),
+    );
     expect(await screen.findByText('Gerät 626198 gespeichert')).toBeTruthy();
     expect(textbox('WI-Nr').value).toBe('626198');
   });

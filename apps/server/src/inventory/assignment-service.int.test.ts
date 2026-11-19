@@ -138,6 +138,16 @@ async function captureDevice(
   return response.json<{ id: number }>().id;
 }
 
+/**
+ * Leaves review flags open at a device, as the prefill of a model template does (CU-118, #188);
+ * the flags of the API tests of 2.5 stand in `inventory.routes.int.test.ts`.
+ */
+function flagForReview(deviceId: number, keys: string[]) {
+  t.database.sqlite
+    .prepare("UPDATE device SET review_keys = ?, capture_status = 'review_pending' WHERE id = ?")
+    .run(JSON.stringify(keys), deviceId);
+}
+
 const createListing = (payload: Record<string, unknown>) =>
   t.app.inject({ method: 'POST', url: '/api/listings', headers: SAME_ORIGIN_WRITE, payload });
 
@@ -433,6 +443,24 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
     expect(count('listing')).toBe(1);
   });
 
+  it('AC-REQ-013-03 rejects a device with open review flags with review_pending and the flagged keys; nothing is created', async () => {
+    const deviceId = await captureDevice('626198');
+    flagForReview(deviceId, ['condition', String(ids.ram)]);
+
+    const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'review_pending',
+      message: 'Erst Werte prüfen',
+      details: { keys: ['condition', String(ids.ram)] },
+    });
+    expect(count('listing')).toBe(0);
+    expect(rows('SELECT listing_id, version FROM device')).toEqual([
+      { listing_id: null, version: 1 },
+    ]);
+  });
+
   it('rejects an unknown device as a program error of the user interface (400)', async () => {
     const response = await createListing({ fromDeviceId: 999, deviceVersion: 1 });
 
@@ -474,6 +502,29 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
       const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
 
       expect(response.json().error.code).toBe('device_not_available');
+      expect(count('listing')).toBe(1);
+    });
+
+    it('checks the stock status before the review flags', async () => {
+      const deviceId = await captureDevice('626198');
+      flagForReview(deviceId, [String(ids.ram)]);
+      t.database.sqlite
+        .prepare("UPDATE device SET stock_status = 'sold' WHERE id = ?")
+        .run(deviceId);
+
+      const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
+
+      expect(response.json().error.code).toBe('device_not_available');
+    });
+
+    it('checks the review flags before the variant data', async () => {
+      await createListing({ fromDeviceId: await captureDevice('626198'), deviceVersion: 1 });
+      const deviceId = await captureDevice('626199');
+      flagForReview(deviceId, [String(ids.ram)]);
+
+      const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 1 });
+
+      expect(response.json().error.code).toBe('review_pending');
       expect(count('listing')).toBe(1);
     });
 
@@ -735,6 +786,25 @@ describe('POST /api/devices/{id}/assignment (CU-123, Technical Specification 2.6
     expect([quantityOf(miA), quantityOf(miB)]).toEqual([1, 1]);
   });
 
+  it('AC-REQ-013-03 rejects a device with open review flags with review_pending and the flagged keys; nothing is stored', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199');
+    flagForReview(deviceId, [String(ids.battery), 'visualGrade']);
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'review_pending',
+      message: 'Erst Werte prüfen',
+      details: { keys: [String(ids.battery), 'visualGrade'] },
+    });
+    expect(rows('SELECT listing_id, version FROM device WHERE id = ?', deviceId)).toEqual([
+      { listing_id: null, version: 1 },
+    ]);
+    expect(quantityOf(miA)).toBe(1);
+  });
+
   it('rejects a sold device with device_not_available', async () => {
     const miA = await createMiA();
     const deviceId = await captureDevice('626199');
@@ -811,6 +881,27 @@ describe('POST /api/devices/{id}/assignment (CU-123, Technical Specification 2.6
       const response = await assign(device?.id ?? 0, { version: 2, listingId: miA });
 
       expect(response.json().error.code).toBe('device_not_available');
+    });
+
+    it('checks the assignment before the review flags', async () => {
+      const miA = await createMiA();
+      const [device] = rows<{ id: number }>('SELECT id FROM device WHERE listing_id = ?', miA);
+      flagForReview(device?.id ?? 0, [String(ids.ram)]);
+
+      const response = await assign(device?.id ?? 0, { version: 2, listingId: miA });
+
+      expect(response.json().error.code).toBe('already_assigned');
+    });
+
+    it('checks the review flags before the model template', async () => {
+      const miA = await createMiA();
+      const deviceId = await captureDevice('626200', { modelTemplateId: ids.mvB });
+      flagForReview(deviceId, [String(ids.ram)]);
+
+      const response = await assign(deviceId, { version: 1, listingId: miA });
+
+      expect(response.json().error.code).toBe('review_pending');
+      expect(quantityOf(miA)).toBe(1);
     });
 
     it('checks the assignment before the model template', async () => {
