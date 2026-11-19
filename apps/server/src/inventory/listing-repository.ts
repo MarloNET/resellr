@@ -82,6 +82,16 @@ export function createListingRepository(db: Kysely<DB>) {
       return rows.map((row) => row.text_block_id);
     },
 
+    /** The prices of a model listing by channel id (2.7). */
+    async listPrices(listingId: number) {
+      return db
+        .selectFrom('listing_price')
+        .select(['channel_id', 'amount_cents', 'vb', 'source'])
+        .where('listing_id', '=', listingId)
+        .orderBy('channel_id')
+        .execute();
+    },
+
     /**
      * The model listing holding this article number key, `undefined` if there is none: the
      * article number is unique without regard to case (2.7, 3.3).
