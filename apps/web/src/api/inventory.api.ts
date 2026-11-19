@@ -12,16 +12,17 @@ import {
   type Listing,
   type ListingChoice,
   type ListingCreateInput,
+  type ListingDetail,
   variantDeviationDetailsSchema,
   type VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
 
-// Hooks of the devices of F-05 and the model listings of F-06 (CU-131, Technical Specification
-// 2.5, 2.6). The unassigned devices (#258) and the other model listing hooks
+// Hooks of the devices of F-05 and the model listings of F-06 and F-07 (CU-131, Technical
+// Specification 2.5 to 2.7). The unassigned devices (#258) and the other model listing hooks
 // follow.
 
 /**
@@ -132,6 +133,24 @@ export function useListingChoiceQuery(modelTemplateId: number) {
     queryKey: queryKeys.inventory.listingChoice(modelTemplateId),
     queryFn: ({ signal }) =>
       apiClient.get<ListingChoice>(`/api/model-templates/${modelTemplateId}/listings`, { signal }),
+  });
+}
+
+/**
+ * A model listing with stock data, prices, devices and delivery scope for UI-014
+ * (`GET /api/listings/{id}?includeCancelled=`, 2.7); no request without an id.
+ */
+export function useListingQuery(id: number | null, { includeCancelled = false } = {}) {
+  return useQuery<ListingDetail, ApiError>({
+    queryKey: queryKeys.inventory.listing(id ?? 0, { includeCancelled }),
+    queryFn: ({ signal }) =>
+      apiClient.get<ListingDetail>(
+        `/api/listings/${id}${includeCancelled ? '?includeCancelled=true' : ''}`,
+        { signal },
+      ),
+    enabled: id !== null,
+    // The filter "auch stornierte" keeps the page while the other list loads.
+    placeholderData: keepPreviousData,
   });
 }
 

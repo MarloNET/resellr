@@ -196,6 +196,32 @@ describe('settings reader (CU-086, Technical Specification 2.0.11, Nachtrag MAR-
     await expect(reader.resolveConditionCode('  ', null)).resolves.toBeUndefined();
   });
 
+  it('finds text blocks with name and status, active or not, and leaves unknown ids out (#198)', async () => {
+    const { sqlite } = database;
+    const insert = sqlite.prepare(
+      `INSERT INTO text_block (name, name_key, kind, body, active, all_device_types, all_channels,
+         version, created_at, updated_at)
+       VALUES (?, ?, 'delivery_scope', '', ?, 1, 1, 1, '2026-11-16T08:00:00.000Z',
+         '2026-11-16T08:00:00.000Z')`,
+    );
+    const charger = Number(insert.run('Netzteil', 'netzteil', 1).lastInsertRowid);
+    const manual = Number(insert.run('Handbuch', 'handbuch', 0).lastInsertRowid);
+    const reader = createSettingsReader(database.db);
+
+    await expect(reader.findTextBlocks([manual, charger, 999])).resolves.toEqual([
+      { id: charger, name: 'Netzteil', active: true },
+      { id: manual, name: 'Handbuch', active: false },
+    ]);
+  });
+
+  it('does not query the database for no text blocks', async () => {
+    const reader = createSettingsReader(database.db);
+    await database.close();
+
+    await expect(reader.findTextBlocks([])).resolves.toEqual([]);
+    database = openDatabase<DB>(join(root, 'resellr.db'));
+  });
+
   it('lists the attributes of a device type in their order with level, rules, unit, flag and status', async () => {
     const { sqlite } = database;
     const notebook = insertDeviceType(sqlite, 'Notebook');
