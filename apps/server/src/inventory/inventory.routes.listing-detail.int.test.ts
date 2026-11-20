@@ -1,15 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
+import { stockColumnDifferences, syncStockColumns } from '../../test/stock.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { migrations } from '../db/migrations/index.ts';
 import { runMigrations } from '../db/migrator.ts';
+import type { DB } from '../db/schema.ts';
+import { type ChangeReport, createUnitOfWork, emptyChangeReport } from '../db/unit-of-work.ts';
+import { createClock } from '../shared/clock.ts';
+import type { ChangeEvent } from '../shared/events.ts';
+import { createDeviceService } from './device-service.ts';
+import { createInventoryReader } from './inventory-reader.ts';
+import { createListingStockUpdater, formStockColumns } from './listing-stock-updater.ts';
 
 // API tests of `GET /api/listings/{id}?includeCancelled=` (CU-130, CU-292, CU-122, CU-125,
 // CU-086; Technical Specification 2.7) on the initial settings of the seed migration: MV-A is an
 // Apple MacBook Pro 13, a notebook with battery and battery capacity. The model listing is
 // created through the API (#197); prices, delivery scope, sale and cancellation have no writing
-// endpoint before #204, #206 and S9, so the tests write them into the database.
+// endpoint before #204, #206 and S9, so the tests write them into the database. With #209 the
+// stock data (CU-120, CU-128, CU-129; DER-65-02, DER-65-03).
 
 type TestApp = ReturnType<typeof createTestApp>;
 let t: TestApp;
@@ -30,6 +39,7 @@ let ids: Record<
   | 'macos'
   | 'originalPowerSupply'
   | 'withBattery'
+  | 'withoutBattery'
   | 'shop'
   | 'kleinanzeigen',
   number
@@ -76,6 +86,7 @@ beforeEach(async () => {
     macos: valueId('macOS'),
     originalPowerSupply: valueId('mit Netzteil (original)'),
     withBattery: valueId('mit Akku'),
+    withoutBattery: valueId('ohne Akku'),
     shop: channelId('shop'),
     kleinanzeigen: channelId('kleinanzeigen'),
   };
@@ -86,8 +97,16 @@ afterEach(async () => {
   await t.close();
 });
 
-/** Captures a checked device of MV-A through the API; returns its id. */
-async function captureDevice(wiNr: string, capacity: object = { percent: 85 }): Promise<number> {
+/**
+ * Captures a checked device of MV-A through the API, with "mit Akku" and the battery capacity or,
+ * with `null`, with "ohne Akku" and no battery capacity; without `withBatteryValue` the battery
+ * capacity only, without a battery value. Returns its id.
+ */
+async function captureDevice(
+  wiNr: string,
+  capacity: object | null = { percent: 85 },
+  withBatteryValue = true,
+): Promise<number> {
   const response = await t.app.inject({
     method: 'POST',
     url: '/api/devices',
@@ -107,8 +126,12 @@ async function captureDevice(wiNr: string, capacity: object = { percent: 85 }): 
         [ids.os]: ids.macos,
         [ids.osVersion]: 'macOS 14',
         [ids.powerSupply]: ids.originalPowerSupply,
-        [ids.battery]: ids.withBattery,
-        [ids.batteryCapacity]: capacity,
+        ...(capacity === null
+          ? { [ids.battery]: ids.withoutBattery }
+          : {
+              ...(withBatteryValue && { [ids.battery]: ids.withBattery }),
+              [ids.batteryCapacity]: capacity,
+            }),
       },
       confirmedKeys: [],
     },
@@ -130,16 +153,26 @@ async function createListing() {
   return { listingId: response.json<{ id: number }>().id, deviceId };
 }
 
-/** Assigns a further captured device to the model listing through the API. */
-async function assign(deviceId: number, listingId: number) {
+/** Assigns a further captured device to the model listing through the API; returns the answer. */
+async function assign(deviceId: number, listingId: number, confirmDeviation = false) {
   const response = await t.app.inject({
     method: 'POST',
     url: `/api/devices/${deviceId}/assignment`,
     headers: SAME_ORIGIN_WRITE,
-    payload: { version: 1, listingId },
+    payload: { version: 1, listingId, ...(confirmDeviation && { confirmDeviation }) },
   });
   expect(response.statusCode).toBe(200);
+  return response.json<{ listing: { id: number; quantity: number } }>();
 }
+
+/** `PATCH /api/devices/{id}` with the device values of UI-010 (2.5). */
+const patchDevice = (deviceId: number, payload: Record<string, unknown>) =>
+  t.app.inject({
+    method: 'PATCH',
+    url: `/api/devices/${deviceId}`,
+    headers: SAME_ORIGIN_WRITE,
+    payload,
+  });
 
 const run = (sql: string, ...params: unknown[]) => t.database.sqlite.prepare(sql).run(...params);
 const get = (url: string) => t.app.inject({ method: 'GET', url, headers: { host: HOST } });
@@ -182,8 +215,7 @@ describe('GET /api/listings/{id} (CU-292, Technical Specification 2.7)', () => {
       displayTitle: 'MacBook Pro 13',
       quantity: 1,
       version: 1,
-      // Until #209 the WI-Nrs and the battery text of the stock data are empty (Nachtrag MAR-1053).
-      stock: { quantity: 1, wiNrs: [], batteryText: '', stockHash: expect.any(String) },
+      stock: { quantity: 1, wiNrs: ['626198'], batteryText: '85 %', stockHash: expect.any(String) },
       prices: [],
       deliveryScope: [],
     });
@@ -259,6 +291,8 @@ describe('GET /api/listings/{id} (CU-292, Technical Specification 2.7)', () => {
       STAMP,
       cancelled,
     );
+    // Sale and cancellation get their endpoints in S9; the stock columns as CU-128 forms them.
+    await syncStockColumns(t.database.db);
 
     const without = (await get(`/api/listings/${listingId}`)).json();
     const withCancelled = (await get(`/api/listings/${listingId}?includeCancelled=true`)).json();
@@ -281,6 +315,8 @@ describe('GET /api/listings/{id} (CU-292, Technical Specification 2.7)', () => {
       cancelled,
     ]);
     expect(withCancelled.devices[2]).toMatchObject({ wiNr: '626200', stockStatus: 'cancelled' });
+    // Sold and cancelled devices do not count in the stock data (2.8.2).
+    expect(without.stock).toMatchObject({ quantity: 1, wiNrs: ['626198'], batteryText: '85 %' });
   });
 
   it('leaves out a cancelled device of another model listing and a device assigned elsewhere', async () => {
@@ -312,5 +348,273 @@ describe('GET /api/listings/{id} (CU-292, Technical Specification 2.7)', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ error: { code: 'bad_request' } });
+  });
+});
+
+describe('stock data of a model listing (CU-120, CU-128, CU-129; Technical Specification 2.8.2, 3.3)', () => {
+  const stockOf = async (listingId: number) =>
+    (await get(`/api/listings/${listingId}`)).json<{ stock: Record<string, unknown> }>().stock;
+
+  it('DER-65-02 after an assignment GET returns the new stock data and the answer the new quantity', async () => {
+    const { listingId } = await createListing();
+    const before = await stockOf(listingId);
+
+    const answer = await assign(await captureDevice('626199', { percent: 90 }), listingId);
+
+    expect(answer.listing).toEqual({ id: listingId, quantity: 2 });
+    const after = await stockOf(listingId);
+    expect(after).toEqual({
+      quantity: 2,
+      wiNrs: ['626198', '626199'],
+      batteryText: '85–90 %',
+      stockHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+    expect(after.stockHash).not.toBe(before.stockHash);
+  });
+
+  it('DER-65-02 after rebooking a device into a new model listing GET returns the stock data of both', async () => {
+    const { listingId: miA } = await createListing();
+    const moved = await captureDevice('626199', { percent: 90 });
+    await assign(moved, miA);
+    const patched = await patchDevice(moved, { version: 2, visualGrade: '4', confirmedKeys: [] });
+    expect(patched.statusCode).toBe(200);
+
+    const created = await t.app.inject({
+      method: 'POST',
+      url: '/api/listings',
+      headers: SAME_ORIGIN_WRITE,
+      payload: { fromDeviceId: moved, deviceVersion: 3 },
+    });
+
+    expect(created.statusCode).toBe(201);
+    const miB = created.json<{ id: number; quantity: number }>();
+    expect(miB.quantity).toBe(1);
+    expect(await stockOf(miA)).toMatchObject({
+      quantity: 1,
+      wiNrs: ['626198'],
+      batteryText: '85 %',
+    });
+    expect(await stockOf(miB.id)).toMatchObject({
+      quantity: 1,
+      wiNrs: ['626199'],
+      batteryText: '90 %',
+    });
+  });
+
+  it('DER-65-02 after PATCH /api/devices/{id} of the battery capacity of an assigned device GET returns the new stock data (2.5)', async () => {
+    const { listingId } = await createListing();
+    const second = await captureDevice('626199', { percent: 90 });
+    await assign(second, listingId);
+    const before = await stockOf(listingId);
+    expect(before).toMatchObject({ batteryText: '85–90 %' });
+
+    const patched = await patchDevice(second, {
+      version: 2,
+      values: { [ids.batteryCapacity]: { percent: 70 } },
+      confirmedKeys: [],
+    });
+
+    expect(patched.statusCode).toBe(200);
+    const after = await stockOf(listingId);
+    expect(after).toMatchObject({
+      quantity: 2,
+      wiNrs: ['626198', '626199'],
+      batteryText: '70–85 %',
+    });
+    expect(after.stockHash).not.toBe(before.stockHash);
+  });
+
+  it('DER-65-02 CU-121 reports StockChanged for a change of the battery capacity of an assigned device, none for one of the OS version (R4)', async () => {
+    const { listingId, deviceId } = await createListing();
+    const seen: ChangeEvent[] = [];
+    const devices = createDeviceService({
+      uow: createUnitOfWork<DB>(t.database.db, {
+        change: {
+          StockChanged: async (event): Promise<ChangeReport> => {
+            seen.push(event);
+            return emptyChangeReport();
+          },
+        },
+      }),
+      clock: createClock(),
+    });
+    const storedHash = () =>
+      t.database.sqlite.prepare('SELECT stock_hash FROM listing WHERE id = ?').get(listingId);
+    const before = storedHash();
+
+    await devices.update(deviceId, {
+      version: 2,
+      values: { [ids.osVersion]: 'macOS 15' },
+      confirmedKeys: [],
+    });
+
+    expect(seen).toEqual([]);
+    expect(storedHash()).toEqual(before);
+
+    await devices.update(deviceId, {
+      version: 3,
+      values: { [ids.batteryCapacity]: { notDeterminable: true } },
+      confirmedKeys: [],
+    });
+
+    expect(seen).toEqual([{ type: 'StockChanged', listingId }]);
+    expect(await stockOf(listingId)).toMatchObject({ batteryText: 'nicht ermittelbar' });
+  });
+
+  it('DER-65-02 the status of the attribute battery does not enter the stock data, a device without battery value enters with its battery capacity (RQ-27)', async () => {
+    const { listingId } = await createListing();
+    const before = await stockOf(listingId);
+    expect(before).toMatchObject({ batteryText: '85 %' });
+    const setBatteryActive = async (active: boolean) => {
+      const { version } = t.database.sqlite
+        .prepare('SELECT version FROM attribute WHERE id = ?')
+        .get(ids.battery) as { version: number };
+      const response = await t.app.inject({
+        method: 'PATCH',
+        url: `/api/attributes/${ids.battery}`,
+        headers: SAME_ORIGIN_WRITE,
+        payload: { version, active },
+      });
+      expect(response.statusCode).toBe(200);
+    };
+
+    await setBatteryActive(false);
+
+    expect(await stockOf(listingId)).toEqual(before);
+    expect(await stockColumnDifferences(t.database.db)).toEqual([]);
+
+    // Captured while the attribute battery is inactive: no battery value, battery capacity 80;
+    // assigned with "trotzdem zuordnen" for the deviation of the battery value.
+    await assign(await captureDevice('626199', { percent: 80 }, false), listingId, true);
+    const assigned = await stockOf(listingId);
+    expect(assigned).toMatchObject({
+      quantity: 2,
+      wiNrs: ['626198', '626199'],
+      batteryText: '80–85 %',
+    });
+
+    await setBatteryActive(true);
+
+    expect(await stockOf(listingId)).toEqual(assigned);
+    expect(await stockColumnDifferences(t.database.db)).toEqual([]);
+  });
+
+  it('DER-65-01 a stored battery value without "Akku vorhanden" keeps its device out of the battery text while the attribute battery is inactive (RQ-27)', async () => {
+    const { listingId, deviceId } = await createListing();
+    // A battery capacity next to "ohne Akku" has no writing path; CU-128 forms from both.
+    run(
+      'UPDATE device SET device_values = ? WHERE id = ?',
+      JSON.stringify({ [ids.battery]: ids.withoutBattery, [ids.batteryCapacity]: { percent: 50 } }),
+      deviceId,
+    );
+    run('UPDATE attribute SET active = 0 WHERE id = ?', ids.battery);
+
+    const formed = await formStockColumns(t.database.db, listingId);
+
+    expect(JSON.parse(formed.stock_json)).toEqual({
+      quantity: 1,
+      wiNrs: ['626198'],
+      batteryText: '',
+    });
+    await syncStockColumns(t.database.db);
+  });
+
+  it('DER-65-01 a device assigned with "trotzdem zuordnen" and "ohne Akku" does not enter the battery text (AC-REQ-036-05)', async () => {
+    const first = await captureDevice('626198', { notDeterminable: true });
+    const created = await t.app.inject({
+      method: 'POST',
+      url: '/api/listings',
+      headers: SAME_ORIGIN_WRITE,
+      payload: { fromDeviceId: first, deviceVersion: 1 },
+    });
+    const listingId = created.json<{ id: number }>().id;
+
+    await assign(await captureDevice('626199', null), listingId, true);
+
+    expect(await stockOf(listingId)).toMatchObject({
+      quantity: 2,
+      wiNrs: ['626198', '626199'],
+      batteryText: 'nicht ermittelbar',
+    });
+  });
+
+  it('DER-65-03 CU-128 writes the stock columns in the transaction of the device change and reports StockChanged', async () => {
+    const { listingId, deviceId } = await createListing();
+    const stored = () =>
+      t.database.sqlite
+        .prepare('SELECT quantity, stock_json, stock_hash FROM listing WHERE id = ?')
+        .get(listingId);
+    const before = stored();
+    const seen: ChangeEvent[] = [];
+    const uow = createUnitOfWork<DB>(t.database.db, {
+      change: {
+        StockChanged: async (event): Promise<ChangeReport> => {
+          seen.push(event);
+          return emptyChangeReport();
+        },
+      },
+    });
+
+    // A failing action rolls back the device change and the stock columns together.
+    const failing = uow.run(async (tx) => {
+      await tx.db
+        .updateTable('device')
+        .set({ stock_status: 'sold' })
+        .where('id', '=', deviceId)
+        .execute();
+      await createListingStockUpdater(tx).update(listingId);
+      throw new Error('after the update');
+    });
+    await expect(failing).rejects.toThrow('after the update');
+    expect(stored()).toEqual(before);
+
+    await uow.run(async (tx) => {
+      await tx.db
+        .updateTable('device')
+        .set({ stock_status: 'sold' })
+        .where('id', '=', deviceId)
+        .execute();
+      return createListingStockUpdater(tx).update(listingId);
+    });
+    expect(seen).toEqual([{ type: 'StockChanged', listingId }]);
+    expect(stored()).toEqual({
+      quantity: 0,
+      stock_json: '{"quantity":0,"wiNrs":[],"batteryText":""}',
+      stock_hash: '74f68861b8f71e9b878b5b1b24fe0b6535a9992a0a894753c3dae776abcc15f3',
+    });
+
+    // An unchanged `stock_hash` writes nothing and reports nothing (2.8.2, Nachtrag MAR-1204).
+    run(`UPDATE listing SET stock_json = '{"marker":true}' WHERE id = ?`, listingId);
+    await uow.run((tx) => createListingStockUpdater(tx).update(listingId));
+    expect(seen).toHaveLength(1);
+    expect(stored()).toMatchObject({ stock_json: '{"marker":true}' });
+    await syncStockColumns(t.database.db);
+  });
+
+  it('DER-65-03 the invariant test finds stock columns that differ from the new forming from the devices', async () => {
+    const { listingId, deviceId } = await createListing();
+    const reader = createInventoryReader(t.database.db);
+    const formed = await formStockColumns(t.database.db, listingId);
+    expect((await reader.findListing(listingId))?.stock).toEqual({
+      ...JSON.parse(formed.stock_json),
+      stockHash: formed.stock_hash,
+    });
+
+    expect(await stockColumnDifferences(t.database.db)).toEqual([]);
+
+    // A device change past CU-128 leaves the columns behind the devices.
+    run("UPDATE device SET stock_status = 'sold' WHERE id = ?", deviceId);
+
+    expect((await reader.findListing(listingId))?.stock).toMatchObject({ quantity: 1 });
+    expect(await stockColumnDifferences(t.database.db)).toEqual([
+      {
+        listingId,
+        stored: expect.objectContaining({ quantity: 1 }),
+        formed: expect.objectContaining({ quantity: 0 }),
+      },
+    ]);
+    // Written as CU-128 forms them, so the invariant test after this test passes.
+    await syncStockColumns(t.database.db);
+    expect(await stockColumnDifferences(t.database.db)).toEqual([]);
   });
 });

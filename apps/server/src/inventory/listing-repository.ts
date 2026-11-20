@@ -104,6 +104,12 @@ export function createListingRepository(db: Kysely<DB>) {
         .executeTakeFirst();
     },
 
+    /** The ids of all model listings in ascending order (CU-129). */
+    async listIds(): Promise<number[]> {
+      const rows = await db.selectFrom('listing').select('id').orderBy('id').execute();
+      return rows.map((row) => row.id);
+    },
+
     /**
      * Writes the derived stock columns (3.3); only CU-128 calls it, in the transaction of the
      * device change (FIND-221).

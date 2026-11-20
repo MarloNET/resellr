@@ -216,7 +216,10 @@ function ListingDevices({
  * head with the untruncated title and "Geräteart · Stückzahl n · Artikelnummer <Nr>", the listing
  * values (read only) with the hint to the model template, and the devices with the filter "auch
  * stornierte"; the states loading, error ("geladen", DER-60-02) and P-06 above the page
- * (DER-60-06). Channel cards follow with S5, photos with S7, prices with #204, editing with #206.
+ * (DER-60-06). With #209 the head shows the quantity of the current stock data, and head and devices
+ * show the state of each answer of `GET /api/listings/{id}`: on opening and after an own write
+ * action, which reads the model listing again (DER-65-02). Channel cards follow with S5, photos with
+ * S7, prices with #204, editing with #206.
  */
 export function ListingPage() {
   const id = listingIdOf(useParams().listingId);
@@ -267,7 +270,7 @@ export function ListingPage() {
         </h1>
         {ready && (
           <p className="m-0 text-body text-text-secondary">
-            {TEXTS.head(deviceType.name, listing.quantity, listing.articleNumber)}
+            {TEXTS.head(deviceType.name, listing.stock.quantity, listing.articleNumber)}
           </p>
         )}
       </header>

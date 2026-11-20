@@ -8,14 +8,14 @@ import { createSettingsReader } from '../settings/index.ts';
 import { NotFoundError } from '../shared/domain-error.ts';
 import { toListing } from './assignment-service.ts';
 import { createDeviceRepository } from './device-repository.ts';
+import { toListingStock } from './inventory-reader.ts';
 import { createListingRepository } from './listing-repository.ts';
-
-type StoredStock = Omit<ListingDetail['stock'], 'stockHash'>;
 
 /**
  * Model listing detail (CU-292, REQ-088; Technical Specification 2.7): serves
- * `GET /api/listings/{id}?includeCancelled=` with the outer `db`: the model listing with its stock
- * data (2.8.2, as CU-128 stored them), its prices by channel, its devices (the cancelled ones only
+ * `GET /api/listings/{id}?includeCancelled=` with the outer `db`: the model listing with its
+ * current stock data (2.8.2: quantity, WI-Nrs, battery text and hash, as CU-128 formed them anew
+ * with the last device change; CU-129), its prices by channel, its devices (the cancelled ones only
  * with `includeCancelled`) with the battery capacity from the attribute with the system role
  * `battery_capacity`, and its delivery scope as text blocks with their names in their order;
  * `not_found` for an unknown model listing. Channel contents and photos have reads of their own
@@ -44,7 +44,7 @@ export function createListingDetailQuery(db: Kysely<DB>) {
 
       return {
         ...toListing(row, deliveryScopeIds),
-        stock: { ...(JSON.parse(row.stock_json) as StoredStock), stockHash: row.stock_hash },
+        stock: toListingStock(row),
         prices: (await listings.listPrices(id)).map((price) => ({
           channelId: price.channel_id,
           amountCents: price.amount_cents,

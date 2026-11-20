@@ -70,7 +70,7 @@ const COLUMNS: (keyof StoredValues)[] = [
 describe('attribute usage query (CU-074, Technical Specification 2.1)', () => {
   it.each(COLUMNS)('finds a value stored in %s', async (column) => {
     insertAttributes();
-    insertAttributeValueRecords(database.sqlite, { [column]: { '12': 16 } });
+    await insertAttributeValueRecords(database, { [column]: { '12': 16 } });
     const usage = createAttributeUsageQuery(database.db);
 
     expect(await usage.hasValues(12)).toBe(true);
@@ -80,7 +80,7 @@ describe('attribute usage query (CU-074, Technical Specification 2.1)', () => {
 
   it('counts false, zero and a list as stored values; a missing key is no value', async () => {
     insertAttributes();
-    insertAttributeValueRecords(database.sqlite, {
+    await insertAttributeValueRecords(database, {
       modelValues: { '11': false, '13': [{ count: 2, typeId: 41, positionId: null }] },
       deviceValues: { '12': 0 },
     });
@@ -91,7 +91,7 @@ describe('attribute usage query (CU-074, Technical Specification 2.1)', () => {
 
   it('reports no attribute without records', async () => {
     insertAttributes();
-    insertAttributeValueRecords(database.sqlite, {});
+    await insertAttributeValueRecords(database, {});
     const usage = createAttributeUsageQuery(database.db);
 
     expect(await usage.attributeIdsWithValues(1)).toEqual(new Set());

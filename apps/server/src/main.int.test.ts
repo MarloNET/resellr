@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 import BetterSqlite3 from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { EMPTY_STOCK_COLUMNS } from '../test/stock.ts';
+
 const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
 let root: string;
@@ -441,7 +443,8 @@ function writeMiAShopPrice(file: string): void {
           article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
           stock_hash, version, created_at, updated_at)
         SELECT 1, 1, v.id, 2, 'leichte Gebrauchsspuren', 'leichte gebrauchsspuren', '{}', '{}',
-          '626198', '626198', 'original', 'MI-A', 0, '{}', '', 1, '${ts}', '${ts}'
+          '626198', '626198', 'original', 'MI-A', 0, '${EMPTY_STOCK_COLUMNS.stock_json}',
+          '${EMPTY_STOCK_COLUMNS.stock_hash}', 1, '${ts}', '${ts}'
         FROM pick_list_value v JOIN pick_list l ON l.id = v.pick_list_id
         WHERE l.key = 'condition' AND v.label_key = 'gebraucht';
       INSERT INTO listing_price (listing_id, channel_id, amount_cents, vb, source)

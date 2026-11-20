@@ -2,6 +2,7 @@ import { variantDifferences } from '@resellr/domain/inventory/compare-variants';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
+import { EMPTY_STOCK_COLUMNS, syncStockColumns } from '../../test/stock.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { runMigrations } from '../db/migrator.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
@@ -100,7 +101,7 @@ function insertListing(
          condition_description, condition_description_key, variant_values, other_device_values,
          article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
          stock_hash, version, created_at, updated_at)
-       VALUES (?, ?, 2, '', '', ?, '{}', ?, ?, 'original', ?, 1, '{}', '', 1, ?, ?)`,
+       VALUES (?, ?, 2, '', '', ?, '{}', ?, ?, 'original', ?, ?, ?, ?, 1, ?, ?)`,
     )
     .run(
       modelTemplateId,
@@ -109,6 +110,9 @@ function insertListing(
       articleNumber,
       articleNumber.toLowerCase(),
       `MacBook Air ${articleNumber}`,
+      EMPTY_STOCK_COLUMNS.quantity,
+      EMPTY_STOCK_COLUMNS.stock_json,
+      EMPTY_STOCK_COLUMNS.stock_hash,
       STAMP,
       STAMP,
     );
@@ -182,6 +186,7 @@ describe('check of the variant set in inventory (CU-290, REQ-005)', () => {
     const miA = insertListing(mvA, '626198', { [ram.id]: 16, [os.id]: 'macOS' });
     insertListing(mvA, '626199', { [ram.id]: 8, [os.id]: 'macOS' });
     insertDevice(mvA, miA, '626198', { [ram.id]: 16, [os.id]: 'macOS' });
+    await syncStockColumns(t.database.db);
     const before = inventoryRows();
 
     const response = await patchAttribute(os.id, { version: os.version, variantForming: false });
