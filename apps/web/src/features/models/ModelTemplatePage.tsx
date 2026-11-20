@@ -504,15 +504,17 @@ export function ModelTemplatePage() {
   }, [editing, draft, choicesLoaded]);
 
   // While changing, the form opens with the stored model template and the inputs of its
-  // attribute values (UI-007 "ändern").
+  // attribute values (UI-007 "ändern"). A model template deleted meanwhile keeps its outdated
+  // data in the query; M-15 then stands instead of the form (2.0.5).
   const template = templateQuery.data;
   const templateAttributes = attributesQuery.data?.items;
+  const templateGone = templateQuery.error?.kind === 'not-found';
   useEffect(() => {
-    if (!editing || draft !== null || !choicesLoaded) return;
+    if (!editing || draft !== null || !choicesLoaded || templateGone) return;
     if (template === undefined || templateAttributes === undefined) return;
     setStored(template);
     setDraft(draftOf(template, templateAttributes));
-  }, [editing, draft, choicesLoaded, template, templateAttributes]);
+  }, [editing, draft, choicesLoaded, templateGone, template, templateAttributes]);
 
   const saving = createMutation.isPending || updateMutation.isPending;
   // Until the choices are read again after a rejection, a save could send the rejected id; until
@@ -886,7 +888,7 @@ export function ModelTemplatePage() {
   }
 
   // An address without a valid id names no model template, like `404 not_found` (M-15).
-  const notFound = editing && (templateId === null || templateQuery.error?.kind === 'not-found');
+  const notFound = editing && (templateId === null || templateGone);
   // A failed read shows P-06 or the error banner; the inputs stay (2.0.7).
   const loadFailed =
     deviceTypes.error ??

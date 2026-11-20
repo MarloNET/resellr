@@ -345,13 +345,15 @@ function readableAttributeValues(
   return readable;
 }
 
-/** The labels of the pick list values in attribute values, read in one query (3.4). */
+/**
+ * The labels of the pick list values in attribute values, each read against the attributes of
+ * its device type, in one query (3.4).
+ */
 async function pickListLabels(
   settings: SettingsReader,
-  attributes: readonly AttributeEntry[],
-  templates: readonly AttributeValueObjects[],
+  templates: readonly (readonly [readonly AttributeEntry[], AttributeValueObjects])[],
 ) {
-  const ids = templates.flatMap((values) =>
+  const ids = templates.flatMap(([attributes, values]) =>
     pickListValueReferences(attributes, values).map(({ id }) => id),
   );
   const labels = new Map(
@@ -501,7 +503,16 @@ export function createModelTemplateService({ uow, clock }: ModelTemplateServiceD
           JSON.stringify(values.defaultDeviceValues) !== JSON.stringify(stored.defaultDeviceValues);
         if (!modelChanged && !defaultsChanged) return stored;
 
-        const label = await pickListLabels(settings, attributes, [stored, values]);
+        // The stored values are read with the attributes of the stored device type, so values
+        // dropped by a change of the device type appear as changed fields (2.0.9).
+        const storedAttributes =
+          next.deviceTypeId === stored.deviceTypeId
+            ? attributes
+            : await settings.listAttributes(stored.deviceTypeId);
+        const label = await pickListLabels(settings, [
+          [storedAttributes, stored],
+          [attributes, values],
+        ]);
         const names = {
           ...row,
           device_type_name: await nameOf(
@@ -524,7 +535,7 @@ export function createModelTemplateService({ uow, clock }: ModelTemplateServiceD
         const { oldValue, newValue } = changedFields(
           {
             ...readableModelData(row),
-            ...readableAttributeValues(attributes, stored, label),
+            ...readableAttributeValues(storedAttributes, stored, label),
           },
           {
             ...readableModelData(names),

@@ -405,6 +405,37 @@ describe('UI-007 changing a model template (CU-114, #181)', () => {
     expectAccessiblePage();
   });
 
+  it('UI-007.error DER-52-06 "Neu laden" of a model template deleted meanwhile shows the banner instead of the form', async () => {
+    let deleted = false;
+    mockApi({
+      template: () =>
+        deleted
+          ? Response.json(
+              errorBody('not_found', { message: 'Dieser Eintrag ist nicht mehr vorhanden.' }),
+              { status: 404 },
+            )
+          : Response.json(T14),
+      update: () => Response.json(errorBody('version_conflict', { message: 'x' }), { status: 409 }),
+    });
+    await openPage();
+    await save();
+    const conflict = screen.getByRole('alert');
+
+    deleted = true;
+    await act(async () => {
+      fireEvent.click(within(conflict).getByRole('button', { name: 'Neu laden' }));
+    });
+
+    await vi.waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        'Dieser Eintrag ist nicht mehr vorhanden.',
+      ),
+    );
+    expect(screen.queryByRole('form')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expectAccessiblePage();
+  });
+
   it('UI-007.error DER-52-06 a model template deleted meanwhile shows the same banner on saving', async () => {
     mockApi({
       update: () =>

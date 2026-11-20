@@ -224,6 +224,37 @@ describe('PATCH /api/model-templates/{id} (CU-109, CU-105, Technical Specificati
     });
   });
 
+  it('records the dropped values of the old device type in the audit entry `updated` (2.0.9)', async () => {
+    await patch({
+      version: 1,
+      deviceTypeId: ids.tablet,
+      modelValues: { [A.tabletColor]: 'schwarz' },
+      defaultDeviceValues: {},
+    });
+
+    const entry = t.database.sqlite
+      .prepare("SELECT old_value, new_value FROM audit_entry WHERE action = 'updated'")
+      .get() as { old_value: string; new_value: string };
+    expect(JSON.parse(entry.old_value)).toEqual({
+      Geräteart: 'Notebook',
+      Farbe: null,
+      Tastaturlayout: 'Deutsch',
+      Prozessor: 'Intel Core i5-1135G7',
+      Anschlüsse: '2 × USB-C hinten',
+      'Vorbelegungswert Betriebssystem': 'Windows 11 Pro',
+      'Vorbelegungswert Tastatur Gerät': 'Deutsch',
+    });
+    expect(JSON.parse(entry.new_value)).toEqual({
+      Geräteart: 'Tablet',
+      Farbe: 'schwarz',
+      Tastaturlayout: null,
+      Prozessor: null,
+      Anschlüsse: null,
+      'Vorbelegungswert Betriebssystem': null,
+      'Vorbelegungswert Tastatur Gerät': null,
+    });
+  });
+
   describe('AC-REQ-010-03 required data emptied by a change', () => {
     it.each([
       ['modelName', { modelName: '  ' }, 'Modellbezeichnung: 1 bis 100 Zeichen'],
