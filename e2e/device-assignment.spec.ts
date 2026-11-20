@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { type AppServer, test as appTest, expect, workerServer } from './fixtures/app-fixture.ts';
+import { expectReachable } from './fixtures/reachability.ts';
 
 /** The devices of this spec live on a server of their own, so other specs keep their lists. */
 const test = appTest.extend<object, { server: AppServer }>({
@@ -200,6 +201,59 @@ test.describe('FLOW-02 Zuordnen mit Abweichung (CU-123, CU-119, REQ-018; Technic
       expect.objectContaining({
         id: miA.id,
         quantity: 2,
+        variantSummary: expect.objectContaining({ visualGrade: 2 }),
+      }),
+    ]);
+  });
+});
+
+test.describe('UI-005 Kontext B: Variantenangabe eines zugeordneten Geräts ändern (CU-121, CU-135, CU-137; Technical Specification 2.5)', () => {
+  test('UI-005.default DER-56-04 DER-56-05 the visual grade of a device assigned to MI-A changed from 2 to 4 in UI-010 opens UI-005; "Zuordnung behalten" saves it, MI-A keeps visual grade 2', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const api = apiOf(page, server.baseUrl);
+    const { template, capture } = await setUpTemplate(api, hash);
+    const device = await capture(`A${hash}`.slice(0, 20));
+    const miA = await api.write<{ id: number }>('/api/listings', {
+      fromDeviceId: device.id,
+      deviceVersion: device.version,
+    });
+    await page.goto(`/geraete/${device.id}`);
+
+    const grade = page.getByRole('textbox', { name: 'Optik-Note' });
+    await expect(grade).toHaveValue('2');
+    await grade.fill('4');
+    await page.getByRole('button', { name: 'Gerätewerte speichern' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
+    await expect(dialog.getByText('Das Gerät weicht vom Modell-Inserat ab.')).toBeVisible();
+    await expect(dialog.getByRole('row', { name: /Optik-Note/ }).locator('th, td')).toHaveText([
+      'Optik-Note',
+      '4',
+      '2',
+    ]);
+    await expect(
+      dialog.getByRole('button', { name: 'Neues Modell-Inserat anlegen' }),
+    ).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Umbuchen' })).toBeVisible();
+    // UI-005 is modal: the check covers the dialog, the page behind it is hidden (6.3).
+    await expectReachable(page);
+
+    await dialog.getByRole('button', { name: 'Zuordnung behalten' }).click();
+
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText('Gerät gespeichert')).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('textbox', { name: 'Optik-Note' })).toHaveValue('4');
+    const listings = await api.read<{
+      items: { id: number; quantity: number; variantSummary: { visualGrade: number } }[];
+    }>(`/api/model-templates/${template.id}/listings`);
+    expect(listings.items).toEqual([
+      expect.objectContaining({
+        id: miA.id,
+        quantity: 1,
         variantSummary: expect.objectContaining({ visualGrade: 2 }),
       }),
     ]);

@@ -17,7 +17,11 @@ import { Link, useParams } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
 import { useModelTemplateQuery } from '../../api/catalog.api.ts';
-import { useDeviceQuery, useUpdateDeviceMutation } from '../../api/inventory.api.ts';
+import {
+  useDeviceQuery,
+  useUpdateDeviceMutation,
+  variantDeviationDetailsOf,
+} from '../../api/inventory.api.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import {
   useAttributesQuery,
@@ -80,6 +84,7 @@ import {
   withoutMissingChoices,
 } from './DeviceIntakePage.tsx';
 import { CAPTURE_STATUS_LABELS, STOCK_STATUS_LABELS, UNASSIGNED_TEXT } from './DevicesPage.tsx';
+import { DeviationDialog, type KeepAssignment } from './DeviationDialog.tsx';
 
 // Texts of UI-010 `screen.md` (UI/UX design v0.6.1); "geladen" for opening (DER-54-10). The
 // device values use the texts of UI-003, as UI-010 shows the same form (DER-56-01).
@@ -242,8 +247,11 @@ const hasErrors = (errors: FieldErrors) => Object.values(errors).some(Boolean);
  * deactivated condition or pick list value stays chosen and offered with "(deaktiviert)"; after
  * `pick_list_value_deactivated` every changed choice missing after the reload is emptied with
  * its text, without falling back to the stored value (2.0.11, design v0.6.8, DER-56-08,
- * DER-56-11). A sold or cancelled device is read only (DER-56-02). States: validation, success,
- * error, conflict (P-05), wird-beendet (P-07), ausgang-unbekannt (P-08, DER-56-07), disabled.
+ * DER-56-11). A sold or cancelled device is read only (DER-56-02). If the changed variant data of
+ * an assigned device deviate from its model listing, UI-005 Kontext B opens with the answer and
+ * the inputs stay; "Zuordnung behalten" stores them (2.5, DER-56-04, DER-56-05), a rejection of
+ * it shows at the form. States: validation, success, error, conflict (P-05), wird-beendet (P-07),
+ * ausgang-unbekannt (P-08, DER-56-07), disabled.
  */
 function DeviceValuesCard({ device }: { device: DeviceDetail }) {
   const queryClient = useQueryClient();
@@ -294,6 +302,9 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
   // Pick list values rejected as deactivated whose list could not be read again (2.0.11).
   const [droppedValues, setDroppedValues] = useState<ReadonlySet<number>>(new Set());
   const [reloading, setReloading] = useState(false);
+  // The answer `variant_deviation` of an assigned device and the request sent; UI-005 Kontext B is
+  // open while set (2.5).
+  const [deviation, setDeviation] = useState<Pick<KeepAssignment, 'details' | 'body'> | null>(null);
 
   const formId = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -364,7 +375,14 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
     focusFirstError();
   }
 
-  function onFailed(error: ApiError) {
+  function onFailed(error: ApiError, body?: DeviceUpdateInput) {
+    // The changed variant data of an assigned device deviate from its model listing: UI-005
+    // Kontext B decides, the inputs stay (2.5, DER-56-04).
+    const details = variantDeviationDetailsOf(error);
+    if (details !== null && body !== undefined) {
+      setDeviation({ details, body });
+      return;
+    }
     if (error.kind === 'validation') {
       const next: FieldErrors = {};
       for (const { path, message } of error.error?.fields ?? []) next[path] ??= message;
@@ -440,6 +458,14 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
     setReloading(false);
   }
 
+  /** The form takes the stored device of "Gerätewerte speichern" or "Zuordnung behalten". */
+  function onSaved(saved: Device) {
+    if (attributesDevice === null) return;
+    setStored(saved);
+    setDraft(draftOf(saved, attributesDevice.attributes));
+    setNotice({ kind: 'success' });
+  }
+
   function save() {
     blurCheck.cancel();
     const current = draftRef.current;
@@ -454,13 +480,10 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
     }
     setErrors({});
     setNotice(null);
-    updateMutation.mutate(bodyOf(current, attributesDevice, base.version), {
-      onSuccess: (saved) => {
-        setStored(saved);
-        setDraft(draftOf(saved, attributesDevice.attributes));
-        setNotice({ kind: 'success' });
-      },
-      onError: onFailed,
+    const body = bodyOf(current, attributesDevice, base.version);
+    updateMutation.mutate(body, {
+      onSuccess: onSaved,
+      onError: (error) => onFailed(error, body),
     });
   }
 
@@ -634,6 +657,25 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
           <ModelDataPanel templateId={device.modelTemplateId} deviceTypeId={deviceTypeId} />
         )}
       </div>
+      {stored !== null && (
+        <DeviationDialog
+          device={stored}
+          keep={
+            deviation && {
+              ...deviation,
+              onKept: (saved) => {
+                setDeviation(null);
+                onSaved(saved);
+              },
+              onRejected: (error) => {
+                setDeviation(null);
+                onFailed(error);
+              },
+            }
+          }
+          onClose={() => setDeviation(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,12 +1,18 @@
 import { CONFIRMATION_TITLES, ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
+import type { Device, DeviceUpdateInput } from '@resellr/domain/schemas/device.schema';
 import type {
   DeviceAssignment,
+  VariantDeviationDetails,
   VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
 import { useState } from 'react';
 
 import type { ApiError } from '../../api/api-client.ts';
-import { useAssignDeviceMutation, useListingDeviationsQuery } from '../../api/inventory.api.ts';
+import {
+  useAssignDeviceMutation,
+  useListingDeviationsQuery,
+  useUpdateDeviceMutation,
+} from '../../api/inventory.api.ts';
 import { useOpsStatusQuery } from '../../api/ops.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
 import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
@@ -49,10 +55,14 @@ const TEXTS = {
   listing: 'Modell-Inserat',
   loading: 'Lade Modell-Inserate …',
   assignAnyway: 'Trotzdem zuordnen',
+  keepAssignment: 'Zuordnung behalten',
+  rebook: 'Umbuchen',
   newListing: 'Neues Modell-Inserat anlegen',
   cancel: 'Abbrechen',
   error: (referenceNumber: string | null) =>
     `Zuordnung fehlgeschlagen. Referenz: ${referenceNumber ?? '–'}`,
+  saveError: (referenceNumber: string | null) =>
+    `Speichern nicht möglich. Referenz: ${referenceNumber ?? '–'}`,
 } as const;
 
 /** Dialog width of UI-005 in px (Technical Specification 2.0.10). */
@@ -73,16 +83,10 @@ export interface DeviationDialogDevice {
   modelTemplateId: number;
 }
 
-export interface DeviationDialogProps {
-  /** `details.deviations` of `variant_deviation`; `null` keeps the dialog closed. */
-  deviations: VariantDeviationItem[] | null;
+interface CommonProps {
   device: DeviationDialogDevice;
-  /** The model listing chosen in UI-004. */
-  listingId: number;
-  /** "Abbrechen" and Esc: back to UI-004, nothing is stored (DER-59-02). */
+  /** "Abbrechen" and Esc: back to the calling screen, nothing is stored (DER-59-02). */
   onClose: () => void;
-  /** After "Trotzdem zuordnen" (`200`): the calling screen closes UI-004 and shows the banner. */
-  onAssigned: (assignment: DeviceAssignment) => void;
   /**
    * "Neues Modell-Inserat anlegen" (#201); without it the action is shown but not available.
    * Available only when the device deviates from every model listing of the model template.
@@ -90,106 +94,214 @@ export interface DeviationDialogProps {
   onCreateListing?: () => void;
 }
 
+/** Kontext A: "Zuordnen" of UI-004 answered `variant_deviation` (REQ-018). */
+interface AssignmentProps extends CommonProps {
+  /** `details.deviations` of `variant_deviation`; `null` keeps the dialog closed. */
+  deviations: VariantDeviationItem[] | null;
+  /** The model listing chosen in UI-004. */
+  listingId: number;
+  /** After "Trotzdem zuordnen" (`200`): the calling screen closes UI-004 and shows the banner. */
+  onAssigned: (assignment: DeviceAssignment) => void;
+  keep?: never;
+}
+
 /**
- * Dialog UI-005 Kontext A "Abweichungen bei Zuordnung" (CU-135, REQ-018; Technical Specification
- * 2.6, 2.0.10): opens over UI-004 when "Zuordnen" answers `confirmation_required`/
- * `variant_deviation` and shows the hint, the deviations of that answer as table (Merkmal, Wert am
- * Gerät, Wert am Modell-Inserat) and both condition descriptions complete side by side.
- * "Trotzdem zuordnen" sends the assignment again with `confirmDeviation: true`; "Abbrechen" and
- * Esc return to UI-004. It reads the model listings with their deviations to the device
- * (`?deviceId=`), the data of UI-005 for "Neues Modell-Inserat anlegen". States: default,
- * loading and error as UI-004, conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
- * ausgang-unbekannt (P-08). Kontext B (#191), "Umbuchen" (#202, #203) and the action
- * "Neues Modell-Inserat anlegen" (#201) follow.
+ * Kontext B: "Gerätewerte speichern" of an assigned device answered `variant_deviation` (REQ-014;
+ * 2.5); `null` keeps the dialog closed.
  */
-export function DeviationDialog({ deviations, ...props }: DeviationDialogProps) {
+export interface KeepAssignment {
+  /** `details` of the answer: the deviations and the rebook targets. */
+  details: VariantDeviationDetails;
+  /** The request of "Gerätewerte speichern", sent again with `deviationDecision: keep`. */
+  body: DeviceUpdateInput;
+  /** After "Zuordnung behalten" (`200`): the calling screen takes the stored device. */
+  onKept: (device: Device) => void;
+  /**
+   * A rejection the form of the calling screen shows (field rules, deactivated values, sold
+   * meanwhile, conflict P-05): the dialog closes and hands it over.
+   */
+  onRejected: (error: ApiError) => void;
+}
+
+interface KeepProps extends CommonProps {
+  keep: KeepAssignment | null;
+  deviations?: never;
+  listingId?: never;
+  onAssigned?: never;
+}
+
+export type DeviationDialogProps = AssignmentProps | KeepProps;
+
+/** Errors of "Zuordnung behalten" the form of the calling screen shows (2.5, P-05). */
+const FORM_ERRORS = new Set<ApiError['kind']>(['validation', 'rejected', 'conflict']);
+
+/**
+ * Dialog UI-005 "Abweichungen bei Zuordnung" (CU-135, REQ-018, REQ-014; Technical Specification
+ * 2.5, 2.6, 2.0.10) shows the hint, the deviations of the answer as table (Merkmal, Wert am
+ * Gerät, Wert am Modell-Inserat) and both condition descriptions complete side by side.
+ * Kontext A opens over UI-004 when "Zuordnen" answers `confirmation_required`/
+ * `variant_deviation`: "Trotzdem zuordnen" sends the assignment again with
+ * `confirmDeviation: true`; it reads the model listings with their deviations to the device
+ * (`?deviceId=`), the data of UI-005 for "Neues Modell-Inserat anlegen", loading and error as
+ * UI-004. Kontext B opens over UI-010 when "Gerätewerte speichern" of an assigned device answers
+ * so: "Zuordnung behalten" sends the same request with `deviationDecision: keep`, a technical
+ * error shows "Speichern nicht möglich. Referenz: <Nr>" (DER-56-05); the data for "Neues
+ * Modell-Inserat anlegen" and "Umbuchen" are the rebook targets of the answer, as the stored
+ * device differs from the changed one. "Abbrechen" and Esc return to the calling screen. States:
+ * default, error, conflict (P-05), unreachable (P-06), wird-beendet (P-07) and ausgang-unbekannt
+ * (P-08). "Umbuchen" (#202, #203) and the action "Neues Modell-Inserat anlegen" (#201) follow.
+ */
+export function DeviationDialog(props: DeviationDialogProps) {
   const writesLocked = useWritesLocked();
   const assignMutation = useAssignDeviceMutation();
+  const updateMutation = useUpdateDeviceMutation(props.device.id);
+  const pending = assignMutation.isPending || updateMutation.isPending;
   // Esc and a click outside would hide the dialog while the write runs or after an unknown
   // outcome (P-08).
-  const locked = assignMutation.isPending || writesLocked;
+  const locked = pending || writesLocked;
+  const deviations = props.keep === undefined ? props.deviations : props.keep?.details.deviations;
+  const open = deviations !== null && deviations !== undefined;
+
+  function confirm(callbacks: Callbacks) {
+    if (props.keep === undefined) {
+      const { device, listingId, onAssigned } = props;
+      assignMutation.mutate(
+        {
+          deviceId: device.id,
+          body: { version: device.version, listingId, confirmDeviation: true },
+        },
+        {
+          onSuccess: onAssigned,
+          onError: (error) => {
+            if (error.kind === 'rejected' && DIALOG_REJECTIONS.has(error.error?.code ?? '')) {
+              callbacks.onRejection(error.error?.message ?? '');
+              return;
+            }
+            callbacks.onError(error);
+          },
+        },
+      );
+      return;
+    }
+    const keep = props.keep;
+    if (keep === null) return;
+    updateMutation.mutate(
+      { ...keep.body, deviationDecision: 'keep' },
+      {
+        onSuccess: keep.onKept,
+        onError: (error) => {
+          if (FORM_ERRORS.has(error.kind)) {
+            keep.onRejected(error);
+            return;
+          }
+          callbacks.onError(error);
+        },
+      },
+    );
+  }
 
   return (
-    <Dialog open={deviations !== null} onOpenChange={(open) => !open && props.onClose()}>
+    <Dialog open={open} onOpenChange={(next) => !next && props.onClose()}>
       {/* The content mounts per opening, so each opening starts without banner. */}
       <DialogContent width={WIDTH} dismissible={!locked}>
-        {deviations !== null && (
-          <DeviationContent
-            {...props}
-            deviations={deviations}
-            writesLocked={writesLocked}
-            pending={assignMutation.isPending}
-            onAssign={(callbacks) =>
-              assignMutation.mutate(
-                {
-                  deviceId: props.device.id,
-                  body: {
-                    version: props.device.version,
-                    listingId: props.listingId,
-                    confirmDeviation: true,
-                  },
-                },
-                callbacks,
-              )
-            }
-          />
-        )}
+        {open &&
+          (props.keep === undefined ? (
+            <AssignmentContent
+              deviations={deviations}
+              device={props.device}
+              onClose={props.onClose}
+              onCreateListing={props.onCreateListing}
+              busy={locked}
+              onConfirm={confirm}
+            />
+          ) : (
+            <DeviationContent
+              context="device_values"
+              deviations={deviations}
+              onClose={props.onClose}
+              onCreateListing={props.onCreateListing}
+              // The changed device against every model listing: the assigned one deviates.
+              differsFromAll={(props.keep?.details.rebookTargets ?? []).every(
+                (target) => target.deviations.length > 0,
+              )}
+              busy={locked}
+              onConfirm={confirm}
+            />
+          ))}
       </DialogContent>
     </Dialog>
   );
 }
 
-interface DeviationContentProps extends Omit<DeviationDialogProps, 'deviations'> {
+interface Callbacks {
+  /** A rejection the dialog shows with its text (Kontext A, as UI-004). */
+  onRejection: (message: string) => void;
+  /** Any other error: the banners of P-05 to P-07 or `.error`. */
+  onError: (error: ApiError) => void;
+}
+
+/** Kontext A: the deviations and the model listings with their deviations to the stored device. */
+function AssignmentContent({
+  device,
+  ...props
+}: Omit<DeviationContentProps, 'context' | 'differsFromAll' | 'readState'> & {
+  device: DeviationDialogDevice;
+}) {
+  const targets = useListingDeviationsQuery(device.modelTemplateId, device.id);
+  return (
+    <DeviationContent
+      {...props}
+      context="assignment"
+      readState={targets}
+      // "Neues Modell-Inserat anlegen" needs variant data that differ from every model listing.
+      differsFromAll={
+        targets.isSuccess && targets.data.items.every((item) => (item.deviations ?? []).length > 0)
+      }
+    />
+  );
+}
+
+interface DeviationContentProps {
+  context: 'assignment' | 'device_values';
   deviations: VariantDeviationItem[];
-  writesLocked: boolean;
-  pending: boolean;
-  onAssign: (callbacks: {
-    onSuccess: (assignment: DeviceAssignment) => void;
-    onError: (error: ApiError) => void;
-  }) => void;
+  onClose: () => void;
+  onCreateListing?: () => void;
+  /** The list read for Kontext A (loading, error, P-06); none in Kontext B. */
+  readState?: Pick<ReturnType<typeof useListingDeviationsQuery>, 'isPending' | 'error'>;
+  differsFromAll: boolean;
+  busy: boolean;
+  onConfirm: (callbacks: Callbacks) => void;
 }
 
 /** Content of the dialog; mounted per opening. */
 function DeviationContent({
+  context,
   deviations,
-  device,
   onClose,
-  onAssigned,
   onCreateListing,
-  writesLocked,
-  pending,
-  onAssign,
+  readState,
+  differsFromAll,
+  busy,
+  onConfirm,
 }: DeviationContentProps) {
-  const targets = useListingDeviationsQuery(device.modelTemplateId, device.id);
   const [rejection, setRejection] = useState<string | null>(null);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
-  // The overlay hides the banners of the frame and of UI-004, so P-06 stands in this dialog as
-  // well (Nachtrag MAR-395): for the status of the frame, which it only reads, and its own list.
+  // The overlay hides the banners of the frame and of the calling screen, so P-06 stands in this
+  // dialog as well (Nachtrag MAR-395): for the status of the frame, which it only reads, and its
+  // own list.
   const opsUnreachable = useOpsStatusQuery({ enabled: false }).error?.kind === 'unreachable';
-  const unreachable = opsUnreachable || targets.error?.kind === 'unreachable';
-  const readFailed = targets.error?.kind === 'unreachable' ? null : targets.error;
-  const busy = pending || writesLocked;
+  const unreachable = opsUnreachable || readState?.error?.kind === 'unreachable';
+  const readFailed = readState?.error?.kind === 'unreachable' ? null : readState?.error;
+  const errorText = context === 'assignment' ? TEXTS.error : TEXTS.saveError;
 
   const description = deviations.find(({ key }) => key === 'conditionDescription');
   const rows = deviations.filter(({ key }) => key !== 'conditionDescription');
-  // "Neues Modell-Inserat anlegen" needs variant data that differ from every model listing.
-  const differsFromAll =
-    targets.isSuccess && targets.data.items.every((item) => (item.deviations ?? []).length > 0);
 
-  function assign() {
+  function confirm() {
     if (busy) return;
     setRejection(null);
     setNotice(null);
-    onAssign({
-      onSuccess: onAssigned,
-      onError: (error) => {
-        if (error.kind === 'rejected' && DIALOG_REJECTIONS.has(error.error?.code ?? '')) {
-          setRejection(error.error?.message ?? '');
-          return;
-        }
-        setNotice(noticeOf(error));
-      },
-    });
+    onConfirm({ onRejection: setRejection, onError: (error) => setNotice(noticeOf(error)) });
   }
 
   return (
@@ -210,14 +322,14 @@ function DeviationContent({
           notice={notice}
           onClose={() => setNotice(null)}
           onReloaded={() => setNotice(null)}
-          errorText={TEXTS.error}
+          errorText={errorText}
         />
         {rejection !== null && (
           <div role="alert" className={bannerClassName('error')}>
             {rejection}
           </div>
         )}
-        {targets.isPending && !unreachable && (
+        {readState?.isPending && !unreachable && (
           <p role="status" className="m-0 text-text-secondary">
             {TEXTS.loading}
           </p>
@@ -274,6 +386,12 @@ function DeviationContent({
         <Button type="button" disabled={busy} onClick={onClose}>
           {TEXTS.cancel}
         </Button>
+        {context === 'device_values' && (
+          // "Umbuchen" with the rebook targets follows with #202; until then not available.
+          <Button type="button" disabled>
+            {TEXTS.rebook}
+          </Button>
+        )}
         <Button
           type="button"
           disabled={busy || onCreateListing === undefined || !differsFromAll}
@@ -281,8 +399,8 @@ function DeviationContent({
         >
           {TEXTS.newListing}
         </Button>
-        <Button type="button" variant="primary" disabled={busy} onClick={assign}>
-          {TEXTS.assignAnyway}
+        <Button type="button" variant="primary" disabled={busy} onClick={confirm}>
+          {context === 'assignment' ? TEXTS.assignAnyway : TEXTS.keepAssignment}
         </Button>
       </DialogFooter>
     </>
