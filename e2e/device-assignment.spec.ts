@@ -36,6 +36,53 @@ function apiOf(page: Page, baseUrl: string) {
   };
 }
 
+/**
+ * A model template of a device type without attributes, so a device needs only condition and
+ * visual grade, and `capture` for its devices.
+ */
+async function setUpTemplate(api: ReturnType<typeof apiOf>, hash: string) {
+  const deviceType = await api.write<{ id: number }>('/api/device-types', {
+    name: `Zuordnung ${hash}`,
+    active: true,
+  });
+  const manufacturer = await api.write<{ id: number }>('/api/manufacturers', {
+    name: `Hersteller ${hash}`,
+  });
+  const template = await api.write<{ id: number }>('/api/model-templates', {
+    deviceTypeId: deviceType.id,
+    manufacturerId: manufacturer.id,
+    modelName: `Modell ${hash}`,
+    typeDesignation: '',
+    mpn: null,
+    mpnUnknown: true,
+    originalEan: '',
+    modelValues: {},
+    defaultDeviceValues: {},
+  });
+  const { items: pickLists } = await api.read<{ items: { id: number; key: string }[] }>(
+    '/api/pick-lists?limit=200',
+  );
+  const conditionList = pickLists.find(({ key }) => key === 'condition');
+  if (conditionList === undefined) throw new Error('Zustand is missing');
+  const { items: conditions } = await api.read<{ items: { id: number; label: string }[] }>(
+    `/api/pick-lists/${conditionList.id}/values?limit=200`,
+  );
+  const used = conditions.find(({ label }) => label === 'gebraucht');
+  if (used === undefined) throw new Error('gebraucht is missing');
+  const capture = (wiNr: string, visualGrade = '2') =>
+    api.write<{ id: number; version: number }>('/api/devices', {
+      wiNr,
+      supplierId: null,
+      modelTemplateId: template.id,
+      conditionValueId: used.id,
+      visualGrade,
+      conditionDescription: '',
+      values: {},
+      confirmedKeys: [],
+    });
+  return { template, capture };
+}
+
 test.describe('FLOW-02 Zuordnen ohne Abweichung (CU-123, CU-294; Technical Specification 2.6)', () => {
   // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
   test.beforeEach(({}, testInfo) => {
@@ -50,47 +97,7 @@ test.describe('FLOW-02 Zuordnen ohne Abweichung (CU-123, CU-294; Technical Speci
     const hash = uniqueHash(testInfo.title, testInfo.project.name);
     const api = apiOf(page, server.baseUrl);
 
-    // A model template of a device type without attributes, so a device needs only condition
-    // and visual grade.
-    const deviceType = await api.write<{ id: number }>('/api/device-types', {
-      name: `Zuordnung ${hash}`,
-      active: true,
-    });
-    const manufacturer = await api.write<{ id: number }>('/api/manufacturers', {
-      name: `Hersteller ${hash}`,
-    });
-    const template = await api.write<{ id: number }>('/api/model-templates', {
-      deviceTypeId: deviceType.id,
-      manufacturerId: manufacturer.id,
-      modelName: `Modell ${hash}`,
-      typeDesignation: '',
-      mpn: null,
-      mpnUnknown: true,
-      originalEan: '',
-      modelValues: {},
-      defaultDeviceValues: {},
-    });
-    const { items: pickLists } = await api.read<{ items: { id: number; key: string }[] }>(
-      '/api/pick-lists?limit=200',
-    );
-    const conditionList = pickLists.find(({ key }) => key === 'condition');
-    if (conditionList === undefined) throw new Error('Zustand is missing');
-    const { items: conditions } = await api.read<{ items: { id: number; label: string }[] }>(
-      `/api/pick-lists/${conditionList.id}/values?limit=200`,
-    );
-    const used = conditions.find(({ label }) => label === 'gebraucht');
-    if (used === undefined) throw new Error('gebraucht is missing');
-    const capture = (wiNr: string) =>
-      api.write<{ id: number; version: number }>('/api/devices', {
-        wiNr,
-        supplierId: null,
-        modelTemplateId: template.id,
-        conditionValueId: used.id,
-        visualGrade: '2',
-        conditionDescription: '',
-        values: {},
-        confirmedKeys: [],
-      });
+    const { template, capture } = await setUpTemplate(api, hash);
 
     // MI-A with quantity 1 from the first device.
     const first = await capture(`A${hash}`.slice(0, 20));
@@ -123,5 +130,78 @@ test.describe('FLOW-02 Zuordnen ohne Abweichung (CU-123, CU-294; Technical Speci
       `/api/model-templates/${template.id}/listings`,
     );
     expect(after.items).toEqual([expect.objectContaining({ id: miA.id, quantity: 2 })]);
+  });
+});
+
+test.describe('FLOW-02 Zuordnen mit Abweichung (CU-123, CU-119, REQ-018; Technical Specification 2.6)', () => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
+  test.beforeEach(({}, testInfo) => {
+    // The flow runs through the API only and does not depend on the window size; UI-005 has no
+    // entry in a screen yet (UI-004 is mounted by a later task), its states are component tests.
+    test.skip(testInfo.project.name !== 'FM-1', 'API flow, checked once');
+  });
+
+  test('AC-REQ-018-02 FLOW-02 with deviation: "Zuordnen" answers variant_deviation, "Trotzdem zuordnen" assigns to MI-A, whose visual grade stays 2', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const api = apiOf(page, server.baseUrl);
+    const { template, capture } = await setUpTemplate(api, hash);
+    const first = await capture(`A${hash}`.slice(0, 20));
+    const miA = await api.write<{ id: number }>('/api/listings', {
+      fromDeviceId: first.id,
+      deviceVersion: first.version,
+    });
+    const second = await capture(`B${hash}`.slice(0, 20), '4');
+
+    // UI-004 "Zuordnen": the question of UI-005, nothing is stored.
+    const question = await page.request.post(
+      `${server.baseUrl}/api/devices/${second.id}/assignment`,
+      {
+        headers: { origin: server.baseUrl },
+        data: { version: second.version, listingId: miA.id, confirmDeviation: false },
+      },
+    );
+    expect(question.status()).toBe(422);
+    expect((await question.json()).error).toMatchObject({
+      code: 'confirmation_required',
+      message: 'Das Gerät weicht vom Modell-Inserat ab.',
+      details: {
+        kind: 'variant_deviation',
+        deviations: [
+          { key: 'visualGrade', label: 'Optik-Note', deviceValue: '4', listingValue: '2' },
+        ],
+      },
+    });
+    // The data of UI-005: MI-A with its deviation to the device.
+    const targets = await api.read<{ items: { id: number; deviations: unknown[] }[] }>(
+      `/api/model-templates/${template.id}/listings?deviceId=${second.id}`,
+    );
+    expect(targets.items).toEqual([
+      expect.objectContaining({
+        id: miA.id,
+        deviations: [expect.objectContaining({ key: 'visualGrade' })],
+      }),
+    ]);
+
+    // UI-005 "Trotzdem zuordnen".
+    const assignment = await api.write<{ listing: { id: number; quantity: number } }>(
+      `/api/devices/${second.id}/assignment`,
+      { version: second.version, listingId: miA.id, confirmDeviation: true },
+      200,
+    );
+
+    expect(assignment.listing).toEqual({ id: miA.id, quantity: 2 });
+    const after = await api.read<{
+      items: { id: number; quantity: number; variantSummary: { visualGrade: number } }[];
+    }>(`/api/model-templates/${template.id}/listings`);
+    expect(after.items).toEqual([
+      expect.objectContaining({
+        id: miA.id,
+        quantity: 2,
+        variantSummary: expect.objectContaining({ visualGrade: 2 }),
+      }),
+    ]);
   });
 });

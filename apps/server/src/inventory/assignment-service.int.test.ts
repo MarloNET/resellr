@@ -974,3 +974,274 @@ describe('assign events (CU-123, CU-128; Technical Specification 2.0.4, 2.6)', (
     ]);
   });
 });
+
+describe('assignment with deviating variant data (CU-123, CU-119, REQ-018; Technical Specification 2.6)', () => {
+  /** MI-A of a first device with `change`; returns its id. */
+  async function createMiAWith(change: Parameters<typeof captureDevice>[1]): Promise<number> {
+    const response = await createListing({
+      fromDeviceId: await captureDevice('626198', change),
+      deviceVersion: 1,
+    });
+    expect(response.statusCode).toBe(201);
+    return response.json<{ id: number }>().id;
+  }
+
+  const deviceOf = (deviceId: number) =>
+    rows<{ listing_id: number | null; version: number }>(
+      'SELECT listing_id, version FROM device WHERE id = ?',
+      deviceId,
+    );
+
+  /** Expects `variant_deviation` with `deviations` and that nothing is stored. */
+  function expectDeviation(response: Awaited<ReturnType<typeof assign>>, deviations: object[]) {
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'confirmation_required',
+      message: 'Das Gerät weicht vom Modell-Inserat ab.',
+      details: { kind: 'variant_deviation', deviations },
+    });
+  }
+
+  it('AC-REQ-018-01 answers a device that deviates only in the visual grade (4) from MI-A (2) with variant_deviation "Optik-Note: Gerät 4, Modell-Inserat 2"; nothing is stored', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { visualGrade: '4' });
+    const auditEntries = count('audit_entry');
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expectDeviation(response, [
+      { key: 'visualGrade', label: 'Optik-Note', deviceValue: '4', listingValue: '2' },
+    ]);
+    expect(quantityOf(miA)).toBe(1);
+    expect(deviceOf(deviceId)).toEqual([{ listing_id: null, version: 1 }]);
+    expect(count('audit_entry')).toBe(auditEntries);
+  });
+
+  it('AC-REQ-018-01 answers confirmDeviation false like a request without it', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { visualGrade: '4' });
+
+    const response = await assign(deviceId, {
+      version: 1,
+      listingId: miA,
+      confirmDeviation: false,
+    });
+
+    expectDeviation(response, [
+      { key: 'visualGrade', label: 'Optik-Note', deviceValue: '4', listingValue: '2' },
+    ]);
+  });
+
+  it('AC-REQ-018-02 trotzdem zuordnen raises the quantity of MI-A by 1, keeps its visual grade 2 and writes the decision with time and deviation to the audit log', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { visualGrade: '4' });
+
+    const response = await assign(deviceId, {
+      version: 1,
+      listingId: miA,
+      confirmDeviation: true,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      device: { id: deviceId, listingId: miA, visualGrade: 4, version: 2 },
+      listing: { id: miA, quantity: 2 },
+    });
+    expect(quantityOf(miA)).toBe(2);
+    expect(rows('SELECT visual_grade, version FROM listing WHERE id = ?', miA)).toEqual([
+      { visual_grade: 2, version: 1 },
+    ]);
+    const entries = rows<Record<string, unknown>>(
+      `SELECT object_type, object_id, object_label, action, old_value, new_value,
+              occurred_at IS NOT NULL AS timed
+         FROM audit_entry WHERE object_id = ? AND object_type = 'device' AND action LIKE 'assigned%'`,
+      deviceId,
+    );
+    expect(entries).toEqual([
+      {
+        object_type: 'device',
+        object_id: deviceId,
+        object_label: 'Gerät 626199',
+        action: 'assigned_despite_deviation',
+        old_value: null,
+        new_value: JSON.stringify({
+          'Modell-Inserat': 'MacBook Pro 13',
+          Abweichungen: ['Optik-Note: Gerät 4, Modell-Inserat 2'],
+        }),
+        timed: 1,
+      },
+    ]);
+  });
+
+  it('AC-REQ-018-03 assigns without a question despite battery capacity 77 (85), operating system version "14.6" ("15.1") and the description " Leichte Gebrauchsspuren " in other case', async () => {
+    const miA = await createMiAWith({
+      conditionDescription: 'leichte Gebrauchsspuren',
+      values: values({ [ids.osVersion]: '15.1' }),
+    });
+    const deviceId = await captureDevice('626199', {
+      conditionDescription: ' Leichte Gebrauchsspuren ',
+      values: values({ [ids.batteryCapacity]: { percent: 77 }, [ids.osVersion]: '14.6' }),
+    });
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expect(response.statusCode).toBe(200);
+    expect(quantityOf(miA)).toBe(2);
+    expect(
+      rows(
+        "SELECT action FROM audit_entry WHERE object_id = ? AND object_type = 'device'",
+        deviceId,
+      ),
+    ).toContainEqual({ action: 'assigned' });
+  });
+
+  it('AC-REQ-018-04 answers RAM 8 GB against MI-A with 16 GB with "RAM: Gerät 8GB, Modell-Inserat 16GB"', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { values: values({ [ids.ram]: 8 }) });
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expectDeviation(response, [
+      { key: String(ids.ram), label: 'RAM', deviceValue: '8GB', listingValue: '16GB' },
+    ]);
+  });
+
+  it('AC-REQ-018-05 answers both condition descriptions complete and assigns only after the choice', async () => {
+    const miA = await createMiAWith({ conditionDescription: 'leichte Gebrauchsspuren' });
+    const deviceId = await captureDevice('626199', {
+      conditionDescription: 'Display- und Gehäuseschaden',
+    });
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expectDeviation(response, [
+      {
+        key: 'conditionDescription',
+        label: 'Zustandsbeschreibung',
+        deviceValue: 'Display- und Gehäuseschaden',
+        listingValue: 'leichte Gebrauchsspuren',
+      },
+    ]);
+    expect(deviceOf(deviceId)).toEqual([{ listing_id: null, version: 1 }]);
+
+    const confirmed = await assign(deviceId, {
+      version: 1,
+      listingId: miA,
+      confirmDeviation: true,
+    });
+
+    expect(confirmed.statusCode).toBe(200);
+    expect(deviceOf(deviceId)).toEqual([{ listing_id: miA, version: 2 }]);
+  });
+
+  it('AC-REQ-018-06 answers the deviation of the keyboard layout "Ungarisch" from "Deutsch (QWERTZ)"', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', {
+      values: values({ [ids.keyboard]: ids.hungarian }),
+    });
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expectDeviation(response, [
+      {
+        key: String(ids.keyboard),
+        label: 'Tastaturlayout',
+        deviceValue: 'Ungarisch',
+        listingValue: 'Deutsch (QWERTZ)',
+      },
+    ]);
+  });
+
+  it('DER-59-01 K-03 deactivating the variant attribute RAM with stored values gives 200; a device captured after it without RAM deviates from MI-A with "leer ≠ Wert"', async () => {
+    const miA = await createMiA();
+    const deactivated = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/attributes/${ids.ram}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload: { version: 1, active: false },
+    });
+    expect(deactivated.statusCode).toBe(200);
+    const withoutRam: Record<string, unknown> = values();
+    delete withoutRam[ids.ram];
+    const deviceId = await captureDevice('626199', { values: withoutRam });
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expectDeviation(response, [
+      { key: String(ids.ram), label: 'RAM', deviceValue: '–', listingValue: '16GB' },
+    ]);
+  });
+
+  it('checks the model template before the variant data (2.6)', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { modelTemplateId: ids.mvB, visualGrade: '4' });
+
+    const response = await assign(deviceId, { version: 1, listingId: miA });
+
+    expect(response.json().error.code).toBe('other_model_template');
+  });
+
+  it('checks the device version before the variant data, also when confirmed', async () => {
+    const miA = await createMiA();
+    const deviceId = await captureDevice('626199', { visualGrade: '4' });
+
+    const response = await assign(deviceId, { version: 2, listingId: miA, confirmDeviation: true });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('version_conflict');
+    expect(deviceOf(deviceId)).toEqual([{ listing_id: null, version: 1 }]);
+  });
+
+  describe('GET /api/model-templates/{id}/listings?deviceId= (CU-294)', () => {
+    const choice = (query: string) =>
+      t.app.inject({
+        method: 'GET',
+        url: `/api/model-templates/${ids.mvA}/listings?${query}`,
+        headers: { host: HOST },
+      });
+
+    it('gives each model listing its deviations to the device, empty for a matching one', async () => {
+      const miA = await createMiA();
+      const miB = (
+        await createListing({
+          fromDeviceId: await captureDevice('626199', { visualGrade: '4' }),
+          deviceVersion: 1,
+        })
+      ).json<{ id: number }>().id;
+      const deviceId = await captureDevice('626200', { values: values({ [ids.ram]: 8 }) });
+
+      const response = await choice(`deviceId=${deviceId}`);
+
+      expect(response.statusCode).toBe(200);
+      const ram = { key: String(ids.ram), label: 'RAM', deviceValue: '8GB', listingValue: '16GB' };
+      expect(
+        response
+          .json<{ items: { id: number; deviations: unknown[] }[] }>()
+          .items.map(({ id, deviations }) => ({ id, deviations })),
+      ).toEqual([
+        { id: miA, deviations: [ram] },
+        {
+          id: miB,
+          deviations: [
+            { key: 'visualGrade', label: 'Optik-Note', deviceValue: '2', listingValue: '4' },
+            ram,
+          ],
+        },
+      ]);
+    });
+
+    it('rejects an unknown device as a program error of the user interface (400)', async () => {
+      await createMiA();
+
+      const response = await choice('deviceId=999');
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('rejects a deviceId that is no id (400)', async () => {
+      const response = await choice('deviceId=abc');
+
+      expect(response.statusCode).toBe(400);
+    });
+  });
+});

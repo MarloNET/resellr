@@ -3,6 +3,7 @@ import {
   type DeviceAssignment,
   type Listing,
   type ListingChoiceItem,
+  type VariantDeviationItem,
   type VariantSummary,
 } from '@resellr/domain/schemas/listing.schema';
 import { useRef, useState } from 'react';
@@ -13,6 +14,7 @@ import {
   useAssignDeviceMutation,
   useCreateListingMutation,
   useListingChoiceQuery,
+  variantDeviationsOf,
 } from '../../api/inventory.api.ts';
 import { useOpsStatusQuery } from '../../api/ops.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
@@ -36,6 +38,7 @@ import {
 } from '../../components/ui/Dialog.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { RadioGroup } from '../../components/ui/RadioGroup.tsx';
+import { DeviationDialog } from './DeviationDialog.tsx';
 
 // Texts of UI-004 `screen.md` (UI/UX design v0.6.1).
 const TEXTS = {
@@ -138,8 +141,9 @@ function checkArticleNumber(articleNumber: string): string | undefined {
  * template yet, only "Neues Modell-Inserat anlegen"), disabled ("Zuordnen" without a choice),
  * validation (field "Artikelnummer" after `article_number_taken`, DER-60-04), error, success
  * (`onAssigned`, UI-014), conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
- * ausgang-unbekannt (P-08). The deviation dialog (#196), the rejection with open review flags
- * (#189) and the mode "umbuchen" (#202) follow.
+ * ausgang-unbekannt (P-08). If "Zuordnen" answers `variant_deviation`, the dialog UI-005 opens
+ * over it (CU-135, #196); "Abbrechen" there returns here with the choice kept. The rejection with
+ * open review flags (#189) and the mode "umbuchen" (#202) follow.
  */
 export function AssignDialog({ open, onOpenChange, device, onAssigned }: AssignDialogProps) {
   const createMutation = useCreateListingMutation();
@@ -228,6 +232,8 @@ function AssignForm({
   const [articleNumberError, setArticleNumberError] = useState<string | undefined>();
   const [rejection, setRejection] = useState<string | null>(null);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
+  // `details.deviations` of `variant_deviation`; UI-005 is open while set (REQ-018).
+  const [deviations, setDeviations] = useState<VariantDeviationItem[] | null>(null);
   // The overlay hides the banners of the frame, so P-06 stands in the dialog as well (Nachtrag
   // MAR-395): for the status of the frame, which it only reads, and for the list of the dialog.
   const opsUnreachable = useOpsStatusQuery({ enabled: false }).error?.kind === 'unreachable';
@@ -289,7 +295,14 @@ function AssignForm({
     if (busy || listingId === null) return;
     setRejection(null);
     setNotice(null);
-    onAssign(listingId, { onSuccess: onAssigned, onError: showRejection });
+    onAssign(listingId, {
+      onSuccess: onAssigned,
+      onError: (error) => {
+        const deviating = variantDeviationsOf(error);
+        if (deviating === null) showRejection(error);
+        else setDeviations(deviating);
+      },
+    });
   }
 
   // Enter = "Zuordnen" (UI-004 "Fenstergröße und Bedienung"); in the empty state and once the
@@ -399,6 +412,18 @@ function AssignForm({
           </span>
         )}
       </DialogFooter>
+      {listingId !== null && (
+        <DeviationDialog
+          deviations={deviations}
+          device={device}
+          listingId={listingId}
+          onClose={() => setDeviations(null)}
+          onAssigned={(assignment) => {
+            setDeviations(null);
+            onAssigned(assignment);
+          }}
+        />
+      )}
     </form>
   );
 }

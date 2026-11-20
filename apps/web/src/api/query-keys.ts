@@ -47,6 +47,8 @@ export const queryKeys = {
       ['inventory', 'listing', id, filter] as const,
     listingChoice: (modelTemplateId: number) =>
       ['inventory', 'listing-choice', modelTemplateId] as const,
+    listingDeviations: (modelTemplateId: number, deviceId: number) =>
+      ['inventory', 'listing-choice', modelTemplateId, { deviceId }] as const,
   },
 } as const;
 
