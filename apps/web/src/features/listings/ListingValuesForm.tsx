@@ -123,6 +123,23 @@ const storedValuesOf = (listing: Listing): Readonly<Record<string, unknown>> => 
   ...listing.variantValues,
 });
 
+/**
+ * The stored values split by the current flag "variantenbildend" (2.1: the flag may change after
+ * the model listing was created), as CU-124 splits them before the check.
+ */
+function storedSplitOf(listing: Listing, attributes: readonly Attribute[]) {
+  const stored = storedValuesOf(listing) as AttributeValues;
+  const { variantAttributes, otherAttributes } = listingAttributes(attributes);
+  const pick = (of: readonly Attribute[]): AttributeValues =>
+    Object.fromEntries(
+      of.flatMap(({ id }) => {
+        const value = stored[String(id)];
+        return value === undefined ? [] : [[String(id), value]];
+      }),
+    );
+  return { variantValues: pick(variantAttributes), otherValues: pick(otherAttributes) };
+}
+
 /** The inputs of the stored model listing: its values of the attributes the form asks for. */
 function draftOf(listing: Listing, attributes: readonly Attribute[]): ValuesDraft {
   const stored = storedValuesOf(listing);
@@ -177,15 +194,13 @@ function bodyOf(
 function checkAll(draft: ValuesDraft, attributes: readonly Attribute[], stored: Listing) {
   const errors: FieldErrors = {};
   const body = bodyOf(draft, attributes, stored.version);
+  const split = storedSplitOf(stored, attributes);
   const after = {
     conditionValueId: body.conditionValueId,
     visualGrade: body.visualGrade,
     conditionDescription: body.conditionDescription,
-    variantValues: mergeAttributeValues(
-      stored.variantValues as AttributeValues,
-      body.variantValues,
-    ),
-    otherValues: mergeAttributeValues(stored.otherValues as AttributeValues, body.otherValues),
+    variantValues: mergeAttributeValues(split.variantValues, body.variantValues),
+    otherValues: mergeAttributeValues(split.otherValues, body.otherValues),
     deliveryScopeTextBlockIds: body.deliveryScopeTextBlockIds,
     articleNumber: body.articleNumber,
     eanMode: body.eanMode,
@@ -308,17 +323,25 @@ export function ListingValuesForm({
 
   // The stored model listing the form changes; it changes only with "Neu laden" (P-05), so a read
   // in the background never overwrites the inputs and the version stays the one shown.
-  const [stored, setStored] = useState<ListingDetail | null>(listing);
+  const [stored, setStored] = useState<ListingDetail>(listing);
   const storedRef = useRef(stored);
   storedRef.current = stored;
+  const listingRef = useRef(listing);
+  listingRef.current = listing;
   const [draft, setDraft] = useState<ValuesDraft>(() => draftOf(listing, attributes));
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // After "Neu laden" the form takes the first model listing read again: the page may pass it
+  // before or after the reload ends (T-1).
+  const awaitingReload = useRef(false);
+  function takeReloaded(next: ListingDetail) {
+    awaitingReload.current = false;
+    setStored(next);
+    setDraft(draftOf(next, attributes));
+  }
   useEffect(() => {
-    if (stored !== null) return;
-    setStored(listing);
-    setDraft(draftOf(listing, attributes));
-  }, [stored, listing, attributes]);
+    if (awaitingReload.current && listing !== storedRef.current) takeReloaded(listing);
+  });
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
@@ -334,10 +357,10 @@ export function ListingValuesForm({
   const blurCheck = useDeferredBlurCheck();
 
   const saving = updateMutation.isPending;
-  const canSave = !saving && !writesLocked && !reloading && stored !== null;
+  const canSave = !saving && !writesLocked && !reloading;
 
   // The stored condition stays offered, deactivated with "(deaktiviert)" (2.0.11).
-  const storedConditionId = stored?.conditionValueId ?? null;
+  const storedConditionId = stored.conditionValueId;
   const offeredConditions = choiceOptions(conditions.data?.items ?? [], {
     storedId: storedConditionId,
     markDeactivated: true,
@@ -365,7 +388,6 @@ export function ListingValuesForm({
   function checkOnBlur(path: string) {
     if (rejectionShown[path]) return;
     const base = storedRef.current;
-    if (base === null) return;
     const current = draftRef.current;
     blurCheck.checkOnBlur(() => setError(path, checkAll(current, attributes, base)[path]));
   }
@@ -395,6 +417,7 @@ export function ListingValuesForm({
     const ports = portListIds(pickLists.data?.items);
     const { variantAttributes, otherAttributes } = listingAttributes(attributes);
     const { conditionValueId } = current;
+    const split = storedSplitOf(base, attributes);
     return [
       ...(conditionValueId === null
         ? []
@@ -410,12 +433,12 @@ export function ListingValuesForm({
       ...attributeListChoices(variantAttributes, 'device', current.values, {
         prefix: 'variantValues',
         ports,
-        stored: base.variantValues,
+        stored: split.variantValues,
       }),
       ...attributeListChoices(otherAttributes, 'device', current.values, {
         prefix: 'otherValues',
         ports,
-        stored: base.otherValues,
+        stored: split.otherValues,
       }),
     ];
   }
@@ -432,25 +455,22 @@ export function ListingValuesForm({
     setReloading(true);
     const lists = await reloadPickListValues(queryClient);
     const current = draftRef.current;
-    const base = storedRef.current;
-    if (base !== null) {
-      const missing = findMissingListChoices(listChoices(current, base), lists, {
-        path: rejectedPath,
-        id: rejectedId,
-      });
-      const dropped = droppedAfterReload(lists, rejectedId);
-      if (dropped.length > 0) setDroppedValues((previous) => new Set([...previous, ...dropped]));
-      if (missing.length > 0) {
-        const texts: FieldErrors = {};
-        for (const { path, message } of missing) texts[path] ??= message;
-        setDraft(withoutMissingChoices(current, attributes, missing));
-        setErrors((previous) => ({ ...previous, ...texts }));
-        setRejectionShown((previous) => ({
-          ...previous,
-          ...Object.fromEntries(Object.keys(texts).map((path) => [path, true])),
-        }));
-        focusFirstError();
-      }
+    const missing = findMissingListChoices(listChoices(current, storedRef.current), lists, {
+      path: rejectedPath,
+      id: rejectedId,
+    });
+    const dropped = droppedAfterReload(lists, rejectedId);
+    if (dropped.length > 0) setDroppedValues((previous) => new Set([...previous, ...dropped]));
+    if (missing.length > 0) {
+      const texts: FieldErrors = {};
+      for (const { path, message } of missing) texts[path] ??= message;
+      setDraft(withoutMissingChoices(current, attributes, missing));
+      setErrors((previous) => ({ ...previous, ...texts }));
+      setRejectionShown((previous) => ({
+        ...previous,
+        ...Object.fromEntries(Object.keys(texts).map((path) => [path, true])),
+      }));
+      focusFirstError();
     }
     setReloading(false);
   }
@@ -485,7 +505,7 @@ export function ListingValuesForm({
   function save() {
     blurCheck.cancel();
     const base = storedRef.current;
-    if (!canSave || base === null) return;
+    if (!canSave) return;
     const current = draftRef.current;
     const found = checkAll(current, attributes, base);
     setRejectionShown({});
@@ -509,9 +529,10 @@ export function ListingValuesForm({
         onReloaded={() => {
           // "Neu laden" of P-05: the form takes the model listing read again (T-1).
           setNotice(null);
-          setStored(null);
           setErrors({});
           setRejectionShown({});
+          awaitingReload.current = true;
+          if (listingRef.current !== storedRef.current) takeReloaded(listingRef.current);
         }}
         errorText={TEXTS.saveError}
       />
@@ -576,7 +597,7 @@ export function ListingValuesForm({
               errors={attributeErrors(errors)}
               withRequired
               dropped={droppedValues}
-              stored={stored === null ? {} : storedValuesOf(stored)}
+              stored={storedValuesOf(stored)}
               onChange={changeAttribute}
               onBlur={(attributeId) => {
                 const attribute = attributes.find(({ id }) => id === attributeId);

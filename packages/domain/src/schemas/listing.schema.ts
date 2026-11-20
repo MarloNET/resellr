@@ -82,10 +82,7 @@ export const listingUpdateBodySchema = z.strictObject({
   conditionDescription: z.string().optional(),
   variantValues: valuesSchema.optional(),
   otherValues: valuesSchema.optional(),
-  deliveryScopeTextBlockIds: z
-    .array(idSchema)
-    .refine((ids) => new Set(ids).size === ids.length, 'text block chosen twice')
-    .optional(),
+  deliveryScopeTextBlockIds: z.array(idSchema).optional(),
   articleNumber: z.string().optional(),
   eanMode: z.enum(EAN_MODES).optional(),
   ownEan: z.string().nullable().optional(),

@@ -26,7 +26,7 @@ import {
   NotFoundError,
   RuleViolation,
 } from '../shared/domain-error.ts';
-import { toListing } from './assignment-service.ts';
+import { splitDeviceValues, toListing } from './assignment-service.ts';
 import {
   checkActivePickListValues,
   checkedRequest,
@@ -158,8 +158,12 @@ export function createListingService({ uow, clock }: ListingServiceDeps) {
         if (template === undefined) throw new Error(`model template of listing ${id} is missing`);
         const attributes = await settings.listAttributes(template.deviceTypeId);
         const { variantAttributes, otherAttributes } = listingAttributes(attributes);
-        const storedVariant = stored.variantValues as AttributeValues;
-        const storedOther = stored.otherValues as AttributeValues;
+        // The stored values split by the current flag "variantenbildend" (2.1: the flag may
+        // change after the model listing was created; the values move with it).
+        const { variant: storedVariant, other: storedOther } = splitDeviceValues(attributes, {
+          ...(stored.otherValues as AttributeValues),
+          ...(stored.variantValues as AttributeValues),
+        });
 
         // The state after the change (2.5, 2.7): a missing field stays, the values are changes.
         const eanMode = input.eanMode ?? stored.eanMode;
@@ -193,8 +197,13 @@ export function createListingService({ uow, clock }: ListingServiceDeps) {
           ),
         ];
         const values = await findPickListValues(settings, references);
+        // UI-014 cannot choose a text block twice: a duplicate is a structure error (2.0.5).
+        const blockIds = new Set(changed.deliveryScopeTextBlockIds);
+        if (blockIds.size !== changed.deliveryScopeTextBlockIds.length) {
+          throw new BadRequestError('deliveryScopeTextBlockIds: text block chosen twice');
+        }
         const blocks = await settings.findTextBlocks(changed.deliveryScopeTextBlockIds);
-        if (blocks.length !== new Set(changed.deliveryScopeTextBlockIds).size) {
+        if (blocks.length !== blockIds.size) {
           throw new BadRequestError('deliveryScopeTextBlockIds: text block unknown');
         }
         checkActivePickListValues(references, values);

@@ -176,12 +176,6 @@ describe('listingUpdateBodySchema (CU-116, Technical Specification 2.7)', () => 
       expect(result.error?.issues[0]?.code).toBe('unrecognized_keys');
     }
   });
-
-  it('rejects a text block chosen twice', () => {
-    expect(
-      listingUpdateBodySchema.safeParse({ version: 1, deliveryScopeTextBlockIds: [5, 5] }).success,
-    ).toBe(false);
-  });
 });
 
 describe('listingValuesSchema (CU-116, Technical Specification 2.7)', () => {

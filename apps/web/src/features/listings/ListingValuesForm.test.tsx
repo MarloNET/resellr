@@ -498,6 +498,54 @@ describe('UI-014.edit Inseratswerte bearbeiten (CU-139, Story #64)', () => {
     expectAccessibleForm();
   });
 
+  it('UI-014.conflict DER-64-06 (a) "Neu laden" shows the model listing read again and the next save sends its version', async () => {
+    const current = structuredClone(LISTING);
+    let conflict = true;
+    const { sent } = mockApi({
+      listing: current,
+      update: (init) => {
+        if (!conflict) return savedAnswer(init);
+        conflict = false;
+        return Response.json(errorBody('version_conflict'), { status: 409 });
+      },
+    });
+    await openEdit();
+    fireEvent.change(textbox('Optik-Note'), { target: { value: '4' } });
+    fireEvent.click(saveButton());
+    const banner = await screen.findByRole('alert');
+    // Changed in another window meanwhile.
+    Object.assign(current, { visualGrade: 3, version: 5 });
+
+    fireEvent.click(within(banner).getByRole('button', { name: 'Neu laden' }));
+
+    await vi.waitFor(() => expect(textbox('Optik-Note').value).toBe('3'));
+    fireEvent.click(saveButton());
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toMatchObject({ version: 5, visualGrade: '3' });
+  });
+
+  it('DER-64-01 saves when the flag "variantenbildend" changed after the creation: the stored values are sent by the current flag (2.1)', async () => {
+    const { sent } = mockApi({
+      listing: {
+        ...LISTING,
+        // Stored before Tastaturlayout became and Netzteil stopped being variant forming.
+        variantValues: { '15': SSD, '17': ORIGINAL },
+        otherValues: { '16': GERMAN },
+      },
+    });
+    await openEdit();
+    fireEvent.change(textbox('Artikelnummer'), { target: { value: 'TP14-A' } });
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({
+      variantValues: { 15: SSD, 16: GERMAN },
+      otherValues: { 17: ORIGINAL },
+      articleNumber: 'TP14-A',
+    });
+  });
+
   it('UI-014.wird-beendet DER-64-06 (b) shows P-07 without reference number on 503 shutting_down and keeps the inputs', async () => {
     mockApi({ update: () => Response.json(errorBody('shutting_down'), { status: 503 }) });
     await openEdit();

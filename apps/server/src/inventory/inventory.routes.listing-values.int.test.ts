@@ -405,6 +405,49 @@ describe('PATCH /api/listings/{id} (CU-124, Technical Specification 2.7)', () =>
 
     expect(response.statusCode).toBe(400);
   });
+
+  it('answers bad_request for a text block chosen twice (2.0.5 structure error)', async () => {
+    const listingId = await createListing('626198');
+    const cable = insertTextBlock('Netzkabel');
+
+    const response = await patch(listingId, {
+      version: 1,
+      deliveryScopeTextBlockIds: [cable, cable],
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+    expect(listingRow(listingId)).toMatchObject({ version: 1 });
+  });
+
+  it('moves the stored values when the flag "variantenbildend" was set after the creation (2.1)', async () => {
+    const listingId = await createListing('626198');
+    run('UPDATE attribute SET variant_forming = 1 WHERE id = ?', ids.osVersion);
+
+    const response = await patch(listingId, { version: 1, articleNumber: 'MBP13-A' });
+
+    expect(response.statusCode).toBe(200);
+    const row = listingRow(listingId);
+    expect(JSON.parse(row?.variant_values as string)).toMatchObject({
+      [ids.osVersion]: 'macOS 14',
+    });
+    expect(JSON.parse(row?.other_device_values as string)).toEqual({});
+  });
+
+  it('moves the stored values when the flag "variantenbildend" was removed after the creation (2.1)', async () => {
+    const listingId = await createListing('626198');
+    run('UPDATE attribute SET variant_forming = 0 WHERE id = ?', ids.storageType);
+
+    const response = await patch(listingId, { version: 1, articleNumber: 'MBP13-A' });
+
+    expect(response.statusCode).toBe(200);
+    const row = listingRow(listingId);
+    expect(JSON.parse(row?.variant_values as string)).not.toHaveProperty(String(ids.storageType));
+    expect(JSON.parse(row?.other_device_values as string)).toEqual({
+      [ids.osVersion]: 'macOS 14',
+      [ids.storageType]: ids.nvme,
+    });
+  });
 });
 
 describe('PATCH /api/listings/{id} active entries (CU-124, Technical Specification 2.0.11, T6)', () => {
