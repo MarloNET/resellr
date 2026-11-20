@@ -125,7 +125,7 @@ describe('model template service: changing (CU-105, REQ-010, Technical Specifica
     expect(handler).toHaveBeenCalledOnce();
   });
 
-  it('AC-REQ-010-05 a change of a device default stores it without ContentInputsChanged', async () => {
+  it('a change of a device default stores it without ContentInputsChanged (2.4)', async () => {
     const handler = vi.fn(async () => emptyChangeReport());
 
     const saved = await serviceWith({ change: { ContentInputsChanged: handler } }).update(mv, {
