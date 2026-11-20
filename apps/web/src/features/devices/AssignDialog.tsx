@@ -1,6 +1,7 @@
 import {
   articleNumberSchema,
   type DeviceAssignment,
+  type DeviceRebooking,
   type Listing,
   type ListingChoiceItem,
   type VariantDeviationItem,
@@ -14,6 +15,7 @@ import {
   useAssignDeviceMutation,
   useCreateListingMutation,
   useListingChoiceQuery,
+  useRebookDeviceMutation,
   variantDeviationsOf,
 } from '../../api/inventory.api.ts';
 import { useOpsStatusQuery } from '../../api/ops.api.ts';
@@ -38,22 +40,26 @@ import {
 } from '../../components/ui/Dialog.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { RadioGroup } from '../../components/ui/RadioGroup.tsx';
+import type { SavedNoticeState } from '../models/ModelTemplatePage.tsx';
 import { DeviationDialog } from './DeviationDialog.tsx';
 
 // Texts of UI-004 `screen.md` (UI/UX design v0.6.1).
 const TEXTS = {
   title: 'Modell-Inserat wählen',
+  rebookTitle: 'Gerät umbuchen',
   device: 'Gerät',
   modelTemplate: 'Modellvorlage',
   listings: 'Modell-Inserat',
   loading: 'Lade Modell-Inserate …',
   empty: 'Für diese Modellvorlage gibt es noch kein Modell-Inserat.',
+  noOtherListing: 'Kein anderes Modell-Inserat dieser Modellvorlage',
   condition: 'Zustand',
   visualGrade: 'Optik-Note',
   conditionDescription: 'Zustandsbeschreibung',
   quantity: (quantity: number) => `Stückzahl ${quantity}`,
   articleNumber: 'Artikelnummer',
   assign: 'Zuordnen',
+  rebook: 'Umbuchen',
   chooseListing: 'Bitte ein Modell-Inserat wählen',
   newListing: 'Neues Modell-Inserat anlegen',
   cancel: 'Abbrechen',
@@ -65,19 +71,37 @@ const TEXTS = {
 export const assignedText = (wiNr: string, quantity: number) =>
   `Gerät ${wiNr} zugeordnet (Stückzahl ${quantity})`;
 
+/** Banner of UI-014 after "Umbuchen" in UI-004 or UI-005 (UI-005 "Umbuchen", DER-61-06). */
+export const rebookedText = 'Gerät umgebucht';
+
+/** UI-014 of the target model listing with the banner `rebookedText` (UI-005 "Umbuchen"). */
+export const rebookedLocation = (rebooking: DeviceRebooking) =>
+  [
+    `/inserate/${rebooking.listing.id}`,
+    { state: { savedNotice: rebookedText } satisfies SavedNoticeState },
+  ] as const;
+
 /** Dialog width of UI-004 in px (Technical Specification 2.0.10). */
 const WIDTH = 720;
 
 /**
- * Rejections of `POST /api/listings` and `POST /api/devices/{id}/assignment` that UI-004 shows
- * with their text in the dialog (2.6).
+ * Rejections of `POST /api/listings`, `POST /api/devices/{id}/assignment` and
+ * `POST /api/devices/{id}/rebooking` that UI-004 shows with their text in the dialog (2.6).
  */
 const DIALOG_REJECTIONS = new Set([
   'variant_duplicate',
   'device_not_available',
+  'device_not_assigned',
   'already_assigned',
   'other_model_template',
 ]);
+
+/**
+ * `confirmation_required`/`target_deviation` of "Umbuchen" (2.6): until the second step
+ * `UI-005.ziel-abweichung` (#203) the dialog shows its text, nothing is stored.
+ */
+const isTargetDeviation = (error: ApiError) =>
+  error.kind === 'confirmation-required' && error.error?.details?.kind === 'target_deviation';
 
 /** The checked device the dialog works on (UI-004 "Gerät": WI-Nr and model template). */
 export interface AssignDialogDevice {
@@ -87,6 +111,8 @@ export interface AssignDialogDevice {
   wiNr: string;
   /** The model template whose model listings UI-004 offers (REQ-017). */
   modelTemplateId: number;
+  /** The model listing of an assigned device; the mode "umbuchen" offers the others (REQ-020). */
+  listingId?: number | null;
   /** Model name of the model template (`modelTemplateLabel`, Nachtrag MAR-1030). */
   modelTemplateLabel: string;
 }
@@ -97,10 +123,15 @@ export interface AssignDialogProps {
   onOpenChange: (open: boolean) => void;
   device: AssignDialogDevice;
   /**
+   * `rebook`: the mode "umbuchen" of UI-010 (REQ-020, DER-61-01) with the title "Gerät umbuchen",
+   * the other model listings of the model template and "Umbuchen" instead of "Zuordnen".
+   */
+  mode?: 'assign' | 'rebook';
+  /**
    * After "Zuordnen" (`200`), before the dialog closes: the calling screen shows
    * `assignedText` with the new quantity (UI-004.success, DER-58-04).
    */
-  onAssigned: (assignment: DeviceAssignment) => void;
+  onAssigned?: (assignment: DeviceAssignment) => void;
 }
 
 /** The variant data of a model listing in one line (UI-004 "Liste Modell-Inserate"). */
@@ -115,7 +146,8 @@ function summaryText(summary: VariantSummary): string {
   ].join(' · ');
 }
 
-function ListingOption({ item }: { item: ListingChoiceItem }) {
+/** A model listing to choose: title, variant data and quantity (UI-004, UI-005 "Umbuchen"). */
+export function ListingOption({ item }: { item: ListingChoiceItem }) {
   return (
     <span className="flex min-w-0 flex-col py-1">
       <span className="font-semibold">{item.displayTitle}</span>
@@ -142,15 +174,27 @@ function checkArticleNumber(articleNumber: string): string | undefined {
  * validation (field "Artikelnummer" after `article_number_taken`, DER-60-04), error, success
  * (`onAssigned`, UI-014), conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
  * ausgang-unbekannt (P-08). If "Zuordnen" answers `variant_deviation`, the dialog UI-005 opens
- * over it (CU-135, #196); "Abbrechen" there returns here with the choice kept. The rejection with
- * open review flags (#189) and the mode "umbuchen" (#202) follow.
+ * over it (CU-135, #196); "Abbrechen" there returns here with the choice kept. In the mode
+ * "umbuchen" (#202, REQ-020) the dialog offers the other model listings of the model template of
+ * the assigned device ("Kein anderes Modell-Inserat dieser Modellvorlage" without one), and
+ * "Umbuchen" sends `POST /api/devices/{id}/rebooking` without confirmation; on success UI-014 of
+ * the target opens with the banner "Gerät umgebucht" (DER-61-06). A deviating target answers
+ * `target_deviation`, whose second step (#203) follows. The rejection with open review flags
+ * (#189) follows.
  */
-export function AssignDialog({ open, onOpenChange, device, onAssigned }: AssignDialogProps) {
+export function AssignDialog({
+  open,
+  onOpenChange,
+  device,
+  mode = 'assign',
+  onAssigned,
+}: AssignDialogProps) {
   const createMutation = useCreateListingMutation();
   const assignMutation = useAssignDeviceMutation();
+  const rebookMutation = useRebookDeviceMutation();
   const writesLocked = useWritesLocked();
   const navigate = useNavigate();
-  const pending = createMutation.isPending || assignMutation.isPending;
+  const pending = createMutation.isPending || assignMutation.isPending || rebookMutation.isPending;
   // Esc, a click outside and "Abbrechen" would hide the dialog while the write runs or after an
   // unknown outcome (P-08).
   const locked = pending || writesLocked;
@@ -161,6 +205,7 @@ export function AssignDialog({ open, onOpenChange, device, onAssigned }: AssignD
       <DialogContent width={WIDTH} dismissible={!locked}>
         <AssignForm
           device={device}
+          mode={mode}
           pending={pending}
           writesLocked={writesLocked}
           onCancel={() => onOpenChange(false)}
@@ -188,8 +233,21 @@ export function AssignDialog({ open, onOpenChange, device, onAssigned }: AssignD
             )
           }
           onAssigned={(assignment) => {
-            onAssigned(assignment);
+            onAssigned?.(assignment);
             onOpenChange(false);
+          }}
+          onRebook={(targetListingId, callbacks) =>
+            rebookMutation.mutate(
+              {
+                deviceId: device.id,
+                body: { version: device.version, targetListingId, confirmDeviation: false },
+              },
+              callbacks,
+            )
+          }
+          onRebooked={(rebooking) => {
+            onOpenChange(false);
+            void navigate(...rebookedLocation(rebooking));
           }}
         />
       </DialogContent>
@@ -204,6 +262,7 @@ interface Callbacks<T> {
 
 interface AssignFormProps {
   device: AssignDialogDevice;
+  mode: 'assign' | 'rebook';
   pending: boolean;
   writesLocked: boolean;
   onCancel: () => void;
@@ -211,11 +270,14 @@ interface AssignFormProps {
   onCreated: (listing: Listing) => void;
   onAssign: (listingId: number, callbacks: Callbacks<DeviceAssignment>) => void;
   onAssigned: (assignment: DeviceAssignment) => void;
+  onRebook: (targetListingId: number, callbacks: Callbacks<DeviceRebooking>) => void;
+  onRebooked: (rebooking: DeviceRebooking) => void;
 }
 
 /** Content of the dialog; mounted per opening. */
 function AssignForm({
   device,
+  mode,
   pending,
   writesLocked,
   onCancel,
@@ -223,9 +285,15 @@ function AssignForm({
   onCreated,
   onAssign,
   onAssigned,
+  onRebook,
+  onRebooked,
 }: AssignFormProps) {
   const choice = useListingChoiceQuery(device.modelTemplateId);
-  const items = choice.data?.items ?? [];
+  const rebooking = mode === 'rebook';
+  // "umbuchen" offers the other model listings of the model template (DER-61-01).
+  const items = (choice.data?.items ?? []).filter(
+    (item) => !rebooking || item.id !== device.listingId,
+  );
   const [listingId, setListingId] = useState<number | null>(null);
   // `null` until the WI-Nr is taken as article number; then UI-004 shows the field (DER-60-04).
   const [articleNumber, setArticleNumber] = useState<string | null>(null);
@@ -245,7 +313,10 @@ function AssignForm({
   const busy = pending || writesLocked;
 
   function showRejection(error: ApiError) {
-    if (error.kind === 'rejected' && DIALOG_REJECTIONS.has(error.error?.code ?? '')) {
+    if (
+      (error.kind === 'rejected' && DIALOG_REJECTIONS.has(error.error?.code ?? '')) ||
+      isTargetDeviation(error)
+    ) {
       setRejection(error.error?.message ?? '');
       return;
     }
@@ -291,10 +362,14 @@ function AssignForm({
   }
 
   function assign() {
-    // "Zuordnen" is deactivated without a choice (UI-004.disabled).
+    // "Zuordnen" and "Umbuchen" are deactivated without a choice (UI-004.disabled).
     if (busy || listingId === null) return;
     setRejection(null);
     setNotice(null);
+    if (rebooking) {
+      onRebook(listingId, { onSuccess: onRebooked, onError: showRejection });
+      return;
+    }
     onAssign(listingId, {
       onSuccess: onAssigned,
       onError: (error) => {
@@ -314,7 +389,7 @@ function AssignForm({
     <form
       ref={formRef}
       noValidate
-      aria-label={TEXTS.title}
+      aria-label={rebooking ? TEXTS.rebookTitle : TEXTS.title}
       className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault();
@@ -323,7 +398,7 @@ function AssignForm({
       }}
     >
       <DialogHeader>
-        <DialogTitle>{TEXTS.title}</DialogTitle>
+        <DialogTitle>{rebooking ? TEXTS.rebookTitle : TEXTS.title}</DialogTitle>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4">
         <OutcomeUnknownBanner />
@@ -368,7 +443,11 @@ function AssignForm({
             onChange={(value) => setListingId(Number(value))}
           />
         ) : (
-          choice.isSuccess && <p className="m-0 text-text-secondary">{TEXTS.empty}</p>
+          choice.isSuccess && (
+            <p className="m-0 text-text-secondary">
+              {rebooking ? TEXTS.noOtherListing : TEXTS.empty}
+            </p>
+          )
         )}
         {articleNumber !== null && (
           <FormField label={TEXTS.articleNumber} required error={articleNumberError}>
@@ -407,7 +486,7 @@ function AssignForm({
               title={assignReason}
               onClick={enterAssigns ? undefined : assign}
             >
-              {TEXTS.assign}
+              {rebooking ? TEXTS.rebook : TEXTS.assign}
             </Button>
           </span>
         )}
@@ -422,6 +501,8 @@ function AssignForm({
             setDeviations(null);
             onAssigned(assignment);
           }}
+          assignedListingId={device.listingId ?? undefined}
+          onRebooked={onRebooked}
         />
       )}
     </form>

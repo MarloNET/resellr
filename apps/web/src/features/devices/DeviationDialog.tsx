@@ -1,12 +1,17 @@
 import { CONFIRMATION_TITLES, ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
 import type {
   DeviceAssignment,
+  DeviceRebooking,
   VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
 import { useState } from 'react';
 
 import type { ApiError } from '../../api/api-client.ts';
-import { useAssignDeviceMutation, useListingDeviationsQuery } from '../../api/inventory.api.ts';
+import {
+  useAssignDeviceMutation,
+  useListingDeviationsQuery,
+  useRebookDeviceMutation,
+} from '../../api/inventory.api.ts';
 import { useOpsStatusQuery } from '../../api/ops.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
 import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
@@ -35,6 +40,8 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/Table.tsx';
+import { RadioGroup } from '../../components/ui/RadioGroup.tsx';
+import { ListingOption } from './AssignDialog.tsx';
 
 // Texts of UI-005 `screen.md` and `default.png` (UI/UX design v0.6.1), the loading and error texts
 // as in UI-004.
@@ -50,6 +57,9 @@ const TEXTS = {
   loading: 'Lade Modell-Inserate …',
   assignAnyway: 'Trotzdem zuordnen',
   newListing: 'Neues Modell-Inserat anlegen',
+  rebook: 'Umbuchen',
+  rebookTargets: 'Anderes Modell-Inserat derselben Modellvorlage',
+  noOtherListing: 'Kein anderes Modell-Inserat dieser Modellvorlage',
   cancel: 'Abbrechen',
   error: (referenceNumber: string | null) =>
     `Zuordnung fehlgeschlagen. Referenz: ${referenceNumber ?? '–'}`,
@@ -61,6 +71,7 @@ const WIDTH = 800;
 /** Rejections of "Trotzdem zuordnen" that UI-005 shows with their text, as UI-004 does (2.6). */
 const DIALOG_REJECTIONS = new Set([
   'device_not_available',
+  'device_not_assigned',
   'already_assigned',
   'other_model_template',
 ]);
@@ -84,6 +95,14 @@ export interface DeviationDialogProps {
   /** After "Trotzdem zuordnen" (`200`): the calling screen closes UI-004 and shows the banner. */
   onAssigned: (assignment: DeviceAssignment) => void;
   /**
+   * The model listing of an already assigned device: then "Umbuchen" (REQ-020) offers the other
+   * model listings of the model template; without it the device is not assigned and the action is
+   * not shown.
+   */
+  assignedListingId?: number;
+  /** After "Umbuchen" (`200`): the calling screen opens UI-014 of the target (DER-61-06). */
+  onRebooked?: (rebooking: DeviceRebooking) => void;
+  /**
    * "Neues Modell-Inserat anlegen" (#201); without it the action is shown but not available.
    * Available only when the device deviates from every model listing of the model template.
    */
@@ -99,15 +118,21 @@ export interface DeviationDialogProps {
  * Esc return to UI-004. It reads the model listings with their deviations to the device
  * (`?deviceId=`), the data of UI-005 for "Neues Modell-Inserat anlegen". States: default,
  * loading and error as UI-004, conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
- * ausgang-unbekannt (P-08). Kontext B (#191), "Umbuchen" (#202, #203) and the action
- * "Neues Modell-Inserat anlegen" (#201) follow.
+ * ausgang-unbekannt (P-08). For an already assigned device "Umbuchen" (#202, REQ-020) opens in the
+ * dialog the choice of the other model listings of the model template (title, variant data,
+ * quantity) with the button "Umbuchen", which sends `POST /api/devices/{id}/rebooking` without
+ * confirmation; without another model listing the action is not available and the hint "Kein
+ * anderes Modell-Inserat dieser Modellvorlage" shows (DER-61-02). Kontext B (#191), the second
+ * step of "Umbuchen" (#203) and the action "Neues Modell-Inserat anlegen" (#201) follow.
  */
 export function DeviationDialog({ deviations, ...props }: DeviationDialogProps) {
   const writesLocked = useWritesLocked();
   const assignMutation = useAssignDeviceMutation();
+  const rebookMutation = useRebookDeviceMutation();
+  const pending = assignMutation.isPending || rebookMutation.isPending;
   // Esc and a click outside would hide the dialog while the write runs or after an unknown
   // outcome (P-08).
-  const locked = assignMutation.isPending || writesLocked;
+  const locked = pending || writesLocked;
 
   return (
     <Dialog open={deviations !== null} onOpenChange={(open) => !open && props.onClose()}>
@@ -118,7 +143,16 @@ export function DeviationDialog({ deviations, ...props }: DeviationDialogProps) 
             {...props}
             deviations={deviations}
             writesLocked={writesLocked}
-            pending={assignMutation.isPending}
+            pending={pending}
+            onRebook={(targetListingId, callbacks) =>
+              rebookMutation.mutate(
+                {
+                  deviceId: props.device.id,
+                  body: { version: props.device.version, targetListingId, confirmDeviation: false },
+                },
+                callbacks,
+              )
+            }
             onAssign={(callbacks) =>
               assignMutation.mutate(
                 {
@@ -147,6 +181,13 @@ interface DeviationContentProps extends Omit<DeviationDialogProps, 'deviations'>
     onSuccess: (assignment: DeviceAssignment) => void;
     onError: (error: ApiError) => void;
   }) => void;
+  onRebook: (
+    targetListingId: number,
+    callbacks: {
+      onSuccess: (rebooking: DeviceRebooking) => void;
+      onError: (error: ApiError) => void;
+    },
+  ) => void;
 }
 
 /** Content of the dialog; mounted per opening. */
@@ -156,9 +197,12 @@ function DeviationContent({
   onClose,
   onAssigned,
   onCreateListing,
+  assignedListingId,
+  onRebooked,
   writesLocked,
   pending,
   onAssign,
+  onRebook,
 }: DeviationContentProps) {
   const targets = useListingDeviationsQuery(device.modelTemplateId, device.id);
   const [rejection, setRejection] = useState<string | null>(null);
@@ -175,21 +219,38 @@ function DeviationContent({
   // "Neues Modell-Inserat anlegen" needs variant data that differ from every model listing.
   const differsFromAll =
     targets.isSuccess && targets.data.items.every((item) => (item.deviations ?? []).length > 0);
+  // "Umbuchen" only for an assigned device, to another model listing of the model template.
+  const rebookable = assignedListingId !== undefined;
+  const otherListings = (targets.data?.items ?? []).filter(({ id }) => id !== assignedListingId);
+  const noOtherListing = rebookable && targets.isSuccess && otherListings.length === 0;
+  // The choice of the target opens with "Umbuchen" in the footer.
+  const [choosingTarget, setChoosingTarget] = useState(false);
+  const [targetId, setTargetId] = useState<number | null>(null);
+
+  function showFailure(error: ApiError) {
+    // A deviating target (`target_deviation`) shows its text until the second step (#203).
+    if (
+      (error.kind === 'rejected' && DIALOG_REJECTIONS.has(error.error?.code ?? '')) ||
+      (error.kind === 'confirmation-required' && error.error?.details?.kind === 'target_deviation')
+    ) {
+      setRejection(error.error?.message ?? '');
+      return;
+    }
+    setNotice(noticeOf(error));
+  }
 
   function assign() {
     if (busy) return;
     setRejection(null);
     setNotice(null);
-    onAssign({
-      onSuccess: onAssigned,
-      onError: (error) => {
-        if (error.kind === 'rejected' && DIALOG_REJECTIONS.has(error.error?.code ?? '')) {
-          setRejection(error.error?.message ?? '');
-          return;
-        }
-        setNotice(noticeOf(error));
-      },
-    });
+    onAssign({ onSuccess: onAssigned, onError: showFailure });
+  }
+
+  function rebook() {
+    if (busy || targetId === null) return;
+    setRejection(null);
+    setNotice(null);
+    onRebook(targetId, { onSuccess: (rebooking) => onRebooked?.(rebooking), onError: showFailure });
   }
 
   return (
@@ -269,8 +330,45 @@ function DeviationContent({
             </div>
           </section>
         )}
+        {choosingTarget && (
+          <section aria-label={TEXTS.rebookTargets} className="flex flex-col gap-3">
+            <RadioGroup
+              legend={TEXTS.rebookTargets}
+              value={targetId === null ? '' : String(targetId)}
+              options={otherListings.map((item) => ({
+                value: String(item.id),
+                label: <ListingOption item={item} />,
+              }))}
+              disabled={busy}
+              onChange={(value) => setTargetId(Number(value))}
+            />
+            <Button
+              type="button"
+              variant="primary"
+              className="self-end"
+              disabled={busy || targetId === null}
+              onClick={rebook}
+            >
+              {TEXTS.rebook}
+            </Button>
+          </section>
+        )}
+        {noOtherListing && <p className="m-0 text-text-secondary">{TEXTS.noOtherListing}</p>}
       </DialogBody>
       <DialogFooter>
+        {rebookable && !choosingTarget && (
+          // A secondary button at the left of the footer (`screen.md`, position as in `default.png`);
+          // not available without another model listing of the model template (DER-61-02).
+          <Button
+            type="button"
+            className="mr-auto"
+            disabled={busy || otherListings.length === 0}
+            title={noOtherListing ? TEXTS.noOtherListing : undefined}
+            onClick={() => setChoosingTarget(true)}
+          >
+            {TEXTS.rebook}
+          </Button>
+        )}
         <Button type="button" disabled={busy} onClick={onClose}>
           {TEXTS.cancel}
         </Button>

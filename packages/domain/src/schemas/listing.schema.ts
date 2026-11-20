@@ -140,6 +140,35 @@ export const deviceAssignmentSchema = z.object({
   adjustStockChannels: z.array(idSchema),
 });
 export type DeviceAssignment = z.infer<typeof deviceAssignmentSchema>;
+
+/**
+ * `POST /api/devices/{id}/rebooking` (2.6, REQ-020): the version of the device the user saw and
+ * the target model listing; `confirmDeviation` confirms deviating variant data of the target.
+ */
+export const deviceRebookingBodySchema = z.strictObject({
+  version: versionSchema,
+  targetListingId: idSchema,
+  confirmDeviation: z.boolean().default(false),
+});
+export type DeviceRebookingInput = z.input<typeof deviceRebookingBodySchema>;
+
+/**
+ * `details` of `422 confirmation_required` with `kind: target_deviation` (2.6, REQ-020, K-04): the
+ * current deviations of the device from the target model listing.
+ */
+export const targetDeviationDetailsSchema = z.object({
+  kind: z.literal('target_deviation'),
+  deviations: z.array(variantDeviationSchema),
+});
+
+/**
+ * The answer of a rebooking (2.6): as of an assignment, with the target as `listing`, and the
+ * previous model listing with its new quantity, which may be 0 (AC-REQ-020-03).
+ */
+export const deviceRebookingSchema = deviceAssignmentSchema.extend({
+  previousListing: z.object({ id: idSchema, quantity: z.int().min(0) }),
+});
+export type DeviceRebooking = z.infer<typeof deviceRebookingSchema>;
 /** `?includeCancelled=true` adds the cancelled devices of the model listing (2.7, UI-014). */
 export const listingDetailQuerySchema = z.strictObject({
   includeCancelled: z

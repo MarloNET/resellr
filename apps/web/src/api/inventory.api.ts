@@ -9,6 +9,8 @@ import type {
 import {
   type DeviceAssignment,
   type DeviceAssignmentInput,
+  type DeviceRebooking,
+  type DeviceRebookingInput,
   type Listing,
   type ListingChoice,
   type ListingCreateInput,
@@ -216,5 +218,19 @@ export function useSaveListingPriceMutation(listingId: number) {
           previous === undefined ? previous : { ...previous, version: listing.version, prices },
       );
     },
+  });
+}
+
+/**
+ * "Umbuchen" of UI-004 (Modus "umbuchen") and UI-005 (`POST /api/devices/{id}/rebooking`, 2.6,
+ * REQ-020): the device and the quantities of both model listings change, so the cached devices
+ * and model listings are read again.
+ */
+export function useRebookDeviceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeviceRebooking, ApiError, { deviceId: number; body: DeviceRebookingInput }>({
+    mutationFn: ({ deviceId, body }) =>
+      apiClient.post<DeviceRebooking>(`/api/devices/${deviceId}/rebooking`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
   });
 }
