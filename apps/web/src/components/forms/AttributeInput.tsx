@@ -11,7 +11,7 @@ import { Button } from '../ui/Button.tsx';
 import { Checkbox } from '../ui/Checkbox.tsx';
 import { Input } from '../ui/Input.tsx';
 import { Select } from '../ui/Select.tsx';
-import { choiceOptions, type ChoiceOption } from './deactivated-choice.ts';
+import { type ChoiceItem, choiceOptions, type ChoiceOption } from './deactivated-choice.ts';
 import type { FormFieldControlProps } from './FormField.tsx';
 
 // Texts of the inputs (UI-007, UI-003 "Akkukapazität"; Technical Specification 2.5, 2.8.2).
@@ -120,19 +120,26 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
 
 /**
  * The values a choice offers (2.0.11, CU-319): the active ones without those the screen no
- * longer offers, and the stored ones of the field, a deactivated one with "(deaktiviert)".
+ * longer offers, the stored ones of the field, a deactivated one with "(deaktiviert)", and the
+ * chosen one, deactivated after a reload without a mark (design v0.6.11, Nachtrag MAR-1058).
  */
-function useOfferedValues(
-  pickListId: number | null,
+function offeredValues(
+  items: readonly ChoiceItem[],
   dropped: ReadonlySet<number>,
   storedIds: readonly number[],
+  chosenId: number | null,
 ) {
-  const { data } = usePickListValuesQuery(pickListId);
-  return choiceOptions(data?.items ?? [], {
+  return choiceOptions(items, {
     storedId: null,
     storedIds,
+    chosenId,
     markDeactivated: true,
   }).filter(({ id }) => !dropped.has(id) || storedIds.includes(id));
+}
+
+/** The values of a list, active and deactivated, empty until they are read. */
+function usePickListItems(pickListId: number | null): readonly ChoiceItem[] {
+  return usePickListValuesQuery(pickListId).data?.items ?? [];
 }
 
 function ValueOptions({ values }: { values: readonly ChoiceOption[] }) {
@@ -167,7 +174,8 @@ export interface AttributeInputProps {
  * 2.5): text, integer and decimal as a text field (the decimal with comma or point), yes/no and
  * *Auswahl aus Liste* as a choice, *Mehrfachangabe Anzahl × Typ* as entries of count, type and
  * position, the battery capacity as a number or "nicht ermittelbar". A choice offers the active
- * values of its list and a stored, deactivated one with "(deaktiviert)" (2.0.11).
+ * values of its list, a stored, deactivated one with "(deaktiviert)" and its chosen one, also
+ * when it is deactivated after a reload, without a mark (2.0.11, Nachtrag MAR-1058).
  */
 export function AttributeInput(props: AttributeInputProps) {
   const { attribute } = props;
@@ -240,7 +248,13 @@ function PickField({
   onChange,
   onBlur,
 }: AttributeInputProps) {
-  const values = useOfferedValues(attribute.pickListId, dropped, storedIds);
+  const chosenId = typeof value === 'number' ? value : null;
+  const values = offeredValues(
+    usePickListItems(attribute.pickListId),
+    dropped,
+    storedIds,
+    chosenId,
+  );
   return (
     <Select
       {...control}
@@ -271,8 +285,8 @@ function PortsField({
   onChange,
   onBlur,
 }: AttributeInputProps) {
-  const types = useOfferedValues(usePickListIdOf('port_type'), dropped, storedIds);
-  const positions = useOfferedValues(usePickListIdOf('port_position'), dropped, storedIds);
+  const types = usePickListItems(usePickListIdOf('port_type'));
+  const positions = usePickListItems(usePickListIdOf('port_position'));
   const entries = Array.isArray(value) && value.length > 0 ? value : [EMPTY_PORT];
   const change = (index: number, next: Partial<PortInput>) =>
     onChange(entries.map((entry, at) => (at === index ? { ...entry, ...next } : entry)));
@@ -302,7 +316,7 @@ function PortsField({
             onBlur={onBlur}
           >
             <EmptyOption required />
-            <ValueOptions values={types} />
+            <ValueOptions values={offeredValues(types, dropped, storedIds, entry.typeId)} />
           </Select>
           <Select
             aria-label={`${attribute.label} ${TEXTS.position}`}
@@ -313,7 +327,7 @@ function PortsField({
             onBlur={onBlur}
           >
             <EmptyOption required={false} />
-            <ValueOptions values={positions} />
+            <ValueOptions values={offeredValues(positions, dropped, storedIds, entry.positionId)} />
           </Select>
           {entries.length > 1 && (
             <Button

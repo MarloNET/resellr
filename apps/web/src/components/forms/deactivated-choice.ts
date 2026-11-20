@@ -18,22 +18,33 @@ export interface ChoiceOption {
  * the active ones and the stored one, even if deactivated meanwhile. With `markDeactivated` the
  * stored, deactivated entry carries "(deaktiviert)" (UI-003, UI-010, UI-014, UI-033). A field
  * holding several entries of one list (types of *Mehrfachangabe Anzahl × Typ*) passes them as
- * `storedIds`.
+ * `storedIds`. `chosenId`, the value of the form, stays offered while deactivated after a
+ * reload, without "(deaktiviert)" unless it is stored (2.0.11 "Gewählter, noch nicht abgelehnter
+ * Eintrag", design v0.6.11, addendum MAR-1058).
  */
 export function choiceOptions(
   items: readonly ChoiceItem[],
   {
     storedId,
     storedIds = [],
+    chosenId = null,
     markDeactivated = false,
-  }: { storedId: number | null; storedIds?: readonly number[]; markDeactivated?: boolean },
+  }: {
+    storedId: number | null;
+    storedIds?: readonly number[];
+    chosenId?: number | null;
+    markDeactivated?: boolean;
+  },
 ): ChoiceOption[] {
+  const isStored = (id: number) => id === storedId || storedIds.includes(id);
   return items
-    .filter((item) => item.active || item.id === storedId || storedIds.includes(item.id))
+    .filter((item) => item.active || isStored(item.id) || item.id === chosenId)
     .map((item) => ({
       id: item.id,
       label:
-        !item.active && markDeactivated ? FIXED_TEXTS.deactivatedChoice(item.label) : item.label,
+        !item.active && markDeactivated && isStored(item.id)
+          ? FIXED_TEXTS.deactivatedChoice(item.label)
+          : item.label,
     }));
 }
 

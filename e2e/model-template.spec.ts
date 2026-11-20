@@ -89,6 +89,66 @@ test.describe('UI-007 Modellvorlage anlegen (CU-114)', () => {
     ]);
   });
 
+  test('UI-007.default UI-007.success DER-52-02 a model template opened from UI-006 is changed and saved, the search finds the new value (#181)', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const manufacturer = uniqueName('Dell', testInfo.title, testInfo.project.name);
+    await createManufacturer(page, server.baseUrl, manufacturer);
+    await page.goto('/modelle/neu');
+    await field(page, 'Geräteart').selectOption({ label: 'Notebook' });
+    await fillNotebookAttributes(page);
+    await field(page, 'Hersteller').selectOption({ label: manufacturer });
+    await field(page, 'Modellbezeichnung').fill('Latitude 5520');
+    await field(page, 'Typbezeichnung').fill('P104F');
+    await field(page, 'Herstellernummer').fill('5520-0001');
+    await saveButton(page).click();
+    await expect(page).toHaveURL(/\/modelle$/);
+
+    await page.getByRole('searchbox', { name: 'Suchbegriff' }).fill(manufacturer);
+    await page
+      .getByRole('table', { name: 'Modellvorlagen' })
+      .getByRole('row')
+      .filter({ hasText: manufacturer })
+      .getByText('P104F')
+      .click();
+    await expect(page).toHaveURL(/\/modelle\/\d+$/);
+    const editForm = page.getByRole('form', { name: 'Modellvorlage ändern' });
+    const editField = (name: string) => editForm.getByLabel(new RegExp(`^${name}\\*?$`));
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Modellvorlage ändern' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'Änderungen an Modelldaten wirken auf alle Modell-Inserate und Datenblätter dieser Modellvorlage.',
+      ),
+    ).toBeVisible();
+    await expect(editField('Modellbezeichnung')).toHaveValue('Latitude 5520');
+    await expect(editField(PROCESSOR)).toHaveValue('Intel Core i5-1135G7');
+    await expectReachable(page);
+
+    await editField('Typbezeichnung').fill('P104F001');
+    await editField(PROCESSOR).fill('Intel Core i7-1185G7');
+    await saveButton(page).click();
+
+    await expect(page).toHaveURL(/\/modelle$/);
+    await expect(page.getByText('Modellvorlage gespeichert')).toBeVisible();
+    await page.getByRole('searchbox', { name: 'Suchbegriff' }).fill('P104F001');
+    const row = page
+      .getByRole('table', { name: 'Modellvorlagen' })
+      .getByRole('row')
+      .filter({ hasText: manufacturer });
+    await expect(row.getByRole('cell')).toHaveText([
+      'Notebook',
+      manufacturer,
+      'Latitude 5520',
+      'P104F001',
+      '5520-0001',
+    ]);
+    await row.getByText('P104F001').click();
+    await expect(editField(PROCESSOR)).toHaveValue('Intel Core i7-1185G7');
+  });
+
   test('AC-REQ-008-03 a model template with MPN "unbekannt" is listed as "unbekannt"', async ({
     page,
     server,

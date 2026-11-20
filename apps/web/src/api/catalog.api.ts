@@ -4,6 +4,7 @@ import {
   type ModelTemplateList,
   type ModelTemplateMatch,
   modelTemplateMatchSchema,
+  type ModelTemplateUpdateInput,
 } from '@resellr/domain/schemas/model-template.schema';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -63,6 +64,22 @@ export function useCreateModelTemplateMutation() {
     mutationFn: (body) => apiClient.post<ModelTemplate>('/api/model-templates', body),
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: queryKeys.catalog.modelTemplateLists() }),
+  });
+}
+
+/**
+ * "Modellvorlage speichern" of UI-007 for a model template being changed
+ * (`PATCH /api/model-templates/{id}`, 2.4). The answer goes into the cache of the model template,
+ * the lists of UI-006 load again in the background (2.0.7 "Wartezustand bei Folgeanfragen").
+ */
+export function useUpdateModelTemplateMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation<ModelTemplate, ApiError, ModelTemplateUpdateInput>({
+    mutationFn: (body) => apiClient.patch<ModelTemplate>(`/api/model-templates/${id}`, body),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(queryKeys.catalog.modelTemplate(id), saved);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.catalog.modelTemplateLists() });
+    },
   });
 }
 
