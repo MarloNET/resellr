@@ -198,6 +198,8 @@ export const ERROR_MESSAGES = {
   /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+  /** UI-005 Kontext A "Hinweis" (REQ-018, design v0.6.1); its title is in `CONFIRMATION_TITLES`. */
+  'confirmation_required.variant_deviation': 'Das Gerät weicht vom Modell-Inserat ab.',
   /** UI-004 "Zuordnen" of a sold or cancelled device: the wording of the sale (2.0.6). */
   'device_not_available.assignment': DEVICE_SOLD_OR_CANCELLED,
   /**
@@ -277,6 +279,8 @@ export const ERROR_MESSAGES = {
 export const CONFIRMATION_TITLES = {
   /** UI-007.dublette (M-27, REQ-011). */
   'confirmation_required.possible_duplicate': 'Mögliche Dublette',
+  /** UI-005 "Abweichungen bei Zuordnung" (REQ-018, mockup `default.png`). */
+  'confirmation_required.variant_deviation': 'Abweichungen bei Zuordnung',
 } as const;
 
 /**

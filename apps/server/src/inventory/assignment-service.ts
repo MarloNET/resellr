@@ -1,5 +1,6 @@
 import {
   descriptionKey,
+  deviationLine,
   variantsMatch,
   type VariantSpec,
 } from '@resellr/domain/inventory/compare-variants';
@@ -22,12 +23,14 @@ import { type AttributeEntry, createSettingsReader } from '../settings/index.ts'
 import type { Clock } from '../shared/clock.ts';
 import {
   BadRequestError,
+  ConfirmationRequired,
   ConflictError,
   NotFoundError,
   RuleViolation,
 } from '../shared/domain-error.ts';
 import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
 import { readableValues, toDevice } from './device-service.ts';
+import { listingDeviations, listVariantAttributes } from './listing-choice-query.ts';
 import { createListingRepository, type ListingRow } from './listing-repository.ts';
 import { createListingStockUpdater } from './listing-stock-updater.ts';
 
@@ -93,8 +96,8 @@ function checkReviewed(device: Pick<DeviceRow, 'capture_status' | 'review_keys'>
  * that assigns devices, creates a model listing from a device and rebooks. With #197 creating a
  * model listing from a checked, available device, with #194 assigning a device to an existing
  * model listing of its model template, with #199 leaving the previous model listing on creating,
- * with #189 both only for a checked device; the deviation check (#196) and rebooking (#202)
- * follow.
+ * with #196 the deviation check of the assignment, with #189 both only for a checked device;
+ * rebooking (#202) follows.
  */
 export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
   return {
@@ -105,9 +108,12 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
      * (`400`, a program error of the user interface), the version (`version_conflict`), then the
      * preconditions of 2.6: available (`device_not_available`), not assigned
      * (`already_assigned`), checked (`review_pending`), the same model template
-     * (`other_model_template`); the first matching stage wins and nothing is stored.
-     * `variant_deviation` (#196) follows. `adjustStockChannels` is the report of the
-     * `StockChanged` handlers, empty until S5.
+     * (`other_model_template`), then the variant data (REQ-018): if they deviate after the
+     * comparison rule and `confirmDeviation` is not `true`, `confirmation_required` with
+     * `details.kind = variant_deviation` and the deviations; the first matching stage wins and
+     * nothing is stored. Confirmed, the audit entry is `assigned_despite_deviation` with the
+     * deviations (AC-REQ-018-02); the values of the model listing stay unchanged.
+     * `adjustStockChannels` is the report of the `StockChanged` handlers, empty until S5.
      */
     async assign(deviceId: number, input: DeviceAssignmentInput): Promise<DeviceAssignment> {
       const request = deviceAssignmentBodySchema.parse(input);
@@ -129,17 +135,42 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
           throw new RuleViolation('other_model_template');
         }
 
+        // A device always has its model template (`NOT NULL`, `ON DELETE RESTRICT`).
+        const template = await createCatalogReader(tx.db).findModelTemplate(
+          device.model_template_id,
+        );
+        if (template === undefined) {
+          throw new Error(`model template ${device.model_template_id} of a device is missing`);
+        }
+        const settings = createSettingsReader(tx.db);
+        const deviations = await listingDeviations(
+          settings,
+          await listVariantAttributes(settings, template.deviceTypeId),
+          device,
+          listing,
+        );
+        if (deviations.length > 0 && !request.confirmDeviation) {
+          throw new ConfirmationRequired('variant_deviation', {
+            usage: 'variant_deviation',
+            details: { deviations },
+          });
+        }
+
         const at = clock.now().toISOString();
         await devices.assign(device.id, listing.id, at);
         const quantity = await createListingStockUpdater(tx).update(listing.id);
 
+        // "trotzdem zuordnen": the decision with its time (the entry's) and the deviations.
         await createAuditWriter({ db: tx.db, clock }).write({
           objectType: 'device',
           objectId: device.id,
           objectLabel: `Gerät ${device.wi_nr}`,
-          action: 'assigned',
+          action: deviations.length > 0 ? 'assigned_despite_deviation' : 'assigned',
           oldValue: null,
-          newValue: { 'Modell-Inserat': listing.display_title },
+          newValue: {
+            'Modell-Inserat': listing.display_title,
+            ...(deviations.length > 0 && { Abweichungen: deviations.map(deviationLine) }),
+          },
         });
 
         const stored = await devices.findById(device.id);
