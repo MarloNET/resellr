@@ -779,3 +779,373 @@ describe('review flags of POST /api/devices (CU-121, CU-118, Technical Specifica
     expect(response.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
   });
 });
+
+/**
+ * "ThinkPad T14" of 2.5 "Nur aktive Merkmale": a notebook with the default RAM 16 GB, and a
+ * request with its values unchanged and the other required values of the level device.
+ */
+function insertT14() {
+  const { sqlite } = t.database;
+  const one = <T>(sql: string, ...params: unknown[]) => sqlite.prepare(sql).get(...params) as T;
+  const notebook = one<{ id: number }>("SELECT id FROM device_type WHERE name = 'Notebook'").id;
+  const attributeId = (label: string) =>
+    one<{ id: number }>(
+      'SELECT id FROM attribute WHERE device_type_id = ? AND label = ?',
+      notebook,
+      label,
+    ).id;
+  const valueId = (label: string) =>
+    one<{ id: number }>('SELECT id FROM pick_list_value WHERE label = ?', label).id;
+  const ram = attributeId('RAM');
+  const t14 = insertModelTemplate(sqlite, {
+    deviceTypeId: notebook,
+    manufacturerId: insertManufacturer(sqlite, 'Lenovo'),
+    modelName: 'ThinkPad T14',
+    mpn: '20W0S0CN00',
+    defaultDeviceValues: { [ram]: 16 },
+  });
+  const t14Body = (wiNr: string) =>
+    body({
+      wiNr,
+      modelTemplateId: t14,
+      values: {
+        [ram]: 16,
+        [attributeId('Speicherkapazität')]: 512,
+        [attributeId('Tastaturlayout')]: valueId('Deutsch (QWERTZ)'),
+        [attributeId('Betriebssystem')]: valueId('Windows 11 Pro'),
+        [attributeId('Netzteil')]: valueId('mit Netzteil (original)'),
+        [attributeId('Akku')]: ids.withBattery,
+        [attributeId('Akkukapazität')]: { percent: 90 },
+      },
+    });
+  return { t14, ram, t14Body };
+}
+
+/** Deactivates or activates an attribute through `PATCH /api/attributes/{id}` (UI-027). */
+async function setAttributeActive(id: number, active: boolean) {
+  const { version } = t.database.sqlite
+    .prepare('SELECT version FROM attribute WHERE id = ?')
+    .get(id) as { version: number };
+  const response = await t.app.inject({
+    method: 'PATCH',
+    url: `/api/attributes/${id}`,
+    headers: SAME_ORIGIN_WRITE,
+    payload: { version, active },
+  });
+  expect(response.statusCode).toBe(200);
+}
+
+describe('prefill only of active attributes (CU-117, CU-293, CU-121; Technical Specification 2.5)', () => {
+  it('DER-34-21 the prefill of "ThinkPad T14" has neither RAM 16 GB nor its review flag while RAM is deactivated, again after activating', async () => {
+    const { t14, ram } = insertT14();
+    await setAttributeActive(ram, false);
+
+    const deactivated = await get(`/api/model-templates/${t14}/device-prefill`);
+
+    expect(deactivated.statusCode).toBe(200);
+    const prefill = deactivated.json();
+    expect(prefill.values).toEqual({});
+    expect(prefill.reviewKeys).toEqual([]);
+    const stored = t.database.sqlite
+      .prepare('SELECT default_device_values FROM model_template WHERE id = ?')
+      .get(t14) as { default_device_values: string };
+    expect(JSON.parse(stored.default_device_values)).toEqual({ [ram]: 16 });
+
+    await setAttributeActive(ram, true);
+    const again = (await get(`/api/model-templates/${t14}/device-prefill`)).json();
+    expect(again.values).toEqual({ [ram]: 16 });
+    expect(again.reviewKeys).toEqual([String(ram)]);
+  });
+
+  it('DER-34-21 saving a device forms the prefill with the same attributes, so a deactivated RAM gets no review flag', async () => {
+    const { ram, t14Body } = insertT14();
+    await setAttributeActive(ram, false);
+
+    // UI-003 no longer asks for RAM; a value sent anyway equals the default and is not flagged.
+    const deactivated = await post(t14Body('700001'));
+    expect(deactivated.statusCode).toBe(201);
+    expect(deactivated.json()).toMatchObject({ captureStatus: 'checked', reviewKeys: [] });
+
+    await setAttributeActive(ram, true);
+    const again = await post(t14Body('700002'));
+    expect(again.statusCode).toBe(201);
+    expect(again.json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+  });
+
+  it('DER-34-21 deactivating and activating an attribute leaves the stored review flags of a device unchanged', async () => {
+    const { ram, t14Body } = insertT14();
+    const created = await post(t14Body('700003'));
+    expect(created.json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+    const { id } = created.json() as { id: number };
+    const storedRow = () =>
+      t.database.sqlite
+        .prepare('SELECT review_keys, capture_status, version FROM device WHERE id = ?')
+        .get(id);
+    const before = storedRow();
+
+    await setAttributeActive(ram, false);
+    expect(storedRow()).toEqual(before);
+    expect((await get(`/api/devices/${id}`)).json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+
+    await setAttributeActive(ram, true);
+    expect(storedRow()).toEqual(before);
+    expect((await get(`/api/devices/${id}`)).json()).toMatchObject({
+      captureStatus: 'review_pending',
+      reviewKeys: [String(ram)],
+    });
+  });
+});
+
+/** An entry of the code translation; `supplierId` `null` = for all suppliers (2.2). */
+function insertConditionCode(entry: {
+  code: string;
+  supplierId?: number | null;
+  plainText: string;
+  conditionValueId?: number | null;
+  visualGrade?: number | null;
+}) {
+  t.database.sqlite
+    .prepare(
+      `INSERT INTO condition_code (code, code_key, supplier_id, plain_text,
+         suggested_condition_value_id, suggested_visual_grade, version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    )
+    .run(
+      entry.code,
+      entry.code.toLowerCase(),
+      entry.supplierId ?? null,
+      entry.plainText,
+      entry.conditionValueId ?? null,
+      entry.visualGrade ?? null,
+      STAMP,
+      STAMP,
+    );
+}
+
+const conditionValue = (label: string) =>
+  (
+    t.database.sqlite.prepare('SELECT id FROM pick_list_value WHERE label = ?').get(label) as {
+      id: number;
+    }
+  ).id;
+
+describe('condition code in the prefill and POST /api/devices (CU-293, CU-121; Technical Specification 2.5, 2.2)', () => {
+  const DGS_TEXT = 'Display- und Gehäuseschaden';
+
+  it('AC-REQ-015-01 code "dgs" puts "Display- und Gehäuseschaden" into the condition description and stores "DGS" as condition code', async () => {
+    insertConditionCode({ code: 'DGS', plainText: DGS_TEXT });
+
+    const prefill = (
+      await get(`/api/model-templates/${ids.mvA}/device-prefill?conditionCode=dgs`)
+    ).json();
+    expect(prefill).toMatchObject({
+      conditionDescription: DGS_TEXT,
+      codeResult: { found: true, plainText: DGS_TEXT },
+      reviewKeys: [],
+    });
+
+    const response = await post(
+      body({ conditionCode: 'dgs', conditionDescription: prefill.conditionDescription }),
+    );
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      conditionCode: 'DGS',
+      conditionDescription: DGS_TEXT,
+      captureStatus: 'checked',
+    });
+    const stored = t.database.sqlite
+      .prepare('SELECT condition_code, condition_description FROM device WHERE wi_nr = ?')
+      .get('626198');
+    expect(stored).toEqual({ condition_code: 'DGS', condition_description: DGS_TEXT });
+    const entry = t.database.sqlite
+      .prepare('SELECT new_value FROM audit_entry WHERE object_type = ?')
+      .get('device') as { new_value: string };
+    expect(JSON.parse(entry.new_value)).toMatchObject({
+      Zustandscode: 'DGS',
+      Zustandsbeschreibung: DGS_TEXT,
+    });
+  });
+
+  it('AC-REQ-015-02 with supplier "L1" takes the plain text of its own entry', async () => {
+    insertConditionCode({ code: 'DGS', plainText: DGS_TEXT });
+    insertConditionCode({ code: 'DGS', supplierId: ids.ost, plainText: 'Display gebrochen (L1)' });
+
+    const withSupplier = (
+      await get(
+        `/api/model-templates/${ids.mvA}/device-prefill?conditionCode=DGS&supplierId=${ids.ost}`,
+      )
+    ).json();
+    expect(withSupplier).toMatchObject({
+      conditionDescription: 'Display gebrochen (L1)',
+      codeResult: { found: true, plainText: 'Display gebrochen (L1)' },
+    });
+    const withoutSupplier = (
+      await get(`/api/model-templates/${ids.mvA}/device-prefill?conditionCode=DGS&supplierId=`)
+    ).json();
+    expect(withoutSupplier.conditionDescription).toBe(DGS_TEXT);
+  });
+
+  it('AC-REQ-015-03 an unknown code "XYZ" takes no text, and a device with it and a manual description saves', async () => {
+    const prefill = (
+      await get(`/api/model-templates/${ids.mvA}/device-prefill?conditionCode=XYZ`)
+    ).json();
+    expect(prefill).toMatchObject({
+      conditionDescription: '',
+      codeResult: { found: false, plainText: null },
+    });
+
+    const response = await post(
+      body({ conditionCode: 'XYZ', conditionDescription: 'Kratzer am Rahmen' }),
+    );
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      conditionCode: 'XYZ',
+      conditionDescription: 'Kratzer am Rahmen',
+    });
+  });
+
+  it('AC-REQ-015-04 the suggested visual grade 4 is prefilled and flagged for review until confirmed or changed', async () => {
+    insertConditionCode({ code: 'DGS', plainText: DGS_TEXT, visualGrade: 4 });
+
+    const prefill = (
+      await get(`/api/model-templates/${ids.mvA}/device-prefill?conditionCode=DGS`)
+    ).json();
+    expect(prefill).toMatchObject({ visualGrade: 4, reviewKeys: ['visualGrade'] });
+
+    const pending = await post(
+      body({ conditionCode: 'DGS', visualGrade: '4', conditionDescription: DGS_TEXT }),
+    );
+    expect(pending.json()).toMatchObject({
+      reviewKeys: ['visualGrade'],
+      captureStatus: 'review_pending',
+    });
+    const confirmed = await post(
+      body({
+        wiNr: '626199',
+        conditionCode: 'DGS',
+        visualGrade: '4',
+        confirmedKeys: ['visualGrade'],
+      }),
+    );
+    expect(confirmed.json()).toMatchObject({ reviewKeys: [], captureStatus: 'checked' });
+    const changed = await post(body({ wiNr: '626200', conditionCode: 'DGS', visualGrade: '2' }));
+    expect(changed.json()).toMatchObject({ reviewKeys: [], captureStatus: 'checked' });
+  });
+
+  it('DER-57-02 flags the suggested condition and visual grade, never the plain text', async () => {
+    insertConditionCode({
+      code: 'DGS',
+      plainText: DGS_TEXT,
+      conditionValueId: ids.used,
+      visualGrade: 3,
+    });
+
+    const prefill = (
+      await get(`/api/model-templates/${ids.mvA}/device-prefill?conditionCode=DGS`)
+    ).json();
+
+    expect(prefill).toMatchObject({
+      conditionValueId: ids.used,
+      visualGrade: 3,
+      conditionDescription: DGS_TEXT,
+    });
+    expect([...prefill.reviewKeys].sort()).toEqual(['condition', 'visualGrade']);
+    const response = await post(
+      body({
+        conditionCode: 'DGS',
+        conditionDescription: 'eigener Text',
+        confirmedKeys: ['condition', 'visualGrade'],
+      }),
+    );
+    expect(response.json()).toMatchObject({ reviewKeys: [], captureStatus: 'checked' });
+  });
+
+  it('DER-57-03 code "DGS" with the deactivated suggestion "refurbished" keeps the condition empty without flag, prefills the visual grade, and the condition again once active', async () => {
+    const refurbished = conditionValue('refurbished');
+    insertConditionCode({
+      code: 'DGS',
+      plainText: DGS_TEXT,
+      conditionValueId: refurbished,
+      visualGrade: 4,
+    });
+    setActive(refurbished, false);
+
+    const prefill = (
+      await get(`/api/model-templates/${ids.mvA}/device-prefill?conditionCode=DGS`)
+    ).json();
+    expect(prefill).toMatchObject({
+      conditionValueId: null,
+      visualGrade: 4,
+      conditionDescription: DGS_TEXT,
+      reviewKeys: ['visualGrade'],
+    });
+    const response = await post(
+      body({ conditionCode: 'DGS', visualGrade: '4', confirmedKeys: ['visualGrade'] }),
+    );
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ reviewKeys: [], captureStatus: 'checked' });
+
+    setActive(refurbished, true);
+    const again = (
+      await get(`/api/model-templates/${ids.mvA}/device-prefill?conditionCode=DGS`)
+    ).json();
+    expect(again.conditionValueId).toBe(refurbished);
+    expect([...again.reviewKeys].sort()).toEqual(['condition', 'visualGrade']);
+  });
+
+  it('DER-57-04 forms the flags on saving from the condition code and the supplier sent', async () => {
+    insertConditionCode({
+      code: 'DGS',
+      supplierId: ids.ost,
+      plainText: 'Display gebrochen (Ost)',
+      visualGrade: 4,
+    });
+
+    const withSupplier = await post(
+      body({ supplierId: ids.ost, conditionCode: 'DGS', visualGrade: '4' }),
+    );
+    expect(withSupplier.json()).toMatchObject({
+      conditionCode: 'DGS',
+      reviewKeys: ['visualGrade'],
+      captureStatus: 'review_pending',
+    });
+    const withoutSupplier = await post(
+      body({ wiNr: '626199', conditionCode: 'DGS', visualGrade: '4' }),
+    );
+    expect(withoutSupplier.json()).toMatchObject({
+      conditionCode: 'DGS',
+      reviewKeys: [],
+      captureStatus: 'checked',
+    });
+  });
+
+  it('stores no condition code without one or for an empty one, and rejects one longer than 20 characters', async () => {
+    const without = await post(body());
+    expect(without.json().conditionCode).toBeNull();
+    const empty = await post(body({ wiNr: '626199', conditionCode: '  ' }));
+    expect(empty.json().conditionCode).toBeNull();
+
+    const tooLong = await post(body({ wiNr: '626200', conditionCode: 'X'.repeat(21) }));
+    expect(tooLong.statusCode).toBe(422);
+    expect(tooLong.json().error).toMatchObject({
+      code: 'validation_failed',
+      fields: [{ path: 'conditionCode', message: 'Zustandscode: 1 bis 20 Zeichen' }],
+    });
+    expect(count('device')).toBe(2);
+  });
+
+  it('rejects an unknown query parameter of the prefill with 400', async () => {
+    const response = await get(`/api/model-templates/${ids.mvA}/device-prefill?code=DGS`);
+
+    expect(response.statusCode).toBe(400);
+  });
+});

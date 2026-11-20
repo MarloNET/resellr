@@ -100,7 +100,7 @@ describe('prefill of a device (CU-117, REQ-013; Technical Specification 2.5)', (
     expect(prefill.reviewKeys).toEqual([String(RAM)]);
   });
 
-  it('flags condition and visual grade suggested by the condition code, not its plain text', () => {
+  it('DER-57-02 flags condition and visual grade suggested by the condition code, not its plain text', () => {
     const prefill = buildDevicePrefill(input({ defaultDeviceValues: {}, code: DGS }));
 
     expect(prefill).toEqual({
@@ -113,16 +113,29 @@ describe('prefill of a device (CU-117, REQ-013; Technical Specification 2.5)', (
     });
   });
 
-  it('flags only what the code entry suggests', () => {
+  it('AC-REQ-015-04 prefills the suggested visual grade 4 with a review flag, and flags only what the entry suggests', () => {
     const prefill = buildDevicePrefill(
       input({
         defaultDeviceValues: {},
-        code: { plainText: 'Neu', suggestedConditionValueId: null, suggestedVisualGrade: 1 },
+        code: { plainText: 'Neu', suggestedConditionValueId: null, suggestedVisualGrade: 4 },
       }),
     );
 
     expect(prefill.conditionValueId).toBeNull();
+    expect(prefill.visualGrade).toBe(4);
     expect(prefill.reviewKeys).toEqual(['visualGrade']);
+  });
+
+  it('AC-REQ-015-03 takes no text and no suggestion for an unknown code', () => {
+    const prefill = buildDevicePrefill(input({ defaultDeviceValues: {}, code: null }));
+
+    expect(prefill).toMatchObject({
+      conditionValueId: null,
+      visualGrade: null,
+      conditionDescription: '',
+      reviewKeys: [],
+      codeResult: { found: false, plainText: null },
+    });
   });
 
   it('takes defaults only of active attributes', () => {
@@ -134,6 +147,26 @@ describe('prefill of a device (CU-117, REQ-013; Technical Specification 2.5)', (
 
     expect(prefill.values).not.toHaveProperty(String(KEYBOARD));
     expect(prefill.reviewKeys).not.toContain(String(KEYBOARD));
+  });
+
+  it('DER-34-21 takes neither value nor review flag of a deactivated attribute, again once it is active again', () => {
+    // "ThinkPad T14" with the default RAM 16 GB (2.5 "Nur aktive Merkmale").
+    const defaultDeviceValues = { ...DEFAULTS, [RAM]: 16 };
+    const withRam = (active: boolean) =>
+      ATTRIBUTES.map((entry) => (entry.id === RAM ? { ...entry, active } : entry));
+
+    const deactivated = buildDevicePrefill(
+      input({ defaultDeviceValues, attributes: withRam(false) }),
+    );
+    expect(deactivated.values).not.toHaveProperty(String(RAM));
+    expect(deactivated.reviewKeys).not.toContain(String(RAM));
+    expect(deactivated.values).toEqual(DEFAULTS);
+
+    const activeAgain = buildDevicePrefill(
+      input({ defaultDeviceValues, attributes: withRam(true) }),
+    );
+    expect(activeAgain.values).toHaveProperty(String(RAM), 16);
+    expect(activeAgain.reviewKeys).toContain(String(RAM));
   });
 
   it('DER-55-06 takes neither a deactivated pick list value nor a deactivated condition suggestion', () => {

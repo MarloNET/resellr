@@ -5,13 +5,16 @@ import type {
 } from '@resellr/domain/schemas/attribute.schema';
 import type { AttributeValueDefinition } from '@resellr/domain/schemas/attribute-values.schema';
 import type { BatteryValueFlag, PickListKey } from '@resellr/domain/schemas/pick-list.schema';
+import { toKey } from '@resellr/domain/text/normalize-key';
 import type { Kysely } from 'kysely';
 
 import type { DB } from '../db/schema.ts';
+import { createConditionCodeRepository } from './condition-code-repository.ts';
 import { createDeviceTypeRepository } from './device-type-repository.ts';
 import { createManufacturerRepository } from './manufacturer-repository.ts';
 import { createPickListRepository } from './pick-list-repository.ts';
 import { createSupplierRepository } from './supplier-repository.ts';
+import { createTextBlockRepository } from './text-block-repository.ts';
 
 /** A settings entry with its name and status, for the rule of 2.0.11. */
 export interface SettingsEntry {
@@ -29,6 +32,15 @@ export interface PickListValueEntry {
   active: boolean;
 }
 
+/** The entry of the code translation a condition code resolves to (2.2, REQ-015). */
+export interface ConditionCodeTranslationEntry {
+  /** The code as the entry spells it (3.1). */
+  code: string;
+  plainText: string;
+  suggestedConditionValueId: number | null;
+  suggestedVisualGrade: number | null;
+}
+
 /**
  * An attribute definition as the value rules of CU-067, the check of 2.0.11 and the comparison
  * rule of CU-119 (flag "variantenbildend", 2.6) need it.
@@ -36,6 +48,9 @@ export interface PickListValueEntry {
 export interface AttributeEntry extends AttributeValueDefinition {
   pickListId: number | null;
   variantForming: boolean;
+  /** Unit of a number value and whether a space precedes it ("16GB", "13,3 Zoll"; 2.1). */
+  unit: string | null;
+  unitSpacing: boolean;
 }
 
 const toEntry = (row: { id: number; name: string; active: number }): SettingsEntry => ({
@@ -48,15 +63,19 @@ const toEntry = (row: { id: number; name: string; active: number }): SettingsEnt
  * Read interface of the settings for other components (CU-086; Technical Specification 4.1,
  * 2.0.11, Nachtrag MAR-904): device type and manufacturer for the model template service
  * (CU-105), with #178 the attribute definitions of a device type and the pick list values, with
- * #185 the supplier and the values of the list battery for the device service (CU-121); each
- * further method follows with the first task that calls it. Inside an action pass `tx.db`, so
- * the check sees the state of the writing transaction.
+ * #185 the supplier and the values of the list battery for the device service (CU-121), with #193
+ * the entry of a condition code for the prefill (CU-293, CU-121), with #198 the text blocks of a
+ * delivery scope for the model listing detail (CU-292); each further method follows with the
+ * first task that calls it. Inside an action pass `tx.db`, so the check sees the state of the
+ * writing transaction.
  */
 export function createSettingsReader(db: Kysely<DB>) {
   const deviceTypes = createDeviceTypeRepository(db);
   const manufacturers = createManufacturerRepository(db);
   const suppliers = createSupplierRepository(db);
   const pickLists = createPickListRepository(db);
+  const conditionCodes = createConditionCodeRepository(db);
+  const textBlocks = createTextBlockRepository(db);
   return {
     /** The device type with name and status, active or not; `undefined` if unknown. */
     async findDeviceType(id: number): Promise<SettingsEntry | undefined> {
@@ -77,6 +96,16 @@ export function createSettingsReader(db: Kysely<DB>) {
     },
 
     /**
+     * The text blocks with these ids with name and status, active or not; unknown ids are left
+     * out. No query for `[]`.
+     */
+    async findTextBlocks(ids: readonly number[]): Promise<SettingsEntry[]> {
+      if (ids.length === 0) return [];
+      const rows = await textBlocks.findNamesByIds([...new Set(ids)]);
+      return rows.map(toEntry);
+    },
+
+    /**
      * The attributes of a device type in their order, active and deactivated (2.5: the schema of
      * CU-067 is built from them at run time).
      */
@@ -94,6 +123,8 @@ export function createSettingsReader(db: Kysely<DB>) {
         required: row.required === 1,
         active: row.active === 1,
         variantForming: row.variant_forming === 1,
+        unit: row.unit,
+        unitSpacing: row.unit_spacing === 1,
       }));
     },
 
@@ -111,6 +142,28 @@ export function createSettingsReader(db: Kysely<DB>) {
         label: row.label,
         active: row.active === 1,
       }));
+    },
+
+    /**
+     * The entry a condition code resolves to (2.2 "Auflösen eines Codes", REQ-015): the one of
+     * the supplier before the one without supplier, without a supplier only the one without; the
+     * code without regard to case. `undefined` for an unknown or empty code.
+     */
+    async resolveConditionCode(
+      code: string,
+      supplierId: number | null,
+    ): Promise<ConditionCodeTranslationEntry | undefined> {
+      const codeKey = toKey(code);
+      if (codeKey === '') return undefined;
+      const row = await conditionCodes.resolve(codeKey, supplierId);
+      return (
+        row && {
+          code: row.code,
+          plainText: row.plain_text,
+          suggestedConditionValueId: row.suggested_condition_value_id,
+          suggestedVisualGrade: row.suggested_visual_grade,
+        }
+      );
     },
 
     /**

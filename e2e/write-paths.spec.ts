@@ -241,10 +241,18 @@ const VIA_PATHS: Record<string, (body: unknown) => string> = {
 };
 
 /**
+ * Actions on a single entry, with the read of the entry that shows their result: an assignment
+ * through the device (`listing` of `GET /api/devices/{id}`, 2.5, 2.6).
+ */
+const ACTION_PATHS: [RegExp, (path: string) => string][] = [
+  [/^\/api\/devices\/\d+\/assignment$/, (path) => path.replace(/\/assignment$/, '')],
+];
+
+/**
  * What the user sees of the seeded data: the answer of `GET` on every collection the demo data
  * created entries in and on every single resource it saved (`PUT`, e.g. the merchant profile). A
  * seed area that writes to a path without `GET` fails here and has to name how its data is read
- * (`READ_PATHS`, `DETAIL_PATHS`, `ENTRY_PATHS`, `VIA_PATHS`).
+ * (`READ_PATHS`, `DETAIL_PATHS`, `ENTRY_PATHS`, `VIA_PATHS`, `ACTION_PATHS`).
  */
 async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<unknown> {
   const api = createDemoApi(baseUrl);
@@ -258,6 +266,12 @@ async function readSeededState(baseUrl: string, writes: SeedWrite[]): Promise<un
         const { id } = answer as { id: number };
         state[`${path}/${id}`] = await api.request('GET', `${path}/${id}`);
       }
+      continue;
+    }
+    const action = ACTION_PATHS.find(([pattern]) => pattern.test(path));
+    if (action !== undefined) {
+      const read = action[1](path);
+      state[`${path} via ${read}`] = await api.request('GET', read);
       continue;
     }
     const via = VIA_PATHS[path];

@@ -369,7 +369,22 @@ async function pickListValueIds(api: DemoApi, pickListId: number) {
   return new Map(items.map(({ id, label }) => [label, id]));
 }
 
-export const seedDevices: SeedArea = async (api) => {
+/** A demo device as the user captures it in UI-003 (`DEMO_DEVICES`). */
+interface DemoDevice {
+  wiNr: string;
+  modelName: string;
+  supplier: string | null;
+  condition: string;
+  visualGrade: number;
+  conditionDescription: string;
+  values: Readonly<Record<string, string | number | object>>;
+}
+
+/** Captures the devices through `POST /api/devices`; returns their answers in the same order. */
+async function captureDevices(
+  api: DemoApi,
+  devices: readonly DemoDevice[],
+): Promise<{ id: number; version: number }[]> {
   const { items: templates } = await api.request<{
     items: { id: number; modelName: string; deviceType: { id: number } }[];
   }>('GET', '/api/model-templates?limit=200');
@@ -381,7 +396,8 @@ export const seedDevices: SeedArea = async (api) => {
   const conditionList = pickLists.find(({ key }) => key === 'condition');
   if (conditionList === undefined) throw new Error('Demo data: Zustand is missing');
   const conditions = await pickListValueIds(api, conditionList.id);
-  for (const { modelName, supplier, condition, values, ...device } of DEMO_DEVICES) {
+  const captured = [];
+  for (const { modelName, supplier, condition, values, ...device } of devices) {
     const template = templates.find((candidate) => candidate.modelName === modelName);
     if (template === undefined) throw new Error(`Demo data: ${modelName} is missing`);
     const attributes = await attributesByLabel(api, template.deviceType.id);
@@ -396,15 +412,22 @@ export const seedDevices: SeedArea = async (api) => {
           : value,
       ]);
     }
-    await api.request('POST', '/api/devices', {
-      ...device,
-      supplierId: supplier === null ? null : idOf(suppliers, supplier),
-      modelTemplateId: template.id,
-      conditionValueId: idOf(conditions, condition),
-      values: Object.fromEntries(entries),
-      confirmedKeys: [],
-    });
+    captured.push(
+      await api.request<{ id: number; version: number }>('POST', '/api/devices', {
+        ...device,
+        supplierId: supplier === null ? null : idOf(suppliers, supplier),
+        modelTemplateId: template.id,
+        conditionValueId: idOf(conditions, condition),
+        values: Object.fromEntries(entries),
+        confirmedKeys: [],
+      }),
+    );
   }
+  return captured;
+}
+
+export const seedDevices: SeedArea = async (api) => {
+  await captureDevices(api, DEMO_DEVICES);
 };
 
 /**
@@ -427,6 +450,50 @@ export const seedListings: SeedArea = async (api) => {
 };
 
 /**
+ * Assignments (S4, UI-004 "Zuordnen", #194): the demo device "626200", a ThinkPad T14 Gen 2 with
+ * the variant data of "626198" and another battery capacity, is captured and assigned to the
+ * model listing of "626198", which then has the quantity 2.
+ */
+export const DEMO_ASSIGNMENTS = [
+  {
+    listingOfWiNr: '626198',
+    device: {
+      wiNr: '626200',
+      modelName: 'ThinkPad T14 Gen 2',
+      supplier: 'Lieferant A',
+      condition: 'gebraucht',
+      visualGrade: 2,
+      conditionDescription: 'Leichte Gebrauchsspuren am Deckel',
+      values: {
+        RAM: 16,
+        Speicherkapazität: 512,
+        Tastaturlayout: 'Deutsch (QWERTZ)',
+        Betriebssystem: 'Windows 11 Pro',
+        Netzteil: 'mit Netzteil (original)',
+        Akku: 'mit Akku',
+        Akkukapazität: { percent: 79 },
+      },
+    },
+  },
+] as const;
+
+export const seedAssignments: SeedArea = async (api) => {
+  for (const { listingOfWiNr, device } of DEMO_ASSIGNMENTS) {
+    const { items } = await api.request<{
+      items: { wiNr: string; listing: { id: number } | null }[];
+    }>('GET', `/api/devices?${new URLSearchParams({ wiNr: listingOfWiNr })}`);
+    const listing = items.find(({ wiNr }) => wiNr === listingOfWiNr)?.listing;
+    if (!listing) throw new Error(`Demo data: model listing of ${listingOfWiNr} is missing`);
+    const [captured] = await captureDevices(api, [device]);
+    if (captured === undefined) throw new Error(`Demo data: device ${device.wiNr} is missing`);
+    await api.request('POST', `/api/devices/${captured.id}/assignment`, {
+      version: captured.version,
+      listingId: listing.id,
+    });
+  }
+};
+
+/**
  * The `seed<Bereich>(api)` functions in the order of the build steps. Each build step adds the
  * synthetic, deterministic demo data of its area as its own function at the end of this list
  * (random values only with a fixed seed). S1 has no demo data (FIND-223).
@@ -441,6 +508,7 @@ export const SEED_AREAS: readonly SeedArea[] = [
   seedModelTemplates,
   seedDevices,
   seedListings,
+  seedAssignments,
 ];
 
 /** Demo data (CU-061) for `npm run demo`: synthetic, no customer data (Baseline 11.3). */

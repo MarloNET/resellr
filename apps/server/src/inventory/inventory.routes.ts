@@ -10,7 +10,16 @@ import {
   deviceUpdateBodySchema,
   toWiNrKey,
 } from '@resellr/domain/schemas/device.schema';
-import { listingCreateBodySchema, listingSchema } from '@resellr/domain/schemas/listing.schema';
+import {
+  deviceAssignmentBodySchema,
+  deviceAssignmentSchema,
+  listingChoiceQuerySchema,
+  listingChoiceSchema,
+  listingCreateBodySchema,
+  listingDetailQuerySchema,
+  listingDetailSchema,
+  listingSchema,
+} from '@resellr/domain/schemas/listing.schema';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
@@ -24,6 +33,8 @@ import { createAssignmentService } from './assignment-service.ts';
 import { createDevicePrefillQuery } from './device-prefill-query.ts';
 import { createDeviceRepository } from './device-repository.ts';
 import { createDeviceService, toDevice } from './device-service.ts';
+import { createListingChoiceQuery } from './listing-choice-query.ts';
+import { createListingDetailQuery } from './listing-detail-query.ts';
 import { createListingRepository } from './listing-repository.ts';
 
 export interface InventoryRoutesOptions {
@@ -35,13 +46,30 @@ export interface InventoryRoutesOptions {
 const idParams = z.strictObject({ id: z.coerce.number().pipe(idSchema) });
 
 /**
+ * `GET …/device-prefill?conditionCode=&supplierId=` (2.5): without a code no code result, without
+ * `supplierId` (or empty) only the entry of the code without supplier applies (2.2).
+ */
+const prefillQuerystring = z.strictObject({
+  conditionCode: z
+    .string()
+    .optional()
+    .transform((code) => (code === undefined || code.trim() === '' ? null : code)),
+  supplierId: z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined || value === '' ? null : Number(value)))
+    .pipe(idSchema.nullable()),
+});
+
+/**
  * Inventory routes (CU-130, Technical Specification 2.5): `POST /api/devices`,
  * `GET /api/devices?wiNr=`, `GET /api/devices/{id}`, `PATCH /api/devices/{id}` for the device
- * values and `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` (2.6);
- * the unassigned devices (#258), assigning (#194) and the other model listing routes follow. The
- * reading routes read through the repositories CU-122 and CU-125, the catalog reader CU-108 and
- * the query CU-293 with the outer `db`, the writing ones go through the services CU-121 and CU-123
- * and their unit of work (2.0.4).
+ * values and `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` and with
+ * #194 `GET /api/model-templates/{id}/listings` and `POST /api/devices/{id}/assignment` (2.6) and
+ * with #198 `GET /api/listings/{id}` (2.7); the unassigned devices (#258) and the other model
+ * listing routes follow. The reading routes read through the repositories CU-122 and CU-125, the
+ * catalog reader CU-108 and the queries CU-292, CU-293 and CU-294 with the outer `db`, the writing ones go through the services CU-121 and CU-123 and their
+ * unit of work (2.0.4).
  */
 export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = async (
   app,
@@ -53,6 +81,8 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
   const deviceService = createDeviceService({ uow, clock });
   const assignmentService = createAssignmentService({ uow, clock });
   const prefillQuery = createDevicePrefillQuery(db);
+  const listingChoiceQuery = createListingChoiceQuery(db);
+  const listingDetailQuery = createListingDetailQuery(db);
 
   // `201` with the new device (2.0.1). The shape is checked here (`400`), every rule a user can
   // violate by the service, so all field errors come in one `422` (2.5).
@@ -143,10 +173,58 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
       reply.code(201).send(await assignmentService.createFromDevice(request.body)),
   );
 
-  // The prefill of UI-003 after the choice of a model template, with its review flags (2.5).
+  // UI-014 (2.7): the model listing with stock data, prices, devices and delivery scope.
+  app.get(
+    '/api/listings/:id',
+    {
+      schema: {
+        params: idParams,
+        querystring: listingDetailQuerySchema,
+        response: { 200: listingDetailSchema },
+      },
+    },
+    async (request) => listingDetailQuery.find(request.params.id, request.query),
+  );
+
+  // `200` with the device and the new quantity of its model listing (2.6, REQ-017): "Zuordnen" in
+  // UI-004.
+  app.post(
+    '/api/devices/:id/assignment',
+    {
+      schema: {
+        params: idParams,
+        body: deviceAssignmentBodySchema,
+        response: { 200: deviceAssignmentSchema },
+      },
+    },
+    async (request) => assignmentService.assign(request.params.id, request.body),
+  );
+
+  // The model listings of a model template to choose from in UI-004, with `deviceId` each with
+  // its deviations to that device (2.6, UI-005).
+  app.get(
+    '/api/model-templates/:id/listings',
+    {
+      schema: {
+        params: idParams,
+        querystring: listingChoiceQuerySchema,
+        response: { 200: listingChoiceSchema },
+      },
+    },
+    async (request) => listingChoiceQuery.list(request.params.id, request.query.deviceId),
+  );
+
+  // The prefill of UI-003 after the choice of a model template or the input of a condition code,
+  // with its review flags (2.5).
   app.get(
     '/api/model-templates/:id/device-prefill',
-    { schema: { params: idParams, response: { 200: devicePrefillSchema } } },
-    async (request) => prefillQuery.find(request.params.id),
+    {
+      schema: {
+        params: idParams,
+        querystring: prefillQuerystring,
+        response: { 200: devicePrefillSchema },
+      },
+    },
+    async (request) => prefillQuery.find(request.params.id, request.query),
   );
 };

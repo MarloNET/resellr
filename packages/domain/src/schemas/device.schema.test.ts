@@ -64,6 +64,7 @@ describe('device schema (CU-116, Technical Specification 2.5)', () => {
     expect(schema.parse(body())).toEqual({
       wiNr: '626198',
       supplierId: null,
+      conditionCode: null,
       modelTemplateId: 7,
       conditionValueId: 1,
       visualGrade: 3,
@@ -160,6 +161,12 @@ describe('device schema (CU-116, Technical Specification 2.5)', () => {
     expect(schema.parse(body({ supplierId: null })).supplierId).toBeNull();
     expect(schema.parse(body({ supplierId: 4 })).supplierId).toBe(4);
   });
+
+  it('takes the condition code as entered without the spaces at the edges, empty as none (REQ-015)', () => {
+    expect(schema.parse(body({ conditionCode: ' dgs ' })).conditionCode).toBe('dgs');
+    expect(schema.parse(body({ conditionCode: '  ' })).conditionCode).toBeNull();
+    expect(schema.parse(body({ conditionCode: null })).conditionCode).toBeNull();
+  });
 });
 
 describe('request shape of POST /api/devices (CU-116, 2.0.5)', () => {
@@ -169,6 +176,20 @@ describe('request shape of POST /api/devices (CU-116, 2.0.5)', () => {
         body({ wiNr: '62-61', modelTemplateId: null, conditionValueId: null, visualGrade: '' }),
       ).success,
     ).toBe(true);
+  });
+
+  it('takes a condition code of at most 20 characters (UI-003 "Eingaben")', () => {
+    expect(deviceCreateBodySchema.safeParse(body({ conditionCode: 'X'.repeat(20) })).success).toBe(
+      true,
+    );
+    expect(
+      deviceCreateBodySchema.safeParse(body({ conditionCode: 'X'.repeat(21) })).error?.issues,
+    ).toEqual([
+      expect.objectContaining({
+        path: ['conditionCode'],
+        message: 'Zustandscode: 1 bis 20 Zeichen',
+      }),
+    ]);
   });
 
   it.each([

@@ -4,6 +4,7 @@ import { buttonClassName } from '../components/ui/Button.tsx';
 import { DeviceIntakePage } from '../features/devices/DeviceIntakePage.tsx';
 import { DevicePage } from '../features/devices/DevicePage.tsx';
 import { DevicesPage } from '../features/devices/DevicesPage.tsx';
+import { ListingPage } from '../features/listings/ListingPage.tsx';
 import { ModelLibraryPage } from '../features/models/ModelLibraryPage.tsx';
 import { ModelTemplatePage } from '../features/models/ModelTemplatePage.tsx';
 import {
@@ -54,6 +55,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/inserate" replace /> },
       { path: 'inserate', element: <ListingOverviewPlaceholder /> },
+      { path: 'inserate/:listingId', element: <ListingPage /> },
       { path: 'modelle', element: <ModelLibraryPage /> },
       { path: 'modelle/neu', element: <ModelTemplatePage /> },
       { path: 'geraete', element: <DevicesPage /> },
