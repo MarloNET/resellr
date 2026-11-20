@@ -138,6 +138,7 @@ function renderDialog() {
           open
           device={DEVICE}
           onOpenChange={onOpenChange}
+          fieldLabel={(key) => key}
           onAssigned={({ device, listing }) =>
             setAssigned(assignedText(device.wiNr, listing.quantity))
           }
