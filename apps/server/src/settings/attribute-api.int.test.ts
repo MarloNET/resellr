@@ -414,8 +414,8 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
       id: number;
     };
     const ssd = (await createAttribute(notebook.id, { label: 'SSD' })).json() as { id: number };
-    insertAttributeValueRecords(
-      t.database.sqlite,
+    await insertAttributeValueRecords(
+      t.database,
       {
         modelValues: { [String(cpu.id)]: 'i5' },
         defaultDeviceValues: { [String(ram.id)]: 16 },
@@ -682,8 +682,8 @@ describe('attribute API (CU-087, Technical Specification 2.1)', () => {
       const notebook = await createDeviceType('Notebook');
       const ram = (await createAttribute(notebook.id)).json();
       const ssd = (await createAttribute(notebook.id, { label: 'SSD' })).json();
-      insertAttributeValueRecords(
-        t.database.sqlite,
+      await insertAttributeValueRecords(
+        t.database,
         { deviceValues: { [String(ram.id)]: 16 } },
         notebook.id,
       );

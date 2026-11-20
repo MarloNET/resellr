@@ -10,6 +10,7 @@ import {
   insertModelTemplate,
 } from '../../test/model-templates.ts';
 import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
+import { EMPTY_STOCK_COLUMNS } from '../../test/stock.ts';
 import { type Database, openDatabase } from '../db/database.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import { runMigrations } from '../db/migrator.ts';
@@ -47,7 +48,7 @@ function insertListing(modelTemplateId: number, articleNumber: string): number {
          condition_description, condition_description_key, variant_values, other_device_values,
          article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
          stock_hash, version, created_at, updated_at)
-       VALUES (?, ?, 2, '', '', '{"1":16}', '{"2":"silber"}', ?, ?, 'original', ?, 1, '{}', '', 1, ?, ?)`,
+       VALUES (?, ?, 2, '', '', '{"1":16}', '{"2":"silber"}', ?, ?, 'original', ?, ?, ?, ?, 1, ?, ?)`,
     )
     .run(
       modelTemplateId,
@@ -55,6 +56,9 @@ function insertListing(modelTemplateId: number, articleNumber: string): number {
       articleNumber,
       articleNumber.toLowerCase(),
       `Listing ${articleNumber}`,
+      EMPTY_STOCK_COLUMNS.quantity,
+      EMPTY_STOCK_COLUMNS.stock_json,
+      EMPTY_STOCK_COLUMNS.stock_hash,
       STAMP,
       STAMP,
     );
@@ -102,7 +106,7 @@ describe('listing repository (CU-125, Technical Specification 2.1, Nachtrag MAR-
       other_device_values: '{"2":"silber"}',
       display_title: 'Listing 626198',
       article_number: '626198',
-      quantity: 1,
+      quantity: 0,
     });
   });
 
