@@ -786,7 +786,9 @@ describe('prefill only of active attributes (CU-117, CU-293, CU-121; Technical S
     const deactivated = await get(`/api/model-templates/${t14}/device-prefill`);
 
     expect(deactivated.statusCode).toBe(200);
-    expect(deactivated.json()).toMatchObject({ values: {}, reviewKeys: [] });
+    const prefill = deactivated.json();
+    expect(prefill.values).toEqual({});
+    expect(prefill.reviewKeys).toEqual([]);
     const stored = t.database.sqlite
       .prepare('SELECT default_device_values FROM model_template WHERE id = ?')
       .get(t14) as { default_device_values: string };
