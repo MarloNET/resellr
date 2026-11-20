@@ -74,7 +74,8 @@ export type Listing = z.infer<typeof listingSchema>;
  * it: only types, missing and unknown fields (`400 bad_request`); the model data are not part of
  * it (AC-REQ-088-06). A missing field stays unchanged, `variantValues` and `otherValues` hold
  * changes (a key overwrites, `null` removes; `mergeAttributeValues`). The rules apply to the
- * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` takes effect with #207.
+ * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` confirms assigned
+ * devices that deviate afterwards (`assigned_devices_deviate`).
  */
 export const listingUpdateBodySchema = z.strictObject({
   version: versionSchema,

@@ -88,6 +88,15 @@ export interface VariantDeviation {
   listingValue: string;
 }
 
+/**
+ * An assigned device that deviates from its model listing after a change of the listing values
+ * (REQ-088, AC-REQ-088-03): `details.devices[]` of `assigned_devices_deviate` (2.7).
+ */
+export interface DeviatingDevice {
+  wiNr: string;
+  deviations: VariantDeviation[];
+}
+
 /** A missing value or an empty condition description in a deviation (2.1, "RAM: Gerät –"). */
 export const MISSING_VALUE = '–';
 
