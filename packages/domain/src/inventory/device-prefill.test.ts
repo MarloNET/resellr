@@ -149,6 +149,26 @@ describe('prefill of a device (CU-117, REQ-013; Technical Specification 2.5)', (
     expect(prefill.reviewKeys).not.toContain(String(KEYBOARD));
   });
 
+  it('DER-34-21 takes neither value nor review flag of a deactivated attribute, again once it is active again', () => {
+    // "ThinkPad T14" with the default RAM 16 GB (2.5 "Nur aktive Merkmale").
+    const defaultDeviceValues = { ...DEFAULTS, [RAM]: 16 };
+    const withRam = (active: boolean) =>
+      ATTRIBUTES.map((entry) => (entry.id === RAM ? { ...entry, active } : entry));
+
+    const deactivated = buildDevicePrefill(
+      input({ defaultDeviceValues, attributes: withRam(false) }),
+    );
+    expect(deactivated.values).not.toHaveProperty(String(RAM));
+    expect(deactivated.reviewKeys).not.toContain(String(RAM));
+    expect(deactivated.values).toEqual(DEFAULTS);
+
+    const activeAgain = buildDevicePrefill(
+      input({ defaultDeviceValues, attributes: withRam(true) }),
+    );
+    expect(activeAgain.values).toHaveProperty(String(RAM), 16);
+    expect(activeAgain.reviewKeys).toContain(String(RAM));
+  });
+
   it('DER-55-06 takes neither a deactivated pick list value nor a deactivated condition suggestion', () => {
     const prefill = buildDevicePrefill(
       input({ code: DGS, deactivatedValueIds: [HUNGARIAN, REFURBISHED] }),
