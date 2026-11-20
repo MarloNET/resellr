@@ -4,6 +4,7 @@ import {
   formatDate,
   formatDateTime,
   formatMoney,
+  formatMoneyInput,
   formatNumber,
   formatWithUnit,
   formatYesNo,
@@ -93,5 +94,23 @@ describe('output formats (E4)', () => {
 
   it('rejects an invalid timestamp', () => {
     expect(() => formatDateTime('gestern')).toThrow(RangeError);
+  });
+});
+
+describe('money as input value (2.7, UI-014 "Preis je Kanal")', () => {
+  it.each([
+    [26900, '269,00'],
+    [5000, '50,00'],
+    [123456, '1234,56'],
+    [5, '0,05'],
+  ])(
+    'formats %d cents as %j: decimal comma, no thousands separator, no currency',
+    (cents, expected) => {
+      expect(formatMoneyInput(cents)).toBe(expected);
+    },
+  );
+
+  it('rejects a fractional cent amount', () => {
+    expect(() => formatMoneyInput(1.5)).toThrow(RangeError);
   });
 });

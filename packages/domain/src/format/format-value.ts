@@ -26,6 +26,20 @@ export function formatMoney(cents: number): string {
 }
 
 /**
+ * Cent amount as the value of a money input ("1234,56"): with decimal comma and two decimal
+ * places, without thousands separators and currency, so `parseDecimal` reads it back (2.7, UI-014
+ * "Preis je Kanal").
+ */
+export function formatMoneyInput(cents: number): string {
+  if (!Number.isSafeInteger(cents)) {
+    throw new RangeError(`Not a whole cent amount: ${cents}`);
+  }
+  const absolute = Math.abs(cents);
+  const rest = (absolute % 100).toString().padStart(2, '0');
+  return `${cents < 0 ? '-' : ''}${Math.floor(absolute / 100)},${rest}`;
+}
+
+/**
  * Number with decimal comma and without thousands separators ("13,3", "1234"). Takes a whole
  * number or the canonical decimal string of an attribute value; a fractional number has no
  * defined rounding and is rejected, as are numbers that would print in exponent notation.

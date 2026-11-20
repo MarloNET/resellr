@@ -51,3 +51,18 @@ function compareMagnitude(left: string, right: string): -1 | 0 | 1 {
   if (leftDigits === rightDigits) return 0;
   return leftDigits < rightDigits ? -1 : 1;
 }
+
+/**
+ * Turns a decimal in canonical form (a result of `parseDecimal`) into whole cents
+ * (`"269"` → `26900`, `"279.05"` → `27905`), or returns `null` for more than two decimal places
+ * or an amount beyond a safe whole number. Money is stored as cents (Technical Specification
+ * 2.0.1, 2.7); the rule of the field (e.g. "Preis > 0") is checked afterwards.
+ */
+export function decimalToCents(canonical: string): number | null {
+  const negative = canonical.startsWith('-');
+  const [integerPart = '', fractionPart = ''] = canonical.replace('-', '').split('.');
+  if (fractionPart.length > 2) return null;
+  const cents = Number(integerPart + fractionPart.padEnd(2, '0'));
+  if (!Number.isSafeInteger(cents)) return null;
+  return negative && cents !== 0 ? -cents : cents;
+}

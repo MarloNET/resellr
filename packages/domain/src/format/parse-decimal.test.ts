@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { compareDecimal, parseDecimal } from './parse-decimal.ts';
+import { compareDecimal, decimalToCents, parseDecimal } from './parse-decimal.ts';
 
 describe('decimal input (E3)', () => {
   it.each([
@@ -76,4 +76,24 @@ describe('comparison of canonical decimals', () => {
   ])('compares %j with %j as %d', (left, right, expected) => {
     expect(compareDecimal(left, right)).toBe(expected);
   });
+});
+
+describe('canonical decimal as whole cents (2.0.1, 2.7)', () => {
+  it.each([
+    ['269', 26900],
+    ['269.5', 26950],
+    ['279.05', 27905],
+    ['0.01', 1],
+    ['0', 0],
+    ['-2.5', -250],
+  ])('turns %j into %d cents', (canonical, expected) => {
+    expect(decimalToCents(canonical)).toBe(expected);
+  });
+
+  it.each(['12.345', '0.001', '9007199254740992'])(
+    'returns null for %j: more than two decimal places or not a safe whole cent amount',
+    (canonical) => {
+      expect(decimalToCents(canonical)).toBeNull();
+    },
+  );
 });

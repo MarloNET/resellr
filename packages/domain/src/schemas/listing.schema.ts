@@ -4,8 +4,8 @@ import { FIELD_MESSAGES } from '../messages/messages.de.ts';
 import { centsSchema, dateSchema, idSchema, versionSchema } from './common.schema.ts';
 import { deviceSchema, STOCK_STATUSES } from './device.schema.ts';
 
-// Model listing (REQ-017, REQ-019, REQ-088; Technical Specification 2.6, 2.7, 3.3). Changing
-// follows with #200 and #206.
+// Model listing (REQ-017, REQ-019, REQ-032, REQ-088; Technical Specification 2.6, 2.7, 3.3), with
+// #204 the price per channel. Changing the listing values follows with #200 and #206.
 
 /** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
 const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
@@ -151,6 +151,44 @@ export const listingDetailQuerySchema = z.strictObject({
 /** Source of a price (2.7): entered by the user or derived by a price rule (from S5). */
 export const PRICE_SOURCES = ['manual', 'rule'] as const;
 
+/** A price of a model listing for one channel (2.7, 3.3 `listing_price`). */
+export const listingPriceSchema = z.object({
+  channelId: idSchema,
+  amountCents: centsSchema,
+  vb: z.boolean(),
+  source: z.enum(PRICE_SOURCES),
+});
+export type ListingPrice = z.infer<typeof listingPriceSchema>;
+
+/**
+ * A price in whole cents above 0 (2.7, AC-REQ-032-03): "12,345" arrives as `1234.5` and breaks
+ * the rule like 0, so the check is a field rule (`422`) and not a type check (`400`).
+ */
+export const priceAmountSchema = z
+  .number()
+  .refine((cents) => Number.isSafeInteger(cents) && cents > 0, { message: FIELD_MESSAGES.price });
+
+/**
+ * `PUT /api/listings/{id}/prices/{channelId}` (2.7, REQ-032): the version of the model listing
+ * the user saw, the price in cents and the flag VB, only for channels with `vbAllowed`.
+ */
+export const listingPriceBodySchema = z.strictObject({
+  version: versionSchema,
+  amountCents: priceAmountSchema,
+  vb: z.boolean(),
+});
+export type ListingPriceInput = z.input<typeof listingPriceBodySchema>;
+
+/**
+ * The answer of `PUT /api/listings/{id}/prices/{channelId}` (2.7): the new version of the model
+ * listing and the prices of all channels, as price rules can change several (from S5).
+ */
+export const listingPricesSchema = z.object({
+  listing: z.object({ version: versionSchema }),
+  prices: z.array(listingPriceSchema),
+});
+export type ListingPrices = z.infer<typeof listingPricesSchema>;
+
 /** The stored battery capacity of a device (3.4): a percentage or "nicht ermittelbar". */
 const batteryCapacitySchema = z.union([
   z.object({ percent: z.int().min(0).max(100) }),
@@ -185,14 +223,7 @@ export const listingDetailSchema = listingSchema.extend({
     batteryText: z.string(),
     stockHash: z.string(),
   }),
-  prices: z.array(
-    z.object({
-      channelId: idSchema,
-      amountCents: centsSchema,
-      vb: z.boolean(),
-      source: z.enum(PRICE_SOURCES),
-    }),
-  ),
+  prices: z.array(listingPriceSchema),
   devices: z.array(listingDeviceSchema),
   deliveryScope: z.array(z.object({ id: idSchema, name: z.string() })),
 });
