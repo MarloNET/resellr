@@ -193,7 +193,7 @@ describe('UI-010 "Umbuchen" and UI-004 in the mode "umbuchen" (CU-137, CU-134, #
     expect(screen.queryByRole('dialog', { name: 'Gerät umbuchen' })).toBeNull();
   });
 
-  it('UI-004.error AC-REQ-020-02 shows "Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden" in the dialog after device_not_available; the dialog stays', async () => {
+  it('AC-REQ-020-02 UI-004.error shows "Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden" in the dialog after device_not_available; the dialog stays', async () => {
     mockApi({
       rebook: () =>
         Response.json(

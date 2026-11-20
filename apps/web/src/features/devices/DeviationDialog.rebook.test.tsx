@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider, useNavigate } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createQueryClient } from '../../app/query-client.ts';
+import { buttonClassName } from '../../components/ui/Button.tsx';
 import { ListingPage } from '../listings/ListingPage.tsx';
 import { rebookedLocation } from './AssignDialog.tsx';
 import { DeviationDialog } from './DeviationDialog.tsx';
@@ -164,6 +165,8 @@ describe('UI-005 "Umbuchen" (CU-135, #202, REQ-020)', () => {
     ).toBeTruthy();
     expect(footerRebook().disabled).toBe(true);
     expect(footerRebook().title).toBe('Kein anderes Modell-Inserat dieser Modellvorlage');
+    // A secondary button of the component library at the left of the footer (UI-005 `screen.md`).
+    expect(footerRebook().className).toBe(buttonClassName('secondary', 'mr-auto'));
     fireEvent.click(footerRebook());
     expect(within(dialog()).queryByRole('radio')).toBeNull();
     expect(sent).toEqual([]);

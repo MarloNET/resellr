@@ -357,17 +357,17 @@ function DeviationContent({
       </DialogBody>
       <DialogFooter>
         {rebookable && !choosingTarget && (
-          // A link at the left of the footer (`default.png`); not available without another model
-          // listing of the model template (DER-61-02).
-          <button
+          // A secondary button at the left of the footer (`screen.md`, position as in `default.png`);
+          // not available without another model listing of the model template (DER-61-02).
+          <Button
             type="button"
-            className="mr-auto cursor-pointer text-body text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="mr-auto"
             disabled={busy || otherListings.length === 0}
             title={noOtherListing ? TEXTS.noOtherListing : undefined}
             onClick={() => setChoosingTarget(true)}
           >
             {TEXTS.rebook}
-          </button>
+          </Button>
         )}
         <Button type="button" disabled={busy} onClick={onClose}>
           {TEXTS.cancel}
