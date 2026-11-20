@@ -87,7 +87,7 @@ const STRUCTURE_CODES = new Set([
  * (`400`, e.g. a value for an attribute of another level), a violated rule a field error, the
  * first one per field, all fields in one answer (`422 validation_failed`).
  */
-function checkedRequest<T>(schema: z.ZodType<T>, input: unknown): T {
+export function checkedRequest<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (result.success) return result.data;
   const issues: z.core.$ZodIssue[] = result.error.issues;
@@ -107,7 +107,7 @@ function checkedRequest<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 
 /** A pick list value in the request and the list it has to come from (2.0.11). */
-interface PickListValueReference {
+export interface PickListValueReference {
   /** Field path like `fields[].path`, e.g. `conditionValueId`, `values.14` (2.0.11). */
   path: string;
   id: number;
@@ -123,14 +123,16 @@ interface PickListValueReference {
  * `positionId`. With `stored` (`PATCH`) only a changed value counts: a condition or choice whose
  * id differs from the stored one, an id of a port entry the stored value of the same attribute
  * does not hold (Nachtrag MAR-904). A value of another shape is left to the schema of CU-067.
+ * The values are at `<prefix>.<id>`, for a model listing `variantValues` and `otherValues` (CU-124).
  */
-function pickListValueReferences(
+export function pickListValueReferences(
   attributes: readonly AttributeEntry[],
   request: { conditionValueId: number | null; values: Readonly<Record<string, unknown>> },
   stored: { conditionValueId: number | null; values: Readonly<Record<string, unknown>> } = {
     conditionValueId: null,
     values: {},
   },
+  prefix = 'values',
 ): PickListValueReference[] {
   const references: PickListValueReference[] = [];
   const { conditionValueId } = request;
@@ -144,7 +146,7 @@ function pickListValueReferences(
   }
   for (const attribute of attributes.filter(({ level }) => level === 'device')) {
     const key = String(attribute.id);
-    const path = `values.${key}`;
+    const path = `${prefix}.${key}`;
     const value = request.values[key];
     const before = stored.values[key];
     if (attribute.dataType === 'pick' && typeof value === 'number' && value !== before) {
@@ -183,7 +185,7 @@ function pickListValueReferences(
  * The referenced pick list values (2.0.11 stage (3)): each must exist in the expected list,
  * otherwise the user interface sent a wrong id (`400 bad_request`; none is ever deleted).
  */
-async function findPickListValues(
+export async function findPickListValues(
   settings: SettingsReader,
   references: readonly PickListValueReference[],
 ): Promise<Map<number, PickListValueEntry>> {
@@ -210,7 +212,7 @@ async function findPickListValues(
  * the usage `.condition` ("Zustand <Wert> ist deaktiviert") or `.attribute` ("<Merkmal>: <Wert>
  * ist deaktiviert") and `details: { path, id }`.
  */
-function checkActivePickListValues(
+export function checkActivePickListValues(
   references: readonly PickListValueReference[],
   values: ReadonlyMap<number, PickListValueEntry>,
 ) {

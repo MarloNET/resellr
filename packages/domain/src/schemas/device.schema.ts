@@ -40,14 +40,14 @@ export const wiNrSchema = z.string().superRefine((wiNr, context) => {
 export const toWiNrKey = (wiNr: string) => wiNr.toLowerCase();
 
 /** A required choice: `null` is "nothing chosen" and fails with the text of the field (2.0.5). */
-const requiredChoice = (message: string) =>
+export const requiredChoice = (message: string) =>
   idSchema.nullable().refine((id): id is number => id !== null, message);
 
 /**
  * Visual grade (2.5): a whole number 1–5, entered as text or sent as number; one text for
  * missing and wrong (UI-003 `screen.md`). Stored as number.
  */
-const visualGradeSchema = z
+export const visualGradeSchema = z
   .union([z.number(), z.string()])
   .nullable()
   .transform((input, context) => {
@@ -61,7 +61,7 @@ const visualGradeSchema = z
   });
 
 /** Condition description: 0–1,000 characters after trimming (3.3). */
-const conditionDescriptionSchema = z
+export const conditionDescriptionSchema = z
   .string()
   .trim()
   .max(CONDITION_DESCRIPTION_MAX, FIELD_MESSAGES.conditionDescription);

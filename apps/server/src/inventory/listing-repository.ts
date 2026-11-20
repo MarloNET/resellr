@@ -1,6 +1,6 @@
 import type { Insertable, Kysely, Selectable } from 'kysely';
 
-import type { DB, ListingTable } from '../db/schema.ts';
+import type { DB, ListingPriceTable, ListingTable } from '../db/schema.ts';
 
 export type ListingRow = Selectable<ListingTable>;
 export type ListingInsert = Omit<Insertable<ListingTable>, 'id'>;
@@ -8,10 +8,29 @@ export type ListingInsert = Omit<Insertable<ListingTable>, 'id'>;
 /** The derived stock columns of a model listing (3.3), written only by CU-128 (FIND-221). */
 export type ListingStockColumns = Pick<ListingRow, 'quantity' | 'stock_json' | 'stock_hash'>;
 
+/** The listing values of a model listing (2.7, 3.3) with its version, written by CU-124. */
+export type ListingValueColumns = Pick<
+  ListingRow,
+  | 'condition_value_id'
+  | 'visual_grade'
+  | 'condition_description'
+  | 'condition_description_key'
+  | 'variant_values'
+  | 'other_device_values'
+  | 'article_number'
+  | 'article_number_key'
+  | 'ean_mode'
+  | 'own_ean'
+  | 'version'
+  | 'updated_at'
+>;
+
 /**
  * Queries on `listing`, `listing_delivery_scope` and `listing_price` (CU-125; Technical
- * Specification 4.1, Nachtrag MAR-879), with #197 those for creating a model listing. A new model
- * listing has no delivery scope and no prices (AC-REQ-019-01), so creating writes neither table.
+ * Specification 4.1, Nachtrag MAR-879), with #197 those for creating a model listing, with #204
+ * those for saving a price and with #206 those for changing its listing values and delivery scope.
+ * A new model listing has no delivery scope and no prices (AC-REQ-019-01), so creating writes
+ * neither table.
  * Inside an action pass `tx.db`, outside of one the outer `db` (2.0.4).
  */
 export function createListingRepository(db: Kysely<DB>) {
@@ -92,6 +111,30 @@ export function createListingRepository(db: Kysely<DB>) {
         .execute();
     },
 
+    /** Inserts or replaces the price of a model listing for one channel (2.7, 3.3). */
+    async savePrice(row: Insertable<ListingPriceTable>): Promise<void> {
+      await db
+        .insertInto('listing_price')
+        .values(row)
+        .onConflict((conflict) =>
+          conflict.columns(['listing_id', 'channel_id']).doUpdateSet({
+            amount_cents: row.amount_cents,
+            vb: row.vb,
+            source: row.source,
+          }),
+        )
+        .execute();
+    },
+
+    /** Raises the version of a model listing after a change of its prices (2.0.3). */
+    async raiseVersion(id: number, updatedAt: string): Promise<void> {
+      await db
+        .updateTable('listing')
+        .set((eb) => ({ version: eb('version', '+', 1), updated_at: updatedAt }))
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow();
+    },
+
     /**
      * The model listing holding this article number key, `undefined` if there is none: the
      * article number is unique without regard to case (2.7, 3.3).
@@ -108,6 +151,30 @@ export function createListingRepository(db: Kysely<DB>) {
     async listIds(): Promise<number[]> {
       const rows = await db.selectFrom('listing').select('id').orderBy('id').execute();
       return rows.map((row) => row.id);
+    },
+
+    /** Writes the listing values of a model listing with its new version (2.7, CU-124). */
+    async updateValues(id: number, columns: ListingValueColumns): Promise<void> {
+      await db.updateTable('listing').set(columns).where('id', '=', id).executeTakeFirstOrThrow();
+    },
+
+    /**
+     * Replaces the delivery scope of a model listing by these text blocks in their order (A-32,
+     * 2.7); an empty list removes it.
+     */
+    async replaceDeliveryScope(listingId: number, textBlockIds: readonly number[]): Promise<void> {
+      await db.deleteFrom('listing_delivery_scope').where('listing_id', '=', listingId).execute();
+      if (textBlockIds.length === 0) return;
+      await db
+        .insertInto('listing_delivery_scope')
+        .values(
+          textBlockIds.map((textBlockId, position) => ({
+            listing_id: listingId,
+            text_block_id: textBlockId,
+            position,
+          })),
+        )
+        .execute();
     },
 
     /**

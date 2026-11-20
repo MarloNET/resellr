@@ -13,8 +13,10 @@ import {
   useDeviceTypesQuery,
   usePickListsQuery,
 } from '../../api/settings.api.ts';
+import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
 import { bannerClassName, PageBanner } from '../../components/patterns/PageBanner.tsx';
 import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.tsx';
+import { Button } from '../../components/ui/Button.tsx';
 import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import {
   Table,
@@ -32,6 +34,7 @@ import {
   PickListLabel,
 } from '../devices/DeviceIntakePage.tsx';
 import { STOCK_STATUS_LABELS } from '../devices/DevicesPage.tsx';
+import { ListingValuesForm } from './ListingValuesForm.tsx';
 
 // Texts of UI-014 `screen.md` (UI/UX design v0.6.1); "geladen" for opening (DER-60-02).
 const TEXTS = {
@@ -43,6 +46,8 @@ const TEXTS = {
   loadError: (referenceNumber: string | null) =>
     `Das Modell-Inserat konnte nicht geladen werden. Referenz: ${referenceNumber ?? '–'}`,
   values: 'Inseratswerte',
+  edit: 'Bearbeiten',
+  saved: 'Inseratswerte gespeichert',
   modelDataHint: 'Modelldaten werden in der Modellvorlage gepflegt.',
   condition: 'Zustand',
   visualGrade: 'Optik-Note',
@@ -98,16 +103,20 @@ function ValueRow({ label, children }: { label: string; children: ReactNode }) {
  * Area "Inseratswerte" (read only): condition, visual grade, the listed device values (variant
  * values and other values) in the order of the attributes, delivery scope ("–" when empty),
  * article number, EAN and the condition description; the model data are not here, a hint names
- * the model template (DER-60-05, AC-REQ-088-06). Editing follows with #206.
+ * the model template (DER-60-05, AC-REQ-088-06). "Bearbeiten" opens `UI-014.edit` in its place
+ * (CU-139, DER-64-01).
  */
 function ListingValues({
   listing,
   attributes,
   originalEan,
+  editing,
 }: {
   listing: ListingDetail;
   attributes: readonly Attribute[];
   originalEan: string | null;
+  /** `UI-014.edit` instead of the values, with the hint to the model template kept. */
+  editing: { form: ReactNode } | { onEdit: () => void };
 }) {
   const headingId = useId();
   const lists = usePickListsQuery();
@@ -115,14 +124,48 @@ function ListingValues({
   const listed = attributes.filter(({ id }) => values[String(id)] !== undefined);
   return (
     <section aria-labelledby={headingId} className={CARD}>
-      <h2 id={headingId} className={`${CARD_HEADING} border-b border-border pb-4`}>
-        {TEXTS.values}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <h2 id={headingId} className={CARD_HEADING}>
+          {TEXTS.values}
+        </h2>
+        {'onEdit' in editing && <Button onClick={editing.onEdit}>{TEXTS.edit}</Button>}
+      </div>
       <p className="m-0 text-body text-text-secondary">{TEXTS.modelDataHint}</p>
+      {'form' in editing ? (
+        editing.form
+      ) : (
+        <ListingValueList
+          listing={listing}
+          listed={listed}
+          values={values}
+          lists={lists.data?.items}
+          originalEan={originalEan}
+        />
+      )}
+    </section>
+  );
+}
+
+/** The listing values read only: label and value side by side (mockup UI-014). */
+function ListingValueList({
+  listing,
+  listed,
+  values,
+  lists,
+  originalEan,
+}: {
+  listing: ListingDetail;
+  listed: readonly Attribute[];
+  values: Record<string, unknown>;
+  lists: Parameters<typeof listIdOf>[0];
+  originalEan: string | null;
+}) {
+  return (
+    <>
       <dl className="m-0 grid grid-cols-1 gap-x-12 full:grid-cols-2">
         <ValueRow label={TEXTS.condition}>
           <PickListLabel
-            pickListId={listIdOf(lists.data?.items, 'condition')}
+            pickListId={listIdOf(lists, 'condition')}
             valueId={listing.conditionValueId}
           />
         </ValueRow>
@@ -150,7 +193,7 @@ function ListingValues({
           {listing.conditionDescription === '' ? TEXTS.empty : listing.conditionDescription}
         </dd>
       </dl>
-    </section>
+    </>
   );
 }
 
@@ -216,14 +259,17 @@ function ListingDevices({
  * head with the untruncated title and "Geräteart · Stückzahl n · Artikelnummer <Nr>", the listing
  * values (read only) with the hint to the model template, and the devices with the filter "auch
  * stornierte"; the states loading, error ("geladen", DER-60-02) and P-06 above the page
- * (DER-60-06). With #209 the head shows the quantity of the current stock data, and head and devices
- * show the state of each answer of `GET /api/listings/{id}`: on opening and after an own write
- * action, which reads the model listing again (DER-65-02). Channel cards follow with S5, photos with
- * S7, prices with #204, editing with #206.
+ * (DER-60-06); with #206 the edit view of the listing values (`UI-014.edit`, CU-139), the banner
+ * "Inseratswerte gespeichert" after saving (DER-64-02) and P-08 (DER-64-06). With #209 the head
+ * shows the quantity of the current stock data, and head and devices show the state of each answer
+ * of `GET /api/listings/{id}`: on opening and after an own write action, which reads the model
+ * listing again (DER-65-02). Channel cards follow with S5, photos with S7, prices with #204.
  */
 export function ListingPage() {
   const id = listingIdOf(useParams().listingId);
   const [includeCancelled, setIncludeCancelled] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const query = useListingQuery(id, { includeCancelled });
   // A failed later read (the filter "auch stornierte" without an answer) keeps the last loaded
   // state of this model listing, so P-06 stands above the page and never replaces it (7.3).
@@ -248,6 +294,7 @@ export function ListingPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <OutcomeUnknownBanner />
       {unreachable && <UnreachableBanner />}
       {notFound && (
         <div role="alert" className={bannerClassName('error')}>
@@ -257,6 +304,11 @@ export function ListingPage() {
       {loadError && (
         <PageBanner variant="error" error={loadError}>
           {TEXTS.loadError}
+        </PageBanner>
+      )}
+      {saved && (
+        <PageBanner variant="success" onClose={() => setSaved(false)}>
+          {TEXTS.saved}
         </PageBanner>
       )}
 
@@ -291,6 +343,29 @@ export function ListingPage() {
             listing={listing}
             attributes={attributes.data.items}
             originalEan={template.data?.originalEan ?? null}
+            editing={
+              editing && deviceTypeId !== null
+                ? {
+                    form: (
+                      <ListingValuesForm
+                        listing={listing}
+                        attributes={attributes.data.items}
+                        deviceTypeId={deviceTypeId}
+                        onCancel={() => setEditing(false)}
+                        onSaved={() => {
+                          setEditing(false);
+                          setSaved(true);
+                        }}
+                      />
+                    ),
+                  }
+                : {
+                    onEdit: () => {
+                      setSaved(false);
+                      setEditing(true);
+                    },
+                  }
+            }
           />
           <ListingDevices
             devices={listing.devices}

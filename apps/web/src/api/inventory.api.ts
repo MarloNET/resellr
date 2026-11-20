@@ -13,6 +13,9 @@ import {
   type ListingChoice,
   type ListingCreateInput,
   type ListingDetail,
+  type ListingUpdateInput,
+  type ListingPriceInput,
+  type ListingPrices,
   variantDeviationDetailsSchema,
   type VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
@@ -22,8 +25,8 @@ import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
 
 // Hooks of the devices of F-05 and the model listings of F-06 and F-07 (CU-131, Technical
-// Specification 2.5 to 2.7). The unassigned devices (#258) and the other model listing hooks
-// follow.
+// Specification 2.5 to 2.7), with #204 the price per channel. The unassigned devices (#258) and
+// the other model listing hooks follow.
 
 /**
  * Hits of the device search of UI-009 (`GET /api/devices?wiNr=`, REQ-016): the first page of
@@ -155,6 +158,19 @@ export function useListingQuery(id: number | null, { includeCancelled = false } 
 }
 
 /**
+ * "Speichern" of the listing values in `UI-014.edit` (`PATCH /api/listings/{id}`, 2.7): on success
+ * the model listing is read again, with the names of its delivery scope, and the model listings
+ * to choose from in UI-004 with their variant data.
+ */
+export function useUpdateListingMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation<Listing, ApiError, ListingUpdateInput>({
+    mutationFn: (body) => apiClient.patch<Listing>(`/api/listings/${id}`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
+  });
+}
+
+/**
  * The model listings of a model template with their deviations to a device for UI-005
  * (`GET /api/model-templates/{id}/listings?deviceId=`, 2.6).
  */
@@ -193,4 +209,26 @@ export function useAssignDeviceMutation() {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
     },
   );
+}
+
+/**
+ * "Preis speichern" of a channel in UI-014 (`PUT /api/listings/{id}/prices/{channelId}`, 2.7): the
+ * answer holds the prices of all channels and the new version, which the cached model listing
+ * takes over without reading it again (DER-62-04).
+ */
+export function useSaveListingPriceMutation(listingId: number) {
+  const queryClient = useQueryClient();
+  return useMutation<ListingPrices, ApiError, { channelId: number; body: ListingPriceInput }>({
+    mutationFn: ({ channelId, body }) =>
+      apiClient.put<ListingPrices>(`/api/listings/${listingId}/prices/${channelId}`, body),
+    onSuccess: ({ listing, prices }) => {
+      queryClient.setQueriesData<ListingDetail>(
+        {
+          queryKey: queryKeys.inventory.listing(listingId, { includeCancelled: false }).slice(0, 3),
+        },
+        (previous) =>
+          previous === undefined ? previous : { ...previous, version: listing.version, prices },
+      );
+    },
+  });
 }
