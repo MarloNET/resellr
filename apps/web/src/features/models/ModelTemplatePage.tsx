@@ -1,6 +1,8 @@
-import { ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
+import { ERROR_MESSAGES, MESSAGES } from '@resellr/domain/messages/messages.de';
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
+import type { AttributeValue } from '@resellr/domain/schemas/attribute-values.schema';
 import {
+  type ModelTemplate,
   type ModelTemplateCreateInput,
   modelTemplateCreateSchema,
   type ModelTemplateMatch,
@@ -10,10 +12,15 @@ import type { ManufacturerCreateResult } from '@resellr/domain/schemas/manufactu
 import type { PickListList, PickListValueList } from '@resellr/domain/schemas/pick-list.schema';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
-import { possibleDuplicatesOf, useCreateModelTemplateMutation } from '../../api/catalog.api.ts';
+import {
+  possibleDuplicatesOf,
+  useCreateModelTemplateMutation,
+  useModelTemplateQuery,
+  useUpdateModelTemplateMutation,
+} from '../../api/catalog.api.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import {
   useAttributesQuery,
@@ -26,10 +33,17 @@ import {
   type AttributeInputs,
   attributeRequestValues,
   attributesOfLevel,
+  storedPickListIds,
 } from '../../components/forms/AttributeFieldsForm.tsx';
-import type { AttributeInputValue, PortInput } from '../../components/forms/AttributeInput.tsx';
+import {
+  attributeInputOf,
+  type AttributeInputValue,
+  type PortInput,
+} from '../../components/forms/AttributeInput.tsx';
 import {
   type ChoiceItem,
+  choiceOptions,
+  type ChoiceOption,
   findMissingChoices,
   type MissingChoice,
 } from '../../components/forms/deactivated-choice.ts';
@@ -39,7 +53,7 @@ import {
   useFocusFirstError,
 } from '../../components/forms/FormField.tsx';
 import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
-import { PageBanner } from '../../components/patterns/PageBanner.tsx';
+import { bannerClassName, PageBanner } from '../../components/patterns/PageBanner.tsx';
 import {
   noticeOf,
   SaveNoticeBanners,
@@ -63,6 +77,10 @@ import { ManufacturerCreateDialog } from './ManufacturerCreateDialog.tsx';
 const TEXTS = {
   back: 'Zurück zur Modell-Bibliothek',
   title: 'Modellvorlage anlegen',
+  titleEdit: 'Modellvorlage ändern',
+  /** "Beim Ändern Hinweis" (DER-52-02); the scope count follows with S5 (#183). */
+  editHint:
+    'Änderungen an Modelldaten wirken auf alle Modell-Inserate und Datenblätter dieser Modellvorlage.',
   loading: 'Lade Modellvorlage …',
   modelData: 'Modelldaten',
   choose: 'Bitte wählen',
@@ -223,6 +241,8 @@ function portListIds(queryClient: QueryClient) {
 interface AttributeChoice {
   path: string;
   id: number;
+  /** Whether the stored value of the field holds the id (changing); it is never missing. */
+  stored: boolean;
   list: string;
   message: (name: string) => string;
 }
@@ -235,29 +255,36 @@ interface ReloadedList {
 
 /**
  * The pick list values chosen in the attribute fields, in form order, with the list they come
- * from and the text of their usage (2.0.11).
+ * from and the text of their usage (2.0.11); a value held by the stored values of the same
+ * attribute (`stored`, while changing) is marked stored.
  */
 function attributeChoices(
   attributes: readonly Attribute[],
   draft: Draft,
   ports: { type: number | null; position: number | null },
+  stored: Readonly<Record<ValueObject, Readonly<Record<string, unknown>>>> | null,
 ): AttributeChoice[] {
   const choices: AttributeChoice[] = [];
   for (const { key, level } of VALUE_OBJECTS) {
     for (const attribute of attributesOfLevel(attributes, level)) {
       const path = `${key}.${attribute.id}`;
       const message = deactivatedValueText(attribute.label);
+      const storedIds = storedPickListIds(stored?.[key][String(attribute.id)]);
+      const choice = (id: number, list: number | null): AttributeChoice => ({
+        path,
+        id,
+        stored: storedIds.includes(id),
+        list: String(list),
+        message,
+      });
       const input = draft[key][String(attribute.id)];
       if (attribute.dataType === 'pick' && typeof input === 'number') {
-        choices.push({ path, id: input, list: String(attribute.pickListId), message });
+        choices.push(choice(input, attribute.pickListId));
       }
       if (attribute.dataType === 'ports' && Array.isArray(input)) {
         for (const { typeId, positionId } of input) {
-          if (typeId !== null)
-            choices.push({ path, id: typeId, list: String(ports.type), message });
-          if (positionId !== null) {
-            choices.push({ path, id: positionId, list: String(ports.position), message });
-          }
+          if (typeId !== null) choices.push(choice(typeId, ports.type));
+          if (positionId !== null) choices.push(choice(positionId, ports.position));
         }
       }
     }
@@ -292,16 +319,17 @@ const asItems = (list: PickListValueList | undefined): ChoiceItem[] =>
 /**
  * The attribute choices whose value is missing in their reloaded list, in form order, through
  * CU-319. A field of data type ports holds values of two lists, so each choice is checked with
- * the list it comes from; a new model template has no stored value.
+ * the list it comes from; a stored value is never missing.
  */
 function missingAttributeChoices(
   choices: readonly AttributeChoice[],
   lists: Readonly<Record<string, ReloadedList>>,
 ): MissingChoice[] {
-  return choices.flatMap(({ path, id, list, message }) =>
-    findMissingChoices([{ path, id, storedId: null, before: lists[list]?.before ?? [], message }], {
-      [path]: lists[list]?.after ?? undefined,
-    }),
+  return choices.flatMap(({ path, id, stored, list, message }) =>
+    findMissingChoices(
+      [{ path, id, storedId: stored ? id : null, before: lists[list]?.before ?? [], message }],
+      { [path]: lists[list]?.after ?? undefined },
+    ),
   );
 }
 
@@ -313,6 +341,57 @@ const withoutAttributePaths = (errors: FieldErrors): FieldErrors =>
 
 const optionValue = (id: number | null) => (id === null ? '' : String(id));
 const idOf = (value: string) => (value === '' ? null : Number(value));
+
+/** The id of `/modelle/:modelTemplateId`; `null` for an address without a valid id. */
+function templateIdOf(param: string): number | null {
+  const id = Number(param);
+  return /^\d+$/.test(param) && Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/** The inputs of stored attribute values by attribute id (3.4); values without definition go. */
+function inputsOf(values: Readonly<Record<string, unknown>>, attributes: readonly Attribute[]) {
+  const inputs: Record<string, AttributeInputValue> = {};
+  for (const attribute of attributes) {
+    const value = values[String(attribute.id)];
+    if (value !== undefined)
+      inputs[attribute.id] = attributeInputOf(attribute, value as AttributeValue);
+  }
+  return inputs;
+}
+
+/** The form of a stored model template (UI-007 "ändern"). */
+const draftOf = (template: ModelTemplate, attributes: readonly Attribute[]): Draft => ({
+  deviceTypeId: template.deviceTypeId,
+  manufacturerId: template.manufacturerId,
+  modelName: template.modelName,
+  typeDesignation: template.typeDesignation ?? '',
+  mpn: template.mpn ?? '',
+  mpnUnknown: template.mpnUnknown,
+  originalEan: template.originalEan ?? '',
+  modelValues: inputsOf(template.modelValues, attributes),
+  defaultDeviceValues: inputsOf(template.defaultDeviceValues, attributes),
+});
+
+/**
+ * The entries of "Geräteart" or "Hersteller" (2.4 "Anzeige in UI-007", CU-319): the active ones,
+ * while changing the stored one, and the chosen one also when it is deactivated after a reload,
+ * each without a mark; a rejected entry whose list could not be read again is no longer offered
+ * unless it is the stored one.
+ */
+function offeredEntries(
+  items: readonly { id: number; name: string; active: boolean }[] | undefined,
+  {
+    storedId,
+    chosenId,
+    droppedId,
+  }: { storedId: number | null; chosenId: number | null; droppedId?: number },
+): ChoiceOption[] | undefined {
+  if (items === undefined) return undefined;
+  return choiceOptions(
+    items.map(({ id, name, active }) => ({ id, label: name, active })),
+    { storedId, chosenId },
+  ).filter(({ id }) => id !== droppedId || id === storedId);
+}
 
 /**
  * Model template UI-007 for a new model template (CU-114, REQ-008; Technical Specification
@@ -326,40 +405,54 @@ const idOf = (value: string) => (value === '' ? null : Number(value));
  * save and the dialog dublette for a possible duplicate (REQ-011). "Neuen Hersteller anlegen"
  * opens the dialog UI-008 (#179). Opened from UI-003 ("Neue Modellvorlage anlegen"), the calling
  * page is UI-003: the saved model template, or the existing one of "Vorhandene verwenden", goes
- * into the draft of UI-003 (CU-133) and UI-003 opens again (DER-54-07, DER-54-14). Changing (#181)
- * follows.
+ * into the draft of UI-003 (CU-133) and UI-003 opens again (DER-54-07, DER-54-14).
+ *
+ * Opened as `/modelle/:modelTemplateId` (UI-006), UI-007 changes the model template (#181,
+ * REQ-010): "Lade Modellvorlage …" while it loads (DER-52-01), the hint on model data
+ * (DER-52-02), `PATCH` with the version shown, P-05 on `version_conflict` (DER-52-05) and M-15
+ * on `not_found` (DER-52-06). A stored device type, manufacturer or pick list value deactivated
+ * meanwhile stays chosen and offered, the pick list value with "(deaktiviert)" (DER-52-08).
  */
 export function ModelTemplatePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const param = useParams().modelTemplateId;
+  // `/modelle/:modelTemplateId` changes a model template, `/modelle/neu` creates one.
+  const editing = param !== undefined;
+  const templateId = param === undefined ? null : templateIdOf(param);
   // UI-003 or UI-006 (UI-007 "Aktionen": "Aufrufseite").
   const fromDeviceIntake = isCalledFromDeviceIntake(location.state);
   const callerPath = fromDeviceIntake ? DEVICE_INTAKE_PATH : LIBRARY_PATH;
+  const title = editing ? TEXTS.titleEdit : TEXTS.title;
   const deviceTypes = useDeviceTypesQuery();
   const manufacturers = useManufacturersQuery();
+  const templateQuery = useModelTemplateQuery(templateId);
   const createMutation = useCreateModelTemplateMutation();
+  const updateMutation = useUpdateModelTemplateMutation(templateId ?? 0);
   const writesLocked = useWritesLocked();
   const queryClient = useQueryClient();
 
   // A rejected entry whose list could not be read again counts as missing (2.4, Nachtrag
   // MAR-925): it is no longer offered.
   const [dropped, setDropped] = useState<Partial<Record<ChoiceField, number>>>({});
-  const activeDeviceTypes = deviceTypes.data?.items.filter(
-    ({ id, active }) => active && id !== dropped.deviceTypeId,
-  );
-  const activeManufacturers = manufacturers.data?.items.filter(
-    ({ id, active }) => active && id !== dropped.manufacturerId,
-  );
 
   // Pick list values rejected as deactivated whose list could not be read again (2.0.11).
   const [droppedValues, setDroppedValues] = useState<ReadonlySet<number>>(new Set());
 
+  // The stored model template the form changes; it changes only with "Neu laden" (P-05), so a
+  // read in the background never overwrites the inputs and the version stays the one shown.
+  const [stored, setStored] = useState<ModelTemplate | null>(null);
+  const storedRef = useRef(stored);
+  storedRef.current = stored;
   const [draft, setDraft] = useState<Draft | null>(null);
   // The current inputs for the check after reloading the choices.
   const draftRef = useRef(draft);
   draftRef.current = draft;
   // The fields of the attributes of the chosen device type; none are loaded without one (2.4).
-  const attributesQuery = useAttributesQuery(draft?.deviceTypeId ?? null);
+  // While changing, those of the stored device type are read before the form opens.
+  const attributesQuery = useAttributesQuery(
+    draft === null ? (templateQuery.data?.deviceTypeId ?? null) : draft.deviceTypeId,
+  );
   const attributes = draft?.deviceTypeId == null ? [] : attributesQuery.data?.items;
   const attributesRef = useRef(attributes);
   attributesRef.current = attributes;
@@ -382,10 +475,21 @@ export function ModelTemplatePage() {
   const focusFirstError = useFocusFirstError(formRef);
   const blurCheck = useDeferredBlurCheck();
 
+  const offeredDeviceTypes = offeredEntries(deviceTypes.data?.items, {
+    storedId: stored?.deviceTypeId ?? null,
+    chosenId: draft?.deviceTypeId ?? null,
+    droppedId: dropped.deviceTypeId,
+  });
+  const offeredManufacturers = offeredEntries(manufacturers.data?.items, {
+    storedId: stored?.manufacturerId ?? null,
+    chosenId: draft?.manufacturerId ?? null,
+    droppedId: dropped.manufacturerId,
+  });
+
   // The form opens once the choices have arrived, with nothing chosen (Design v0.6.7).
-  const choicesLoaded = activeDeviceTypes !== undefined && activeManufacturers !== undefined;
+  const choicesLoaded = offeredDeviceTypes !== undefined && offeredManufacturers !== undefined;
   useEffect(() => {
-    if (draft !== null || !choicesLoaded) return;
+    if (editing || draft !== null || !choicesLoaded) return;
     setDraft({
       deviceTypeId: null,
       manufacturerId: null,
@@ -397,14 +501,28 @@ export function ModelTemplatePage() {
       modelValues: {},
       defaultDeviceValues: {},
     });
-  }, [draft, choicesLoaded]);
+  }, [editing, draft, choicesLoaded]);
 
-  const saving = createMutation.isPending;
+  // While changing, the form opens with the stored model template and the inputs of its
+  // attribute values (UI-007 "ändern"). A model template deleted meanwhile keeps its outdated
+  // data in the query; M-15 then stands instead of the form (2.0.5).
+  const template = templateQuery.data;
+  const templateAttributes = attributesQuery.data?.items;
+  const templateGone = templateQuery.error?.kind === 'not-found';
+  useEffect(() => {
+    if (!editing || draft !== null || !choicesLoaded || templateGone) return;
+    if (template === undefined || templateAttributes === undefined) return;
+    setStored(template);
+    setDraft(draftOf(template, templateAttributes));
+  }, [editing, draft, choicesLoaded, templateGone, template, templateAttributes]);
+
+  const saving = createMutation.isPending || updateMutation.isPending;
   // Until the choices are read again after a rejection, a save could send the rejected id; until
   // the attributes have arrived, it would send none of their values. While the dialog of a
   // possible duplicate is open, only its choices save (Ctrl+S does not).
   const canSave =
     draft !== null &&
+    (!editing || stored !== null) &&
     attributes !== undefined &&
     !saving &&
     !writesLocked &&
@@ -545,7 +663,8 @@ export function ModelTemplatePage() {
     const texts: FieldErrors = {};
     for (const field of CHOICE_FIELDS) {
       const value = draftRef.current?.[field] ?? null;
-      if (value === null) continue;
+      // The stored entry stays offered, so it is never missing (2.4 "Erkennen").
+      if (value === null || value === storedRef.current?.[field]) continue;
       const result = reloaded[field];
       const missing = result.isError
         ? field === rejected && value === id
@@ -610,7 +729,12 @@ export function ModelTemplatePage() {
         after: state?.status === 'error' ? null : asItems(state?.data),
       };
     }
-    const choices = attributeChoices(definitions, current, portListIds(queryClient));
+    const choices = attributeChoices(
+      definitions,
+      current,
+      portListIds(queryClient),
+      storedValuesFor(current.deviceTypeId),
+    );
     const missing = missingAttributeChoices(choices, lists);
     const rejectedList = ATTRIBUTE_PATH.test(rejected)
       ? attributeChoiceList(definitions, rejected, id, portListIds(queryClient), lists)
@@ -659,7 +783,24 @@ export function ModelTemplatePage() {
     }
     setErrors({});
     setNotice(null);
-    send(bodyOf(draft, attributes));
+    if (!editing) {
+      send(bodyOf(draft, attributes));
+      return;
+    }
+    if (stored === null) return;
+    updateMutation.mutate(
+      { version: stored.version, ...bodyOf(draft, attributes) },
+      { onSuccess: () => void navigate(callerPath, { state: savedState }), onError: onFailed },
+    );
+  }
+
+  /**
+   * The stored attribute values while changing, if the form shows the stored device type; the
+   * values of another device type do not apply (2.4 "Auswahlmerkmale in UI-007").
+   */
+  function storedValuesFor(deviceTypeId: number | null) {
+    const base = storedRef.current;
+    return base !== null && base.deviceTypeId === deviceTypeId ? base : null;
   }
 
   function send(body: ModelTemplateCreateInput) {
@@ -667,8 +808,7 @@ export function ModelTemplatePage() {
       onSuccess: (created) => {
         // Back in UI-003 the new model template is chosen (DER-54-07).
         if (fromDeviceIntake) chooseModelTemplateInDraft(created.id);
-        const state: SavedNoticeState = { savedNotice: TEXTS.saved };
-        void navigate(callerPath, { state });
+        void navigate(callerPath, { state: savedState });
       },
       onError: onFailed,
     });
@@ -695,6 +835,9 @@ export function ModelTemplatePage() {
     }
     void navigate(templatePath(id));
   }
+
+  // The success banner of UI-007 on the calling page (DER-50-02).
+  const savedState: SavedNoticeState = { savedNotice: TEXTS.saved };
 
   // Ctrl+S saves like the primary button (UI-007 "Aktionen").
   const saveRef = useRef(save);
@@ -735,6 +878,7 @@ export function ModelTemplatePage() {
           errors={fieldErrors}
           withRequired={key === 'modelValues'}
           dropped={droppedValues}
+          stored={storedValuesFor(draft.deviceTypeId)?.[key]}
           disabled={saving}
           onChange={(attributeId, input) => changeAttribute(key, attributeId, input)}
           onBlur={(attributeId) => checkOnBlur(`${key}.${attributeId}`)}
@@ -743,9 +887,15 @@ export function ModelTemplatePage() {
     );
   }
 
+  // An address without a valid id names no model template, like `404 not_found` (M-15).
+  const notFound = editing && (templateId === null || templateGone);
   // A failed read shows P-06 or the error banner; the inputs stay (2.0.7).
-  const loadFailed = deviceTypes.error ?? manufacturers.error ?? attributesQuery.error;
-  const loading = draft === null && loadFailed === null;
+  const loadFailed =
+    deviceTypes.error ??
+    manufacturers.error ??
+    attributesQuery.error ??
+    (notFound ? null : templateQuery.error);
+  const loading = draft === null && loadFailed === null && !notFound;
 
   return (
     <div className="flex h-full flex-col">
@@ -754,7 +904,7 @@ export function ModelTemplatePage() {
           <span aria-hidden="true">← </span>
           {TEXTS.back}
         </Link>
-        <h1 className="m-0 text-page-title font-semibold">{TEXTS.title}</h1>
+        <h1 className="m-0 text-page-title font-semibold">{title}</h1>
 
         <OutcomeUnknownBanner />
         {loadFailed?.kind === 'unreachable' && <UnreachableBanner />}
@@ -763,12 +913,29 @@ export function ModelTemplatePage() {
             {TEXTS.error}
           </PageBanner>
         )}
+        {notFound && (
+          <div role="alert" className={bannerClassName('warn')}>
+            {MESSAGES['M-15']}
+          </div>
+        )}
         <SaveNoticeBanners
           notice={notice}
           onClose={() => setNotice(null)}
-          onReloaded={() => setNotice(null)}
+          onReloaded={() => {
+            // "Neu laden" of P-05: the form opens again with the model template read again (T-1).
+            setNotice(null);
+            setStored(null);
+            setDraft(null);
+            setErrors({});
+            setRejectionShown({});
+          }}
           errorText={TEXTS.error}
         />
+        {editing && draft !== null && (
+          <div role="note" className={bannerClassName('warn')}>
+            {TEXTS.editHint}
+          </div>
+        )}
 
         {loading && (
           <p role="status" className="m-0 text-body text-text-secondary">
@@ -780,7 +947,7 @@ export function ModelTemplatePage() {
           <form
             id={formId}
             ref={formRef}
-            aria-label={TEXTS.title}
+            aria-label={title}
             noValidate
             className="grid grid-cols-1 gap-6 full:grid-cols-2"
             onPointerDown={blurCheck.pressPointer}
@@ -812,9 +979,9 @@ export function ModelTemplatePage() {
                     <option value="" disabled>
                       {TEXTS.choose}
                     </option>
-                    {(activeDeviceTypes ?? []).map(({ id, name }) => (
+                    {(offeredDeviceTypes ?? []).map(({ id, label }) => (
                       <option key={id} value={id}>
-                        {name}
+                        {label}
                       </option>
                     ))}
                   </Select>
@@ -834,9 +1001,9 @@ export function ModelTemplatePage() {
                       <option value="" disabled>
                         {TEXTS.choose}
                       </option>
-                      {(activeManufacturers ?? []).map(({ id, name }) => (
+                      {(offeredManufacturers ?? []).map(({ id, label }) => (
                         <option key={id} value={id}>
-                          {name}
+                          {label}
                         </option>
                       ))}
                     </Select>

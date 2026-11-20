@@ -5,7 +5,9 @@ import type { DB, ModelTemplateTable } from '../db/schema.ts';
 
 export type ModelTemplateRow = Selectable<ModelTemplateTable>;
 
-/** Columns of a new model template (3.3); keys, values and flags are set by the caller. */
+/**
+ * Columns of a new or changed model template (3.3); keys, values and flags are set by the caller.
+ */
 export interface ModelTemplateInsert {
   deviceTypeId: number;
   manufacturerId: number;
@@ -144,6 +146,29 @@ export function createModelTemplateRepository(db: Kysely<DB>) {
         .returning('id')
         .executeTakeFirstOrThrow();
       return id;
+    },
+
+    /** Stores the state of a model template after a change with the next version (2.0.3, 3.3). */
+    async update(id: number, template: ModelTemplateInsert & { version: number }): Promise<void> {
+      await db
+        .updateTable('model_template')
+        .set({
+          device_type_id: template.deviceTypeId,
+          manufacturer_id: template.manufacturerId,
+          model_name: template.modelName,
+          model_name_key: template.modelNameKey,
+          type_designation: template.typeDesignation,
+          mpn: template.mpn,
+          mpn_unknown: template.mpnUnknown ? 1 : 0,
+          original_ean: template.originalEan,
+          model_values: JSON.stringify(template.modelValues),
+          default_device_values: JSON.stringify(template.defaultDeviceValues),
+          search_key: template.searchKey,
+          version: template.version,
+          updated_at: template.at,
+        })
+        .where('id', '=', id)
+        .execute();
     },
   };
 }
