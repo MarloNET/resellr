@@ -143,6 +143,11 @@ export const FIELD_MESSAGES = {
    */
   originalEan: 'EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer',
   /**
+   * UI-014 "Preis je Kanal", not a number above 0 with at most two decimal places (2.7,
+   * AC-REQ-032-03).
+   */
+  price: 'Preis: Zahl größer 0 mit höchstens zwei Nachkommastellen',
+  /**
    * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
    * Technical Specification 8.2 (addendum MAR-487).
    */
