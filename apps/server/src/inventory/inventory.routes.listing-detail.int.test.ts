@@ -7,7 +7,9 @@ import { migrations } from '../db/migrations/index.ts';
 import { runMigrations } from '../db/migrator.ts';
 import type { DB } from '../db/schema.ts';
 import { type ChangeReport, createUnitOfWork, emptyChangeReport } from '../db/unit-of-work.ts';
+import { createClock } from '../shared/clock.ts';
 import type { ChangeEvent } from '../shared/events.ts';
+import { createDeviceService } from './device-service.ts';
 import { createInventoryReader } from './inventory-reader.ts';
 import { createListingStockUpdater, formStockColumns } from './listing-stock-updater.ts';
 
@@ -97,11 +99,13 @@ afterEach(async () => {
 
 /**
  * Captures a checked device of MV-A through the API, with "mit Akku" and the battery capacity or,
- * with `null`, with "ohne Akku" and no battery capacity; returns its id.
+ * with `null`, with "ohne Akku" and no battery capacity; without `withBatteryValue` the battery
+ * capacity only, without a battery value. Returns its id.
  */
 async function captureDevice(
   wiNr: string,
   capacity: object | null = { percent: 85 },
+  withBatteryValue = true,
 ): Promise<number> {
   const response = await t.app.inject({
     method: 'POST',
@@ -124,7 +128,10 @@ async function captureDevice(
         [ids.powerSupply]: ids.originalPowerSupply,
         ...(capacity === null
           ? { [ids.battery]: ids.withoutBattery }
-          : { [ids.battery]: ids.withBattery, [ids.batteryCapacity]: capacity }),
+          : {
+              ...(withBatteryValue && { [ids.battery]: ids.withBattery }),
+              [ids.batteryCapacity]: capacity,
+            }),
       },
       confirmedKeys: [],
     },
@@ -157,6 +164,15 @@ async function assign(deviceId: number, listingId: number, confirmDeviation = fa
   expect(response.statusCode).toBe(200);
   return response.json<{ listing: { id: number; quantity: number } }>();
 }
+
+/** `PATCH /api/devices/{id}` with the device values of UI-010 (2.5). */
+const patchDevice = (deviceId: number, payload: Record<string, unknown>) =>
+  t.app.inject({
+    method: 'PATCH',
+    url: `/api/devices/${deviceId}`,
+    headers: SAME_ORIGIN_WRITE,
+    payload,
+  });
 
 const run = (sql: string, ...params: unknown[]) => t.database.sqlite.prepare(sql).run(...params);
 const get = (url: string) => t.app.inject({ method: 'GET', url, headers: { host: HOST } });
@@ -360,12 +376,7 @@ describe('stock data of a model listing (CU-120, CU-128, CU-129; Technical Speci
     const { listingId: miA } = await createListing();
     const moved = await captureDevice('626199', { percent: 90 });
     await assign(moved, miA);
-    const patched = await t.app.inject({
-      method: 'PATCH',
-      url: `/api/devices/${moved}`,
-      headers: SAME_ORIGIN_WRITE,
-      payload: { version: 2, visualGrade: '4', confirmedKeys: [] },
-    });
+    const patched = await patchDevice(moved, { version: 2, visualGrade: '4', confirmedKeys: [] });
     expect(patched.statusCode).toBe(200);
 
     const created = await t.app.inject({
@@ -390,33 +401,122 @@ describe('stock data of a model listing (CU-120, CU-128, CU-129; Technical Speci
     });
   });
 
-  it('DER-65-02 after a change of the battery capacity of an assigned device CU-128 forms the stock data anew, and GET returns them', async () => {
+  it('DER-65-02 after PATCH /api/devices/{id} of the battery capacity of an assigned device GET returns the new stock data (2.5)', async () => {
     const { listingId } = await createListing();
     const second = await captureDevice('626199', { percent: 90 });
     await assign(second, listingId);
-    expect(await stockOf(listingId)).toMatchObject({ batteryText: '85–90 %' });
+    const before = await stockOf(listingId);
+    expect(before).toMatchObject({ batteryText: '85–90 %' });
 
-    // The change of the device values triggering it follows with #192 (2.5); here the update.
-    const { report } = await createUnitOfWork<DB>(t.database.db).run(async (uow) => {
-      await uow.db
-        .updateTable('device')
-        .set({
-          device_values: JSON.stringify({
-            [ids.battery]: ids.withBattery,
-            [ids.batteryCapacity]: { notDeterminable: true },
-          }),
-        })
-        .where('id', '=', second)
-        .execute();
-      return createListingStockUpdater(uow).update(listingId);
+    const patched = await patchDevice(second, {
+      version: 2,
+      values: { [ids.batteryCapacity]: { percent: 70 } },
+      confirmedKeys: [],
     });
 
-    expect(report).toEqual(emptyChangeReport());
-    expect(await stockOf(listingId)).toMatchObject({
+    expect(patched.statusCode).toBe(200);
+    const after = await stockOf(listingId);
+    expect(after).toMatchObject({
       quantity: 2,
       wiNrs: ['626198', '626199'],
-      batteryText: '85 % bzw. nicht ermittelbar',
+      batteryText: '70–85 %',
     });
+    expect(after.stockHash).not.toBe(before.stockHash);
+  });
+
+  it('DER-65-02 CU-121 reports StockChanged for a change of the battery capacity of an assigned device, none for one of the OS version (R4)', async () => {
+    const { listingId, deviceId } = await createListing();
+    const seen: ChangeEvent[] = [];
+    const devices = createDeviceService({
+      uow: createUnitOfWork<DB>(t.database.db, {
+        change: {
+          StockChanged: async (event): Promise<ChangeReport> => {
+            seen.push(event);
+            return emptyChangeReport();
+          },
+        },
+      }),
+      clock: createClock(),
+    });
+    const storedHash = () =>
+      t.database.sqlite.prepare('SELECT stock_hash FROM listing WHERE id = ?').get(listingId);
+    const before = storedHash();
+
+    await devices.update(deviceId, {
+      version: 2,
+      values: { [ids.osVersion]: 'macOS 15' },
+      confirmedKeys: [],
+    });
+
+    expect(seen).toEqual([]);
+    expect(storedHash()).toEqual(before);
+
+    await devices.update(deviceId, {
+      version: 3,
+      values: { [ids.batteryCapacity]: { notDeterminable: true } },
+      confirmedKeys: [],
+    });
+
+    expect(seen).toEqual([{ type: 'StockChanged', listingId }]);
+    expect(await stockOf(listingId)).toMatchObject({ batteryText: 'nicht ermittelbar' });
+  });
+
+  it('DER-65-02 the status of the attribute battery does not enter the stock data, a device without battery value enters with its battery capacity (RQ-27)', async () => {
+    const { listingId } = await createListing();
+    const before = await stockOf(listingId);
+    expect(before).toMatchObject({ batteryText: '85 %' });
+    const setBatteryActive = async (active: boolean) => {
+      const { version } = t.database.sqlite
+        .prepare('SELECT version FROM attribute WHERE id = ?')
+        .get(ids.battery) as { version: number };
+      const response = await t.app.inject({
+        method: 'PATCH',
+        url: `/api/attributes/${ids.battery}`,
+        headers: SAME_ORIGIN_WRITE,
+        payload: { version, active },
+      });
+      expect(response.statusCode).toBe(200);
+    };
+
+    await setBatteryActive(false);
+
+    expect(await stockOf(listingId)).toEqual(before);
+    expect(await stockColumnDifferences(t.database.db)).toEqual([]);
+
+    // Captured while the attribute battery is inactive: no battery value, battery capacity 80;
+    // assigned with "trotzdem zuordnen" for the deviation of the battery value.
+    await assign(await captureDevice('626199', { percent: 80 }, false), listingId, true);
+    const assigned = await stockOf(listingId);
+    expect(assigned).toMatchObject({
+      quantity: 2,
+      wiNrs: ['626198', '626199'],
+      batteryText: '80–85 %',
+    });
+
+    await setBatteryActive(true);
+
+    expect(await stockOf(listingId)).toEqual(assigned);
+    expect(await stockColumnDifferences(t.database.db)).toEqual([]);
+  });
+
+  it('DER-65-01 a stored battery value without "Akku vorhanden" keeps its device out of the battery text while the attribute battery is inactive (RQ-27)', async () => {
+    const { listingId, deviceId } = await createListing();
+    // A battery capacity next to "ohne Akku" has no writing path; CU-128 forms from both.
+    run(
+      'UPDATE device SET device_values = ? WHERE id = ?',
+      JSON.stringify({ [ids.battery]: ids.withoutBattery, [ids.batteryCapacity]: { percent: 50 } }),
+      deviceId,
+    );
+    run('UPDATE attribute SET active = 0 WHERE id = ?', ids.battery);
+
+    const formed = await formStockColumns(t.database.db, listingId);
+
+    expect(JSON.parse(formed.stock_json)).toEqual({
+      quantity: 1,
+      wiNrs: ['626198'],
+      batteryText: '',
+    });
+    await syncStockColumns(t.database.db);
   });
 
   it('DER-65-01 a device assigned with "trotzdem zuordnen" and "ohne Akku" does not enter the battery text (AC-REQ-036-05)', async () => {
@@ -482,6 +582,13 @@ describe('stock data of a model listing (CU-120, CU-128, CU-129; Technical Speci
       stock_json: '{"quantity":0,"wiNrs":[],"batteryText":""}',
       stock_hash: '74f68861b8f71e9b878b5b1b24fe0b6535a9992a0a894753c3dae776abcc15f3',
     });
+
+    // An unchanged `stock_hash` writes nothing and reports nothing (2.8.2, Nachtrag MAR-1204).
+    run(`UPDATE listing SET stock_json = '{"marker":true}' WHERE id = ?`, listingId);
+    await uow.run((tx) => createListingStockUpdater(tx).update(listingId));
+    expect(seen).toHaveLength(1);
+    expect(stored()).toMatchObject({ stock_json: '{"marker":true}' });
+    await syncStockColumns(t.database.db);
   });
 
   it('DER-65-03 the invariant test finds stock columns that differ from the new forming from the devices', async () => {

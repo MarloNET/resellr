@@ -41,6 +41,7 @@ import {
 import { readDevicePrefill } from './device-prefill-query.ts';
 import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
 import { createListingRepository } from './listing-repository.ts';
+import { createListingStockUpdater } from './listing-stock-updater.ts';
 
 export interface DeviceServiceDeps {
   uow: UnitOfWorkRunner<DB>;
@@ -503,7 +504,9 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
      * deactivated value stays valid), then the rules on the complete state after the change
      * (CU-067 with the values of the list battery, FIND-362). The review flags follow the rule of
      * `POST` against the stored ones (2.5, CU-118). An unchanged request keeps the version; a
-     * change of a value writes one audit entry `values_updated` with the changed fields (3.6).
+     * change of a value writes one audit entry `values_updated` with the changed fields (3.6) and,
+     * for an assigned device, forms the stock columns of its model listing anew (CU-128; 2.5,
+     * Nachtrag MAR-1204).
      */
     async update(id: number, input: DeviceUpdateInput): Promise<Device> {
       const { result } = await uow.run(async (tx) => {
@@ -580,6 +583,9 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
             oldValue: pick(oldFields),
             newValue: pick(newFields),
           });
+          if (stored.listingId !== null) {
+            await createListingStockUpdater(tx).update(stored.listingId);
+          }
         }
 
         const updated = await devices.findById(id);

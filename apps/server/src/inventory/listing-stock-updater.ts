@@ -21,10 +21,10 @@ async function stockColumns(devices: readonly StockDevice[]): Promise<ListingSto
 
 /**
  * The stock columns of the model listing as formed anew from its assigned devices (2.8.2): the
- * battery capacity from the attribute with the role `battery_capacity`, the flag "Akku vorhanden"
- * from the value of the attribute with the role `battery` while that attribute is active (2.5,
- * FIND-353). Reads only, with `tx.db` inside an action or the outer `db`; the invariant test of the
- * stock columns compares with it (3.3).
+ * stored value of the attribute with the role `battery_capacity` and the flag "Akku vorhanden" of
+ * the stored value of the attribute with the role `battery`, `null` without one; the status of
+ * both attributes does not enter (RQ-27, Nachtrag MAR-1204). Reads only, with `tx.db` inside an
+ * action or the outer `db`; the invariant test of the stock columns compares with it (3.3).
  */
 export async function formStockColumns(
   db: Kysely<DB>,
@@ -37,15 +37,11 @@ export async function formStockColumns(
   const settings = createSettingsReader(db);
   const attributes = await settings.listAttributes(template.deviceTypeId);
   const capacity = attributes.find((attribute) => attribute.systemRole === 'battery_capacity');
-  const battery = attributes.find(
-    (attribute) => attribute.systemRole === 'battery' && attribute.active,
-  );
-  const withBattery = new Set(
+  const battery = attributes.find((attribute) => attribute.systemRole === 'battery');
+  const batteryFlags = new Map(
     battery === undefined
       ? []
-      : (await settings.listBatteryValues())
-          .filter((value) => value.batteryPresent === true)
-          .map((value) => value.id),
+      : (await settings.listBatteryValues()).map((value) => [value.id, value.batteryPresent]),
   );
 
   const assigned = await createDeviceRepository(db).listByListing(listingId);
@@ -61,9 +57,7 @@ export async function formStockColumns(
         batteryCapacity:
           (capacity && (values[String(capacity.id)] as BatteryCapacityValue | undefined)) ?? null,
         batteryPresent:
-          battery === undefined
-            ? null
-            : typeof batteryValue === 'number' && withBattery.has(batteryValue),
+          typeof batteryValue === 'number' ? (batteryFlags.get(batteryValue) ?? null) : null,
       };
     }),
   );
@@ -82,13 +76,17 @@ export function createListingStockUpdater(uow: UnitOfWork<DB>) {
     initialColumns: () => stockColumns([]),
 
     /**
-     * Forms the stock columns of the model listing anew from its devices, writes them and emits
-     * `StockChanged` (2.6); returns the new quantity.
+     * Forms the stock columns of the model listing anew from its devices; only if `stock_hash`
+     * changes, writes them and emits `StockChanged` (2.8.2, Nachtrag MAR-1204); returns the
+     * quantity.
      */
     async update(listingId: number): Promise<number> {
       const columns = await formStockColumns(uow.db, listingId);
-      await listings.updateStock(listingId, columns);
-      uow.emit({ type: 'StockChanged', listingId });
+      const stored = await listings.findById(listingId);
+      if (stored?.stock_hash !== columns.stock_hash) {
+        await listings.updateStock(listingId, columns);
+        uow.emit({ type: 'StockChanged', listingId });
+      }
       return columns.quantity;
     },
   };
