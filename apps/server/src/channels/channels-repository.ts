@@ -28,11 +28,14 @@ export function createChannelsRepository(db: Kysely<DB>) {
         .execute();
     },
 
-    /** One channel with its flag VB (3.1 `vb_allowed`), `undefined` if there is none. */
+    /**
+     * One channel, active or not, with its name and flag VB (3.1 `vb_allowed`), `undefined` if
+     * there is none (#204, Nachtrag MAR-1171).
+     */
     async findById(id: number) {
       return db
         .selectFrom('channel')
-        .select(['id', 'name', 'active', 'vb_allowed'])
+        .select(['id', 'name', 'vb_allowed'])
         .where('id', '=', id)
         .executeTakeFirst();
     },

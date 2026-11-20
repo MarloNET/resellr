@@ -183,7 +183,13 @@ describe('PUT /api/listings/{id}/prices/{channelId} (CU-126, Technical Specifica
     expect(response.statusCode).toBe(422);
     expect(response.json().error).toMatchObject({
       code: 'validation_failed',
-      fields: [{ path: 'vb', code: 'vb_not_allowed' }],
+      fields: [
+        {
+          path: 'vb',
+          code: 'vb_not_allowed',
+          message: 'VB: Kanal lässt Verhandlungsbasis nicht zu',
+        },
+      ],
     });
     expect(rows('SELECT * FROM listing_price')).toEqual([]);
     expect(listingVersion(listingId)).toBe(1);
@@ -238,40 +244,21 @@ describe('PUT /api/listings/{id}/prices/{channelId} (CU-126, Technical Specifica
     expect(detail.json()).toMatchObject({ version: 4, prices: answer.prices });
   });
 
-  it('turns a price of a price rule into a manual one on saving (2.7)', async () => {
+  it('keeps the version and writes no second audit entry for the same request twice (Nachtrag MAR-1171)', async () => {
     const listingId = await createListing();
-    t.database.sqlite
-      .prepare(
-        "INSERT INTO listing_price (listing_id, channel_id, amount_cents, vb, source) VALUES (?, ?, 29900, 0, 'rule')",
-      )
-      .run(listingId, ids.ebay);
-
-    const response = await putPrice(listingId, ids.ebay, {
-      version: 1,
-      amountCents: 29900,
-      vb: false,
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      listing: { version: 2 },
-      prices: [{ channelId: ids.ebay, amountCents: 29900, vb: false, source: 'manual' }],
-    });
-  });
-
-  it('keeps the version and writes no audit entry for an unchanged price', async () => {
-    const listingId = await createListing();
-    await putPrice(listingId, ids.shop, { version: 1, amountCents: 26900, vb: false });
-
-    const response = await putPrice(listingId, ids.shop, {
+    const request = { version: 1, amountCents: 27900, vb: true };
+    expect((await putPrice(listingId, ids.kleinanzeigen, request)).json().listing).toEqual({
       version: 2,
-      amountCents: 26900,
-      vb: false,
     });
+
+    const response = await putPrice(listingId, ids.kleinanzeigen, { ...request, version: 2 });
 
     expect(response.statusCode).toBe(200);
     expect(response.json().listing).toEqual({ version: 2 });
-    expect(priceAudit()).toHaveLength(1);
+    expect(listingVersion(listingId)).toBe(2);
+    expect(priceAudit().map((entry) => [entry.old_value, entry.new_value])).toEqual([
+      [null, JSON.stringify({ Kanal: 'Kleinanzeigen', Preis: '279,00 €', VB: 'Ja' })],
+    ]);
   });
 
   it('writes the audit entry price_updated with the old and the new price (3.6, REQ-072)', async () => {
@@ -299,20 +286,53 @@ describe('PUT /api/listings/{id}/prices/{channelId} (CU-126, Technical Specifica
     ]);
   });
 
-  it.each([
-    ['an unknown model listing', 'listing'],
-    ['an unknown channel', 'channel'],
-  ])('answers not_found for %s', async (_, unknown) => {
+  it('answers not_found for an unknown model listing', async () => {
     const listingId = await createListing();
 
-    const response = await putPrice(
-      unknown === 'listing' ? listingId + 1 : listingId,
-      unknown === 'channel' ? 999 : ids.shop,
-      { version: 1, amountCents: 26900, vb: false },
-    );
+    const response = await putPrice(listingId + 1, ids.shop, {
+      version: 1,
+      amountCents: 26900,
+      vb: false,
+    });
 
     expect(response.statusCode).toBe(404);
     expect(response.json().error).toMatchObject({ code: 'not_found' });
+  });
+
+  it('answers bad_request for an unknown channel and stores nothing (Nachtrag MAR-1171)', async () => {
+    const listingId = await createListing();
+
+    const response = await putPrice(listingId, 999, { version: 1, amountCents: 26900, vb: false });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toMatchObject({ code: 'bad_request' });
+    expect(rows('SELECT * FROM listing_price')).toEqual([]);
+    expect(listingVersion(listingId)).toBe(1);
+  });
+
+  it('checks the version before the channel: version_conflict for an unknown channel (Nachtrag MAR-1171)', async () => {
+    const listingId = await createListing();
+
+    const response = await putPrice(listingId, 999, { version: 7, amountCents: 26900, vb: false });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error).toMatchObject({ code: 'version_conflict' });
+  });
+
+  it('saves the price of a deactivated channel (2.0.11, Nachtrag MAR-1171)', async () => {
+    const listingId = await createListing();
+    t.database.sqlite.prepare('UPDATE channel SET active = 0 WHERE id = ?').run(ids.ebay);
+
+    const response = await putPrice(listingId, ids.ebay, {
+      version: 1,
+      amountCents: 29900,
+      vb: false,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().prices).toEqual([
+      { channelId: ids.ebay, amountCents: 29900, vb: false, source: 'manual' },
+    ]);
   });
 
   it.each([

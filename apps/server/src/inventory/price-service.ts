@@ -12,7 +12,12 @@ import { createChannelReader } from '../channels/index.ts';
 import type { DB } from '../db/schema.ts';
 import type { UnitOfWorkRunner } from '../db/unit-of-work.ts';
 import type { Clock } from '../shared/clock.ts';
-import { ConflictError, NotFoundError, ValidationError } from '../shared/domain-error.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+} from '../shared/domain-error.ts';
 import { createListingRepository, type ListingRepository } from './listing-repository.ts';
 
 export interface PriceServiceDeps {
@@ -45,10 +50,10 @@ const auditPrice = (channel: string, price: Pick<ListingPrice, 'amountCents' | '
 export function createPriceService({ uow, clock }: PriceServiceDeps) {
   return {
     /**
-     * `PUT /api/listings/{id}/prices/{channelId}`: the price becomes `manual`. Order of the checks:
-     * the model listing and the channel (`not_found`), the version (`version_conflict`), then VB
-     * only for a channel with `vbAllowed` (`validation_failed`, AC-REQ-032-04); the rule of the
-     * amount is checked by the schema (AC-REQ-032-03). A request without change keeps the version;
+     * `PUT /api/listings/{id}/prices/{channelId}`: the price becomes `manual`. Order of the checks
+     * (2.7, Nachtrag MAR-1171): the rule of the amount by the schema (AC-REQ-032-03), the model
+     * listing (`not_found`) and its version (`version_conflict`), the channel (`bad_request`),
+     * then VB only for a channel with `vbAllowed` (`validation_failed`, AC-REQ-032-04). A request without change keeps the version;
      * otherwise the version rises, `ContentInputsChanged` names the channel and the audit entry
      * `price_updated` holds the old and the new price. The answer has the prices of all channels
      * (DER-62-04). Prices check no attribute values (A-39, AC-REQ-005-12 (c)).
@@ -63,9 +68,11 @@ export function createPriceService({ uow, clock }: PriceServiceDeps) {
         const listings = createListingRepository(tx.db);
         const listing = await listings.findById(listingId);
         if (listing === undefined) throw new NotFoundError();
-        const channel = await createChannelReader(tx.db).findChannel(channelId);
-        if (channel === undefined) throw new NotFoundError();
         if (listing.version !== request.version) throw new ConflictError('version_conflict');
+        // Channels are never deleted, so an unknown one is a program error; a deactivated one is
+        // no error (2.0.11 "Ohne Regel bleiben").
+        const channel = await createChannelReader(tx.db).findChannel(channelId);
+        if (channel === undefined) throw new BadRequestError('channelId unknown');
         if (request.vb && !channel.vbAllowed) {
           throw new ValidationError([
             { path: 'vb', code: 'vb_not_allowed', message: FIELD_MESSAGES.priceVbNotAllowed },
