@@ -148,6 +148,11 @@ export const FIELD_MESSAGES = {
    */
   price: 'Preis: Zahl größer 0 mit höchstens zwei Nachkommastellen',
   /**
+   * `vb` for a channel without "Verhandlungsbasis" (2.7, AC-REQ-032-04). UI-014 does not offer the
+   * check box there, so the text only shows when the server reports the rule.
+   */
+  priceVbNotAllowed: 'VB: Kanal lässt Verhandlungsbasis nicht zu',
+  /**
    * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
    * Technical Specification 8.2 (addendum MAR-487).
    */

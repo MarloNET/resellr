@@ -23,6 +23,21 @@ export function createChannelReader(db: Kysely<DB>) {
         sortOrder: row.sort_order,
       }));
     },
+
+    /**
+     * One channel, active or not, with its name and whether it allows "Verhandlungsbasis"
+     * (REQ-029), `undefined` if there is none; for the price of a model listing (2.7, #204).
+     */
+    async findChannel(id: number) {
+      const row = await repository.findById(id);
+      if (row === undefined) return undefined;
+      return {
+        id: row.id,
+        name: row.name,
+        active: row.active === 1,
+        vbAllowed: row.vb_allowed === 1,
+      };
+    },
   };
 }
 

@@ -103,9 +103,12 @@ describe('money as input value (2.7, UI-014 "Preis je Kanal")', () => {
     [5000, '50,00'],
     [123456, '1234,56'],
     [5, '0,05'],
-  ])('formats %d cents as %j: decimal comma, no thousands separator, no currency', (cents, expected) => {
-    expect(formatMoneyInput(cents)).toBe(expected);
-  });
+  ])(
+    'formats %d cents as %j: decimal comma, no thousands separator, no currency',
+    (cents, expected) => {
+      expect(formatMoneyInput(cents)).toBe(expected);
+    },
+  );
 
   it('rejects a fractional cent amount', () => {
     expect(() => formatMoneyInput(1.5)).toThrow(RangeError);
