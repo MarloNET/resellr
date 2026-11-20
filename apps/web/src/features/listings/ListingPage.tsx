@@ -2,8 +2,8 @@ import { formatDate } from '@resellr/domain/format/format-value';
 import { MESSAGES } from '@resellr/domain/messages/messages.de';
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
 import type { ListingDetail, ListingDevice } from '@resellr/domain/schemas/listing.schema';
-import { type ReactNode, useId, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { type ReactNode, useEffect, useId, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 
 import { useModelTemplateQuery } from '../../api/catalog.api.ts';
 import { useChannelsQuery } from '../../api/channels.api.ts';
@@ -32,6 +32,7 @@ import {
   PickListLabel,
 } from '../devices/DeviceIntakePage.tsx';
 import { STOCK_STATUS_LABELS } from '../devices/DevicesPage.tsx';
+import type { SavedNoticeState } from '../models/ModelTemplatePage.tsx';
 
 // Texts of UI-014 `screen.md` (UI/UX design v0.6.1); "geladen" for opening (DER-60-02).
 const TEXTS = {
@@ -216,10 +217,21 @@ function ListingDevices({
  * head with the untruncated title and "Geräteart · Stückzahl n · Artikelnummer <Nr>", the listing
  * values (read only) with the hint to the model template, and the devices with the filter "auch
  * stornierte"; the states loading, error ("geladen", DER-60-02) and P-06 above the page
- * (DER-60-06). Channel cards follow with S5, photos with S7, prices with #204, editing with #206.
+ * (DER-60-06), and the banner of the calling dialog, "Gerät umgebucht" after "Umbuchen" (#202,
+ * DER-61-06). Channel cards follow with S5, photos with S7, prices with #204, editing with #206.
  */
 export function ListingPage() {
   const id = listingIdOf(useParams().listingId);
+  const navigate = useNavigate();
+  const location = useLocation();
+  // The success banner of the calling dialog, taken from the history entry once, so reloading or
+  // going back does not show it again (as UI-006).
+  const [savedNotice, setSavedNotice] = useState(
+    () => (location.state as SavedNoticeState | null)?.savedNotice ?? null,
+  );
+  useEffect(() => {
+    if (location.state !== null) void navigate('.', { replace: true, state: null });
+  }, [location.state, navigate]);
   const [includeCancelled, setIncludeCancelled] = useState(false);
   const query = useListingQuery(id, { includeCancelled });
   // A failed later read (the filter "auch stornierte" without an answer) keeps the last loaded
@@ -245,6 +257,11 @@ export function ListingPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {savedNotice !== null && (
+        <PageBanner variant="success" onClose={() => setSavedNotice(null)}>
+          {savedNotice}
+        </PageBanner>
+      )}
       {unreachable && <UnreachableBanner />}
       {notFound && (
         <div role="alert" className={bannerClassName('error')}>

@@ -79,6 +79,7 @@ import {
   withCapacityOfBattery,
   withoutMissingChoices,
 } from './DeviceIntakePage.tsx';
+import { AssignDialog } from './AssignDialog.tsx';
 import { CAPTURE_STATUS_LABELS, STOCK_STATUS_LABELS, UNASSIGNED_TEXT } from './DevicesPage.tsx';
 
 // Texts of UI-010 `screen.md` (UI/UX design v0.6.1); "geladen" for opening (DER-54-10). The
@@ -99,6 +100,7 @@ const TEXTS = {
   saveError: (referenceNumber: string | null) =>
     `Gerät konnte nicht gespeichert werden. Referenz: ${referenceNumber ?? '–'}`,
   readOnly: 'Werte schreibgeschützt',
+  rebook: 'Umbuchen',
 } as const;
 
 const STOCK_STATUS_CHIPS: Record<DeviceDetail['stockStatus'], BadgeVariant> = {
@@ -642,12 +644,15 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
  * Device UI-010 (CU-137, REQ-014, REQ-016; Technical Specification 2.5, 7.3): the head with
  * WI-Nr, model template, model listing as link or "nicht zugeordnet" and the chips of inventory
  * and capture status, with the states loading, error ("geladen", DER-54-10) and P-06 above the
- * page (DER-54-13), and the card "Gerätewerte" (#190). The actions follow with S8 and S9.
+ * page (DER-54-13), the card "Gerätewerte" (#190) and the action "Umbuchen" (#202, REQ-020) of an
+ * available, assigned device, which opens UI-004 in the mode "umbuchen" (DER-61-01). The other
+ * actions follow with S8 and S9.
  */
 export function DevicePage() {
   const id = deviceIdOf(useParams().deviceId);
   const query = useDeviceQuery(id);
   const device = query.data;
+  const [rebooking, setRebooking] = useState(false);
   const error = query.error;
   // An address without a valid id names no device, like `404 not_found` (M-15, 2.0.5).
   const notFound = id === null || error?.kind === 'not-found';
@@ -666,9 +671,17 @@ export function DevicePage() {
         </PageBanner>
       )}
 
-      <h1 className="m-0 text-page-title font-semibold">
-        {device ? `${TEXTS.title} ${device.wiNr}` : TEXTS.title}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="m-0 text-page-title font-semibold">
+          {device ? `${TEXTS.title} ${device.wiNr}` : TEXTS.title}
+        </h1>
+        {/* "Umbuchen (Should)": only for an available, assigned device (UI-010 "Aktionen"). */}
+        {device && device.stockStatus === 'available' && device.listing !== null && (
+          <Button type="button" onClick={() => setRebooking(true)}>
+            {TEXTS.rebook}
+          </Button>
+        )}
+      </div>
 
       {id !== null && query.isPending && (
         <p role="status" className="m-0 text-body text-text-secondary">
@@ -677,6 +690,14 @@ export function DevicePage() {
       )}
       {device && <DeviceHead device={device} />}
       {device && <DeviceValuesCard device={device} />}
+      {device && device.listing !== null && (
+        <AssignDialog
+          open={rebooking}
+          onOpenChange={setRebooking}
+          mode="rebook"
+          device={{ ...device, listingId: device.listing.id }}
+        />
+      )}
     </div>
   );
 }

@@ -9,6 +9,9 @@ import {
   type DeviceAssignment,
   type DeviceAssignmentInput,
   deviceAssignmentBodySchema,
+  type DeviceRebooking,
+  type DeviceRebookingInput,
+  deviceRebookingBodySchema,
   type Listing,
   type ListingCreateInput,
   listingCreateBodySchema,
@@ -84,8 +87,8 @@ function splitDeviceValues(attributes: readonly AttributeEntry[], values: Attrib
  * that assigns devices, creates a model listing from a device and rebooks. With #197 creating a
  * model listing from a checked, available device, with #194 assigning a device to an existing
  * model listing of its model template, with #199 leaving the previous model listing on creating,
- * with #196 the deviation check of the assignment; rebooking (#202) and the check of the review
- * flags (#189) follow.
+ * with #196 the deviation check of the assignment, with #202 rebooking; the check of the review
+ * flags (#189) follows.
  */
 export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
   return {
@@ -314,6 +317,92 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
         return toListing(stored, await listings.listDeliveryScopeIds(listingId));
       });
       return result;
+    },
+
+    /**
+     * `POST /api/devices/{id}/rebooking` (REQ-020): moves an available, assigned device to another
+     * model listing of its model template at `assigned_at` = now and forms the stock of both model
+     * listings anew (CU-128, `StockChanged` for each); the previous one stays, also with quantity 0
+     * (AC-REQ-020-03). Order of the checks: the device (`not_found`), the target (`400`, a program
+     * error of the user interface, as is the current model listing as target), the version
+     * (`version_conflict`), then the preconditions of 2.6: available (`device_not_available`),
+     * assigned (`device_not_assigned`), the same model template (`other_model_template`), then the
+     * variant data against the target (REQ-018): if they deviate and `confirmDeviation` is not
+     * `true`, `confirmation_required` with `details.kind = target_deviation` and the current
+     * deviations; the first matching stage wins and nothing is stored. The audit entry `rebooked`
+     * names both model listings, a confirmed deviation with the deviations as "trotzdem zuordnen".
+     */
+    async rebook(deviceId: number, input: DeviceRebookingInput): Promise<DeviceRebooking> {
+      const request = deviceRebookingBodySchema.parse(input);
+      const { result, report } = await uow.run(async (tx) => {
+        const devices = createDeviceRepository(tx.db);
+        const listings = createListingRepository(tx.db);
+
+        const device = await devices.findById(deviceId);
+        if (device === undefined) throw new NotFoundError();
+        const target = await listings.findById(request.targetListingId);
+        if (target === undefined) throw new BadRequestError('targetListingId unknown');
+        if (target.id === device.listing_id) {
+          throw new BadRequestError('targetListingId is the current model listing');
+        }
+        if (device.version !== request.version) throw new ConflictError('version_conflict');
+        if (device.stock_status !== 'available') {
+          throw new RuleViolation('device_not_available', { usage: 'rebooking' });
+        }
+        const previous =
+          device.listing_id === null ? undefined : await listings.findById(device.listing_id);
+        if (previous === undefined) throw new RuleViolation('device_not_assigned');
+        if (device.model_template_id !== target.model_template_id) {
+          throw new RuleViolation('other_model_template');
+        }
+
+        // A device always has its model template (`NOT NULL`, `ON DELETE RESTRICT`).
+        const template = await createCatalogReader(tx.db).findModelTemplate(
+          device.model_template_id,
+        );
+        if (template === undefined) {
+          throw new Error(`model template ${device.model_template_id} of a device is missing`);
+        }
+        const settings = createSettingsReader(tx.db);
+        const deviations = await listingDeviations(
+          settings,
+          await listVariantAttributes(settings, template.deviceTypeId),
+          device,
+          target,
+        );
+        if (deviations.length > 0 && !request.confirmDeviation) {
+          throw new ConfirmationRequired('target_deviation', {
+            usage: 'target_deviation',
+            details: { deviations },
+          });
+        }
+
+        await devices.assign(device.id, target.id, clock.now().toISOString());
+        const stock = createListingStockUpdater(tx);
+        const quantity = await stock.update(target.id);
+        const previousQuantity = await stock.update(previous.id);
+
+        await createAuditWriter({ db: tx.db, clock }).write({
+          objectType: 'device',
+          objectId: device.id,
+          objectLabel: `Gerät ${device.wi_nr}`,
+          action: 'rebooked',
+          oldValue: { 'Modell-Inserat': previous.display_title },
+          newValue: {
+            'Modell-Inserat': target.display_title,
+            ...(deviations.length > 0 && { Abweichungen: deviations.map(deviationLine) }),
+          },
+        });
+
+        const stored = await devices.findById(device.id);
+        if (stored === undefined) throw new Error(`device ${device.id} vanished in its action`);
+        return {
+          device: toDevice(stored),
+          listing: { id: target.id, quantity },
+          previousListing: { id: previous.id, quantity: previousQuantity },
+        };
+      });
+      return { ...result, adjustStockChannels: report.adjustStockChannels };
     },
   };
 }
