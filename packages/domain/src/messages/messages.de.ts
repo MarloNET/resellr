@@ -143,6 +143,11 @@ export const FIELD_MESSAGES = {
    */
   originalEan: 'EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer',
   /**
+   * UI-014 "eigene EAN" with the EAN marking "eigene", empty, not 8 or 13 digits or a wrong GS1
+   * check digit: the design text of UI-014 (2.7, AC-REQ-088-04).
+   */
+  ownEan: 'EAN: 8 oder 13 Ziffern mit gültiger Prüfziffer',
+  /**
    * UI-028 "Wert", empty or longer than 100 characters after trimming (3.1). Text defined by
    * Technical Specification 8.2 (addendum MAR-487).
    */
@@ -250,6 +255,9 @@ export const ERROR_MESSAGES = {
   /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
   'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
+  /** UI-014 "Inseratswerte bearbeiten" (2.0.6, AC-REQ-088-02): the display title of it. */
+  'variant_duplicate.listing_values': (listingTitle: string) =>
+    `Variantenangaben stimmen mit Modell-Inserat ${listingTitle} überein`,
   /** UI-004 "Neues Modell-Inserat anlegen" (2.0.6, AC-REQ-019-02): the display title of it. */
   'variant_duplicate.new_listing': (listingTitle: string) =>
     `Gleiche Variantenangaben wie Modell-Inserat ${listingTitle}; bitte dort zuordnen`,

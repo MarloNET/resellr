@@ -1,11 +1,19 @@
 import { z } from 'zod';
 
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
+import { isValidEan } from '../validation/ean.ts';
+import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
 import { centsSchema, dateSchema, idSchema, versionSchema } from './common.schema.ts';
-import { deviceSchema, STOCK_STATUSES } from './device.schema.ts';
+import {
+  conditionDescriptionSchema,
+  deviceSchema,
+  requiredChoice,
+  STOCK_STATUSES,
+  visualGradeSchema,
+} from './device.schema.ts';
 
 // Model listing (REQ-017, REQ-019, REQ-088; Technical Specification 2.6, 2.7, 3.3). Changing
-// follows with #200 and #206.
+// the listing values with #206; the uniqueness of a changed article number follows with #200.
 
 /** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
 const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
@@ -59,6 +67,78 @@ export const listingSchema = z.object({
   version: versionSchema,
 });
 export type Listing = z.infer<typeof listingSchema>;
+
+/**
+ * Shape of `PATCH /api/listings/{id}` for the listing values of UI-014 (2.7) as the route checks
+ * it: only types, missing and unknown fields (`400 bad_request`); the model data are not part of
+ * it (AC-REQ-088-06). A missing field stays unchanged, `variantValues` and `otherValues` hold
+ * changes (a key overwrites, `null` removes; `mergeAttributeValues`). The rules apply to the
+ * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` takes effect with #207.
+ */
+export const listingUpdateBodySchema = z.strictObject({
+  version: versionSchema,
+  conditionValueId: idSchema.nullable().optional(),
+  visualGrade: z.union([z.number(), z.string()]).nullable().optional(),
+  conditionDescription: z.string().optional(),
+  variantValues: valuesSchema.optional(),
+  otherValues: valuesSchema.optional(),
+  deliveryScopeTextBlockIds: z
+    .array(idSchema)
+    .refine((ids) => new Set(ids).size === ids.length, 'text block chosen twice')
+    .optional(),
+  articleNumber: z.string().optional(),
+  eanMode: z.enum(EAN_MODES).optional(),
+  ownEan: z.string().nullable().optional(),
+  confirmDeviatingDevices: z.boolean().optional(),
+});
+export type ListingUpdateInput = z.input<typeof listingUpdateBodySchema>;
+
+/**
+ * Rules of the listing values (2.7, REQ-088) on the complete state of a model listing after a
+ * change: condition, visual grade and condition description as at the device (2.5), the variant
+ * values by the variant attributes and the other values by the other attributes of the level
+ * device without the battery capacity (CU-067, 2.5 "Geprüft wird der vollständige Stand"), the
+ * article number with the text of `POST /api/listings` and the own EAN, required with the marking
+ * "eigene" and checked with its GS1 check digit (AC-REQ-088-04); with "Original" it becomes `null`.
+ * UI-014 checks its form with it, CU-124 the state after `PATCH /api/listings/{id}`.
+ */
+export function listingValuesSchema({
+  variantAttributes,
+  otherAttributes,
+}: {
+  variantAttributes: readonly AttributeValueDefinition[];
+  otherAttributes: readonly AttributeValueDefinition[];
+}) {
+  return (
+    z
+      .strictObject({
+        conditionValueId: requiredChoice(FIELD_MESSAGES.conditionMissing),
+        visualGrade: visualGradeSchema,
+        conditionDescription: conditionDescriptionSchema,
+        variantValues: attributeValuesSchema(variantAttributes, 'device'),
+        otherValues: attributeValuesSchema(otherAttributes, 'device'),
+        deliveryScopeTextBlockIds: z.array(idSchema),
+        articleNumber: articleNumberSchema,
+        eanMode: z.enum(EAN_MODES),
+        ownEan: z.string().nullable(),
+      })
+      // Beside the field errors of the other fields, so all come in one answer (2.5 "Ablehnung").
+      .superRefine(
+        ({ eanMode, ownEan }, context) => {
+          if (eanMode === 'own' && (typeof ownEan !== 'string' || !isValidEan(ownEan))) {
+            context.addIssue({ code: 'custom', path: ['ownEan'], message: FIELD_MESSAGES.ownEan });
+          }
+        },
+        { when: () => true },
+      )
+      .transform((values) => ({
+        ...values,
+        ownEan: values.eanMode === 'own' ? values.ownEan : null,
+      }))
+  );
+}
+export type ListingValues = z.output<ReturnType<typeof listingValuesSchema>>;
+export type ListingValuesInput = z.input<ReturnType<typeof listingValuesSchema>>;
 
 /**
  * The variant data of a model listing as UI-004 lists them (2.6, 2.14 `variantSummary`):
