@@ -84,8 +84,10 @@ export interface DeviationDialogProps {
   /** After "Trotzdem zuordnen" (`200`): the calling screen closes UI-004 and shows the banner. */
   onAssigned: (assignment: DeviceAssignment) => void;
   /**
-   * "Neues Modell-Inserat anlegen" (#201); without it the action is shown but not available.
-   * Available only when the device deviates from every model listing of the model template.
+   * "Neues Modell-Inserat anlegen" (#201): the calling dialog closes UI-005 and creates the model
+   * listing as UI-004, with its rejections, and opens it in UI-014 (UI-005 "wie UI-004"). Without
+   * it the action is shown but not available; available only when the device deviates from every
+   * model listing of the model template (`variant_duplicate` otherwise, AC-REQ-019-02).
    */
   onCreateListing?: () => void;
 }
@@ -96,11 +98,11 @@ export interface DeviationDialogProps {
  * `variant_deviation` and shows the hint, the deviations of that answer as table (Merkmal, Wert am
  * Gerät, Wert am Modell-Inserat) and both condition descriptions complete side by side.
  * "Trotzdem zuordnen" sends the assignment again with `confirmDeviation: true`; "Abbrechen" and
- * Esc return to UI-004. It reads the model listings with their deviations to the device
- * (`?deviceId=`), the data of UI-005 for "Neues Modell-Inserat anlegen". States: default,
- * loading and error as UI-004, conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
- * ausgang-unbekannt (P-08). Kontext B (#191), "Umbuchen" (#202, #203) and the action
- * "Neues Modell-Inserat anlegen" (#201) follow.
+ * Esc return to UI-004; "Neues Modell-Inserat anlegen" hands over to `onCreateListing` (#201).
+ * It reads the model listings with their deviations to the device (`?deviceId=`), the data of
+ * UI-005 for "Neues Modell-Inserat anlegen". States: default, loading and error as UI-004,
+ * conflict (P-05), unreachable (P-06), wird-beendet (P-07) and ausgang-unbekannt (P-08).
+ * Kontext B (#191) and "Umbuchen" (#202, #203) follow.
  */
 export function DeviationDialog({ deviations, ...props }: DeviationDialogProps) {
   const writesLocked = useWritesLocked();
