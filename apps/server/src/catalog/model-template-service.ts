@@ -1,11 +1,20 @@
 import type { FieldError } from '@resellr/domain/errors/error-response';
-import type { PickListKey } from '@resellr/domain/schemas/pick-list.schema';
+import { formatNumber, formatYesNo } from '@resellr/domain/format/format-value';
+import {
+  type AttributeValue,
+  type AttributeValues,
+  type BatteryCapacityValue,
+  mergeAttributeValues,
+  type PortEntry,
+} from '@resellr/domain/schemas/attribute-values.schema';
 import {
   type ModelTemplate,
   type ModelTemplateCreate,
   modelTemplateSearchKey,
+  type ModelTemplateUpdate,
   modelTemplateValuesSchema,
 } from '@resellr/domain/schemas/model-template.schema';
+import type { PickListKey } from '@resellr/domain/schemas/pick-list.schema';
 import type { z } from 'zod';
 import { toModelNameKey } from '@resellr/domain/text/normalize-key';
 
@@ -18,10 +27,17 @@ import {
   type SettingsReader,
 } from '../settings/index.ts';
 import type { Clock } from '../shared/clock.ts';
-import { BadRequestError, RuleViolation, ValidationError } from '../shared/domain-error.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  RuleViolation,
+  ValidationError,
+} from '../shared/domain-error.ts';
 import { createDuplicateCheck } from './duplicate-check.ts';
 import {
   createModelTemplateRepository,
+  type ModelTemplateRepository,
   type ModelTemplateRow,
 } from './model-template-repository.ts';
 
@@ -55,27 +71,35 @@ export function toModelTemplate(row: ModelTemplateRow): ModelTemplate {
 }
 
 /**
- * Device type and manufacturer of a new model template (2.4 "Aktive Geräteart und aktiver
- * Hersteller", 2.0.11, Nachtrag MAR-904): both must exist, otherwise the user interface sent a
- * wrong id (`400 bad_request`; neither is ever deleted); then both must be active, the device
- * type first. Runs after the schema and before every other rule of the service.
+ * Device type and manufacturer of a model template (2.4 "Aktive Geräteart und aktiver
+ * Hersteller", 2.0.11, Nachtrag MAR-904): each must exist, otherwise the user interface sent a
+ * wrong id (`400 bad_request`; neither is ever deleted); then each must be active, the device
+ * type first. With `stored` (`PATCH`) only a changed id is checked, so a stored entry deactivated
+ * meanwhile stays valid. Runs after the schema and before every other rule of the service.
  */
 async function checkActiveEntries(
   settings: SettingsReader,
-  { deviceTypeId, manufacturerId }: Pick<ModelTemplateCreate, 'deviceTypeId' | 'manufacturerId'>,
+  { deviceTypeId, manufacturerId }: Pick<ModelTemplate, 'deviceTypeId' | 'manufacturerId'>,
+  stored?: Pick<ModelTemplate, 'deviceTypeId' | 'manufacturerId'>,
 ): Promise<void> {
-  const deviceType = await settings.findDeviceType(deviceTypeId);
-  const manufacturer = await settings.findManufacturer(manufacturerId);
-  if (deviceType === undefined) throw new BadRequestError('deviceTypeId unknown');
-  if (manufacturer === undefined) throw new BadRequestError('manufacturerId unknown');
-  if (!deviceType.active) {
+  const newDeviceType = deviceTypeId !== stored?.deviceTypeId;
+  const newManufacturer = manufacturerId !== stored?.manufacturerId;
+  const deviceType = newDeviceType ? await settings.findDeviceType(deviceTypeId) : undefined;
+  const manufacturer = newManufacturer
+    ? await settings.findManufacturer(manufacturerId)
+    : undefined;
+  if (newDeviceType && deviceType === undefined) throw new BadRequestError('deviceTypeId unknown');
+  if (newManufacturer && manufacturer === undefined) {
+    throw new BadRequestError('manufacturerId unknown');
+  }
+  if (deviceType !== undefined && !deviceType.active) {
     throw new RuleViolation('device_type_deactivated', {
       usage: 'model_template',
       messageArgs: [deviceType.name],
       details: { path: 'deviceTypeId', id: deviceTypeId },
     });
   }
-  if (!manufacturer.active) {
+  if (manufacturer !== undefined && !manufacturer.active) {
     throw new RuleViolation('manufacturer_deactivated', {
       usage: 'model_template',
       messageArgs: [manufacturer.name],
@@ -99,22 +123,34 @@ interface PickListValueReference {
   expected: { pickListId: number | null } | { pickListKey: PickListKey };
 }
 
+/** Attribute values by attribute id, as stored or sent (3.4). */
+type AttributeValueObjects = Readonly<
+  Record<(typeof VALUE_OBJECTS)[number]['key'], Readonly<Record<string, unknown>>>
+>;
+
+const NO_VALUES: AttributeValueObjects = { modelValues: {}, defaultDeviceValues: {} };
+
 /**
- * The pick list values of the request: `modelValues` before `defaultDeviceValues`, within each
- * in the order of the attributes (2.0.11); for *Auswahl aus Liste* and the roles the list of
+ * The new pick list values of the request: `modelValues` before `defaultDeviceValues`, within
+ * each in the order of the attributes (2.0.11); for *Auswahl aus Liste* and the roles the list of
  * the attribute, for *Mehrfachangabe Anzahl × Typ* `port_type` for `typeId` and `port_position`
- * for `positionId`. A value of another shape is left to the schema of CU-067.
+ * for `positionId`. With `stored` (`PATCH`) only a changed value counts: a choice whose id
+ * differs from the stored one of the same attribute, an id of a port entry the stored value of
+ * the same attribute does not hold (Nachtrag MAR-904). A value of another shape is left to the
+ * schema of CU-067.
  */
 function pickListValueReferences(
   attributes: readonly AttributeEntry[],
-  input: Pick<ModelTemplateCreate, 'modelValues' | 'defaultDeviceValues'>,
+  input: AttributeValueObjects,
+  stored: AttributeValueObjects = NO_VALUES,
 ): PickListValueReference[] {
   const references: PickListValueReference[] = [];
   for (const { key, level } of VALUE_OBJECTS) {
     for (const attribute of attributes.filter((candidate) => candidate.level === level)) {
       const path = `${key}.${attribute.id}`;
       const value = input[key][String(attribute.id)];
-      if (attribute.dataType === 'pick' && typeof value === 'number') {
+      const before = stored[key][String(attribute.id)];
+      if (attribute.dataType === 'pick' && typeof value === 'number' && value !== before) {
         references.push({
           attribute,
           path,
@@ -123,10 +159,11 @@ function pickListValueReferences(
         });
       }
       if (attribute.dataType === 'ports' && Array.isArray(value)) {
+        const storedEntries = (Array.isArray(before) ? before : []) as Partial<PortEntry>[];
         for (const entry of value as unknown[]) {
           if (typeof entry !== 'object' || entry === null) continue;
           const { typeId, positionId } = entry as Record<string, unknown>;
-          if (typeof typeId === 'number') {
+          if (typeof typeId === 'number' && !storedEntries.some((old) => old.typeId === typeId)) {
             references.push({
               attribute,
               path,
@@ -134,7 +171,10 @@ function pickListValueReferences(
               expected: { pickListKey: 'port_type' },
             });
           }
-          if (typeof positionId === 'number') {
+          if (
+            typeof positionId === 'number' &&
+            !storedEntries.some((old) => old.positionId === positionId)
+          ) {
             references.push({
               attribute,
               path,
@@ -150,7 +190,7 @@ function pickListValueReferences(
 }
 
 /**
- * Pick list values of a new model template (2.0.11, Nachtrag MAR-904): each must exist in the
+ * New pick list values of a model template (2.0.11, Nachtrag MAR-904): each must exist in the
  * expected list, otherwise the user interface sent a wrong id (`400 bad_request`); then each
  * must be active, and only the first deactivated one is reported, with `details: { path, id }`.
  * Runs after the device type and the manufacturer and before the other attribute rules.
@@ -202,7 +242,7 @@ const STRUCTURE_CODES = new Set([
  */
 function checkedAttributeValues(
   attributes: readonly AttributeEntry[],
-  input: Pick<ModelTemplateCreate, 'modelValues' | 'defaultDeviceValues'>,
+  input: AttributeValueObjects,
 ) {
   const result = modelTemplateValuesSchema(attributes).safeParse({
     modelValues: input.modelValues,
@@ -225,6 +265,138 @@ function checkedAttributeValues(
   throw new ValidationError(fields);
 }
 
+/** A model template with the names of device type and manufacturer (CU-106). */
+type ModelTemplateWithNames = NonNullable<
+  Awaited<ReturnType<ModelTemplateRepository['findWithNamesById']>>
+>;
+
+/** The model data of a model template as the audit entry names them (3.4, 3.6). */
+function readableModelData(
+  row: Pick<
+    ModelTemplateWithNames,
+    | 'device_type_name'
+    | 'manufacturer_name'
+    | 'model_name'
+    | 'type_designation'
+    | 'mpn'
+    | 'original_ean'
+  >,
+): Record<string, string> {
+  return {
+    Geräteart: row.device_type_name,
+    Hersteller: row.manufacturer_name,
+    Modellbezeichnung: row.model_name,
+    ...(row.type_designation !== null && { Typbezeichnung: row.type_designation }),
+    Herstellernummer: row.mpn ?? MPN_UNKNOWN_LABEL,
+    ...(row.original_ean !== null && { 'Original-EAN': row.original_ean }),
+  };
+}
+
+/** A stored attribute value readable for the audit entry: labels instead of ids (3.4). */
+function readableValue(
+  { dataType, systemRole }: AttributeEntry,
+  value: AttributeValue,
+  label: (id: number) => string,
+): string {
+  if (systemRole === 'battery_capacity') {
+    const capacity = value as BatteryCapacityValue;
+    return 'percent' in capacity ? `${capacity.percent} %` : 'nicht ermittelbar';
+  }
+  switch (dataType) {
+    case 'pick':
+      return label(value as number);
+    case 'boolean':
+      return formatYesNo(value as boolean);
+    case 'integer':
+    case 'decimal':
+      return formatNumber(value as number | string);
+    case 'ports':
+      return (value as PortEntry[])
+        .map(({ count, typeId, positionId }) =>
+          positionId === null
+            ? `${count} × ${label(typeId)}`
+            : `${count} × ${label(typeId)} ${label(positionId)}`,
+        )
+        .join(', ');
+    default:
+      return value as string;
+  }
+}
+
+/**
+ * The attribute values of a model template readable for the audit entry (3.4): by the label of
+ * the attribute, the device defaults as "Vorbelegungswert <Merkmal>"; attributes without a value
+ * are left out.
+ */
+function readableAttributeValues(
+  attributes: readonly AttributeEntry[],
+  values: AttributeValueObjects,
+  label: (id: number) => string,
+): Record<string, string> {
+  const readable: Record<string, string> = {};
+  for (const { key, level } of VALUE_OBJECTS) {
+    for (const attribute of attributes.filter((candidate) => candidate.level === level)) {
+      const value = values[key][String(attribute.id)];
+      if (value === undefined) continue;
+      const name = level === 'model' ? attribute.label : `Vorbelegungswert ${attribute.label}`;
+      readable[name] = readableValue(attribute, value as AttributeValue, label);
+    }
+  }
+  return readable;
+}
+
+/** The labels of the pick list values in attribute values, read in one query (3.4). */
+async function pickListLabels(
+  settings: SettingsReader,
+  attributes: readonly AttributeEntry[],
+  templates: readonly AttributeValueObjects[],
+) {
+  const ids = templates.flatMap((values) =>
+    pickListValueReferences(attributes, values).map(({ id }) => id),
+  );
+  const labels = new Map(
+    (await settings.findPickListValues(ids)).map((value) => [value.id, value.label]),
+  );
+  return (valueId: number) => labels.get(valueId) ?? String(valueId);
+}
+
+/** The name of a changed device type or manufacturer, read in the action (CU-086). */
+async function nameOf(
+  id: number,
+  storedId: number,
+  storedName: string,
+  find: (id: number) => Promise<{ name: string } | undefined>,
+): Promise<string> {
+  return id === storedId ? storedName : ((await find(id))?.name ?? '');
+}
+
+/** The fields of the model data besides the attribute values (3.3); a change is model data. */
+const FIELD_KEYS = [
+  'deviceTypeId',
+  'manufacturerId',
+  'modelName',
+  'typeDesignation',
+  'mpn',
+  'mpnUnknown',
+  'originalEan',
+] as const;
+
+/**
+ * Only the fields that differ, in the order of the state after the change, `null` for a field
+ * without value (2.0.9, 3.6).
+ */
+function changedFields(
+  before: Readonly<Record<string, string>>,
+  after: Readonly<Record<string, string>>,
+) {
+  const fields = [...new Set([...Object.keys(after), ...Object.keys(before)])].filter(
+    (field) => before[field] !== after[field],
+  );
+  const pick = (values: Readonly<Record<string, string>>) =>
+    Object.fromEntries(fields.map((field) => [field, values[field] ?? null]));
+  return { oldValue: pick(before), newValue: pick(after) };
+}
+
 /**
  * Model template service (CU-105, REQ-008; Technical Specification 2.4): creates a model
  * template together with its audit entry in one transaction (2.0.4); without the entry nothing
@@ -234,7 +406,8 @@ function checkedAttributeValues(
  * pick list values and the attribute values against the attribute definitions of the device
  * type (2.0.11, 2.5). The question about a possible duplicate (CU-107) comes after every
  * rejection, so the user never confirms a save that fails afterwards (2.4 "Prüfreihenfolge beim
- * Speichern", 2.0.11). Changing (#181) follows.
+ * Speichern", 2.0.11). Changing checks the state after the change the same way, a stored entry
+ * deactivated meanwhile only when the request changes it (#181).
  */
 export function createModelTemplateService({ uow, clock }: ModelTemplateServiceDeps) {
   return {
@@ -276,6 +449,111 @@ export function createModelTemplateService({ uow, clock }: ModelTemplateServiceD
           newValue,
         });
         return toModelTemplate(stored);
+      });
+      return result;
+    },
+
+    /**
+     * `PATCH /api/model-templates/{id}` (2.4, REQ-010): the preconditions first (`not_found`,
+     * `version_conflict`), then "unbekannt" against the MPN (`400`), the changed device type and
+     * manufacturer and the changed pick list values (2.0.11: unknown `400`, deactivated `422`),
+     * then the attribute values on the complete state after the change (2.5, CU-067). A changed
+     * device type has other attributes, so the stored values do not carry over. An unchanged
+     * request keeps the version; a change writes the audit entry `updated` with the changed
+     * fields and, unless only device defaults changed, `ContentInputsChanged` (AC-REQ-010-05).
+     */
+    async update(id: number, input: ModelTemplateUpdate): Promise<ModelTemplate> {
+      const { result } = await uow.run(async (tx) => {
+        const repository = createModelTemplateRepository(tx.db);
+        const row = await repository.findWithNamesById(id);
+        if (row === undefined) throw new NotFoundError();
+        const { version, modelValues, defaultDeviceValues, ...changes } = input;
+        if (row.version !== version) throw new ConflictError('version_conflict');
+        const stored = toModelTemplate(row);
+
+        const fields = Object.fromEntries(
+          Object.entries(changes).filter(([, value]) => value !== undefined),
+        ) as Partial<Omit<ModelTemplate, 'modelValues' | 'defaultDeviceValues'>>;
+        const next = { ...stored, ...fields };
+        if (next.mpnUnknown !== (next.mpn === null)) {
+          throw new BadRequestError('mpn must be null exactly with mpnUnknown');
+        }
+
+        const settings = createSettingsReader(tx.db);
+        await checkActiveEntries(settings, next, stored);
+        const attributes = await settings.listAttributes(next.deviceTypeId);
+        // The state after the change (2.5): values of another device type do not carry over.
+        const base = next.deviceTypeId === stored.deviceTypeId ? stored : NO_VALUES;
+        const after = {
+          modelValues: mergeAttributeValues(base.modelValues as AttributeValues, modelValues),
+          defaultDeviceValues: mergeAttributeValues(
+            base.defaultDeviceValues as AttributeValues,
+            defaultDeviceValues,
+          ),
+        };
+        await checkPickListValues(settings, pickListValueReferences(attributes, after, base));
+        const values = checkedAttributeValues(attributes, after);
+
+        const modelChanged =
+          FIELD_KEYS.some((key) => next[key] !== stored[key]) ||
+          JSON.stringify(values.modelValues) !== JSON.stringify(stored.modelValues);
+        const defaultsChanged =
+          JSON.stringify(values.defaultDeviceValues) !== JSON.stringify(stored.defaultDeviceValues);
+        if (!modelChanged && !defaultsChanged) return stored;
+
+        const label = await pickListLabels(settings, attributes, [stored, values]);
+        const names = {
+          ...row,
+          device_type_name: await nameOf(
+            next.deviceTypeId,
+            stored.deviceTypeId,
+            row.device_type_name,
+            settings.findDeviceType,
+          ),
+          manufacturer_name: await nameOf(
+            next.manufacturerId,
+            stored.manufacturerId,
+            row.manufacturer_name,
+            settings.findManufacturer,
+          ),
+          model_name: next.modelName,
+          type_designation: next.typeDesignation,
+          mpn: next.mpn,
+          original_ean: next.originalEan,
+        };
+        const { oldValue, newValue } = changedFields(
+          {
+            ...readableModelData(row),
+            ...readableAttributeValues(attributes, stored, label),
+          },
+          {
+            ...readableModelData(names),
+            ...readableAttributeValues(attributes, values, label),
+          },
+        );
+
+        await repository.update(id, {
+          ...next,
+          ...values,
+          modelNameKey: toModelNameKey(next.modelName),
+          searchKey: modelTemplateSearchKey(next),
+          version: stored.version + 1,
+          at: clock.now().toISOString(),
+        });
+        await createAuditWriter({ db: tx.db, clock }).write({
+          objectType: 'model_template',
+          objectId: id,
+          objectLabel: objectLabel(next.modelName),
+          action: 'updated',
+          oldValue,
+          newValue,
+        });
+        // Device defaults act only on devices captured later (AC-REQ-010-05).
+        if (modelChanged) tx.emit({ type: 'ContentInputsChanged', modelTemplateId: id });
+
+        const updated = await repository.findById(id);
+        if (updated === undefined) throw new Error(`model template ${id} vanished in its action`);
+        return toModelTemplate(updated);
       });
       return result;
     },
