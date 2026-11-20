@@ -9,10 +9,10 @@ import {
   timestampSchema,
   versionSchema,
 } from './common.schema.ts';
+import { CONDITION_CODE_MAX } from './condition-code.schema.ts';
 import type { BatteryValueFlag } from './pick-list.schema.ts';
 
-// Device (REQ-012 to REQ-014; Technical Specification 2.5, 3.3, 3.4). The condition code
-// follows with #193, changing a device with #190.
+// Device (REQ-012 to REQ-015; Technical Specification 2.5, 3.3, 3.4).
 
 /** WI-Nr: 1–20 letters and digits, nothing else, not even spaces (Requirements 9.6, 2.5). */
 const WI_NR_PATTERN = /^[A-Za-z0-9]{1,20}$/;
@@ -66,6 +66,19 @@ const conditionDescriptionSchema = z
   .trim()
   .max(CONDITION_DESCRIPTION_MAX, FIELD_MESSAGES.conditionDescription);
 
+/**
+ * Condition code as entered (REQ-015, 3.3): spaces at the edges removed, empty is no code. Its
+ * length is checked with the request (`deviceCreateBodySchema`): UI-003 takes at most 20 characters.
+ */
+const conditionCodeInputSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((code) => {
+    const trimmed = code?.trim() ?? '';
+    return trimmed === '' ? null : trimmed;
+  });
+
 /** Attribute values by attribute id before they are checked against the attribute definitions. */
 const anyValuesSchema = z.record(z.string(), z.unknown());
 
@@ -79,6 +92,12 @@ const anyValuesSchema = z.record(z.string(), z.unknown());
 export const deviceCreateBodySchema = z.strictObject({
   wiNr: z.string(),
   supplierId: idSchema.nullable(),
+  // UI-003 takes at most 20 characters (screen.md "Eingaben"); the text of the code (3.1).
+  conditionCode: z
+    .string()
+    .max(CONDITION_CODE_MAX, FIELD_MESSAGES.conditionCode)
+    .nullable()
+    .optional(),
   modelTemplateId: idSchema.nullable(),
   conditionValueId: idSchema.nullable(),
   visualGrade: z.union([z.number(), z.string()]).nullable(),
@@ -102,6 +121,7 @@ export function deviceCreateSchema(
   return z.strictObject({
     wiNr: wiNrSchema,
     supplierId: idSchema.nullable(),
+    conditionCode: conditionCodeInputSchema,
     modelTemplateId: requiredChoice(FIELD_MESSAGES.modelTemplateMissing),
     conditionValueId: requiredChoice(FIELD_MESSAGES.conditionMissing),
     visualGrade: visualGradeSchema,
@@ -114,6 +134,42 @@ export function deviceCreateSchema(
   });
 }
 export type DeviceCreate = z.output<ReturnType<typeof deviceCreateSchema>>;
+
+/**
+ * Shape of `PATCH /api/devices/{id}` for the device values of UI-010 (2.5) as the route checks
+ * it: a missing field stays unchanged, `values` holds changes (a key overwrites, `null` removes;
+ * `mergeAttributeValues`). The rules apply to the state after the change (`deviceValuesSchema`).
+ * The decisions on a deviation follow with #191.
+ */
+export const deviceUpdateBodySchema = z.strictObject({
+  version: versionSchema,
+  conditionValueId: idSchema.nullable().optional(),
+  visualGrade: z.union([z.number(), z.string()]).nullable().optional(),
+  conditionDescription: z.string().optional(),
+  values: anyValuesSchema.optional(),
+  confirmedKeys: z.array(z.string()),
+});
+export type DeviceUpdateInput = z.input<typeof deviceUpdateBodySchema>;
+
+/**
+ * Rules of the device values (2.5) on the complete state of a device after a change: condition,
+ * visual grade, condition description and the values of the level device by the attributes of
+ * its device type (CU-067), the battery capacity by the values of the list battery. UI-010
+ * checks its form with it, CU-121 the state after `PATCH /api/devices/{id}`.
+ */
+export function deviceValuesSchema(
+  attributes: readonly AttributeValueDefinition[],
+  { batteryValues = [] }: { batteryValues?: readonly BatteryValueFlag[] } = {},
+) {
+  return z.strictObject({
+    conditionValueId: requiredChoice(FIELD_MESSAGES.conditionMissing),
+    visualGrade: visualGradeSchema,
+    conditionDescription: conditionDescriptionSchema,
+    values: attributeValuesSchema(attributes, 'device', { batteryValues }),
+  });
+}
+export type DeviceValues = z.output<ReturnType<typeof deviceValuesSchema>>;
+export type DeviceValuesInput = z.input<ReturnType<typeof deviceValuesSchema>>;
 
 /** Inventory status of a device (3.5). */
 export const STOCK_STATUSES = ['available', 'sold', 'cancelled'] as const;
@@ -130,6 +186,7 @@ export const deviceSchema = z.object({
   modelTemplateId: idSchema,
   listingId: idSchema.nullable(),
   supplierId: idSchema.nullable(),
+  conditionCode: z.string().nullable(),
   conditionValueId: idSchema,
   visualGrade: z.int(),
   conditionDescription: z.string(),
@@ -148,9 +205,9 @@ export type Device = z.infer<typeof deviceSchema>;
 const deviceListingSchema = z.object({ id: idSchema, title: z.string() }).nullable();
 
 /**
- * `GET /api/model-templates/{id}/device-prefill` (2.5, CU-293): the prefill of CU-117 with its
- * review flags and the result of the condition code (`found: false` without a code; the code
- * follows with #193).
+ * `GET /api/model-templates/{id}/device-prefill?conditionCode=&supplierId=` (2.5, CU-293): the
+ * prefill of CU-117 with its review flags and the result of the condition code (`found: false`
+ * without a code or for an unknown one).
  */
 export const devicePrefillSchema = z.object({
   conditionValueId: idSchema.nullable(),

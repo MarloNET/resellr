@@ -1,9 +1,21 @@
-import { type Insertable, type Kysely, type Selectable, sql } from 'kysely';
+import { type Insertable, type Kysely, type Selectable, sql, type Updateable } from 'kysely';
 
 import type { DB, DeviceTable } from '../db/schema.ts';
 
 export type DeviceRow = Selectable<DeviceTable>;
 export type DeviceInsert = Omit<Insertable<DeviceTable>, 'id'>;
+/** The device values, review flags and version a change of the device values writes (2.5). */
+export type DeviceUpdate = Pick<
+  Updateable<DeviceTable>,
+  | 'condition_value_id'
+  | 'visual_grade'
+  | 'condition_description'
+  | 'device_values'
+  | 'review_keys'
+  | 'capture_status'
+  | 'version'
+  | 'updated_at'
+>;
 
 export interface DeviceSearchQuery {
   /** Part of a WI-Nr as key (`toWiNrKey`), at least 1 character. */
@@ -82,6 +94,42 @@ export function createDeviceRepository(db: Kysely<DB>) {
     },
 
     /**
+     * The devices of a model listing for UI-014 (2.7), by `assigned_at` and `id`: the assigned
+     * ones and, with `includeCancelled`, the ones cancelled from it (`cancelled_from_listing_id`,
+     * 3.5).
+     */
+    async listForListingDetail(
+      listingId: number,
+      { includeCancelled }: { includeCancelled: boolean },
+    ) {
+      return db
+        .selectFrom('device')
+        .select([
+          'id',
+          'wi_nr',
+          'stock_status',
+          'sold_channel_id',
+          'sold_on',
+          'device_values',
+          'captured_on',
+        ])
+        .where((eb) =>
+          includeCancelled
+            ? eb.or([
+                eb('listing_id', '=', listingId),
+                eb.and([
+                  eb('stock_status', '=', 'cancelled'),
+                  eb('cancelled_from_listing_id', '=', listingId),
+                ]),
+              ])
+            : eb('listing_id', '=', listingId),
+        )
+        .orderBy('assigned_at')
+        .orderBy('id')
+        .execute();
+    },
+
+    /**
      * Assigns a device to a model listing at `at` (2.6: `assigned_at` orders the WI-Nrs of
      * `{WI-Nr}`) and raises its version (2.0.3).
      */
@@ -96,6 +144,11 @@ export function createDeviceRepository(db: Kysely<DB>) {
         }))
         .where('id', '=', id)
         .executeTakeFirstOrThrow();
+    },
+
+    /** Writes the changed columns of a device (`PATCH /api/devices/{id}`, 2.5). */
+    async update(id: number, changes: DeviceUpdate): Promise<void> {
+      await db.updateTable('device').set(changes).where('id', '=', id).execute();
     },
 
     async findById(id: number): Promise<DeviceRow | undefined> {

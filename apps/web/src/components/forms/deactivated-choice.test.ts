@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { choiceOptions, findMissingChoices, type ChoiceField } from './deactivated-choice.ts';
+import {
+  choiceOptions,
+  findMissingChoices,
+  findMissingListChoices,
+  type ChoiceField,
+  type ListChoice,
+} from './deactivated-choice.ts';
 
 const WEST = { id: 1, label: 'Lieferant West', active: true };
 const OST = { id: 2, label: 'Lieferant Ost', active: true };
@@ -29,6 +35,20 @@ describe('choiceOptions (CU-319, T9)', () => {
     expect(choiceOptions([WEST, NORD], { storedId: 3 })).toEqual([
       { id: 1, label: 'Lieferant West' },
       { id: 3, label: 'Lieferant Nord' },
+    ]);
+  });
+
+  it('adds every stored, deactivated entry of storedIds with "(deaktiviert)" (port types, #190)', () => {
+    expect(
+      choiceOptions([WEST, NORD, { ...OST, active: false }], {
+        storedId: null,
+        storedIds: [3, 2],
+        markDeactivated: true,
+      }),
+    ).toEqual([
+      { id: 1, label: 'Lieferant West' },
+      { id: 3, label: 'Lieferant Nord (deaktiviert)' },
+      { id: 2, label: 'Lieferant Ost (deaktiviert)' },
     ]);
   });
 
@@ -113,5 +133,60 @@ describe('findMissingChoices (CU-319, T9)', () => {
       { path: 'supplierId', id: 2, message: 'Lieferant Lieferant Ost ist deaktiviert' },
     ]);
     expect(findMissingChoices([field({ id: null })], reloaded)).toEqual([]);
+  });
+});
+
+describe('findMissingListChoices (CU-319, T9, #190)', () => {
+  const UNGARISCH = { id: 21, label: 'Ungarisch', active: true };
+  const DEUTSCH = { id: 22, label: 'Deutsch (QWERTZ)', active: true };
+  const USB_C = { id: 31, label: 'USB-C', active: true };
+  const VORN = { id: 41, label: 'vorn', active: true };
+  const attributeText = (label: string) => (value: string) => `${label}: ${value} ist deaktiviert`;
+  const choice = (overrides: Partial<ListChoice>): ListChoice => ({
+    path: 'values.16',
+    id: 21,
+    stored: false,
+    list: '11',
+    message: attributeText('Tastaturlayout'),
+    ...overrides,
+  });
+  const lists = {
+    '11': { before: [UNGARISCH, DEUTSCH], after: [{ ...UNGARISCH, active: false }, DEUTSCH] },
+    '8': { before: [USB_C], after: [{ ...USB_C, active: false }] },
+    '9': { before: [VORN], after: [VORN] },
+  };
+  const rejected = { path: 'conditionValueId', id: 1 };
+
+  it('checks each choice against the list it comes from, two lists in one field (ports)', () => {
+    const choices = [
+      choice({}),
+      choice({ path: 'values.22', id: 31, list: '8', message: attributeText('Anschlüsse') }),
+      choice({ path: 'values.22', id: 41, list: '9', message: attributeText('Anschlüsse') }),
+    ];
+
+    expect(findMissingListChoices(choices, lists, rejected)).toEqual([
+      { path: 'values.16', id: 21, message: 'Tastaturlayout: Ungarisch ist deaktiviert' },
+      { path: 'values.22', id: 31, message: 'Anschlüsse: USB-C ist deaktiviert' },
+    ]);
+  });
+
+  it('does not report a stored entry, even if it is deactivated (UI-010)', () => {
+    expect(findMissingListChoices([choice({ stored: true })], lists, rejected)).toEqual([]);
+  });
+
+  it('reports only the rejected entry at details.path when its list could not be read again', () => {
+    const failed = { '11': { before: [UNGARISCH, DEUTSCH], after: null } };
+
+    expect(
+      findMissingListChoices([choice({}), choice({ path: 'values.17', id: 22 })], failed, {
+        path: 'values.16',
+        id: 21,
+      }),
+    ).toEqual([
+      { path: 'values.16', id: 21, message: 'Tastaturlayout: Ungarisch ist deaktiviert' },
+    ]);
+    expect(
+      findMissingListChoices([choice({ id: 22 })], failed, { path: 'values.16', id: 21 }),
+    ).toEqual([]);
   });
 });

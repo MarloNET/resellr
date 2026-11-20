@@ -33,6 +33,15 @@ describe('remaining review flags (CU-118, REQ-013; Technical Specification 2.5)'
     ]);
   });
 
+  it('AC-REQ-015-04 keeps the flag of the suggested visual grade until it is confirmed or changed', () => {
+    const suggested: ReviewedValues = { conditionValueId: null, visualGrade: 4, values: {} };
+    const keys: ReviewKey[] = ['visualGrade'];
+
+    expect(remainingReviewKeys(keys, [], suggested, suggested)).toEqual(['visualGrade']);
+    expect(remainingReviewKeys(keys, ['visualGrade'], suggested, suggested)).toEqual([]);
+    expect(remainingReviewKeys(keys, [], suggested, { ...suggested, visualGrade: 2 })).toEqual([]);
+  });
+
   it('lifts the flag of every value that differs from the prefilled one', () => {
     const changed: ReviewedValues = {
       conditionValueId: 6,

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { listingCreateBodySchema, toArticleNumberKey } from './listing.schema.ts';
+import {
+  deviceAssignmentBodySchema,
+  listingCreateBodySchema,
+  listingDetailQuerySchema,
+  listingDetailSchema,
+  toArticleNumberKey,
+} from './listing.schema.ts';
 
 const RULE = 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“';
 
@@ -48,5 +54,97 @@ describe('listingCreateBodySchema (CU-116, Technical Specification 2.6)', () => 
 describe('toArticleNumberKey (3.3)', () => {
   it('is the article number in lower case', () => {
     expect(toArticleNumberKey('MI-A626198')).toBe('mi-a626198');
+  });
+});
+
+describe('deviceAssignmentBodySchema (CU-116, Technical Specification 2.6)', () => {
+  it('takes the version of the device and the chosen model listing, without confirmation by default', () => {
+    expect(deviceAssignmentBodySchema.parse({ version: 1, listingId: 9 })).toEqual({
+      version: 1,
+      listingId: 9,
+      confirmDeviation: false,
+    });
+    expect(
+      deviceAssignmentBodySchema.parse({ version: 2, listingId: 9, confirmDeviation: true }),
+    ).toEqual({ version: 2, listingId: 9, confirmDeviation: true });
+  });
+
+  it.each([
+    { listingId: 9 },
+    { version: 1 },
+    { version: 1, listingId: 0 },
+    { version: 1, listingId: 9, targetListingId: 3 },
+  ])('rejects %j', (body) => {
+    expect(deviceAssignmentBodySchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe('listingDetailQuerySchema (CU-116, Technical Specification 2.7)', () => {
+  it('reads includeCancelled as a flag, false without it', () => {
+    expect(listingDetailQuerySchema.parse({})).toEqual({ includeCancelled: false });
+    expect(listingDetailQuerySchema.parse({ includeCancelled: 'true' })).toEqual({
+      includeCancelled: true,
+    });
+    expect(listingDetailQuerySchema.parse({ includeCancelled: 'false' })).toEqual({
+      includeCancelled: false,
+    });
+  });
+
+  it('rejects another value and an unknown parameter', () => {
+    expect(listingDetailQuerySchema.safeParse({ includeCancelled: '1' }).success).toBe(false);
+    expect(listingDetailQuerySchema.safeParse({ limit: '5' }).success).toBe(false);
+  });
+});
+
+describe('listingDetailSchema (CU-116, Technical Specification 2.7)', () => {
+  const listing = {
+    id: 9,
+    modelTemplateId: 7,
+    conditionValueId: 1,
+    visualGrade: 2,
+    conditionDescription: '',
+    variantValues: { '3': 16 },
+    otherValues: {},
+    deliveryScopeTextBlockIds: [4],
+    articleNumber: '626198',
+    eanMode: 'original',
+    ownEan: null,
+    displayTitle: 'MacBook Pro 13',
+    quantity: 1,
+    version: 1,
+  };
+  const detail = {
+    ...listing,
+    stock: { quantity: 1, wiNrs: [], batteryText: '', stockHash: 'ab12' },
+    prices: [{ channelId: 1, amountCents: 26900, vb: false, source: 'manual' }],
+    devices: [
+      {
+        id: 41,
+        wiNr: '626198',
+        stockStatus: 'available',
+        soldChannelId: null,
+        soldOn: null,
+        batteryCapacity: { percent: 85 },
+        capturedOn: '2026-11-16',
+      },
+      {
+        id: 42,
+        wiNr: '626199',
+        stockStatus: 'cancelled',
+        soldChannelId: null,
+        soldOn: null,
+        batteryCapacity: null,
+        capturedOn: '2026-11-17',
+      },
+    ],
+    deliveryScope: [{ id: 4, name: 'Netzteil' }],
+  };
+
+  it('extends the model listing by stock, prices, devices and delivery scope', () => {
+    expect(listingDetailSchema.parse(detail)).toEqual(detail);
+  });
+
+  it('rejects a detail without its devices', () => {
+    expect(listingDetailSchema.safeParse({ ...detail, devices: undefined }).success).toBe(false);
   });
 });

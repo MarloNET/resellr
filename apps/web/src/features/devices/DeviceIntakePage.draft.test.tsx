@@ -128,12 +128,24 @@ const NO_PREFILL = {
   codeResult: { found: false, plainText: null },
 };
 
+/** `GET /api/condition-codes/resolve` for the code "DGS" (2.2). */
+const DGS_TEXT = 'Display gebrochen';
+const DGS = {
+  found: true,
+  plainText: DGS_TEXT,
+  suggestedConditionValueId: null,
+  suggestedVisualGrade: null,
+};
+
 function mockApi({
   modelTemplate = () => Response.json(MODEL_TEMPLATE),
   prefill = () => Response.json(NO_PREFILL),
   create = () => Response.json(CREATED, { status: 201 }),
-}: { modelTemplate?: Route; prefill?: Route; create?: Route } = {}) {
+  resolve = () => Response.json(DGS),
+}: { modelTemplate?: Route; prefill?: Route; create?: Route; resolve?: Route } = {}) {
   const sent: Record<string, unknown>[] = [];
+  // The query strings of the prefill and of the resolution of a condition code asked for.
+  const asked = { prefill: [] as string[], resolve: [] as string[] };
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input), 'http://127.0.0.1');
     const route = `${init?.method ?? 'GET'} ${url.pathname}`;
@@ -147,7 +159,14 @@ function mockApi({
     if (route === 'GET /api/manufacturers') return list(MANUFACTURERS);
     if (route === 'GET /api/model-templates') return list([MV_A]);
     if (route === 'GET /api/model-templates/7') return modelTemplate();
-    if (route === 'GET /api/model-templates/7/device-prefill') return prefill();
+    if (route === 'GET /api/model-templates/7/device-prefill') {
+      asked.prefill.push(url.search);
+      return prefill();
+    }
+    if (route === 'GET /api/condition-codes/resolve') {
+      asked.resolve.push(url.search);
+      return resolve();
+    }
     if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
     if (route === 'POST /api/devices') {
       sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
@@ -156,7 +175,7 @@ function mockApi({
     throw new Error(`unexpected request ${route}`);
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { sent };
+  return { sent, asked };
 }
 
 /** UI-003 as it opens, or after the return from UI-007 with its history state. */
@@ -185,6 +204,11 @@ const nextDeviceBox = () =>
 const saveButton = () =>
   screen.getByRole<HTMLButtonElement>('button', { name: /^(Gerät speichern|Speichern …)$/ });
 const newTemplateLink = () => screen.getByRole('link', { name: 'Neue Modellvorlage anlegen' });
+/** The hint below the field "Zustandscode", linked with `aria-describedby` (DER-57-01). */
+const codeHint = () => {
+  const id = textbox('Zustandscode').getAttribute('aria-describedby');
+  return id === null ? null : (document.getElementById(id)?.textContent ?? null);
+};
 
 async function openPage(state: unknown = null) {
   const router = renderPage(state);
@@ -199,6 +223,7 @@ async function openPage(state: unknown = null) {
 const storedForm = (change: Record<string, unknown> = {}) => ({
   wiNr: '626198',
   supplierId: 4,
+  conditionCode: '',
   modelTemplate: null,
   conditionValueId: null,
   visualGrade: '',
@@ -265,6 +290,66 @@ describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, #186)', () =>
       form: storedForm(),
       modelTemplateId: null,
     });
+  });
+
+  it('UI-003.default DER-54-07 the draft keeps the condition code entered (#193)', async () => {
+    mockApi();
+    await openPage();
+    fireEvent.change(textbox('WI-Nr'), { target: { value: '626198' } });
+    fireEvent.change(select('Lieferant'), { target: { value: '4' } });
+    fireEvent.change(textbox('Zustandscode'), { target: { value: 'DGS' } });
+    fireEvent.blur(textbox('Zustandscode'));
+
+    fireEvent.click(newTemplateLink());
+
+    expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? 'null')).toEqual({
+      form: storedForm({ conditionCode: 'DGS' }),
+      modelTemplateId: null,
+    });
+  });
+
+  it('UI-003.success DER-54-07 DER-57-01 on the return the condition code stands, its plain text shows and the prefill of the model template gets the code (#193)', async () => {
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ form: storedForm({ conditionCode: 'DGS' }), modelTemplateId: 7 }),
+    );
+    const { asked } = mockApi({
+      prefill: () =>
+        Response.json({
+          ...NO_PREFILL,
+          conditionDescription: DGS_TEXT,
+          codeResult: { found: true, plainText: DGS_TEXT },
+        }),
+    });
+    await openPage();
+
+    await vi.waitFor(() => expect(chosenLine()).toBe(MV_A_LINE));
+    expect(textbox('Zustandscode').value).toBe('DGS');
+    await vi.waitFor(() => expect(codeHint()).toBe(`Klartext übernommen: ${DGS_TEXT}`));
+    expect(asked.resolve).toEqual(['?code=DGS&supplierId=4']);
+    await vi.waitFor(() =>
+      expect(within(form()).getByRole('textbox', { name: /^Zustandsbeschreibung/ })).toHaveProperty(
+        'value',
+        DGS_TEXT,
+      ),
+    );
+    expect(asked.prefill).toEqual(['?conditionCode=DGS&supplierId=4']);
+    expectAccessiblePage();
+  });
+
+  it('UI-003.default DER-57-01 on a return without model template the condition code stands with its plain text (#193)', async () => {
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ form: storedForm({ conditionCode: 'DGS' }), modelTemplateId: null }),
+    );
+    const { asked } = mockApi();
+    await openPage();
+
+    expect(textbox('Zustandscode').value).toBe('DGS');
+    await vi.waitFor(() => expect(codeHint()).toBe(`Klartext übernommen: ${DGS_TEXT}`));
+    expect(asked.resolve).toEqual(['?code=DGS&supplierId=4']);
+    expect(chosenLine()).toBeNull();
+    expectAccessiblePage();
   });
 
   it('UI-003.default offers "Neue Modellvorlage anlegen" also beside "Andere Modellvorlage wählen"', async () => {
@@ -335,6 +420,9 @@ describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, #186)', () =>
     await openPage();
     expect(nextDeviceBox().checked).toBe(true);
     await fillValid();
+    fireEvent.change(textbox('Zustandscode'), { target: { value: 'DGS' } });
+    fireEvent.blur(textbox('Zustandscode'));
+    await vi.waitFor(() => expect(codeHint()).toBe(`Klartext übernommen: ${DGS_TEXT}`));
 
     fireEvent.click(saveButton());
 
@@ -343,9 +431,12 @@ describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, #186)', () =>
     await vi.waitFor(() => expect(textbox('WI-Nr').value).toBe(''));
     expect(select('Lieferant').value).toBe('');
     expect(chosenLine()).toBe(MV_A_LINE);
-    expect(select('Zustand').value).toBe('');
+    // The prefill is asked for again without the supplier and the code emptied (REQ-013).
+    await vi.waitFor(() => expect(select('Zustand').value).toBe(''));
     expect(textbox('Optik-Note').value).toBe('');
     expect(select('Tastaturlayout').value).toBe('');
+    expect(textbox('Zustandscode').value).toBe('');
+    expect(codeHint()).toBeNull();
     expect(document.activeElement).toBe(textbox('WI-Nr'));
     expect(screen.getByRole('heading', { level: 1, name: 'Gerät einbuchen' })).toBeTruthy();
     expectAccessiblePage();

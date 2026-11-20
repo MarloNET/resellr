@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { variantDifferences, variantsMatch, type VariantSpec } from './compare-variants.ts';
+import {
+  deviationLine,
+  variantDeviations,
+  variantDifferences,
+  variantsMatch,
+  type VariantSpec,
+  type VariantTexts,
+} from './compare-variants.ts';
 
 const RAM = 12;
 const OS = 14;
@@ -80,5 +87,129 @@ describe('comparison rule of variant data (CU-119, Requirements 6.0)', () => {
     expect(variantsMatch(withPorts([usbC]), withPorts([{ ...usbC, count: 1 }]), [PORTS])).toBe(
       false,
     );
+  });
+});
+
+describe('deviations with formatted values (CU-119, REQ-018, Technical Specification 2.6)', () => {
+  const KEYBOARD = 16;
+  const BATTERY = 20;
+  const attributes = [
+    { id: RAM, label: 'RAM' },
+    { id: KEYBOARD, label: 'Tastaturlayout' },
+  ];
+  const side = (change: Partial<VariantSpec> = {}, texts: Partial<VariantTexts> = {}) => ({
+    spec: spec(change),
+    texts: { condition: 'Sehr gut', values: { RAM: '16GB' }, ...texts },
+  });
+
+  it('gives "Optik-Note: Gerät 4, Modell-Inserat 2" for a device that deviates only there', () => {
+    const deviations = variantDeviations(side({ visualGrade: 4 }), side(), attributes);
+
+    expect(deviations).toEqual([
+      { key: 'visualGrade', label: 'Optik-Note', deviceValue: '4', listingValue: '2' },
+    ]);
+    expect(deviations.map(deviationLine)).toEqual(['Optik-Note: Gerät 4, Modell-Inserat 2']);
+  });
+
+  it('gives "RAM: Gerät 8GB, Modell-Inserat 16GB" with the readable values', () => {
+    const device = side({ values: { [RAM]: 8 } }, { values: { RAM: '8GB' } });
+
+    expect(variantDeviations(device, side(), attributes).map(deviationLine)).toEqual([
+      'RAM: Gerät 8GB, Modell-Inserat 16GB',
+    ]);
+  });
+
+  it('gives the condition by its label and both condition descriptions complete', () => {
+    const device = side(
+      { conditionValueId: 2, conditionDescription: 'Display- und Gehäuseschaden' },
+      { condition: 'Gut' },
+    );
+    const listing = side({ conditionDescription: 'leichte Gebrauchsspuren' });
+
+    expect(variantDeviations(device, listing, attributes)).toEqual([
+      { key: 'condition', label: 'Zustand', deviceValue: 'Gut', listingValue: 'Sehr gut' },
+      {
+        key: 'conditionDescription',
+        label: 'Zustandsbeschreibung',
+        deviceValue: 'Display- und Gehäuseschaden',
+        listingValue: 'leichte Gebrauchsspuren',
+      },
+    ]);
+  });
+
+  it('AC-REQ-018-03 battery capacity, OS version and case or edge spaces of the description give no deviation', () => {
+    const device = side(
+      {
+        conditionDescription: ' Leichte Gebrauchsspuren ',
+        values: { [RAM]: 16, [OS]: 14, [BATTERY]: { percent: 77 } },
+      },
+      { values: { RAM: '16GB', Betriebssystem: '14.6', Akkukapazität: '77 %' } },
+    );
+    const listing = side(
+      {
+        conditionDescription: 'leichte gebrauchsspuren',
+        values: { [RAM]: 16, [OS]: 15, [BATTERY]: { percent: 85 } },
+      },
+      { values: { RAM: '16GB', Betriebssystem: '15.1', Akkukapazität: '85 %' } },
+    );
+
+    expect(variantDeviations(device, listing, attributes)).toEqual([]);
+  });
+
+  it('DER-59-01 a deactivated variant attribute without value at the device deviates from a value at the listing', () => {
+    // The variant set holds active and deactivated attributes (K-03); the new device has no RAM.
+    const device = side({ values: { [OS]: 7 } }, { values: {} });
+
+    expect(variantDeviations(device, side(), attributes)).toEqual([
+      { key: String(RAM), label: 'RAM', deviceValue: '–', listingValue: '16GB' },
+    ]);
+  });
+
+  it('gives "–" for an empty condition description against a filled one', () => {
+    const listing = side({ conditionDescription: 'Kratzer' });
+
+    expect(variantDeviations(side(), listing, attributes)).toEqual([
+      {
+        key: 'conditionDescription',
+        label: 'Zustandsbeschreibung',
+        deviceValue: '–',
+        listingValue: 'Kratzer',
+      },
+    ]);
+  });
+
+  it('AC-REQ-018-06 gives the deviation of the keyboard layout', () => {
+    const device = side(
+      { values: { [RAM]: 16, [OS]: 7, [KEYBOARD]: 41 } },
+      { values: { RAM: '16GB', Tastaturlayout: 'Ungarisch' } },
+    );
+    const listing = side(
+      { values: { [RAM]: 16, [OS]: 7, [KEYBOARD]: 40 } },
+      { values: { RAM: '16GB', Tastaturlayout: 'Deutsch (QWERTZ)' } },
+    );
+
+    expect(variantDeviations(device, listing, attributes).map(deviationLine)).toEqual([
+      'Tastaturlayout: Gerät Ungarisch, Modell-Inserat Deutsch (QWERTZ)',
+    ]);
+  });
+
+  it('DER-59-04 compares multiple entries as a sorted list, other values do not count', () => {
+    const PORTS_ATTRIBUTE = { id: PORTS, label: 'Anschlüsse' };
+    const usbC = { count: 2, typeId: 41, positionId: null };
+    const hdmi = { count: 1, typeId: 42, positionId: 7 };
+    const withPorts = (ports: unknown[], os: number) =>
+      side(
+        { values: { [PORTS]: ports as VariantSpec['values'][string], [OS]: os } },
+        { values: { Anschlüsse: '…' } },
+      );
+
+    expect(
+      variantDeviations(withPorts([usbC, hdmi], 14), withPorts([hdmi, usbC], 15), [
+        PORTS_ATTRIBUTE,
+      ]),
+    ).toEqual([]);
+    expect(
+      variantDeviations(withPorts([usbC], 14), withPorts([hdmi, usbC], 14), [PORTS_ATTRIBUTE]),
+    ).toHaveLength(1);
   });
 });

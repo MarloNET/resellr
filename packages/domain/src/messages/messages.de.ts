@@ -175,6 +175,9 @@ export const FIELD_MESSAGES = {
 
 type MessageText = string | ((...args: string[]) => string);
 
+/** A device that is no longer available, as at the sale (2.0.6, AC-REQ-021-04). */
+const DEVICE_SOLD_OR_CANCELLED = 'Gerät ist bereits verkauft oder storniert';
+
 /** UI-026 "Logo": one text for a too large file and a wrong type (AC-REQ-028-02). */
 const LOGO_FILE_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
 
@@ -195,11 +198,20 @@ export const ERROR_MESSAGES = {
   /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+  /** UI-005 Kontext A "Hinweis" (REQ-018, design v0.6.1); its title is in `CONFIRMATION_TITLES`. */
+  'confirmation_required.variant_deviation': 'Das Gerät weicht vom Modell-Inserat ab.',
+  /** UI-004 "Zuordnen" of a sold or cancelled device: the wording of the sale (2.0.6). */
+  'device_not_available.assignment': DEVICE_SOLD_OR_CANCELLED,
+  /**
+   * UI-010 "Gerätewerte speichern" of a sold or cancelled device (2.5, `UI-010.disabled`,
+   * Auslegung RQ-17).
+   */
+  'device_not_available.device_values': 'Werte schreibgeschützt',
   /**
    * UI-004 "Neues Modell-Inserat anlegen" from a sold or cancelled device: the wording of the sale
    * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
    */
-  'device_not_available.new_listing': 'Gerät ist bereits verkauft oder storniert',
+  'device_not_available.new_listing': DEVICE_SOLD_OR_CANCELLED,
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   'file_too_large.logo': LOGO_FILE_RULE,
@@ -214,9 +226,16 @@ export const ERROR_MESSAGES = {
   'name_taken.supplier': 'Name ist bereits vergeben',
   'name_taken.text_block': 'Name ist bereits vergeben',
   'not_found.default': MESSAGES['M-15'],
+  /** UI-004 "Zuordnen" to a model listing of another model template (2.0.6, AC-REQ-017-02). */
+  'other_model_template.default': 'Gerät gehört zu anderer Modellvorlage',
   /** UI-007, UI-003, UI-010, UI-014 at the field of the attribute (2.0.6, Nachtrag MAR-904). */
   'pick_list_value_deactivated.attribute': (label: string, value: string) =>
     `${label}: ${value} ist deaktiviert`,
+  /**
+   * UI-003, UI-010 "Zustand", a new or changed condition of a device is deactivated (2.0.11,
+   * 8.2, Nachtrag MAR-904).
+   */
+  'pick_list_value_deactivated.condition': (value: string) => `Zustand ${value} ist deaktiviert`,
   /**
    * UI-033 "Vorschlag Zustand", a new or changed suggestion is deactivated (2.0.11, design
    * v0.6.8, addendum MAR-929).
@@ -255,6 +274,8 @@ export const ERROR_MESSAGES = {
 export const CONFIRMATION_TITLES = {
   /** UI-007.dublette (M-27, REQ-011). */
   'confirmation_required.possible_duplicate': 'Mögliche Dublette',
+  /** UI-005 "Abweichungen bei Zuordnung" (REQ-018, mockup `default.png`). */
+  'confirmation_required.variant_deviation': 'Abweichungen bei Zuordnung',
 } as const;
 
 /**

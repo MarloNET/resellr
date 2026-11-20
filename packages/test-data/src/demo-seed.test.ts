@@ -7,6 +7,7 @@ import {
   type DemoApi,
   SEED_AREAS,
   seedDatasheetLayout,
+  seedAssignments,
   seedDevices,
   seedListings,
   seedDeviceTypes,
@@ -113,13 +114,80 @@ describe('createDemoApi', () => {
   });
 });
 
+/** Attributes of the device type Notebook as the demo devices use them. */
+const ATTRIBUTES = [
+  { id: 14, label: 'RAM', pickListId: null },
+  { id: 15, label: 'Speicherkapazität', pickListId: null },
+  { id: 16, label: 'Tastaturlayout', pickListId: 11 },
+  { id: 13, label: 'Betriebssystem', pickListId: 13 },
+  { id: 17, label: 'Netzteil', pickListId: 12 },
+  { id: 18, label: 'Akku', pickListId: 10 },
+  { id: 19, label: 'Akkukapazität', pickListId: null },
+];
+/** The answers of the reads of `seedDevices` and `seedAssignments` by path. */
+const DEVICE_LISTS: Record<string, unknown> = {
+  '/api/model-templates?limit=200': {
+    items: [
+      { id: 1, modelName: 'ThinkPad E15 Gen 2', deviceType: { id: 1 } },
+      { id: 2, modelName: 'ThinkPad T14 Gen 2', deviceType: { id: 1 } },
+      { id: 3, modelName: 'EliteBook 840 G8', deviceType: { id: 1 } },
+    ],
+  },
+  '/api/suppliers?limit=200': {
+    items: [
+      { id: 4, name: 'Lieferant A' },
+      { id: 5, name: 'Lieferant B' },
+    ],
+  },
+  '/api/pick-lists?limit=200': {
+    items: [
+      { id: 1, key: 'condition' },
+      { id: 10, key: 'battery' },
+    ],
+  },
+  '/api/pick-lists/1/values?limit=200': {
+    items: [
+      { id: 21, label: 'gebraucht' },
+      { id: 22, label: 'defekt' },
+    ],
+  },
+  '/api/device-types/1/attributes': { items: ATTRIBUTES },
+  '/api/pick-lists/10/values?limit=200': {
+    items: [
+      { id: 101, label: 'mit Akku' },
+      { id: 102, label: 'mit Akku (defekt)' },
+      { id: 103, label: 'ohne Akku' },
+    ],
+  },
+  '/api/pick-lists/11/values?limit=200': {
+    items: [
+      { id: 111, label: 'Deutsch (QWERTZ)' },
+      { id: 112, label: 'Englisch (QWERTY, US)' },
+    ],
+  },
+  '/api/pick-lists/13/values?limit=200': {
+    items: [
+      { id: 131, label: 'Windows 11 Pro' },
+      { id: 132, label: 'Windows 11 Home' },
+      { id: 133, label: 'Windows 10 Pro' },
+    ],
+  },
+  '/api/pick-lists/12/values?limit=200': {
+    items: [
+      { id: 121, label: 'mit Netzteil (original)' },
+      { id: 122, label: 'mit Netzteil (nicht original)' },
+      { id: 123, label: 'ohne Netzteil' },
+    ],
+  },
+};
+
 describe('seedDemoData', () => {
   const api: DemoApi = {
     baseUrl: 'http://127.0.0.1:4310',
     request: () => Promise.reject(new Error('not called')),
   };
 
-  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout, S3 model templates, then S4 devices and model listings', () => {
+  it('runs the areas of the build steps in their order: S2 device types, suppliers, manufacturers, merchant profile, text blocks and datasheet layout, S3 model templates, then S4 devices, model listings and assignments', () => {
     expect(SEED_AREAS).toEqual([
       seedDeviceTypes,
       seedSuppliers,
@@ -130,6 +198,7 @@ describe('seedDemoData', () => {
       seedModelTemplates,
       seedDevices,
       seedListings,
+      seedAssignments,
     ]);
   });
 
@@ -161,6 +230,57 @@ describe('seedDemoData', () => {
     ]);
   });
 
+  it('captures the demo device "626200" and assigns it through POST /api/devices/{id}/assignment to the model listing of "626198" on the version of its answer', async () => {
+    const requests: unknown[][] = [];
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async (method: string, path: string, body?: unknown) => {
+        if (path === '/api/devices?wiNr=626198') {
+          return {
+            items: [
+              { id: 7, wiNr: '6261980', listing: null },
+              { id: 5, wiNr: '626198', listing: { id: 9, title: 'ThinkPad T14 Gen 2' } },
+            ],
+          } as never;
+        }
+        if (method === 'GET') return DEVICE_LISTS[path] as never;
+        requests.push([method, path, body]);
+        return { id: 12, version: 1 } as never;
+      },
+    };
+
+    await seedAssignments(recording);
+
+    expect(requests).toEqual([
+      [
+        'POST',
+        '/api/devices',
+        {
+          wiNr: '626200',
+          supplierId: 4,
+          modelTemplateId: 2,
+          conditionValueId: 21,
+          visualGrade: 2,
+          conditionDescription: 'Leichte Gebrauchsspuren am Deckel',
+          values: { 13: 131, 14: 16, 15: 512, 16: 111, 17: 121, 18: 101, 19: { percent: 79 } },
+          confirmedKeys: [],
+        },
+      ],
+      ['POST', '/api/devices/12/assignment', { version: 1, listingId: 9 }],
+    ]);
+  });
+
+  it('stops with the WI-Nr when the demo model listing to assign to is missing', async () => {
+    const recording: DemoApi = {
+      baseUrl: 'http://127.0.0.1:4310',
+      request: async () => ({ items: [{ id: 5, wiNr: '626198', listing: null }] }) as never,
+    };
+
+    await expect(seedAssignments(recording)).rejects.toThrow(
+      'Demo data: model listing of 626198 is missing',
+    );
+  });
+
   it('stops with the WI-Nr when the demo device is missing', async () => {
     const recording: DemoApi = {
       baseUrl: 'http://127.0.0.1:4310',
@@ -172,75 +292,11 @@ describe('seedDemoData', () => {
 
   it('captures the demo devices through POST /api/devices with the ids of model template, supplier, condition and pick list values', async () => {
     const requests: unknown[][] = [];
-    const attributes = [
-      { id: 14, label: 'RAM', pickListId: null },
-      { id: 15, label: 'Speicherkapazität', pickListId: null },
-      { id: 16, label: 'Tastaturlayout', pickListId: 11 },
-      { id: 13, label: 'Betriebssystem', pickListId: 13 },
-      { id: 17, label: 'Netzteil', pickListId: 12 },
-      { id: 18, label: 'Akku', pickListId: 10 },
-      { id: 19, label: 'Akkukapazität', pickListId: null },
-    ];
-    const lists: Record<string, unknown> = {
-      '/api/model-templates?limit=200': {
-        items: [
-          { id: 1, modelName: 'ThinkPad E15 Gen 2', deviceType: { id: 1 } },
-          { id: 2, modelName: 'ThinkPad T14 Gen 2', deviceType: { id: 1 } },
-          { id: 3, modelName: 'EliteBook 840 G8', deviceType: { id: 1 } },
-        ],
-      },
-      '/api/suppliers?limit=200': {
-        items: [
-          { id: 4, name: 'Lieferant A' },
-          { id: 5, name: 'Lieferant B' },
-        ],
-      },
-      '/api/pick-lists?limit=200': {
-        items: [
-          { id: 1, key: 'condition' },
-          { id: 10, key: 'battery' },
-        ],
-      },
-      '/api/pick-lists/1/values?limit=200': {
-        items: [
-          { id: 21, label: 'gebraucht' },
-          { id: 22, label: 'defekt' },
-        ],
-      },
-      '/api/device-types/1/attributes': { items: attributes },
-      '/api/pick-lists/10/values?limit=200': {
-        items: [
-          { id: 101, label: 'mit Akku' },
-          { id: 102, label: 'mit Akku (defekt)' },
-          { id: 103, label: 'ohne Akku' },
-        ],
-      },
-      '/api/pick-lists/11/values?limit=200': {
-        items: [
-          { id: 111, label: 'Deutsch (QWERTZ)' },
-          { id: 112, label: 'Englisch (QWERTY, US)' },
-        ],
-      },
-      '/api/pick-lists/13/values?limit=200': {
-        items: [
-          { id: 131, label: 'Windows 11 Pro' },
-          { id: 132, label: 'Windows 11 Home' },
-          { id: 133, label: 'Windows 10 Pro' },
-        ],
-      },
-      '/api/pick-lists/12/values?limit=200': {
-        items: [
-          { id: 121, label: 'mit Netzteil (original)' },
-          { id: 122, label: 'mit Netzteil (nicht original)' },
-          { id: 123, label: 'ohne Netzteil' },
-        ],
-      },
-    };
     const recording: DemoApi = {
       baseUrl: 'http://127.0.0.1:4310',
       request: async (method: string, path: string, body?: unknown) => {
         if (method !== 'GET') requests.push([method, path, body]);
-        return (method === 'GET' ? lists[path] : { id: requests.length }) as never;
+        return (method === 'GET' ? DEVICE_LISTS[path] : { id: requests.length }) as never;
       },
     };
 

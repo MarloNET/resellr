@@ -5,13 +5,13 @@ import type {
   BatteryCapacityValue,
   PortEntry,
 } from '@resellr/domain/schemas/attribute-values.schema';
-import type { PickListValue } from '@resellr/domain/schemas/pick-list.schema';
 
 import { usePickListsQuery, usePickListValuesQuery } from '../../api/settings.api.ts';
 import { Button } from '../ui/Button.tsx';
 import { Checkbox } from '../ui/Checkbox.tsx';
 import { Input } from '../ui/Input.tsx';
 import { Select } from '../ui/Select.tsx';
+import { choiceOptions, type ChoiceOption } from './deactivated-choice.ts';
 import type { FormFieldControlProps } from './FormField.tsx';
 
 // Texts of the inputs (UI-007, UI-003 "Akkukapazität"; Technical Specification 2.5, 2.8.2).
@@ -118,13 +118,24 @@ export function attributeInputOf(
 const optionValue = (id: number | null) => (id === null ? '' : String(id));
 const idOf = (value: string) => (value === '' ? null : Number(value));
 
-/** The active values of a list, without the ones the screen no longer offers. */
-function useActiveValues(pickListId: number | null, dropped: ReadonlySet<number>) {
+/**
+ * The values a choice offers (2.0.11, CU-319): the active ones without those the screen no
+ * longer offers, and the stored ones of the field, a deactivated one with "(deaktiviert)".
+ */
+function useOfferedValues(
+  pickListId: number | null,
+  dropped: ReadonlySet<number>,
+  storedIds: readonly number[],
+) {
   const { data } = usePickListValuesQuery(pickListId);
-  return (data?.items ?? []).filter(({ id, active }) => active && !dropped.has(id));
+  return choiceOptions(data?.items ?? [], {
+    storedId: null,
+    storedIds,
+    markDeactivated: true,
+  }).filter(({ id }) => !dropped.has(id) || storedIds.includes(id));
 }
 
-function ValueOptions({ values }: { values: readonly PickListValue[] }) {
+function ValueOptions({ values }: { values: readonly ChoiceOption[] }) {
   return values.map(({ id, label }) => (
     <option key={id} value={id}>
       {label}
@@ -139,6 +150,11 @@ export interface AttributeInputProps {
   required: boolean;
   /** Pick list values that are no longer offered (2.0.11, read again without success). */
   dropped: ReadonlySet<number>;
+  /**
+   * Pick list values of the stored value of the field (UI-010): offered while deactivated, with
+   * "(deaktiviert)" (2.0.11 "Anzeige vorher", design v0.6.8).
+   */
+  storedIds?: readonly number[];
   disabled?: boolean;
   /** Attributes of the form field (CU-057); the first control of the input takes them. */
   control: FormFieldControlProps;
@@ -150,8 +166,8 @@ export interface AttributeInputProps {
  * Input of one attribute by its data type (CU-112, REQ-005, REQ-014; Technical Specification
  * 2.5): text, integer and decimal as a text field (the decimal with comma or point), yes/no and
  * *Auswahl aus Liste* as a choice, *Mehrfachangabe Anzahl × Typ* as entries of count, type and
- * position, the battery capacity as a number or "nicht ermittelbar". A choice offers only the
- * active values of its list (2.0.11).
+ * position, the battery capacity as a number or "nicht ermittelbar". A choice offers the active
+ * values of its list and a stored, deactivated one with "(deaktiviert)" (2.0.11).
  */
 export function AttributeInput(props: AttributeInputProps) {
   const { attribute } = props;
@@ -218,12 +234,13 @@ function PickField({
   value,
   required,
   dropped,
+  storedIds = [],
   disabled,
   control,
   onChange,
   onBlur,
 }: AttributeInputProps) {
-  const values = useActiveValues(attribute.pickListId, dropped);
+  const values = useOfferedValues(attribute.pickListId, dropped, storedIds);
   return (
     <Select
       {...control}
@@ -248,13 +265,14 @@ function PortsField({
   attribute,
   value,
   dropped,
+  storedIds = [],
   disabled,
   control,
   onChange,
   onBlur,
 }: AttributeInputProps) {
-  const types = useActiveValues(usePickListIdOf('port_type'), dropped);
-  const positions = useActiveValues(usePickListIdOf('port_position'), dropped);
+  const types = useOfferedValues(usePickListIdOf('port_type'), dropped, storedIds);
+  const positions = useOfferedValues(usePickListIdOf('port_position'), dropped, storedIds);
   const entries = Array.isArray(value) && value.length > 0 ? value : [EMPTY_PORT];
   const change = (index: number, next: Partial<PortInput>) =>
     onChange(entries.map((entry, at) => (at === index ? { ...entry, ...next } : entry)));
