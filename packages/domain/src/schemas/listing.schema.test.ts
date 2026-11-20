@@ -7,6 +7,8 @@ import {
   listingDetailSchema,
   listingUpdateBodySchema,
   listingValuesSchema,
+  listingPriceBodySchema,
+  listingPricesSchema,
   toArticleNumberKey,
 } from './listing.schema.ts';
 
@@ -250,5 +252,53 @@ describe('listingValuesSchema (CU-116, Technical Specification 2.7)', () => {
   it('takes a variant value only in variantValues and another value only in otherValues', () => {
     expect(schema.safeParse({ ...valid, otherValues: { '14': 16 } }).success).toBe(false);
     expect(schema.safeParse({ ...valid, otherValues: { '20': 'Blau' } }).success).toBe(true);
+  });
+});
+
+const PRICE_RULE = 'Preis: Zahl größer 0 mit höchstens zwei Nachkommastellen';
+
+describe('listingPriceBodySchema (CU-116, Technical Specification 2.7)', () => {
+  it('takes the version, the amount in cents and the flag VB', () => {
+    expect(listingPriceBodySchema.parse({ version: 2, amountCents: 26900, vb: false })).toEqual({
+      version: 2,
+      amountCents: 26900,
+      vb: false,
+    });
+  });
+
+  it.each([
+    ['0', 0],
+    ['12,345', 1234.5],
+    ['a negative amount', -100],
+    ['an unsafe amount', 2 ** 53],
+  ])('rejects %s with the price rule as a field rule', (_, amountCents) => {
+    const result = listingPriceBodySchema.safeParse({ version: 1, amountCents, vb: false });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ code: 'custom', path: ['amountCents'], message: PRICE_RULE }),
+    ]);
+  });
+
+  it.each([
+    ['a missing vb', { version: 1, amountCents: 100 }],
+    ['a string amount', { version: 1, amountCents: '100', vb: false }],
+    ['an unknown field', { version: 1, amountCents: 100, vb: false, source: 'rule' }],
+  ])('rejects %s as a structural error', (_, body) => {
+    const result = listingPriceBodySchema.safeParse(body);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.every((issue) => issue.code !== 'custom')).toBe(true);
+  });
+});
+
+describe('listingPricesSchema (CU-116, Technical Specification 2.7)', () => {
+  it('holds the new version and the prices of all channels', () => {
+    const answer = {
+      listing: { version: 3 },
+      prices: [
+        { channelId: 1, amountCents: 26900, vb: false, source: 'manual' },
+        { channelId: 2, amountCents: 5000, vb: true, source: 'manual' },
+      ],
+    };
+    expect(listingPricesSchema.parse(answer)).toEqual(answer);
   });
 });

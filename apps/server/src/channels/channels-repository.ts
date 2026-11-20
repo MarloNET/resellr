@@ -27,6 +27,18 @@ export function createChannelsRepository(db: Kysely<DB>) {
         .orderBy('id')
         .execute();
     },
+
+    /**
+     * One channel, active or not, with its name and flag VB (3.1 `vb_allowed`), `undefined` if
+     * there is none (#204, Nachtrag MAR-1171).
+     */
+    async findById(id: number) {
+      return db
+        .selectFrom('channel')
+        .select(['id', 'name', 'vb_allowed'])
+        .where('id', '=', id)
+        .executeTakeFirst();
+    },
   };
 }
 

@@ -1,6 +1,6 @@
 import type { Insertable, Kysely, Selectable } from 'kysely';
 
-import type { DB, ListingTable } from '../db/schema.ts';
+import type { DB, ListingPriceTable, ListingTable } from '../db/schema.ts';
 
 export type ListingRow = Selectable<ListingTable>;
 export type ListingInsert = Omit<Insertable<ListingTable>, 'id'>;
@@ -27,9 +27,10 @@ export type ListingValueColumns = Pick<
 
 /**
  * Queries on `listing`, `listing_delivery_scope` and `listing_price` (CU-125; Technical
- * Specification 4.1, Nachtrag MAR-879), with #197 those for creating a model listing, with #206
- * those for changing its listing values and delivery scope. A new model
- * listing has no delivery scope and no prices (AC-REQ-019-01), so creating writes neither table.
+ * Specification 4.1, Nachtrag MAR-879), with #197 those for creating a model listing, with #204
+ * those for saving a price and with #206 those for changing its listing values and delivery scope.
+ * A new model listing has no delivery scope and no prices (AC-REQ-019-01), so creating writes
+ * neither table.
  * Inside an action pass `tx.db`, outside of one the outer `db` (2.0.4).
  */
 export function createListingRepository(db: Kysely<DB>) {
@@ -108,6 +109,30 @@ export function createListingRepository(db: Kysely<DB>) {
         .where('listing_id', '=', listingId)
         .orderBy('channel_id')
         .execute();
+    },
+
+    /** Inserts or replaces the price of a model listing for one channel (2.7, 3.3). */
+    async savePrice(row: Insertable<ListingPriceTable>): Promise<void> {
+      await db
+        .insertInto('listing_price')
+        .values(row)
+        .onConflict((conflict) =>
+          conflict.columns(['listing_id', 'channel_id']).doUpdateSet({
+            amount_cents: row.amount_cents,
+            vb: row.vb,
+            source: row.source,
+          }),
+        )
+        .execute();
+    },
+
+    /** Raises the version of a model listing after a change of its prices (2.0.3). */
+    async raiseVersion(id: number, updatedAt: string): Promise<void> {
+      await db
+        .updateTable('listing')
+        .set((eb) => ({ version: eb('version', '+', 1), updated_at: updatedAt }))
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow();
     },
 
     /**
