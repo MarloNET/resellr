@@ -118,9 +118,14 @@ export interface KeepAssignment {
   onKept: (device: Device) => void;
   /**
    * A rejection the form of the calling screen shows (field rules, deactivated values, sold
-   * meanwhile, conflict P-05): the dialog closes and hands it over.
+   * meanwhile): the dialog closes and hands it over.
    */
   onRejected: (error: ApiError) => void;
+  /**
+   * After "Neu laden" of P-05 in the dialog has loaded the data again: the calling screen closes
+   * the dialog and takes the device read again (T-1), as Kontext A shows P-05 in the dialog.
+   */
+  onReloaded: () => void;
 }
 
 interface KeepProps extends CommonProps {
@@ -132,8 +137,11 @@ interface KeepProps extends CommonProps {
 
 export type DeviationDialogProps = AssignmentProps | KeepProps;
 
-/** Errors of "Zuordnung behalten" the form of the calling screen shows (2.5, P-05). */
-const FORM_ERRORS = new Set<ApiError['kind']>(['validation', 'rejected', 'conflict']);
+/**
+ * Errors of "Zuordnung behalten" the form of the calling screen shows (2.5); P-05 stays in the
+ * dialog as in Kontext A.
+ */
+const FORM_ERRORS = new Set<ApiError['kind']>(['validation', 'rejected']);
 
 /**
  * Dialog UI-005 "Abweichungen bei Zuordnung" (CU-135, REQ-018, REQ-014; Technical Specification
@@ -226,6 +234,7 @@ export function DeviationDialog(props: DeviationDialogProps) {
               )}
               busy={locked}
               onConfirm={confirm}
+              onReloaded={props.keep?.onReloaded}
             />
           ))}
       </DialogContent>
@@ -271,6 +280,8 @@ interface DeviationContentProps {
   differsFromAll: boolean;
   busy: boolean;
   onConfirm: (callbacks: Callbacks) => void;
+  /** After "Neu laden" of P-05 (Kontext B); without it the dialog only hides the banner. */
+  onReloaded?: () => void;
 }
 
 /** Content of the dialog; mounted per opening. */
@@ -283,6 +294,7 @@ function DeviationContent({
   differsFromAll,
   busy,
   onConfirm,
+  onReloaded,
 }: DeviationContentProps) {
   const [rejection, setRejection] = useState<string | null>(null);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
@@ -321,7 +333,10 @@ function DeviationContent({
         <SaveNoticeBanners
           notice={notice}
           onClose={() => setNotice(null)}
-          onReloaded={() => setNotice(null)}
+          onReloaded={() => {
+            setNotice(null);
+            onReloaded?.();
+          }}
           errorText={errorText}
         />
         {rejection !== null && (

@@ -290,9 +290,13 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
   useEffect(() => {
     const attributes = attributesQuery.data?.items;
     if (stored !== null || attributes === undefined) return;
-    setStored(device);
-    setDraft(draftOf(device, attributes));
-  }, [stored, device, attributesQuery.data]);
+    // After "Neu laden" the cache already holds the device read again, while this render may
+    // still carry the previous one: the query notifies its observers only afterwards (T-1).
+    const current =
+      queryClient.getQueryData<DeviceDetail>(queryKeys.inventory.device(device.id)) ?? device;
+    setStored(current);
+    setDraft(draftOf(current, attributes));
+  }, [stored, device, attributesQuery.data, queryClient]);
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
@@ -466,6 +470,15 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
     setNotice({ kind: 'success' });
   }
 
+  /** "Neu laden" of P-05 at the form or in UI-005: the form takes the device read again (T-1). */
+  function takeReloaded() {
+    setDeviation(null);
+    setNotice(null);
+    setStored(null);
+    setErrors({});
+    setRejectionShown({});
+  }
+
   function save() {
     blurCheck.cancel();
     const current = draftRef.current;
@@ -520,13 +533,7 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
       <SaveNoticeBanners
         notice={notice}
         onClose={() => setNotice(null)}
-        onReloaded={() => {
-          // "Neu laden" of P-05: the form takes the device read again (T-1).
-          setNotice(null);
-          setStored(null);
-          setErrors({});
-          setRejectionShown({});
-        }}
+        onReloaded={takeReloaded}
         successText={TEXTS.saved}
         errorText={TEXTS.saveError}
       />
@@ -671,6 +678,7 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
                 setDeviation(null);
                 onFailed(error);
               },
+              onReloaded: takeReloaded,
             }
           }
           onClose={() => setDeviation(null)}

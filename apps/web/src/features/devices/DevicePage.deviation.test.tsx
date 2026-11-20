@@ -93,9 +93,10 @@ const failed: Route = () =>
 
 /**
  * `fetch` of UI-010: the first `PATCH` answers `first`, every later one (with the decision)
- * `decided`. Records the bodies of the `PATCH`.
+ * `decided`. Records the bodies of the `PATCH`. After the second `PATCH`, `GET` of the device
+ * answers `reloaded` (stored meanwhile in another window).
  */
-function mockApi(first: Route, decided: Route = saved) {
+function mockApi(first: Route, decided: Route = saved, reloaded: object = DEVICE) {
   const sent: Record<string, unknown>[] = [];
   vi.stubGlobal(
     'fetch',
@@ -104,7 +105,9 @@ function mockApi(first: Route, decided: Route = saved) {
       const route = `${init?.method ?? 'GET'} ${url.pathname}`;
       if (url.pathname === '/api/ops/status') return Response.json(OPS_STATUS);
       if (url.pathname === '/api/ops/health') return Response.json({ state: 'ready' });
-      if (route === 'GET /api/devices/5') return Response.json(DEVICE);
+      if (route === 'GET /api/devices/5') {
+        return Response.json(sent.length < 2 ? DEVICE : reloaded);
+      }
       if (route === 'GET /api/pick-lists') return Response.json({ items: PICK_LISTS, total: 1 });
       if (route === 'GET /api/pick-lists/1/values') {
         return Response.json({ items: CONDITIONS, total: 1 });
@@ -187,8 +190,9 @@ describe('UI-005 Kontext B "Abweichungen bei Zuordnung" over UI-010 (CU-135, #19
     const description = within(dialog()).getByRole('region', { name: 'Zustandsbeschreibung' });
     expect(within(description).getByText('Display- und Gehäuseschaden')).toBeTruthy();
     expect(button('Zuordnung behalten').disabled).toBe(false);
-    expect(button('Neues Modell-Inserat anlegen')).toBeTruthy();
-    expect(button('Umbuchen')).toBeTruthy();
+    // "Neues Modell-Inserat anlegen" (#201) and "Umbuchen" (#202) are shown but not available.
+    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(true);
+    expect(button('Umbuchen').disabled).toBe(true);
     expect(button('Abbrechen').disabled).toBe(false);
     expect(within(dialog()).queryByRole('button', { name: 'Trotzdem zuordnen' })).toBeNull();
     expectAccessibleDialog();
@@ -240,17 +244,38 @@ describe('UI-005 Kontext B "Abweichungen bei Zuordnung" over UI-010 (CU-135, #19
     expect(visualGrade().value).toBe('4');
   });
 
-  it('a conflict on "Zuordnung behalten" closes the dialog and shows P-05 at the form', async () => {
-    mockApi(deviating([VISUAL_GRADE]), () =>
-      Response.json(errorBody('version_conflict'), { status: 409 }),
+  it('UI-005.conflict shows P-05 with "Neu laden" in the dialog after 409 version_conflict on "Zuordnung behalten"; the deviations stay visible', async () => {
+    mockApi(
+      deviating([VISUAL_GRADE]),
+      () => Response.json(errorBody('version_conflict'), { status: 409 }),
+      { ...DEVICE, visualGrade: 3, version: 4 },
     );
     await saveVisualGrade4();
 
     fireEvent.click(button('Zuordnung behalten'));
 
-    expect(await screen.findByRole('button', { name: 'Neu laden' })).toBeTruthy();
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(visualGrade().value).toBe('4');
+    expect(await within(dialog()).findByRole('button', { name: 'Neu laden' })).toBeTruthy();
+    expect(within(dialog()).getByRole('alert').textContent).toContain('Neu laden');
+    expect(tableRows()).toContainEqual(['Optik-Note', '4', '2']);
+    expect(button('Zuordnung behalten').disabled).toBe(false);
+    expectAccessibleDialog();
+  });
+
+  it('UI-005.conflict "Neu laden" closes the dialog and the form takes the device read again (T-1)', async () => {
+    const { sent } = mockApi(
+      deviating([VISUAL_GRADE]),
+      () => Response.json(errorBody('version_conflict'), { status: 409 }),
+      { ...DEVICE, visualGrade: 3, version: 4 },
+    );
+    await saveVisualGrade4();
+    fireEvent.click(button('Zuordnung behalten'));
+
+    fireEvent.click(await within(dialog()).findByRole('button', { name: 'Neu laden' }));
+
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await vi.waitFor(() => expect(visualGrade().value).toBe('3'));
+    expect(screen.queryByRole('button', { name: 'Neu laden' })).toBeNull();
+    expect(sent).toHaveLength(2);
   });
 });
 
