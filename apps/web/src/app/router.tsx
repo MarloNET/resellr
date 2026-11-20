@@ -58,6 +58,7 @@ export const routes: RouteObject[] = [
       { path: 'inserate/:listingId', element: <ListingPage /> },
       { path: 'modelle', element: <ModelLibraryPage /> },
       { path: 'modelle/neu', element: <ModelTemplatePage /> },
+      { path: 'modelle/:modelTemplateId', element: <ModelTemplatePage /> },
       { path: 'geraete', element: <DevicesPage /> },
       { path: 'geraete/neu', element: <DeviceIntakePage /> },
       { path: 'geraete/:deviceId', element: <DevicePage /> },
