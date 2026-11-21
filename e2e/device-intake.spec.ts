@@ -427,6 +427,51 @@ test.describe('UI-003 draft for UI-007 and next device (CU-132, CU-133, CU-114, 
     await expectReachable(page);
   });
 
+  test('CU-058 closing UI-004 after "Speichern und zuordnen" returns the focus to the button, after Ctrl+Enter to the field', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const { modelName, manufacturer } = await createNotebookTemplate(page, server.baseUrl, hash);
+    await page.goto('/geraete/neu');
+    await field(page, 'WI-Nr').fill(`F${hash}`.slice(0, 20));
+    await form(page)
+      .getByRole('searchbox', { name: /^Modellvorlage suchen/ })
+      .fill(modelName);
+    await page.getByRole('button', { name: new RegExp(`^${manufacturer} ${modelName}`) }).click();
+    await field(page, 'Zustand').selectOption({ label: 'gebraucht' });
+    await field(page, 'Optik-Note').fill('2');
+    await field(page, 'RAM').fill('16');
+    await field(page, 'Speicherkapazität').fill('512');
+    await field(page, 'Tastaturlayout').selectOption({ label: 'Deutsch (QWERTZ)' });
+    await field(page, 'Betriebssystem').selectOption({ label: 'Windows 11 Pro' });
+    await field(page, 'Netzteil').selectOption({ label: 'mit Netzteil (original)' });
+    await field(page, 'Akku').selectOption({ label: 'ohne Akku' });
+    const dialog = page.getByRole('dialog', { name: 'Modell-Inserat wählen' });
+    const assign = page.getByRole('button', { name: 'Speichern und zuordnen' });
+
+    await assign.click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(assign).toBeFocused();
+
+    // Each save creates a device, so the next one needs a WI-Nr of its own.
+    await field(page, 'WI-Nr').fill(`G${hash}`.slice(0, 20));
+    await assign.click();
+    await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(assign).toBeFocused();
+
+    await field(page, 'WI-Nr').fill(`H${hash}`.slice(0, 20));
+    await field(page, 'Optik-Note').focus();
+    await page.keyboard.press('Control+Enter');
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(field(page, 'Optik-Note')).toBeFocused();
+  });
+
   test('DER-54-14 "Vorhandene verwenden" at the second hit creates no model template, chooses it in UI-003, keeps the inputs and shows "Lade Gerätewerte …"', async ({
     page,
     server,

@@ -22,6 +22,7 @@ export const ERROR_CODES = {
   other_model_template: 422,
   pick_list_value_deactivated: 422,
   placeholder_not_allowed: 422,
+  review_pending: 422,
   shutting_down: 503,
   stale_content: 409,
   stale_stock: 409,

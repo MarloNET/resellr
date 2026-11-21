@@ -32,6 +32,7 @@ const DOMAIN_CODES: [string, number][] = [
   ['other_model_template', 422],
   ['pick_list_value_deactivated', 422],
   ['placeholder_not_allowed', 422],
+  ['review_pending', 422],
   ['supplier_deactivated', 422],
   ['variant_duplicate', 422],
   ['variant_flag_would_merge_listings', 422],
