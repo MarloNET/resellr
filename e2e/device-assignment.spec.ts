@@ -360,4 +360,54 @@ test.describe('UI-005 Kontext B: Variantenangabe eines zugeordneten Geräts änd
       }),
     ]);
   });
+
+  test('AC-REQ-019-05 the visual grade of a device assigned to MI-A changed from 2 to 4 in UI-010 opens UI-005; "Neues Modell-Inserat anlegen" saves it, creates a second model listing with visual grade 4 and opens it in UI-014', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const api = apiOf(page, server.baseUrl);
+    const { template, capture } = await setUpTemplate(api, hash);
+    // MI-A comes from another device, so the WI-Nr of this one is free as article number.
+    const first = await capture(`A${hash}`.slice(0, 20));
+    const miA = await api.write<{ id: number }>('/api/listings', {
+      fromDeviceId: first.id,
+      deviceVersion: first.version,
+    });
+    const device = await capture(`B${hash}`.slice(0, 20));
+    await api.write(
+      `/api/devices/${device.id}/assignment`,
+      {
+        version: device.version,
+        listingId: miA.id,
+        confirmDeviation: false,
+      },
+      200,
+    );
+    await page.goto(`/geraete/${device.id}`);
+
+    const grade = page.getByRole('textbox', { name: 'Optik-Note' });
+    await expect(grade).toHaveValue('2');
+    await grade.fill('4');
+    await page.getByRole('button', { name: 'Gerätewerte speichern' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
+    await dialog.getByRole('button', { name: 'Neues Modell-Inserat anlegen' }).click();
+
+    await expect(page).toHaveURL(/\/inserate\/\d+$/);
+    const created = Number(new URL(page.url()).pathname.split('/').pop());
+    expect(created).not.toBe(miA.id);
+    const listings = await api.read<{
+      items: { id: number; quantity: number; variantSummary: { visualGrade: number } }[];
+    }>(`/api/model-templates/${template.id}/listings`);
+    expect(listings.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: miA.id, quantity: 1 }),
+        expect.objectContaining({
+          id: created,
+          quantity: 1,
+          variantSummary: expect.objectContaining({ visualGrade: 4 }),
+        }),
+      ]),
+    );
+  });
 });

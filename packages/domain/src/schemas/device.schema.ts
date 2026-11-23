@@ -140,8 +140,9 @@ export type DeviceCreate = z.output<ReturnType<typeof deviceCreateSchema>>;
  * it: a missing field stays unchanged, `values` holds changes (a key overwrites, `null` removes;
  * `mergeAttributeValues`). The rules apply to the state after the change (`deviceValuesSchema`).
  * `deviationDecision` decides on the deviation of an assigned device from its model listing (2.5,
- * UI-005 Kontext B): `keep` stores the values and keeps the assignment; `new_listing` (#201) and
- * `rebook` with `targetListingId` and `confirmTargetDeviation` (#202) follow.
+ * UI-005 Kontext B): `keep` stores the values and keeps the assignment, `new_listing` stores them
+ * and creates a model listing from the device (2.6); `rebook` with `targetListingId` and
+ * `confirmTargetDeviation` (#202) follows.
  */
 export const deviceUpdateBodySchema = z.strictObject({
   version: versionSchema,
@@ -150,7 +151,7 @@ export const deviceUpdateBodySchema = z.strictObject({
   conditionDescription: z.string().optional(),
   values: anyValuesSchema.optional(),
   confirmedKeys: z.array(z.string()),
-  deviationDecision: z.enum(['keep']).optional(),
+  deviationDecision: z.enum(['keep', 'new_listing']).optional(),
 });
 export type DeviceUpdateInput = z.input<typeof deviceUpdateBodySchema>;
 

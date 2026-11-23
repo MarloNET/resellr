@@ -6,9 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createQueryClient } from '../../app/query-client.ts';
 import { routes } from '../../app/router.tsx';
 
-// Component tests of dialog UI-005 Kontext B (CU-135, CU-137, #191, REQ-014) as it opens over
-// UI-010 after "Gerätewerte speichern" of an assigned device answers `confirmation_required`/
-// `variant_deviation`, with a mocked `fetch` (Technical Specification 2.5, 6.1, 6.2).
+// Component tests of dialog UI-005 Kontext B (CU-135, CU-137, #191, #201, REQ-014, REQ-019) as it
+// opens over UI-010 after "Gerätewerte speichern" of an assigned device answers
+// `confirmation_required`/`variant_deviation`, with a mocked `fetch` (Technical Specification 2.5,
+// 2.6, 6.1, 6.2).
 
 const OPS_STATUS = {
   dataDirPath: 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten',
@@ -132,17 +133,19 @@ const visualGrade = () =>
 const dialog = () => screen.getByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
 const button = (name: string) => within(dialog()).getByRole<HTMLButtonElement>('button', { name });
 
-/** UI-010 of device 5; changes the visual grade from 2 to 4 and saves. */
+/** UI-010 of device 5; changes the visual grade from 2 to 4 and saves; returns the router. */
 async function saveVisualGrade4() {
+  const router = createMemoryRouter(routes, { initialEntries: ['/geraete/5'] });
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/geraete/5'] })} />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
   await screen.findByRole('form', { name: 'Gerätewerte' });
   fireEvent.change(visualGrade(), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Gerätewerte speichern' }));
   await screen.findByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
+  return router;
 }
 
 /** Accessibility assertion: named dialog with heading, named buttons, labelled table. */
@@ -190,8 +193,9 @@ describe('UI-005 Kontext B "Abweichungen bei Zuordnung" over UI-010 (CU-135, #19
     const description = within(dialog()).getByRole('region', { name: 'Zustandsbeschreibung' });
     expect(within(description).getByText('Display- und Gehäuseschaden')).toBeTruthy();
     expect(button('Zuordnung behalten').disabled).toBe(false);
-    // "Neues Modell-Inserat anlegen" (#201) and "Umbuchen" (#202) are shown but not available.
-    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(true);
+    // No other model listing, so the changed device deviates from all (#201); "Umbuchen" (#202)
+    // is shown but not available.
+    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(false);
     expect(button('Umbuchen').disabled).toBe(true);
     expect(button('Abbrechen').disabled).toBe(false);
     expect(within(dialog()).queryByRole('button', { name: 'Trotzdem zuordnen' })).toBeNull();
@@ -218,6 +222,53 @@ describe('UI-005 Kontext B "Abweichungen bei Zuordnung" over UI-010 (CU-135, #19
     expect(await screen.findByText('Gerät gespeichert')).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(visualGrade().value).toBe('4');
+  });
+
+  it('AC-REQ-019-05 UI-005.default "Neues Modell-Inserat anlegen" sends the same request with deviationDecision new_listing and opens UI-014 of the new model listing', async () => {
+    const { sent } = mockApi(
+      deviating(
+        [VISUAL_GRADE],
+        [{ listingId: 10, title: 'ThinkPad T14 Gen 2', deviations: [DESCRIPTION] }],
+      ),
+      () => Response.json({ ...DEVICE, visualGrade: 4, listingId: 12, version: 5 }),
+    );
+    const router = await saveVisualGrade4();
+
+    fireEvent.click(button('Neues Modell-Inserat anlegen'));
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/inserate/12'));
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual({ ...sent[0], deviationDecision: 'new_listing' });
+  });
+
+  it('UI-005.default "Neues Modell-Inserat anlegen" is not available when the changed device matches another model listing (AC-REQ-019-02)', async () => {
+    mockApi(
+      deviating([VISUAL_GRADE], [{ listingId: 10, title: 'ThinkPad T14 Gen 2', deviations: [] }]),
+    );
+    await saveVisualGrade4();
+
+    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(true);
+    expect(button('Zuordnung behalten').disabled).toBe(false);
+    expectAccessibleDialog();
+  });
+
+  it('UI-005.default "Neues Modell-Inserat anlegen" shows the rejection article_number_taken in the dialog as UI-004 does; the dialog stays', async () => {
+    mockApi(deviating([VISUAL_GRADE]), () =>
+      Response.json(
+        errorBody('article_number_taken', { message: 'Artikelnummer bereits vergeben' }),
+        {
+          status: 422,
+        },
+      ),
+    );
+    const router = await saveVisualGrade4();
+
+    fireEvent.click(button('Neues Modell-Inserat anlegen'));
+
+    expect(await within(dialog()).findByText('Artikelnummer bereits vergeben')).toBeTruthy();
+    expect(router.state.location.pathname).toBe('/geraete/5');
+    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(false);
+    expectAccessibleDialog();
   });
 
   it('UI-005.error DER-56-05 shows "Speichern nicht möglich. Referenz: R-7K2M-9QX4" in the dialog on a technical error, the dialog stays', async () => {

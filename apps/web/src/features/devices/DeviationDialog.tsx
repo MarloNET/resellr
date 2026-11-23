@@ -87,11 +87,6 @@ interface CommonProps {
   device: DeviationDialogDevice;
   /** "Abbrechen" and Esc: back to the calling screen, nothing is stored (DER-59-02). */
   onClose: () => void;
-  /**
-   * "Neues Modell-Inserat anlegen" (#201); without it the action is shown but not available.
-   * Available only when the device deviates from every model listing of the model template.
-   */
-  onCreateListing?: () => void;
 }
 
 /** Kontext A: "Zuordnen" of UI-004 answered `variant_deviation` (REQ-018). */
@@ -102,6 +97,13 @@ interface AssignmentProps extends CommonProps {
   listingId: number;
   /** After "Trotzdem zuordnen" (`200`): the calling screen closes UI-004 and shows the banner. */
   onAssigned: (assignment: DeviceAssignment) => void;
+  /**
+   * "Neues Modell-Inserat anlegen" (#201): the calling dialog closes UI-005 and creates the model
+   * listing as UI-004, with its rejections, and opens it in UI-014 (UI-005 "wie UI-004"). Without
+   * it the action is shown but not available; available only when the device deviates from every
+   * model listing of the model template (`variant_duplicate` otherwise, AC-REQ-019-02).
+   */
+  onCreateListing?: () => void;
   keep?: never;
 }
 
@@ -116,6 +118,11 @@ export interface KeepAssignment {
   body: DeviceUpdateInput;
   /** After "Zuordnung behalten" (`200`): the calling screen takes the stored device. */
   onKept: (device: Device) => void;
+  /**
+   * After "Neues Modell-Inserat anlegen" (`200`, `deviationDecision: new_listing`): the device is
+   * assigned to the new model listing, which the calling screen opens in UI-014 (#201).
+   */
+  onListingCreated: (device: Device) => void;
   /**
    * A rejection the form of the calling screen shows (field rules, deactivated values, sold
    * meanwhile): the dialog closes and hands it over.
@@ -133,6 +140,7 @@ interface KeepProps extends CommonProps {
   deviations?: never;
   listingId?: never;
   onAssigned?: never;
+  onCreateListing?: never;
 }
 
 export type DeviationDialogProps = AssignmentProps | KeepProps;
@@ -142,6 +150,13 @@ export type DeviationDialogProps = AssignmentProps | KeepProps;
  * dialog as in Kontext A.
  */
 const FORM_ERRORS = new Set<ApiError['kind']>(['validation', 'rejected']);
+
+/**
+ * Rejections of "Neues Modell-Inserat anlegen" in Kontext B that UI-005 shows with their text, as
+ * UI-004 shows them for the creation (2.6, UI-005 "Ablehnung wie UI-004"); the other errors go as
+ * for "Zuordnung behalten".
+ */
+const NEW_LISTING_REJECTIONS = new Set(['variant_duplicate', 'article_number_taken']);
 
 /**
  * Dialog UI-005 "Abweichungen bei Zuordnung" (CU-135, REQ-018, REQ-014; Technical Specification
@@ -155,9 +170,11 @@ const FORM_ERRORS = new Set<ApiError['kind']>(['validation', 'rejected']);
  * so: "Zuordnung behalten" sends the same request with `deviationDecision: keep`, a technical
  * error shows "Speichern nicht möglich. Referenz: <Nr>" (DER-56-05); the data for "Neues
  * Modell-Inserat anlegen" and "Umbuchen" are the rebook targets of the answer, as the stored
- * device differs from the changed one. "Abbrechen" and Esc return to the calling screen. States:
- * default, error, conflict (P-05), unreachable (P-06), wird-beendet (P-07) and ausgang-unbekannt
- * (P-08). "Umbuchen" (#202, #203) and the action "Neues Modell-Inserat anlegen" (#201) follow.
+ * device differs from the changed one; "Neues Modell-Inserat anlegen" sends the same request with
+ * `deviationDecision: new_listing` and hands the device assigned to the new model listing over
+ * (#201). In Kontext A that action goes to `onCreateListing` of UI-004. "Abbrechen" and Esc return
+ * to the calling screen. States: default, error, conflict (P-05), unreachable (P-06),
+ * wird-beendet (P-07) and ausgang-unbekannt (P-08). "Umbuchen" (#202, #203) follows.
  */
 export function DeviationDialog(props: DeviationDialogProps) {
   const writesLocked = useWritesLocked();
@@ -191,13 +208,23 @@ export function DeviationDialog(props: DeviationDialogProps) {
       );
       return;
     }
+    decide('keep', callbacks);
+  }
+
+  /** Kontext B: the second `PATCH` with the decision of UI-005 (2.5). */
+  function decide(decision: 'keep' | 'new_listing', callbacks: Callbacks) {
     const keep = props.keep;
-    if (keep === null) return;
+    if (keep === null || keep === undefined) return;
     updateMutation.mutate(
-      { ...keep.body, deviationDecision: 'keep' },
+      { ...keep.body, deviationDecision: decision },
       {
-        onSuccess: keep.onKept,
+        onSuccess: decision === 'keep' ? keep.onKept : keep.onListingCreated,
         onError: (error) => {
+          const code = error.error?.code ?? '';
+          if (decision === 'new_listing' && NEW_LISTING_REJECTIONS.has(code)) {
+            callbacks.onRejection(error.error?.message ?? '');
+            return;
+          }
           if (FORM_ERRORS.has(error.kind)) {
             keep.onRejected(error);
             return;
@@ -218,7 +245,7 @@ export function DeviationDialog(props: DeviationDialogProps) {
               deviations={deviations}
               device={props.device}
               onClose={props.onClose}
-              onCreateListing={props.onCreateListing}
+              onCreateListing={props.onCreateListing && (() => props.onCreateListing?.())}
               busy={locked}
               onConfirm={confirm}
             />
@@ -227,7 +254,7 @@ export function DeviationDialog(props: DeviationDialogProps) {
               context="device_values"
               deviations={deviations}
               onClose={props.onClose}
-              onCreateListing={props.onCreateListing}
+              onCreateListing={(callbacks) => decide('new_listing', callbacks)}
               // The changed device against every model listing: the assigned one deviates.
               differsFromAll={(props.keep?.details.rebookTargets ?? []).every(
                 (target) => target.deviations.length > 0,
@@ -274,7 +301,8 @@ interface DeviationContentProps {
   context: 'assignment' | 'device_values';
   deviations: VariantDeviationItem[];
   onClose: () => void;
-  onCreateListing?: () => void;
+  /** "Neues Modell-Inserat anlegen"; without it the action is shown but not available. */
+  onCreateListing?: (callbacks: Callbacks) => void;
   /** The list read for Kontext A (loading, error, P-06); none in Kontext B. */
   readState?: Pick<ReturnType<typeof useListingDeviationsQuery>, 'isPending' | 'error'>;
   differsFromAll: boolean;
@@ -309,11 +337,12 @@ function DeviationContent({
   const description = deviations.find(({ key }) => key === 'conditionDescription');
   const rows = deviations.filter(({ key }) => key !== 'conditionDescription');
 
-  function confirm() {
+  /** Sends an action of the dialog; its rejection or error replaces the previous banner. */
+  function send(action: (callbacks: Callbacks) => void) {
     if (busy) return;
     setRejection(null);
     setNotice(null);
-    onConfirm({ onRejection: setRejection, onError: (error) => setNotice(noticeOf(error)) });
+    action({ onRejection: setRejection, onError: (error) => setNotice(noticeOf(error)) });
   }
 
   return (
@@ -410,11 +439,11 @@ function DeviationContent({
         <Button
           type="button"
           disabled={busy || onCreateListing === undefined || !differsFromAll}
-          onClick={onCreateListing}
+          onClick={() => onCreateListing && send(onCreateListing)}
         >
           {TEXTS.newListing}
         </Button>
-        <Button type="button" variant="primary" disabled={busy} onClick={confirm}>
+        <Button type="button" variant="primary" disabled={busy} onClick={() => send(onConfirm)}>
           {context === 'assignment' ? TEXTS.assignAnyway : TEXTS.keepAssignment}
         </Button>
       </DialogFooter>
