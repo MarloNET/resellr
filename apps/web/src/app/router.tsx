@@ -7,6 +7,7 @@ import { DevicesPage } from '../features/devices/DevicesPage.tsx';
 import { ListingPage } from '../features/listings/ListingPage.tsx';
 import { ModelLibraryPage } from '../features/models/ModelLibraryPage.tsx';
 import { ModelTemplatePage } from '../features/models/ModelTemplatePage.tsx';
+import { PhotosPage } from '../features/photos/PhotosPage.tsx';
 import {
   LastSettingsSectionRedirect,
   SettingsLayout,
@@ -56,6 +57,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <Navigate to="/inserate" replace /> },
       { path: 'inserate', element: <ListingOverviewPlaceholder /> },
       { path: 'inserate/:listingId', element: <ListingPage /> },
+      { path: 'inserate/:listingId/fotos', element: <PhotosPage /> },
       { path: 'modelle', element: <ModelLibraryPage /> },
       { path: 'modelle/neu', element: <ModelTemplatePage /> },
       { path: 'modelle/:modelTemplateId', element: <ModelTemplatePage /> },

@@ -339,6 +339,27 @@ describe('UI-014 Modell-Inserat (CU-138)', () => {
     expectAccessiblePage('MacBook Pro 13');
   });
 
+  it('UI-014.default "Fotos verwalten" in the area "Fotos" opens UI-015 of the model listing', async () => {
+    mockApi((url) =>
+      url.pathname === '/api/listings/9/photos'
+        ? Response.json({ items: [], total: 0 })
+        : Response.json(LISTING),
+    );
+    renderPage();
+    const photos = await screen.findByRole('region', { name: 'Fotos' });
+    // Tab order of UI-014: listing values, photos, devices.
+    expect(
+      within(screen.getByRole('main'))
+        .getAllByRole('region')
+        .map((region) => within(region).getByRole('heading', { level: 2 }).textContent),
+    ).toEqual(['Inseratswerte', 'Fotos', 'Geräte']);
+
+    fireEvent.click(within(photos).getByRole('link', { name: 'Fotos verwalten' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Fotos verwalten' })).toBeTruthy();
+    expect(await screen.findByText('0 von 20 Fotos')).toBeTruthy();
+  });
+
   it('UI-014.loading DER-60-02 shows placeholder blocks with "Lade Modell-Inserat …" while the model listing loads', async () => {
     mockApi(pending);
 

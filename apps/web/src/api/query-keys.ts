@@ -53,6 +53,10 @@ export const queryKeys = {
     modelTemplateUsage: (modelTemplateId: number) =>
       ['inventory', 'model-template-usage', modelTemplateId] as const,
   },
+  media: {
+    all: ['media'] as const,
+    photos: (listingId: number) => ['media', 'photos', listingId] as const,
+  },
 } as const;
 
 /**
