@@ -15,6 +15,7 @@ import {
   type ListingChoice,
   type ListingCreateInput,
   type ListingDetail,
+  type ListingUpdateInput,
   type ListingPriceInput,
   type ListingPrices,
   variantDeviationDetailsSchema,
@@ -155,6 +156,19 @@ export function useListingQuery(id: number | null, { includeCancelled = false } 
     enabled: id !== null,
     // The filter "auch stornierte" keeps the page while the other list loads.
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * "Speichern" of the listing values in `UI-014.edit` (`PATCH /api/listings/{id}`, 2.7): on success
+ * the model listing is read again, with the names of its delivery scope, and the model listings
+ * to choose from in UI-004 with their variant data.
+ */
+export function useUpdateListingMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation<Listing, ApiError, ListingUpdateInput>({
+    mutationFn: (body) => apiClient.patch<Listing>(`/api/listings/${id}`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
   });
 }
 

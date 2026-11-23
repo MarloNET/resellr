@@ -8,11 +8,29 @@ export type ListingInsert = Omit<Insertable<ListingTable>, 'id'>;
 /** The derived stock columns of a model listing (3.3), written only by CU-128 (FIND-221). */
 export type ListingStockColumns = Pick<ListingRow, 'quantity' | 'stock_json' | 'stock_hash'>;
 
+/** The listing values of a model listing (2.7, 3.3) with its version, written by CU-124. */
+export type ListingValueColumns = Pick<
+  ListingRow,
+  | 'condition_value_id'
+  | 'visual_grade'
+  | 'condition_description'
+  | 'condition_description_key'
+  | 'variant_values'
+  | 'other_device_values'
+  | 'article_number'
+  | 'article_number_key'
+  | 'ean_mode'
+  | 'own_ean'
+  | 'version'
+  | 'updated_at'
+>;
+
 /**
  * Queries on `listing`, `listing_delivery_scope` and `listing_price` (CU-125; Technical
- * Specification 4.1, Nachtrag MAR-879), with #197 those for creating a model listing and with #204
- * those for saving a price. A new model listing has no delivery scope and no prices
- * (AC-REQ-019-01), so creating writes neither table.
+ * Specification 4.1, Nachtrag MAR-879), with #197 those for creating a model listing, with #204
+ * those for saving a price and with #206 those for changing its listing values and delivery scope.
+ * A new model listing has no delivery scope and no prices (AC-REQ-019-01), so creating writes
+ * neither table.
  * Inside an action pass `tx.db`, outside of one the outer `db` (2.0.4).
  */
 export function createListingRepository(db: Kysely<DB>) {
@@ -127,6 +145,30 @@ export function createListingRepository(db: Kysely<DB>) {
         .select(['id', 'display_title'])
         .where('article_number_key', '=', articleNumberKey)
         .executeTakeFirst();
+    },
+
+    /** Writes the listing values of a model listing with its new version (2.7, CU-124). */
+    async updateValues(id: number, columns: ListingValueColumns): Promise<void> {
+      await db.updateTable('listing').set(columns).where('id', '=', id).executeTakeFirstOrThrow();
+    },
+
+    /**
+     * Replaces the delivery scope of a model listing by these text blocks in their order (A-32,
+     * 2.7); an empty list removes it.
+     */
+    async replaceDeliveryScope(listingId: number, textBlockIds: readonly number[]): Promise<void> {
+      await db.deleteFrom('listing_delivery_scope').where('listing_id', '=', listingId).execute();
+      if (textBlockIds.length === 0) return;
+      await db
+        .insertInto('listing_delivery_scope')
+        .values(
+          textBlockIds.map((textBlockId, position) => ({
+            listing_id: listingId,
+            text_block_id: textBlockId,
+            position,
+          })),
+        )
+        .execute();
     },
 
     /**

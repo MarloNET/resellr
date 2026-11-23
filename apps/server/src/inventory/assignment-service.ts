@@ -69,7 +69,7 @@ export function toListing(row: ListingRow, deliveryScopeTextBlockIds: number[]):
  * (attributes of the level device with the flag "variantenbildend", active or deactivated, K-03)
  * and the other device values without the battery capacity, which stays at the device (A-16).
  */
-function splitDeviceValues(attributes: readonly AttributeEntry[], values: AttributeValues) {
+export function splitDeviceValues(attributes: readonly AttributeEntry[], values: AttributeValues) {
   const variant: AttributeValues = {};
   const other: AttributeValues = {};
   for (const attribute of attributes) {
