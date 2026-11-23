@@ -18,6 +18,7 @@ import {
   type ListingUpdateInput,
   type ListingPriceInput,
   type ListingPrices,
+  type VariantDeviationDetails,
   variantDeviationDetailsSchema,
   type VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
@@ -111,8 +112,9 @@ export function useCreateListingMutation() {
 }
 
 /**
- * "Gerätewerte speichern" of UI-010 (`PATCH /api/devices/{id}`, 2.5): on success the device of
- * the page takes the answer, and the hit lists of the search are read again (capture status).
+ * "Gerätewerte speichern" of UI-010 (`PATCH /api/devices/{id}`, 2.5) and "Zuordnung behalten" of
+ * UI-005 Kontext B (`deviationDecision: keep`): on success the device of the page takes the
+ * answer, and the hit lists of the search are read again (capture status).
  */
 export function useUpdateDeviceMutation(id: number) {
   const queryClient = useQueryClient();
@@ -192,9 +194,18 @@ export function useListingDeviationsQuery(modelTemplateId: number, deviceId: num
  * variant_deviation`, REQ-018; 2.6) from a failed assignment; `null` for any other error.
  */
 export function variantDeviationsOf(error: ApiError): VariantDeviationItem[] | null {
+  return variantDeviationDetailsOf(error)?.deviations ?? null;
+}
+
+/**
+ * `details` of deviating variant data (`422 confirmation_required`, `details.kind:
+ * variant_deviation`): with "Gerätewerte speichern" also the rebook targets (2.5, UI-005
+ * Kontext B); `null` for any other error.
+ */
+export function variantDeviationDetailsOf(error: ApiError): VariantDeviationDetails | null {
   if (error.kind !== 'confirmation-required') return null;
   const details = variantDeviationDetailsSchema.safeParse(error.error?.details);
-  return details.success ? details.data.deviations : null;
+  return details.success ? details.data : null;
 }
 
 /**
