@@ -62,7 +62,8 @@ export function buildApp(deps: AppDeps) {
     exit: deps.exit,
   });
 
-  // Media folder in the data folder (2.19); the file intake serves the logo (2.2).
+  // Media folder in the data folder (2.19); the file intake serves the logo (2.2) and the photos
+  // (2.11).
   const mediaDir = join(deps.ops.dataDirPath, 'media');
   const mediaFiles = createMediaFileIntake({ mediaDir, clock: deps.clock });
 
@@ -70,7 +71,14 @@ export function buildApp(deps: AppDeps) {
   app.register(fastifyMultipart);
   app.register(opsRoutes, { ...deps.ops, lifecycle: deps.lifecycle, shutdownService });
   app.register(settingsRoutes, { db: deps.database.db, uow, clock: deps.clock, mediaFiles });
-  app.register(mediaRoutes, { db: deps.database.db, mediaDir });
+  app.register(mediaRoutes, {
+    db: deps.database.db,
+    uow,
+    clock: deps.clock,
+    mediaDir,
+    mediaFiles,
+    isStopping: deps.lifecycle.isStopping,
+  });
   app.register(channelsRoutes, { db: deps.database.db });
   app.register(catalogRoutes, { db: deps.database.db, uow, clock: deps.clock });
   app.register(inventoryRoutes, { db: deps.database.db, uow, clock: deps.clock });

@@ -1,16 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
-/** Kinds of files in the media store (3.1 `media_file.kind`); photos follow in S7. */
-export type MediaKind = 'logo';
+/** Kinds of files in the media store (3.1 `media_file.kind`). */
+export type MediaKind = 'logo' | 'photo';
 
-/** File extensions of the stored images (3.1 `media_file.ext`). */
+/** Stored files: the kinds of `media_file` and the thumbnail of a photo, which has no row (2.19). */
+export type StoredKind = MediaKind | 'thumb';
+
+/** File extensions of the stored images (3.1 `media_file.ext`); a thumbnail is always `jpg`. */
 export type MediaExt = 'jpg' | 'png';
 
-/** Folder of each kind below `<Datenordner>/media` (Technical Specification 2.19). */
-const KIND_FOLDERS: Record<MediaKind, string> = { logo: 'logo' };
+/**
+ * Place of a stored file below `<Datenordner>/media` (Technical Specification 2.11, 2.19): logos
+ * in `logo/`, photos in `photos/<hash[0..1]>/`, so no folder holds all of them, thumbnails in
+ * `thumbs/`.
+ */
+const KIND_FOLDERS: Record<StoredKind, (hash: string) => string[]> = {
+  logo: () => ['logo'],
+  photo: (hash) => ['photos', hash.slice(0, 2)],
+  thumb: () => ['thumbs'],
+};
 
 /** Folder of the temporary files of uploads, emptied by the housekeeping (2.19). */
 const INCOMING_FOLDER = '.incoming';
@@ -48,11 +59,14 @@ const exists = async (path: string) =>
 export function createFileStore({ mediaDir }: { mediaDir: string }) {
   const incomingDir = join(mediaDir, INCOMING_FOLDER);
 
-  const pathOf = (kind: MediaKind, hash: string, ext: MediaExt) =>
-    join(mediaDir, KIND_FOLDERS[kind], `${hash}.${ext}`);
+  const pathOf = (kind: StoredKind, hash: string, ext: MediaExt) =>
+    join(mediaDir, ...KIND_FOLDERS[kind](hash), `${hash}.${ext}`);
 
   return {
-    /** Path of a stored file, e.g. `media/logo/<hash>.png`; the caller checks the hash first. */
+    /**
+     * Path of a stored file, e.g. `media/logo/<hash>.png` or `media/photos/3f/<hash>.jpg`; the
+     * caller checks the hash first.
+     */
     pathOf,
 
     /** A new, unused path for a temporary file; the folder exists afterwards. */
@@ -71,19 +85,19 @@ export function createFileStore({ mediaDir }: { mediaDir: string }) {
      * the same content and the temporary file is deleted (2.11). Call only under the lock of the
      * hash (`withHashLock`).
      */
-    async place(incomingPath: string, kind: MediaKind, hash: string, ext: MediaExt) {
+    async place(incomingPath: string, kind: StoredKind, hash: string, ext: MediaExt) {
       const target = pathOf(kind, hash, ext);
       if (await exists(target)) {
         await rm(incomingPath, { force: true });
         return;
       }
-      await mkdir(join(mediaDir, KIND_FOLDERS[kind]), { recursive: true });
+      await mkdir(dirname(target), { recursive: true });
       // Same file system as `.incoming`, so the rename is atomic.
       await rename(incomingPath, target);
     },
 
     /** Whether the stored file exists. */
-    has: (kind: MediaKind, hash: string, ext: MediaExt) => exists(pathOf(kind, hash, ext)),
+    has: (kind: StoredKind, hash: string, ext: MediaExt) => exists(pathOf(kind, hash, ext)),
   };
 }
 

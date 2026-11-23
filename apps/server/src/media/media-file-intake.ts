@@ -11,20 +11,25 @@ import { RuleViolation } from '../shared/domain-error.ts';
 import { createFileStore, type MediaKind, withHashLock } from './file-store.ts';
 import { type ImageInfo, inspectImage } from './image-inspector.ts';
 import { createMediaFileRepository } from './media-file-repository.ts';
+import { generateThumbnail } from './thumbnail-generator.ts';
 
 /** Usage of the rejection texts `file_too_large.<usage>` and `unsupported_media_type.<usage>`. */
-export type IntakeUsage = 'logo';
+export type IntakeUsage = 'logo' | 'photo';
 
 export interface IntakeOptions {
   kind: MediaKind;
-  /** Largest accepted file in bytes, e.g. 5 MB for the logo (2.2). */
+  /** Largest accepted file in bytes, e.g. 5 MB for the logo (2.2), 20 MB for a photo (2.11). */
   maxBytes: number;
   usage: IntakeUsage;
+  /** Name of the uploaded file, named by the rejection texts of a photo (UI-015). */
+  fileName?: string;
 }
 
 /** A checked upload, still a temporary file in `media/.incoming`. */
 interface IncomingFile extends ImageInfo {
   path: string;
+  /** Temporary thumbnail of a photo (2.11), `null` for a logo. */
+  thumbPath: string | null;
   hash: string;
   byteSize: number;
 }
@@ -71,7 +76,12 @@ function hashingLimit(maxBytes: number) {
 export function createMediaFileIntake({ mediaDir, clock }: { mediaDir: string; clock: Clock }) {
   const fileStore = createFileStore({ mediaDir });
 
-  async function receive(source: Readable, { maxBytes, usage }: IntakeOptions) {
+  async function receive(
+    source: Readable,
+    { kind, maxBytes, usage, fileName }: IntakeOptions,
+  ): Promise<IncomingFile> {
+    const reject = (code: 'file_too_large' | 'unsupported_media_type') =>
+      new RuleViolation(code, { usage, messageArgs: fileName === undefined ? [] : [fileName] });
     const path = await fileStore.createIncomingPath();
     const limit = hashingLimit(maxBytes);
     try {
@@ -82,7 +92,7 @@ export function createMediaFileIntake({ mediaDir, clock }: { mediaDir: string; c
     }
     if (limit.tooLarge()) {
       await fileStore.removeIncoming(path);
-      throw new RuleViolation('file_too_large', { usage });
+      throw reject('file_too_large');
     }
 
     const image = await inspectImage(path).catch(async (error: unknown) => {
@@ -91,17 +101,32 @@ export function createMediaFileIntake({ mediaDir, clock }: { mediaDir: string; c
     });
     if (image === null) {
       await fileStore.removeIncoming(path);
-      throw new RuleViolation('unsupported_media_type', { usage });
+      throw reject('unsupported_media_type');
     }
-    return { path, ...limit.result(), ...image } satisfies IncomingFile;
+    const thumbPath = kind === 'photo' ? await createThumbnail(path) : null;
+    return { path, thumbPath, ...limit.result(), ...image };
+  }
+
+  /** The thumbnail of a checked photo, also in `media/.incoming` (2.11). */
+  async function createThumbnail(photoPath: string): Promise<string> {
+    const thumbPath = await fileStore.createIncomingPath();
+    try {
+      await generateThumbnail(photoPath, thumbPath);
+    } catch (error) {
+      await fileStore.removeIncoming(photoPath);
+      await fileStore.removeIncoming(thumbPath);
+      throw error;
+    }
+    return thumbPath;
   }
 
   return {
     /**
      * Takes one uploaded file. Too large → `413 file_too_large`, not a readable JPEG or PNG →
-     * `415 unsupported_media_type`, both with the text of `usage`; nothing is stored then. A
-     * valid file is placed under its hash, then `action` runs under the lock of the hash and
-     * registers the file with `register` in its transaction.
+     * `415 unsupported_media_type`, both with the text of `usage` (and the file name for a
+     * photo); nothing is stored then. A valid file is placed under its hash, a photo with its
+     * thumbnail; then `action` runs under the lock of the hash and registers the file with
+     * `register` in its transaction.
      */
     async intake<T>(
       source: Readable,
@@ -111,6 +136,8 @@ export function createMediaFileIntake({ mediaDir, clock }: { mediaDir: string; c
       const file = await receive(source, options);
       return withHashLock(file.hash, async () => {
         await fileStore.place(file.path, options.kind, file.hash, file.ext);
+        if (file.thumbPath !== null)
+          await fileStore.place(file.thumbPath, 'thumb', file.hash, 'jpg');
         return action(async (db) => {
           await createMediaFileRepository(db).insertOrReclaim({
             hash: file.hash,

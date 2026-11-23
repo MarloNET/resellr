@@ -143,7 +143,11 @@ function defaultTimeout(kind: RequestKind): number | null {
   return kind === 'read' ? READ_TIMEOUT_MS : null;
 }
 
-function toApiError(status: number, text: string, kind: RequestKind): ApiError {
+/**
+ * Classifies an error answer (2.0.5, 2.0.7); also used by the upload with progress in
+ * `media.api.ts`, which sends with `XMLHttpRequest` instead of `fetch` (2.11, T-2).
+ */
+export function toApiError(status: number, text: string, kind: RequestKind): ApiError {
   const error = parseErrorBody(text);
   const code = error?.code;
 
