@@ -15,6 +15,8 @@ import {
 import {
   deviceAssignmentBodySchema,
   deviceAssignmentSchema,
+  deviceRebookingBodySchema,
+  deviceRebookingSchema,
   listingChoiceQuerySchema,
   listingChoiceSchema,
   listingCreateBodySchema,
@@ -78,11 +80,11 @@ const prefillQuerystring = z.strictObject({
  * Inventory routes (CU-130, Technical Specification 2.5): `POST /api/devices`,
  * `GET /api/devices?wiNr=`, `GET /api/devices/{id}`, `PATCH /api/devices/{id}` for the device
  * values and `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` and with
- * #194 `GET /api/model-templates/{id}/listings` and `POST /api/devices/{id}/assignment` (2.6) and
- * with #198 `GET /api/listings/{id}`, with #204 `PUT /api/listings/{id}/prices/{channelId}` and
- * with #206 `PATCH /api/listings/{id}` (2.7), with #182 `GET /api/model-templates/{id}/usage`
- * (2.4) and with #258 `GET /api/devices/unassigned` (2.5); the other model
- * listing routes follow. The reading routes read through the repositories CU-122 and CU-125, the
+ * #194 `GET /api/model-templates/{id}/listings` and `POST /api/devices/{id}/assignment` (2.6), with
+ * #202 `POST /api/devices/{id}/rebooking` (2.6) and with #198 `GET /api/listings/{id}`, with #204
+ * `PUT /api/listings/{id}/prices/{channelId}` and with #206 `PATCH /api/listings/{id}` (2.7), with
+ * #182 `GET /api/model-templates/{id}/usage` (2.4) and with #258 `GET /api/devices/unassigned`
+ * (2.5); the other model listing routes follow. The reading routes read through the repositories CU-122 and CU-125, the
  * catalog reader CU-108 and the queries CU-292 to CU-295 with the outer `db`, the writing ones go through the services CU-121, CU-123, CU-124 and CU-126 and their
  * unit of work (2.0.4).
  */
@@ -259,6 +261,20 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
       },
     },
     async (request) => assignmentService.assign(request.params.id, request.body),
+  );
+
+  // `200` with the device, the new quantities of the target and of the previous model listing (2.6,
+  // REQ-020): "Umbuchen" in UI-004 and UI-005.
+  app.post(
+    '/api/devices/:id/rebooking',
+    {
+      schema: {
+        params: idParams,
+        body: deviceRebookingBodySchema,
+        response: { 200: deviceRebookingSchema },
+      },
+    },
+    async (request) => assignmentService.rebook(request.params.id, request.body),
   );
 
   // The model listings of a model template to choose from in UI-004, with `deviceId` each with

@@ -227,8 +227,12 @@ export const ERROR_MESSAGES = {
   /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
+  /** UI-005.ziel-abweichung "Hinweis" of "Umbuchen" (REQ-020, K-04, design v0.6.1). */
+  'confirmation_required.target_deviation': 'Das Gerät weicht vom Ziel-Modell-Inserat ab.',
   /** UI-005 Kontext A "Hinweis" (REQ-018, design v0.6.1); its title is in `CONFIRMATION_TITLES`. */
   'confirmation_required.variant_deviation': 'Das Gerät weicht vom Modell-Inserat ab.',
+  /** "Umbuchen" of an unassigned device (2.0.6). */
+  'device_not_assigned.default': 'Gerät keinem Modell-Inserat zugeordnet',
   /** UI-004 "Zuordnen" of a sold or cancelled device: the wording of the sale (2.0.6). */
   'device_not_available.assignment': DEVICE_SOLD_OR_CANCELLED,
   /**
@@ -241,6 +245,9 @@ export const ERROR_MESSAGES = {
    * (2.0.6, AC-REQ-021-04, Nachtrag MAR-1053).
    */
   'device_not_available.new_listing': DEVICE_SOLD_OR_CANCELLED,
+  /** "Umbuchen" in UI-004 and UI-005 of a sold or cancelled device (2.0.6, AC-REQ-020-02). */
+  'device_not_available.rebooking':
+    'Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
   /**

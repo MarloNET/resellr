@@ -2,8 +2,8 @@ import { formatDate } from '@resellr/domain/format/format-value';
 import { MESSAGES } from '@resellr/domain/messages/messages.de';
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
 import type { ListingDetail, ListingDevice } from '@resellr/domain/schemas/listing.schema';
-import { type ReactNode, useId, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { type ReactNode, useEffect, useId, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 
 import { useModelTemplateQuery } from '../../api/catalog.api.ts';
 import { useChannelsQuery } from '../../api/channels.api.ts';
@@ -34,6 +34,7 @@ import {
   PickListLabel,
 } from '../devices/DeviceIntakePage.tsx';
 import { STOCK_STATUS_LABELS } from '../devices/DevicesPage.tsx';
+import type { SavedNoticeState } from '../models/ModelTemplatePage.tsx';
 import { ListingValuesForm } from './ListingValuesForm.tsx';
 
 // Texts of UI-014 `screen.md` (UI/UX design v0.6.1); "geladen" for opening (DER-60-02).
@@ -282,11 +283,22 @@ function ListingDevices({
  * values (read only) with the hint to the model template, and the devices with the filter "auch
  * stornierte"; the states loading, error ("geladen", DER-60-02) and P-06 above the page
  * (DER-60-06); with #206 the edit view of the listing values (`UI-014.edit`, CU-139), the banner
- * "Inseratswerte gespeichert" after saving (DER-64-02) and P-08 (DER-64-06). With #238 the area
+ * "Inseratswerte gespeichert" after saving (DER-64-02) and P-08 (DER-64-06); with #202 the banner
+ * of the calling dialog, "Gerät umgebucht" after "Umbuchen" (DER-61-06). With #238 the area
  * "Fotos" with "Fotos verwalten" (UI-015). Channel cards follow with S5, prices with #204.
  */
 export function ListingPage() {
   const id = listingIdOf(useParams().listingId);
+  const navigate = useNavigate();
+  const location = useLocation();
+  // The success banner of the calling dialog, taken from the history entry once, so reloading or
+  // going back does not show it again (as UI-006).
+  const [savedNotice, setSavedNotice] = useState(
+    () => (location.state as SavedNoticeState | null)?.savedNotice ?? null,
+  );
+  useEffect(() => {
+    if (location.state !== null) void navigate('.', { replace: true, state: null });
+  }, [location.state, navigate]);
   const [includeCancelled, setIncludeCancelled] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -315,6 +327,11 @@ export function ListingPage() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <OutcomeUnknownBanner />
+      {savedNotice !== null && (
+        <PageBanner variant="success" onClose={() => setSavedNotice(null)}>
+          {savedNotice}
+        </PageBanner>
+      )}
       {unreachable && <UnreachableBanner />}
       {notFound && (
         <div role="alert" className={bannerClassName('error')}>

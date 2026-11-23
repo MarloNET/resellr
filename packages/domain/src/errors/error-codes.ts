@@ -9,6 +9,7 @@ export const ERROR_CODES = {
   attribute_has_values: 422,
   bad_request: 400,
   confirmation_required: 422,
+  device_not_assigned: 422,
   device_not_available: 422,
   device_type_deactivated: 422,
   device_type_in_use: 422,
