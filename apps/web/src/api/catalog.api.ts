@@ -5,6 +5,7 @@ import {
   type ModelTemplateMatch,
   modelTemplateMatchSchema,
   type ModelTemplateUpdateInput,
+  type ModelTemplateUsage,
 } from '@resellr/domain/schemas/model-template.schema';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -49,6 +50,19 @@ export function useModelTemplateQuery(id: number | null) {
   return useQuery<ModelTemplate, ApiError>({
     queryKey: queryKeys.catalog.modelTemplate(id ?? 0),
     queryFn: ({ signal }) => apiClient.get<ModelTemplate>(`/api/model-templates/${id}`, { signal }),
+    enabled: id !== null,
+  });
+}
+
+/**
+ * The use of a model template (`GET /api/model-templates/{id}/usage`, 2.4, CU-295): UI-007 locks
+ * "Geräteart" with `deviceCount > 0` (`UI-007.disabled`, DER-52-04); no request without an id.
+ */
+export function useModelTemplateUsageQuery(id: number | null) {
+  return useQuery<ModelTemplateUsage, ApiError>({
+    queryKey: queryKeys.inventory.modelTemplateUsage(id ?? 0),
+    queryFn: ({ signal }) =>
+      apiClient.get<ModelTemplateUsage>(`/api/model-templates/${id}/usage`, { signal }),
     enabled: id !== null,
   });
 }

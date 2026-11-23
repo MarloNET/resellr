@@ -139,6 +139,12 @@ describe('message catalog (E1)', () => {
     );
   });
 
+  it('has the text of device_type_in_use (2.0.6, AC-REQ-010-02, UI-007)', () => {
+    expect(ERROR_MESSAGES['device_type_in_use.default']).toBe(
+      'Geräteart kann nicht geändert werden, weil Geräte erfasst sind',
+    );
+  });
+
   it('DER-54-15 names the deactivated supplier of a new device (2.0.6, 8.2, UI-003)', () => {
     expect(ERROR_MESSAGES['supplier_deactivated.device']('Lieferant West')).toBe(
       'Lieferant Lieferant West ist deaktiviert',

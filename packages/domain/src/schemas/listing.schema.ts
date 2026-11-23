@@ -73,7 +73,8 @@ export type Listing = z.infer<typeof listingSchema>;
  * it: only types, missing and unknown fields (`400 bad_request`); the model data are not part of
  * it (AC-REQ-088-06). A missing field stays unchanged, `variantValues` and `otherValues` hold
  * changes (a key overwrites, `null` removes; `mergeAttributeValues`). The rules apply to the
- * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` takes effect with #207.
+ * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` confirms assigned
+ * devices that deviate afterwards (`assigned_devices_deviate`).
  */
 export const listingUpdateBodySchema = z.strictObject({
   version: versionSchema,
@@ -217,6 +218,19 @@ export const variantDeviationDetailsSchema = z.object({
     .optional(),
 });
 export type VariantDeviationDetails = z.infer<typeof variantDeviationDetailsSchema>;
+
+/**
+ * `details` of `422 confirmation_required` with `kind: assigned_devices_deviate` (2.7, REQ-088):
+ * the assigned, available devices that deviate after the change of the listing values with their
+ * deviations, which `UI-014.abweichung-bestaetigen` shows.
+ */
+export const assignedDevicesDeviateDetailsSchema = z.object({
+  kind: z.literal('assigned_devices_deviate'),
+  devices: z.array(z.object({ wiNr: z.string(), deviations: z.array(variantDeviationSchema) })),
+});
+export type DeviatingDeviceItem = z.infer<
+  typeof assignedDevicesDeviateDetailsSchema
+>['devices'][number];
 
 /**
  * The answer of an assignment (2.6): the device, the new quantity of its model listing and the

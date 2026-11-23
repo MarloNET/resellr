@@ -459,7 +459,9 @@ export function createModelTemplateService({ uow, clock }: ModelTemplateServiceD
      * `PATCH /api/model-templates/{id}` (2.4, REQ-010): the preconditions first (`not_found`,
      * `version_conflict`), then "unbekannt" against the MPN (`400`), the changed device type and
      * manufacturer and the changed pick list values (2.0.11: unknown `400`, deactivated `422`),
-     * then the attribute values on the complete state after the change (2.5, CU-067). A changed
+     * then the check event `ModelTemplateDeviceTypeChanging` for a changed device type
+     * (`device_type_in_use`, #182), then the attribute values on the complete state after the
+     * change (2.5, CU-067). A changed
      * device type has other attributes, so the stored values do not carry over. An unchanged
      * request keeps the version; a change writes the audit entry `updated` with the changed
      * fields and, unless only device defaults changed, `ContentInputsChanged` (AC-REQ-010-05).
@@ -494,6 +496,11 @@ export function createModelTemplateService({ uow, clock }: ModelTemplateServiceD
           ),
         };
         await checkPickListValues(settings, pickListValueReferences(attributes, after, base));
+        // `inventory` rejects a new device type while devices refer to the model template
+        // (REQ-010, 2.4 "Ändern"), before the attribute values of the new device type.
+        if (next.deviceTypeId !== stored.deviceTypeId) {
+          await tx.check({ type: 'ModelTemplateDeviceTypeChanging', modelTemplateId: id });
+        }
         const values = checkedAttributeValues(attributes, after);
 
         const modelChanged =
