@@ -491,5 +491,28 @@ describe('UI-015 Fotos verwalten (CU-214, CU-215)', () => {
       'Dieser Eintrag ist nicht mehr vorhanden.',
     );
     expect(screen.queryByRole('region', { name: 'Fotos verwalten' })).toBeNull();
+    expect(screen.queryByText(/von 20 Fotos/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Fotos hinzufügen' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Fertig' })).toBeNull();
+  });
+
+  it('UI-015.error shows "Die Fotos konnten nicht geladen werden. Referenz: <Nr>" on 500 when loading; "Fotos hinzufügen" is deactivated and "Fertig" leads to UI-014', async () => {
+    mockApi(() =>
+      Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+        status: 500,
+      }),
+    );
+
+    await renderPage();
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Die Fotos konnten nicht geladen werden. Referenz: R-7K2M-9QX4',
+    );
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(screen.queryByText(/von 20 Fotos/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Erneut versuchen' })).toBeNull();
+    expect(addButton().disabled).toBe(true);
+    expect(screen.getByRole('link', { name: 'Fertig' }).getAttribute('href')).toBe('/inserate/9');
+    expectAccessiblePage();
   });
 });

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient, ApiError, toApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
@@ -88,4 +88,23 @@ export function uploadPhoto(
     form.append('file', file);
     request.send(form);
   });
+}
+
+/**
+ * `uploadPhoto` for the photos of one model listing: after each accepted file the photo goes into
+ * the cache at once, and the photos and the model listing (`GET /api/listings/{id}`) are read
+ * again in the background (2.0.7, Nachtrag MAR-1280), so UI-014 shows the current state after
+ * "Fertig".
+ */
+export function useUploadPhoto(listingId: number) {
+  const queryClient = useQueryClient();
+  return async (file: File, onProgress: (percent: number) => void) => {
+    const result = await uploadPhoto(listingId, file, { onProgress });
+    queryClient.setQueryData<PhotoList>(queryKeys.media.photos(listingId), (list) =>
+      list === undefined ? list : { items: [...list.items, result.photo], total: result.count },
+    );
+    void queryClient.invalidateQueries({ queryKey: queryKeys.media.photos(listingId) });
+    void queryClient.invalidateQueries({ queryKey: ['inventory', 'listing', listingId] });
+    return result;
+  };
 }

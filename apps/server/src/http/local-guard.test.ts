@@ -14,7 +14,8 @@ beforeEach(async () => {
     return { ok: true };
   };
   t.app.get('/api/test/items', count);
-  t.app.get('/media/photos/:id', count);
+  // A path below /media that no real route serves (2.0.2 G-5).
+  t.app.get('/media/test/:id', count);
   t.app.get('/datasheets/:name', count);
   t.app.get('/downloads/:name', count);
   t.app.post('/api/test/items', count);
@@ -274,7 +275,7 @@ describe('local-guard G-4 content type (E5)', () => {
 });
 
 describe('local-guard G-5 cross-site reads (E6)', () => {
-  it.each(['/api/test/items', '/media/photos/abc', '/datasheets/x.pdf', '/downloads/x.zip'])(
+  it.each(['/api/test/items', '/media/test/abc', '/datasheets/x.pdf', '/downloads/x.zip'])(
     'GET %s with Sec-Fetch-Site cross-site is rejected with 403 forbidden_origin',
     async (url) => {
       const response = await t.app.inject({
@@ -293,11 +294,11 @@ describe('local-guard G-5 cross-site reads (E6)', () => {
   it.each([
     '/%61pi/test/items',
     '/a%70i/test/items?q=1',
-    '/%6Dedia/photos/abc',
+    '/%6Dedia/test/abc',
     '/%64atasheets/x.pdf',
     '/%64ownloads/x.zip',
     'http://127.0.0.1:4310/api/test/items',
-    'http://127.0.0.1:4310/%6Dedia/photos/abc',
+    'http://127.0.0.1:4310/%6Dedia/test/abc',
   ])('GET %s (other spelling) with Sec-Fetch-Site cross-site is rejected', async (url) => {
     const response = await t.app.inject({
       method: 'GET',
@@ -310,7 +311,7 @@ describe('local-guard G-5 cross-site reads (E6)', () => {
     expect(sideEffects).toBe(0);
   });
 
-  it.each(['/api/test/items', '/%61pi/test/items', '/media/photos/abc'])(
+  it.each(['/api/test/items', '/%61pi/test/items', '/media/test/abc'])(
     'HEAD %s with Sec-Fetch-Site cross-site is rejected like GET',
     async (url) => {
       const response = await t.app.inject({

@@ -1,11 +1,9 @@
 import { ERROR_MESSAGES, MESSAGES } from '@resellr/domain/messages/messages.de';
-import { useQueryClient } from '@tanstack/react-query';
 import { type DragEvent, type KeyboardEvent, useId, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
-import { type Photo, type PhotoList, usePhotosQuery } from '../../api/media.api.ts';
-import { queryKeys } from '../../api/query-keys.ts';
+import { type Photo, usePhotosQuery } from '../../api/media.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
 import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
 import { bannerClassName, PageBanner } from '../../components/patterns/PageBanner.tsx';
@@ -153,21 +151,12 @@ function PhotoGrid({ photos }: { photos: readonly Photo[] }) {
  */
 export function PhotosPage() {
   const id = listingIdOf(useParams().listingId);
-  const queryClient = useQueryClient();
   const query = usePhotosQuery(id);
   const writesLocked = useWritesLocked();
   const headingId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const queue = usePhotoUploadQueue(id ?? 0, (result) => {
-    if (id === null) return;
-    // The answer goes into the cache at once; the lists are read again in the background (2.0.7).
-    queryClient.setQueryData<PhotoList>(queryKeys.media.photos(id), (list) =>
-      list === undefined ? list : { items: [...list.items, result.photo], total: result.count },
-    );
-    void queryClient.invalidateQueries({ queryKey: queryKeys.media.photos(id) });
-    void queryClient.invalidateQueries({ queryKey: ['inventory', 'listing', id] });
-  });
+  const queue = usePhotoUploadQueue(id ?? 0);
 
   const photos = query.data?.items;
   const error = query.error;
@@ -191,8 +180,9 @@ export function PhotosPage() {
     <div className="flex flex-col gap-6 p-6">
       <OutcomeUnknownBanner />
       {unreachable && <UnreachableBanner />}
+      {/* M-15 instead of the grid; without "Fertig", UI-014 would not find it either (MAR-1282). */}
       {notFound && (
-        <div role="alert" className={bannerClassName('error')}>
+        <div role="alert" className={bannerClassName('warn')}>
           {MESSAGES['M-15']}
         </div>
       )}
@@ -206,23 +196,23 @@ export function PhotosPage() {
         <h1 id={headingId} className="m-0 text-page-title font-semibold">
           {TEXTS.title}
         </h1>
-        <div className="flex flex-wrap gap-2">
-          {/* Deactivated with 20 photos, with the reason as tooltip (UI-015.disabled, 2.0.7). */}
-          <span title={atLimit ? TEXTS.limit : undefined}>
-            <Button
-              disabled={addDisabled}
-              title={atLimit ? TEXTS.limit : undefined}
-              onClick={() => inputRef.current?.click()}
-            >
-              {TEXTS.add}
-            </Button>
-          </span>
-          {id !== null && (
+        {!notFound && (
+          <div className="flex flex-wrap gap-2">
+            {/* Deactivated with 20 photos, with the reason as tooltip (UI-015.disabled, 2.0.7). */}
+            <span title={atLimit ? TEXTS.limit : undefined}>
+              <Button
+                disabled={addDisabled}
+                title={atLimit ? TEXTS.limit : undefined}
+                onClick={() => inputRef.current?.click()}
+              >
+                {TEXTS.add}
+              </Button>
+            </span>
             <Link to={`/inserate/${id}`} className={buttonClassName('primary')}>
               {TEXTS.done}
             </Link>
-          )}
-        </div>
+          </div>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -238,7 +228,7 @@ export function PhotosPage() {
         />
       </header>
 
-      {id !== null && !notFound && (
+      {!notFound && (
         <section
           aria-labelledby={headingId}
           aria-busy={photos === undefined && !error}

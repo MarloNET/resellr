@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 
 import { ApiError, type ApiErrorKind } from '../../api/api-client.ts';
-import { type PhotoUploadResult, uploadPhoto } from '../../api/media.api.ts';
+import { useUploadPhoto } from '../../api/media.api.ts';
 
 /** A file of the queue: waiting, uploading with its progress, or rejected with its error. */
 export type UploadEntry = { key: number; fileName: string } & (
@@ -34,17 +34,13 @@ export interface PhotoUploadQueue {
  * its file and the others go on; an uploaded file leaves the queue, because the grid shows it
  * (`UI-015.success` has no banner). Only an unknown outcome or the shutdown stops the queue.
  */
-export function usePhotoUploadQueue(
-  listingId: number,
-  onUploaded: (result: PhotoUploadResult) => void,
-): PhotoUploadQueue {
+export function usePhotoUploadQueue(listingId: number): PhotoUploadQueue {
+  const upload = useUploadPhoto(listingId);
   const [entries, setEntries] = useState<UploadEntry[]>([]);
   const [stoppedBy, setStoppedBy] = useState<ApiError | null>(null);
   const pending = useRef<{ key: number; file: File }[]>([]);
   const running = useRef(false);
   const nextKey = useRef(1);
-  const onUploadedRef = useRef(onUploaded);
-  onUploadedRef.current = onUploaded;
 
   const update = (key: number, change: (entry: UploadEntry) => UploadEntry) =>
     setEntries((list) => list.map((entry) => (entry.key === key ? change(entry) : entry)));
@@ -59,9 +55,8 @@ export function usePhotoUploadQueue(
         update(key, ({ fileName }) => ({ key, fileName, status: 'uploading', progress }));
       uploading(0);
       try {
-        const result = await uploadPhoto(listingId, file, { onProgress: uploading });
+        await upload(file, uploading);
         remove(new Set([key]));
-        onUploadedRef.current(result);
       } catch (cause) {
         const error = cause instanceof ApiError ? cause : new ApiError('error', null, null);
         if (STOPPING.has(error.kind)) {
