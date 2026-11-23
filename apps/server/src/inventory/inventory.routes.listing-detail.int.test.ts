@@ -376,7 +376,12 @@ describe('stock data of a model listing (CU-120, CU-128, CU-129; Technical Speci
     const { listingId: miA } = await createListing();
     const moved = await captureDevice('626199', { percent: 90 });
     await assign(moved, miA);
-    const patched = await patchDevice(moved, { version: 2, visualGrade: '4', confirmedKeys: [] });
+    const patched = await patchDevice(moved, {
+      version: 2,
+      visualGrade: '4',
+      confirmedKeys: [],
+      deviationDecision: 'keep',
+    });
     expect(patched.statusCode).toBe(200);
 
     const created = await t.app.inject({
