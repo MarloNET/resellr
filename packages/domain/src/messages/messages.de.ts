@@ -210,6 +210,12 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  /**
+   * UI-014.abweichung-bestaetigen "Text" with the number of deviating devices (REQ-088, design
+   * v0.6.1); its title is in `CONFIRMATION_TITLES`.
+   */
+  'confirmation_required.assigned_devices_deviate': (count: string) =>
+    `Nach dieser Änderung weichen ${count} zugeordnete Geräte vom Modell-Inserat ab:`,
   /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
@@ -295,6 +301,8 @@ export const ERROR_MESSAGES = {
  * is the `message` of the answer from `ERROR_MESSAGES`.
  */
 export const CONFIRMATION_TITLES = {
+  /** UI-014.abweichung-bestaetigen (REQ-088, design v0.6.1). */
+  'confirmation_required.assigned_devices_deviate': 'Zugeordnete Geräte weichen ab',
   /** UI-007.dublette (M-27, REQ-011). */
   'confirmation_required.possible_duplicate': 'Mögliche Dublette',
   /** UI-005 "Abweichungen bei Zuordnung" (REQ-018, mockup `default.png`). */
