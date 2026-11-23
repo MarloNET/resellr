@@ -159,8 +159,8 @@ async function deviatingDevices(
 /**
  * Model listing service (CU-124, REQ-088; Technical Specification 2.7): changes the listing values
  * of a model listing together with its audit entry and `ContentInputsChanged` in one transaction
- * (2.0.4), with the confirmation of deviating assigned devices (`confirmDeviatingDevices`, #207);
- * the uniqueness of a changed article number follows with #200.
+ * (2.0.4), with the confirmation of deviating assigned devices (`confirmDeviatingDevices`, #207)
+ * and the uniqueness of a changed article number (`article_number_taken`, #200).
  */
 export function createListingService({ uow, clock }: ListingServiceDeps) {
   return {
@@ -173,7 +173,8 @@ export function createListingService({ uow, clock }: ListingServiceDeps) {
      * deactivated one stays valid); the rules on the complete state after the change
      * (`validation_failed`: values by CU-067, article number, own EAN); the variant data differ
      * from every other model listing of the model template (`variant_duplicate`,
-     * AC-REQ-088-02); then the question: if the variant data change and assigned, available
+     * AC-REQ-088-02); the article number belongs to no other model listing, without regard to
+     * case (`article_number_taken` at `articleNumber`, AC-REQ-019-04); then the question: if the variant data change and assigned, available
      * devices deviate from them afterwards, `confirmation_required` with `details.kind =
      * assigned_devices_deviate` and `details.devices[]: { wiNr, deviations[] }` unless
      * `confirmDeviatingDevices` is `true` (AC-REQ-088-03, `UI-014.abweichung-bestaetigen`). The
@@ -270,6 +271,13 @@ export function createListingService({ uow, clock }: ListingServiceDeps) {
           });
         }
 
+        // Unique without case (2.7, 3.3): the own article number in another case stays valid.
+        const articleNumberKey = toArticleNumberKey(after.articleNumber);
+        const holder = await listings.findByArticleNumberKey(articleNumberKey);
+        if (holder !== undefined && holder.id !== id) {
+          throw new RuleViolation('article_number_taken', { details: { path: 'articleNumber' } });
+        }
+
         // The question comes after every rule (2.5): only a change of the variant data makes
         // devices deviate (UI-014 "Änderung trotzdem speichern", precondition).
         const afterRow = {
@@ -316,7 +324,7 @@ export function createListingService({ uow, clock }: ListingServiceDeps) {
           ...afterRow,
           condition_description_key: descriptionKey(after.conditionDescription),
           article_number: after.articleNumber,
-          article_number_key: toArticleNumberKey(after.articleNumber),
+          article_number_key: articleNumberKey,
           ean_mode: after.eanMode,
           own_ean: after.ownEan,
           version: stored.version + 1,

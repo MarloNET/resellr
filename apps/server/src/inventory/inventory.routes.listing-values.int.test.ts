@@ -450,6 +450,78 @@ describe('PATCH /api/listings/{id} (CU-124, Technical Specification 2.7)', () =>
   });
 });
 
+describe('PATCH /api/listings/{id} article number taken (CU-124, Technical Specification 2.7, #200)', () => {
+  it('AC-REQ-019-04 rejects changing the article number of a second model listing to the taken "626198" with "Artikelnummer bereits vergeben"; nothing is stored', async () => {
+    await createListing('626198', '2');
+    const second = await createListing('626199', '4');
+    const entries = auditEntries(second).length;
+
+    const response = await patch(second, { version: 1, articleNumber: '626198' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'article_number_taken',
+      message: 'Artikelnummer bereits vergeben',
+      details: { path: 'articleNumber' },
+    });
+    expect(listingRow(second)).toMatchObject({
+      article_number: '626199',
+      article_number_key: '626199',
+      version: 1,
+    });
+    expect(auditEntries(second)).toHaveLength(entries);
+  });
+
+  it('rejects an article number that differs only in case from another one (2.7)', async () => {
+    const miA = await createListing('626198', '2');
+    const second = await createListing('626199', '4');
+    expect((await patch(miA, { version: 1, articleNumber: 'MI-A' })).statusCode).toBe(200);
+
+    const response = await patch(second, { version: 1, articleNumber: 'mi-a' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('article_number_taken');
+    expect(listingRow(second)).toMatchObject({ article_number: '626199', version: 1 });
+  });
+
+  it('stores the own article number in another case and a free one', async () => {
+    const listingId = await createListing('626198');
+    expect((await patch(listingId, { version: 1, articleNumber: 'MI-A' })).statusCode).toBe(200);
+
+    const response = await patch(listingId, { version: 2, articleNumber: 'mi-a' });
+
+    expect(response.statusCode).toBe(200);
+    expect(listingRow(listingId)).toMatchObject({
+      article_number: 'mi-a',
+      article_number_key: 'mi-a',
+      version: 3,
+    });
+  });
+
+  it('reports a variant duplicate before a taken article number (2.0.11)', async () => {
+    const miA = await createListing('626198', '2');
+    const second = await createListing('626199', '4');
+
+    const response = await patch(second, { version: 1, visualGrade: '2', articleNumber: '626198' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('variant_duplicate');
+    expect(response.json().error.details).toEqual({ listingId: miA });
+  });
+
+  it('reports a taken article number before the question about deviating devices (2.5)', async () => {
+    const miA = await createListing('626198', '2');
+    await assign(await captureDevice('626200', '2'), miA);
+    await createListing('626199', '4');
+
+    const response = await patch(miA, { version: 1, visualGrade: '3', articleNumber: '626199' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('article_number_taken');
+    expect(listingRow(miA)).toMatchObject({ visual_grade: 2, version: 1 });
+  });
+});
+
 /** Assigns a captured device to a model listing through the API (#194, #196). */
 async function assign(deviceId: number, listingId: number, confirmDeviation = false) {
   const response = await t.app.inject({
