@@ -109,7 +109,8 @@ export const catalogRoutes: FastifyPluginAsyncZod<CatalogRoutesOptions> = async 
   );
 
   // The changed model template (REQ-010); the field rules of CU-104 give `422 validation_failed`
-  // before `not_found` and `version_conflict` (2.0.11 order), the service the rest (CU-105).
+  // before `not_found` and `version_conflict` (2.0.11 order), the service the rest (CU-105),
+  // `device_type_in_use` for a new device type of a model template with devices (CU-290).
   app.patch(
     '/api/model-templates/:id',
     {

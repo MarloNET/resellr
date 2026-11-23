@@ -5,6 +5,7 @@ import { isValidEan } from '../validation/ean.ts';
 import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
 import { centsSchema, dateSchema, idSchema, versionSchema } from './common.schema.ts';
 import {
+  articleNumberSchema,
   conditionDescriptionSchema,
   deviceSchema,
   requiredChoice,
@@ -13,16 +14,14 @@ import {
 } from './device.schema.ts';
 
 // Model listing (REQ-017, REQ-019, REQ-032, REQ-088; Technical Specification 2.6, 2.7, 3.3), with
-// #204 the price per channel. Changing the listing values with #206; the uniqueness of a changed
-// article number follows with #200.
+// #204 the price per channel. Changing the listing values with #206, the uniqueness of a changed
+// article number with #200.
 
-/** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
-const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
-
-/** Article number as entered in UI-004 (2.6, 2.7). */
-export const articleNumberSchema = z
-  .string()
-  .regex(ARTICLE_NUMBER_PATTERN, { message: FIELD_MESSAGES.articleNumber });
+/**
+ * Article number as entered in UI-004 (2.6, 2.7). Defined beside `deviceUpdateBodySchema`, which
+ * uses it too (UI-005 Kontext B, Nachtrag MAR-1248), as this module imports that one.
+ */
+export { articleNumberSchema };
 
 /** `listing.article_number_key` (3.3): the article number in lower case, unique without case. */
 export const toArticleNumberKey = (articleNumber: string) => articleNumber.toLowerCase();
@@ -74,7 +73,8 @@ export type Listing = z.infer<typeof listingSchema>;
  * it: only types, missing and unknown fields (`400 bad_request`); the model data are not part of
  * it (AC-REQ-088-06). A missing field stays unchanged, `variantValues` and `otherValues` hold
  * changes (a key overwrites, `null` removes; `mergeAttributeValues`). The rules apply to the
- * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` takes effect with #207.
+ * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` confirms assigned
+ * devices that deviate afterwards (`assigned_devices_deviate`).
  */
 export const listingUpdateBodySchema = z.strictObject({
   version: versionSchema,
@@ -218,6 +218,19 @@ export const variantDeviationDetailsSchema = z.object({
     .optional(),
 });
 export type VariantDeviationDetails = z.infer<typeof variantDeviationDetailsSchema>;
+
+/**
+ * `details` of `422 confirmation_required` with `kind: assigned_devices_deviate` (2.7, REQ-088):
+ * the assigned, available devices that deviate after the change of the listing values with their
+ * deviations, which `UI-014.abweichung-bestaetigen` shows.
+ */
+export const assignedDevicesDeviateDetailsSchema = z.object({
+  kind: z.literal('assigned_devices_deviate'),
+  devices: z.array(z.object({ wiNr: z.string(), deviations: z.array(variantDeviationSchema) })),
+});
+export type DeviatingDeviceItem = z.infer<
+  typeof assignedDevicesDeviateDetailsSchema
+>['devices'][number];
 
 /**
  * The answer of an assignment (2.6): the device, the new quantity of its model listing and the

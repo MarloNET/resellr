@@ -193,16 +193,18 @@ type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
 
 /**
  * `fetch` of the page with lists the test can change in "another window": `lists` answers the
- * reads, `reload` answers the reads after the first one of a list (e.g. a failing or delayed
+ * reads, `attributes` the attributes of the notebook, `reload` answers the reads after the first one of a list (e.g. a failing or delayed
  * reload). Records the bodies of `POST /api/devices` and the number of reads per list.
  */
 function mockApi({
   create = () => Response.json(CREATED, { status: 201 }),
   suppliers = () => list([OST, WEST]),
+  attributes = ATTRIBUTES,
   reload,
 }: {
   create?: Route;
   suppliers?: Route;
+  attributes?: readonly Record<string, unknown>[];
   reload?: (listId: number) => Response | Promise<Response> | undefined;
 } = {}) {
   const lists = structuredClone(START_LISTS);
@@ -227,7 +229,7 @@ function mockApi({
       if (route === 'GET /api/model-templates') return list([MV_A]);
       if (route === 'GET /api/model-templates/7') return Response.json(MODEL_TEMPLATE);
       if (route === 'GET /api/model-templates/7/device-prefill') return Response.json(NO_PREFILL);
-      if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
+      if (route === 'GET /api/device-types/1/attributes') return list([...attributes]);
       if (route === 'POST /api/devices') {
         sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
         return create(init);
@@ -683,5 +685,80 @@ describe('UI-003 choice after pick_list_value_deactivated (2.0.11, design v0.6.8
     );
     expect(select('Tastaturlayout').value).toBe(String(GERMAN));
     expect(errorOf(select('Tastaturlayout'))).toBeNull();
+  });
+});
+
+describe('UI-003 deactivated and reactivated required attribute (M-32, 2.5, Story #34)', () => {
+  /** The required attribute RAM of the level device, deactivated or reactivated. */
+  const ram = (active: boolean) =>
+    attribute({
+      id: 20,
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      required: true,
+      sortOrder: 6,
+      active,
+    });
+  const RAM_MISSING = 'RAM fehlt';
+
+  it('UI-003.default DER-34-22 shows no field for a deactivated attribute and sends no value for it', async () => {
+    const { sent } = mockApi({ attributes: [...ATTRIBUTES, ram(false)] });
+    await fillValid();
+
+    expect(queryTextbox('RAM')).toBeNull();
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.values).not.toHaveProperty('20');
+  });
+
+  it('UI-003.default UI-003.validation DER-34-22 asks for a reactivated required attribute again as an empty required field "*"; without a value the check in the browser names "RAM fehlt" at the field and in the summary, nothing sent; with RAM entered it saves', async () => {
+    const { sent } = mockApi({ attributes: [...ATTRIBUTES, ram(true)] });
+    await fillValid();
+
+    expect(textbox('RAM').value).toBe('');
+    expect(textbox('RAM').getAttribute('aria-required')).toBe('true');
+    expect(document.querySelector(`label[for="${textbox('RAM').id}"]`)?.textContent).toBe('RAM*');
+    fireEvent.click(saveButton());
+
+    expect(errorOf(textbox('RAM'))).toBe(RAM_MISSING);
+    expect(summaryItems()).toEqual([RAM_MISSING]);
+    expect(document.activeElement).toBe(textbox('RAM'));
+    expect(sent).toEqual([]);
+    expectAccessibleForm();
+
+    fireEvent.change(textbox('RAM'), { target: { value: '16' } });
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.values).toMatchObject({ 20: '16' });
+  });
+
+  it('UI-003.validation DER-34-24 shows "RAM fehlt" of 422 validation_failed at values.<id> at the field of RAM and in the summary, focus there, nothing saved, the inputs stay', async () => {
+    // RAM was made required in another window after UI-003 read the attributes, so the check
+    // in the browser lets the request pass and the server names the missing value.
+    const { sent } = mockApi({
+      attributes: [...ATTRIBUTES, { ...ram(true), required: false }],
+      create: () =>
+        Response.json(
+          errorBody('validation_failed', {
+            fields: [{ path: 'values.20', code: 'value_missing', message: RAM_MISSING }],
+          }),
+          { status: 422 },
+        ),
+    });
+    await fillValid();
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(errorOf(textbox('RAM'))).toBe(RAM_MISSING));
+    expect(summaryItems()).toEqual([RAM_MISSING]);
+    expect(document.activeElement).toBe(textbox('RAM'));
+    expect(sent).toHaveLength(1);
+    expect(textbox('WI-Nr').value).toBe('626198');
+    expect(textbox('Optik-Note').value).toBe('3');
+    expect(textbox('Akkukapazität').value).toBe('87');
+    expectAccessibleForm();
   });
 });

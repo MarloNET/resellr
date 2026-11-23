@@ -46,6 +46,7 @@ import {
   RuleViolation,
   ValidationError,
 } from '../shared/domain-error.ts';
+import { createListingFromDevice } from './assignment-service.ts';
 import { readDevicePrefill } from './device-prefill-query.ts';
 import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
 import { listingDeviations, listVariantAttributes } from './listing-choice-query.ts';
@@ -440,8 +441,8 @@ async function assignedDeviation(
  * without one (AC-REQ-013-04). A known condition code is stored as its entry spells it ("dgs" →
  * "DGS", AC-REQ-015-01), an unknown one as entered. Changing the device values checks the state
  * after the change (2.5) and, for an assigned device, the deviation from its model listing with
- * the decision `keep` (UI-005 Kontext B, #191); `new_listing` (#201) and `rebook` (#202) follow
- * and go to CU-123 (FIND-203).
+ * the decisions `keep` (UI-005 Kontext B, #191) and `new_listing`, which CU-123 executes
+ * (FIND-203, #201); `rebook` (#202) follows and goes to CU-123 as well.
  */
 export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
   return {
@@ -572,8 +573,16 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
      * writes one audit entry `values_updated` with the changed fields (3.6), `keep` in addition
      * `assigned_despite_deviation` with the deviations, and, for an assigned device, forms the
      * stock columns of its model listing anew, also for `keep` (CU-128; 2.5, Nachtrag MAR-1204).
+     * `new_listing` stores the values and has CU-123 create the model listing from the stored
+     * device in the same transaction (2.6, its checks and audit entries), with `articleNumber`
+     * when set; a rejection rolls all back; the device answered is assigned to the new model
+     * listing, and CU-123 forms the stock columns of both model listings.
      */
     async update(id: number, input: DeviceUpdateInput): Promise<Device> {
+      // The user interface sends an article number only for "Neues Modell-Inserat anlegen" (2.5).
+      if (input.articleNumber !== undefined && input.deviationDecision !== 'new_listing') {
+        throw new BadRequestError('articleNumber: only with deviationDecision new_listing');
+      }
       const { result } = await uow.run(async (tx) => {
         const settings = createSettingsReader(tx.db);
         const devices = createDeviceRepository(tx.db);
@@ -672,9 +681,18 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
             await createListingStockUpdater(tx).update(stored.listingId);
           }
         }
+        // "Neues Modell-Inserat anlegen": CU-123 creates it from the stored device (FIND-203).
+        if (deviation !== undefined && input.deviationDecision === 'new_listing') {
+          await createListingFromDevice(tx, clock, {
+            fromDeviceId: id,
+            deviceVersion: stored.version + 1,
+            // CU-123 alone checks whether it is taken (2.6, Nachtrag MAR-1248).
+            articleNumber: input.articleNumber,
+          });
+        }
         // "Zuordnung behalten": an entry like "trotzdem zuordnen" with its time (the entry's) and
         // the deviations (DER-56-05); the values of the model listing stay unchanged.
-        if (deviation !== undefined) {
+        if (deviation !== undefined && input.deviationDecision === 'keep') {
           await audit.write({
             objectType: 'device',
             objectId: id,

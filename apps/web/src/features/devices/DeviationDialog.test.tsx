@@ -8,8 +8,9 @@ import { createQueryClient } from '../../app/query-client.ts';
 import { AssignDialog, assignedText } from './AssignDialog.tsx';
 
 // Component tests of dialog UI-005 Kontext A (CU-135, #196, REQ-018) as it opens over UI-004
-// (CU-134) after "Zuordnen" answers `confirmation_required`/`variant_deviation`, with a mocked
-// `fetch` (Technical Specification 6.1, 6.2).
+// (CU-134) after "Zuordnen" answers `confirmation_required`/`variant_deviation`, and of its action
+// "Neues Modell-Inserat anlegen" (#201, REQ-019), with a mocked `fetch` (Technical Specification
+// 6.1, 6.2).
 
 const DEVICE = {
   id: 41,
@@ -94,11 +95,14 @@ type Answer = (init?: RequestInit) => Response | Promise<Response>;
 
 const CHOICE_PATH = `/api/model-templates/${DEVICE.modelTemplateId}/listings`;
 const DEVIATIONS_PATH = `${CHOICE_PATH}?deviceId=${DEVICE.id}`;
+const ASSIGNMENT_PATH = `/api/devices/${DEVICE.id}/assignment`;
+const LISTINGS_PATH = '/api/listings';
+const WRITE_PATHS = [ASSIGNMENT_PATH, LISTINGS_PATH];
 
 /**
  * `fetch` answering the list of UI-004 with MI-A, the list of UI-005 with `targets` (by default
- * MI-A with its deviation) and `POST /api/devices/41/assignment` in turn with `answers`; records
- * the bodies of the writes.
+ * MI-A with its deviation) and `POST /api/devices/41/assignment` and `POST /api/listings` in turn
+ * with `answers`; records the bodies and paths of the writes.
  */
 function mockApi(
   {
@@ -107,6 +111,7 @@ function mockApi(
   ...answers: Answer[]
 ) {
   const sent: unknown[] = [];
+  const paths: string[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn<typeof fetch>(async (input, init) => {
@@ -115,14 +120,15 @@ function mockApi(
       if (method === 'GET' && path === CHOICE_PATH) return Response.json({ items: [MI_A] });
       if (method === 'GET' && path === DEVIATIONS_PATH) return targets(init);
       const answer = answers[sent.length];
-      if (method !== 'POST' || path !== `/api/devices/${DEVICE.id}/assignment` || !answer) {
+      if (method !== 'POST' || !WRITE_PATHS.includes(path) || !answer) {
         throw new Error(`unexpected request ${method} ${path}`);
       }
       sent.push(JSON.parse(String(init?.body)));
+      paths.push(path);
       return answer(init);
     }),
   );
-  return { sent };
+  return { sent, paths };
 }
 
 const onOpenChange = vi.fn<(open: boolean) => void>();
@@ -145,14 +151,19 @@ function renderDialog() {
       </>
     );
   }
-  const router = createMemoryRouter([{ path: '/geraete/:deviceId', element: <Host /> }], {
-    initialEntries: [`/geraete/${DEVICE.id}`],
-  });
+  const router = createMemoryRouter(
+    [
+      { path: '/geraete/:deviceId', element: <Host /> },
+      { path: '/inserate/:listingId', element: <p>UI-014</p> },
+    ],
+    { initialEntries: [`/geraete/${DEVICE.id}`] },
+  );
   render(
     <QueryClientProvider client={createQueryClient()}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+  return router;
 }
 
 const assignDialog = () => screen.getByRole('dialog', { name: 'Modell-Inserat wählen' });
@@ -162,11 +173,12 @@ const button = (name: string) => within(dialog()).getByRole<HTMLButtonElement>('
 
 /** Chooses MI-A in UI-004 and clicks "Zuordnen"; waits for UI-005. */
 async function openDeviations() {
-  renderDialog();
+  const router = renderDialog();
   const radio = await within(assignDialog()).findByRole<HTMLInputElement>('radio');
   fireEvent.click(radio);
   fireEvent.click(within(assignDialog()).getByRole('button', { name: 'Zuordnen' }));
   await screen.findByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
+  return router;
 }
 
 /** The rows of the table as text per cell. */
@@ -192,6 +204,153 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   onOpenChange.mockReset();
+});
+
+/** The model listing `POST /api/listings` creates from the device (MI-B of MV-A, RAM 8). */
+const CREATED = {
+  id: 12,
+  modelTemplateId: 3,
+  conditionValueId: 1,
+  visualGrade: 2,
+  conditionDescription: '',
+  variantValues: { '7': 8 },
+  otherValues: {},
+  deliveryScopeTextBlockIds: [],
+  articleNumber: '626199',
+  eanMode: 'original',
+  ownEan: null,
+  displayTitle: 'MacBook Pro 13',
+  quantity: 1,
+  version: 1,
+};
+
+const RAM = { key: '7', label: 'RAM', deviceValue: '8 GB', listingValue: '16 GB' };
+
+// Before the tests of #196: their last one locks the writes of the module until a reload (P-08).
+describe('UI-005 Kontext A "Neues Modell-Inserat anlegen" (CU-135, CU-134, #201, REQ-019)', () => {
+  it('AC-REQ-019-05 UI-005.default "Neues Modell-Inserat anlegen" creates a model listing from the deviating device and opens it in UI-014', async () => {
+    const { sent, paths } = mockApi(
+      { targets: () => Response.json({ items: [{ ...MI_A, deviations: [RAM] }] }) },
+      deviating(RAM),
+      () => Response.json(CREATED, { status: 201 }),
+    );
+    const router = await openDeviations();
+    await vi.waitFor(() => expect(button('Neues Modell-Inserat anlegen').disabled).toBe(false));
+    expectAccessibleDialog();
+
+    fireEvent.click(button('Neues Modell-Inserat anlegen'));
+
+    // UI-014 of the new model listing (UI-005 "Navigation danach").
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/inserate/12'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(paths).toEqual([ASSIGNMENT_PATH, LISTINGS_PATH]);
+    expect(sent).toEqual([
+      { version: 1, listingId: 9, confirmDeviation: false },
+      { fromDeviceId: 41, deviceVersion: 1 },
+    ]);
+  });
+
+  it('UI-005.default "Neues Modell-Inserat anlegen" is not available when another model listing of the model template matches the device', async () => {
+    const MI_B = { ...MI_A, id: 10, deviations: [] };
+    const { sent } = mockApi(
+      { targets: () => Response.json({ items: [{ ...MI_A, deviations: [RAM] }, MI_B] }) },
+      deviating(RAM),
+    );
+    await openDeviations();
+    await vi.waitFor(() => expect(within(dialog()).queryByRole('status')).toBeNull());
+
+    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(true);
+    expect(button('Trotzdem zuordnen').disabled).toBe(false);
+    expect(sent).toHaveLength(1);
+  });
+
+  it('UI-005.default "Neues Modell-Inserat anlegen" is not available while the model listings load', async () => {
+    mockApi({ targets: () => new Promise<Response>(() => {}) }, deviating(RAM));
+    await openDeviations();
+
+    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(true);
+  });
+
+  it('UI-005 a rejection variant_duplicate of the creation shows in UI-004 with its text, as UI-004', async () => {
+    const message =
+      'Gleiche Variantenangaben wie Modell-Inserat MacBook Pro 13; bitte dort zuordnen';
+    mockApi(
+      { targets: () => Response.json({ items: [{ ...MI_A, deviations: [RAM] }] }) },
+      deviating(RAM),
+      () =>
+        Response.json(errorBody('variant_duplicate', { message, details: { listingId: 10 } }), {
+          status: 422,
+        }),
+    );
+    const router = await openDeviations();
+    await vi.waitFor(() => expect(button('Neues Modell-Inserat anlegen').disabled).toBe(false));
+
+    fireEvent.click(button('Neues Modell-Inserat anlegen'));
+
+    const alert = await within(assignDialog()).findByRole('alert');
+    expect(alert.textContent).toBe(message);
+    expect(queryDialog()).toBeNull();
+    expect(router.state.location.pathname).toBe('/geraete/41');
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('UI-005 article_number_taken of the creation shows the field "Artikelnummer" in UI-004, as UI-004; another article number creates the model listing', async () => {
+    const { sent } = mockApi(
+      { targets: () => Response.json({ items: [{ ...MI_A, deviations: [RAM] }] }) },
+      deviating(RAM),
+      () =>
+        Response.json(
+          errorBody('article_number_taken', {
+            message: 'Artikelnummer bereits vergeben',
+            details: { path: 'articleNumber' },
+          }),
+          { status: 422 },
+        ),
+      () => Response.json({ ...CREATED, articleNumber: '626199-2' }, { status: 201 }),
+    );
+    const router = await openDeviations();
+    await vi.waitFor(() => expect(button('Neues Modell-Inserat anlegen').disabled).toBe(false));
+
+    fireEvent.click(button('Neues Modell-Inserat anlegen'));
+
+    const input = await within(assignDialog()).findByRole<HTMLInputElement>('textbox', {
+      name: /Artikelnummer/,
+    });
+    expect(input.value).toBe('626199');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(queryDialog()).toBeNull();
+
+    fireEvent.change(input, { target: { value: '626199-2' } });
+    fireEvent.click(
+      within(assignDialog()).getByRole('button', { name: 'Neues Modell-Inserat anlegen' }),
+    );
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/inserate/12'));
+    expect(sent.slice(1)).toEqual([
+      { fromDeviceId: 41, deviceVersion: 1 },
+      { fromDeviceId: 41, deviceVersion: 1, articleNumber: '626199-2' },
+    ]);
+  });
+
+  it('UI-005 UI-004 locks its actions while the creation runs', async () => {
+    mockApi(
+      { targets: () => Response.json({ items: [{ ...MI_A, deviations: [RAM] }] }) },
+      deviating(RAM),
+      () => new Promise<Response>(() => {}),
+    );
+    await openDeviations();
+    await vi.waitFor(() => expect(button('Neues Modell-Inserat anlegen').disabled).toBe(false));
+
+    fireEvent.click(button('Neues Modell-Inserat anlegen'));
+
+    const create = within(assignDialog()).getByRole<HTMLButtonElement>('button', {
+      name: 'Neues Modell-Inserat anlegen',
+    });
+    await vi.waitFor(() => expect(create.disabled).toBe(true));
+    expect(
+      within(assignDialog()).getByRole<HTMLButtonElement>('button', { name: 'Abbrechen' }).disabled,
+    ).toBe(true);
+  });
 });
 
 describe('UI-005 Kontext A "Abweichungen bei Zuordnung" (CU-135, #196, REQ-018)', () => {
@@ -283,14 +442,6 @@ describe('UI-005 Kontext A "Abweichungen bei Zuordnung" (CU-135, #196, REQ-018)'
     expect(assignDialog()).toBeTruthy();
     expect(sent).toHaveLength(1);
     expect(onOpenChange).not.toHaveBeenCalled();
-  });
-
-  it('"Neues Modell-Inserat anlegen" is shown but not available until its action follows with #201', async () => {
-    mockApi({}, deviating(VISUAL_GRADE));
-    await openDeviations();
-    await vi.waitFor(() => expect(within(dialog()).queryByRole('status')).toBeNull());
-
-    expect(button('Neues Modell-Inserat anlegen').disabled).toBe(true);
   });
 
   it('UI-005.loading DER-59-03 shows "Lade Modell-Inserate …" as UI-004 while its data load', async () => {

@@ -27,7 +27,7 @@ export interface DeviceSearchQuery {
 /**
  * Queries on `device` (CU-122; Technical Specification 4.1, Nachtrag MAR-965). Inside an action
  * pass `tx.db`, outside of one the outer `db` (2.0.4). With #197 the devices of a model listing and
- * the assignment; the unassigned devices follow with #258.
+ * the assignment; with #258 the unassigned devices.
  */
 export function createDeviceRepository(db: Kysely<DB>) {
   return {
@@ -69,6 +69,21 @@ export function createDeviceRepository(db: Kysely<DB>) {
         .execute();
     },
 
+    /**
+     * The unassigned devices (`GET /api/devices/unassigned`, 2.5, REQ-094): available and without
+     * model listing, by `captured_at` (the oldest first) and `id`.
+     */
+    async listUnassigned() {
+      return db
+        .selectFrom('device')
+        .select(['id', 'wi_nr', 'model_template_id', 'capture_status', 'captured_on'])
+        .where('stock_status', '=', 'available')
+        .where('listing_id', 'is', null)
+        .orderBy('captured_at')
+        .orderBy('id')
+        .execute();
+    },
+
     /** Inserts a device; returns its id. */
     async insert(row: DeviceInsert): Promise<number> {
       const { id } = await db
@@ -77,6 +92,19 @@ export function createDeviceRepository(db: Kysely<DB>) {
         .returning('id')
         .executeTakeFirstOrThrow();
       return id;
+    },
+
+    /**
+     * The number of devices of a model template in any stock status (2.4 "Ändern", "Löschen";
+     * CU-290, CU-295).
+     */
+    async countByModelTemplate(modelTemplateId: number): Promise<number> {
+      const { count } = await db
+        .selectFrom('device')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('model_template_id', '=', modelTemplateId)
+        .executeTakeFirstOrThrow();
+      return Number(count);
     },
 
     /**

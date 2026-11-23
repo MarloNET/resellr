@@ -9,6 +9,8 @@ import {
   deviceSearchQuerySchema,
   deviceUpdateBodySchema,
   toWiNrKey,
+  type UnassignedDeviceItem,
+  unassignedDevicesSchema,
 } from '@resellr/domain/schemas/device.schema';
 import {
   deviceAssignmentBodySchema,
@@ -23,6 +25,7 @@ import {
   listingSchema,
   listingUpdateBodySchema,
 } from '@resellr/domain/schemas/listing.schema';
+import { modelTemplateUsageSchema } from '@resellr/domain/schemas/model-template.schema';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Kysely } from 'kysely';
 import { z } from 'zod';
@@ -40,6 +43,7 @@ import { createListingChoiceQuery } from './listing-choice-query.ts';
 import { createListingDetailQuery } from './listing-detail-query.ts';
 import { createListingRepository } from './listing-repository.ts';
 import { createListingService } from './listing-service.ts';
+import { createModelTemplateUsageQuery } from './model-template-usage-query.ts';
 import { createPriceService } from './price-service.ts';
 
 export interface InventoryRoutesOptions {
@@ -76,9 +80,10 @@ const prefillQuerystring = z.strictObject({
  * values and `GET /api/model-templates/{id}/device-prefill`, with #197 `POST /api/listings` and with
  * #194 `GET /api/model-templates/{id}/listings` and `POST /api/devices/{id}/assignment` (2.6) and
  * with #198 `GET /api/listings/{id}`, with #204 `PUT /api/listings/{id}/prices/{channelId}` and
- * with #206 `PATCH /api/listings/{id}` (2.7); the unassigned devices (#258) and the other model
+ * with #206 `PATCH /api/listings/{id}` (2.7), with #182 `GET /api/model-templates/{id}/usage`
+ * (2.4) and with #258 `GET /api/devices/unassigned` (2.5); the other model
  * listing routes follow. The reading routes read through the repositories CU-122 and CU-125, the
- * catalog reader CU-108 and the queries CU-292, CU-293 and CU-294 with the outer `db`, the writing ones go through the services CU-121, CU-123, CU-124 and CU-126 and their
+ * catalog reader CU-108 and the queries CU-292 to CU-295 with the outer `db`, the writing ones go through the services CU-121, CU-123, CU-124 and CU-126 and their
  * unit of work (2.0.4).
  */
 export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = async (
@@ -94,6 +99,7 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
   const priceService = createPriceService({ uow, clock });
   const prefillQuery = createDevicePrefillQuery(db);
   const listingChoiceQuery = createListingChoiceQuery(db);
+  const usageQuery = createModelTemplateUsageQuery(db);
   const listingDetailQuery = createListingDetailQuery(db);
 
   // `201` with the new device (2.0.1). The shape is checked here (`400`), every rule a user can
@@ -156,6 +162,25 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
         listing: (row.listing_id !== null && linked.get(row.listing_id)) || null,
         stockStatus: row.stock_status as DeviceSearchItem['stockStatus'],
         captureStatus: row.capture_status as DeviceSearchItem['captureStatus'],
+      }));
+      return { items };
+    },
+  );
+
+  // The unassigned devices of UI-009 (REQ-094): one query each for the devices and the names of
+  // their model templates, no join (Nachtrag MAR-1030).
+  app.get(
+    '/api/devices/unassigned',
+    { schema: { response: { 200: unassignedDevicesSchema } } },
+    async () => {
+      const rows = await devices.listUnassigned();
+      const labelOf = await modelTemplateLabels(rows.map((row) => row.model_template_id));
+      const items = rows.map((row): UnassignedDeviceItem => ({
+        id: row.id,
+        wiNr: row.wi_nr,
+        modelTemplateLabel: labelOf(row.model_template_id),
+        captureStatus: row.capture_status as UnassignedDeviceItem['captureStatus'],
+        capturedOn: row.captured_on,
       }));
       return { items };
     },
@@ -262,5 +287,12 @@ export const inventoryRoutes: FastifyPluginAsyncZod<InventoryRoutesOptions> = as
       },
     },
     async (request) => prefillQuery.find(request.params.id, request.query),
+  );
+
+  // The use of a model template: UI-007 locks "Geräteart" with devices (2.4, REQ-010).
+  app.get(
+    '/api/model-templates/:id/usage',
+    { schema: { params: idParams, response: { 200: modelTemplateUsageSchema } } },
+    async (request) => usageQuery.find(request.params.id),
   );
 };

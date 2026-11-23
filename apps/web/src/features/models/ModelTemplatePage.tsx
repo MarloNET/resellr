@@ -19,6 +19,7 @@ import {
   possibleDuplicatesOf,
   useCreateModelTemplateMutation,
   useModelTemplateQuery,
+  useModelTemplateUsageQuery,
   useUpdateModelTemplateMutation,
 } from '../../api/catalog.api.ts';
 import { queryKeys } from '../../api/query-keys.ts';
@@ -412,6 +413,8 @@ function offeredEntries(
  * (DER-52-02), `PATCH` with the version shown, P-05 on `version_conflict` (DER-52-05) and M-15
  * on `not_found` (DER-52-06). A stored device type, manufacturer or pick list value deactivated
  * meanwhile stays chosen and offered, the pick list value with "(deaktiviert)" (DER-52-08).
+ * The form opens once `…/usage` has arrived too; with devices "Geräteart" is locked and names the
+ * reason below it (`UI-007.disabled`, DER-52-03, DER-52-04), without showing the counts (#182).
  */
 export function ModelTemplatePage() {
   const navigate = useNavigate();
@@ -427,6 +430,7 @@ export function ModelTemplatePage() {
   const deviceTypes = useDeviceTypesQuery();
   const manufacturers = useManufacturersQuery();
   const templateQuery = useModelTemplateQuery(templateId);
+  const usageQuery = useModelTemplateUsageQuery(templateId);
   const createMutation = useCreateModelTemplateMutation();
   const updateMutation = useUpdateModelTemplateMutation(templateId ?? 0);
   const writesLocked = useWritesLocked();
@@ -508,13 +512,20 @@ export function ModelTemplatePage() {
   // data in the query; M-15 then stands instead of the form (2.0.5).
   const template = templateQuery.data;
   const templateAttributes = attributesQuery.data?.items;
-  const templateGone = templateQuery.error?.kind === 'not-found';
+  const templateGone =
+    templateQuery.error?.kind === 'not-found' || usageQuery.error?.kind === 'not-found';
+  // The use is read before the form opens, so "Geräteart" is never offered for a moment while it
+  // is locked (DER-52-04).
+  const usage = usageQuery.data;
   useEffect(() => {
     if (!editing || draft !== null || !choicesLoaded || templateGone) return;
-    if (template === undefined || templateAttributes === undefined) return;
+    if (template === undefined || templateAttributes === undefined || usage === undefined) return;
     setStored(template);
     setDraft(draftOf(template, templateAttributes));
-  }, [editing, draft, choicesLoaded, templateGone, template, templateAttributes]);
+  }, [editing, draft, choicesLoaded, templateGone, template, templateAttributes, usage]);
+  // `UI-007.disabled`: with a device "Geräteart" cannot be changed (2.4 "Ändern", DER-52-03).
+  const deviceTypeLocked = editing && (usage?.deviceCount ?? 0) > 0;
+  const deviceTypeReasonId = useId();
 
   const saving = createMutation.isPending || updateMutation.isPending;
   // Until the choices are read again after a rejection, a save could send the rejected id; until
@@ -619,6 +630,12 @@ export function ModelTemplatePage() {
       showFieldErrors({ [path]: error.error?.message });
       setRejectionShown({ [path]: true });
       if (typeof id === 'number') void reloadAfterRejection(path, id);
+      return;
+    }
+    // A device captured in another window since UI-007 opened: the text stands at "Geräteart"
+    // (2.0.6 `device_type_in_use`, AC-REQ-010-02).
+    if (error.kind === 'rejected' && error.error?.code === 'device_type_in_use') {
+      showFieldErrors({ deviceTypeId: error.error.message });
       return;
     }
     // The question comes only if the save would succeed otherwise (2.4 "Prüfreihenfolge").
@@ -894,7 +911,7 @@ export function ModelTemplatePage() {
     deviceTypes.error ??
     manufacturers.error ??
     attributesQuery.error ??
-    (notFound ? null : templateQuery.error);
+    (notFound ? null : (templateQuery.error ?? usageQuery.error));
   const loading = draft === null && loadFailed === null && !notFound;
 
   return (
@@ -967,26 +984,39 @@ export function ModelTemplatePage() {
                 {TEXTS.modelData}
               </h2>
 
-              <FormField label={TEXTS.deviceType} required error={errors.deviceTypeId}>
-                {(control) => (
-                  <Select
-                    {...control}
-                    value={optionValue(draft.deviceTypeId)}
-                    disabled={saving}
-                    onChange={(event) => choose('deviceTypeId', event.target.value)}
-                    onBlur={() => checkOnBlur('deviceTypeId')}
-                  >
-                    <option value="" disabled>
-                      {TEXTS.choose}
-                    </option>
-                    {(offeredDeviceTypes ?? []).map(({ id, label }) => (
-                      <option key={id} value={id}>
-                        {label}
+              <div className="flex flex-col gap-1">
+                <FormField label={TEXTS.deviceType} required error={errors.deviceTypeId}>
+                  {(control) => (
+                    <Select
+                      {...control}
+                      {...(deviceTypeLocked && {
+                        'aria-describedby': [control['aria-describedby'], deviceTypeReasonId]
+                          .filter(Boolean)
+                          .join(' '),
+                      })}
+                      value={optionValue(draft.deviceTypeId)}
+                      disabled={saving || deviceTypeLocked}
+                      onChange={(event) => choose('deviceTypeId', event.target.value)}
+                      onBlur={() => checkOnBlur('deviceTypeId')}
+                    >
+                      <option value="" disabled>
+                        {TEXTS.choose}
                       </option>
-                    ))}
-                  </Select>
+                      {(offeredDeviceTypes ?? []).map(({ id, label }) => (
+                        <option key={id} value={id}>
+                          {label}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </FormField>
+                {/* The reason of `UI-007.disabled` below the locked field, as in the mockup. */}
+                {deviceTypeLocked && (
+                  <p id={deviceTypeReasonId} className="m-0 text-label text-text-secondary">
+                    {ERROR_MESSAGES['device_type_in_use.default']}
+                  </p>
                 )}
-              </FormField>
+              </div>
 
               <div className="relative flex flex-col gap-2">
                 <FormField label={TEXTS.manufacturer} required error={errors.manufacturerId}>

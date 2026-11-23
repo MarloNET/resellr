@@ -9,7 +9,8 @@ import { runMigrations } from '../db/migrator.ts';
 // Technical Specification 2.5 "Variantenangabe eines zugeordneten Geräts ändern", 2.6
 // Vergleichsregel; UI-005 Kontext B): `PATCH /api/devices/{id}` asks with
 // `confirmation_required`/`variant_deviation` and stores nothing, `deviationDecision: keep`
-// stores the values, leaves the model listing unchanged and writes the audit entry.
+// stores the values, leaves the model listing unchanged and writes the audit entry,
+// `deviationDecision: new_listing` stores them and creates a model listing as 2.6 (CU-123, #201).
 
 type TestApp = ReturnType<typeof createTestApp>;
 let t: TestApp;
@@ -199,6 +200,161 @@ describe('variant value of an assigned device changed (CU-121, Technical Specifi
         timed: 1,
       },
     ]);
+  });
+
+  it('AC-REQ-019-05 "new_listing" stores RAM 8 GB of a device assigned to MI-A with RAM 16 GB and creates a second model listing with RAM 8 GB to which the device is assigned', async () => {
+    // MI-A comes from another device, so the WI-Nr of this one is free as article number.
+    const { listingId: miA } = await listingFrom('626199', '2');
+    const deviceId = await captureDevice('626198', '2');
+    const assigned = await write('POST', `/api/devices/${deviceId}/assignment`, {
+      version: 1,
+      listingId: miA,
+      confirmDeviation: false,
+    });
+    expect(assigned.statusCode).toBe(200);
+    const version = deviceRow(deviceId)?.version as number;
+    const ram = String(attribute('RAM'));
+    const listingBefore = listingRow(miA);
+    const lastAudit = rows<{ id: number }>('SELECT MAX(id) AS id FROM audit_entry')[0]?.id ?? 0;
+
+    const response = await patch(deviceId, {
+      version,
+      values: { [ram]: '8' },
+      confirmedKeys: [],
+      deviationDecision: 'new_listing',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const created = response.json().listingId as number;
+    expect(created).not.toBe(miA);
+    expect(response.json()).toMatchObject({ id: deviceId, values: { [ram]: 8 } });
+    expect(listingRow(created)).toMatchObject({ model_template_id: template, quantity: 1 });
+    expect(JSON.parse(listingRow(created)?.variant_values as string)[ram]).toBe(8);
+    // MI-A keeps its values and loses the device (AC-REQ-019-07).
+    expect(listingRow(miA)).toMatchObject({
+      variant_values: listingBefore?.variant_values,
+      quantity: 1,
+    });
+    expect(
+      rows<{ object_type: string; action: string }>(
+        'SELECT object_type, action FROM audit_entry WHERE id > ? ORDER BY id',
+        lastAudit,
+      ),
+    ).toEqual([
+      { object_type: 'device', action: 'values_updated' },
+      { object_type: 'listing', action: 'created' },
+      { object_type: 'device', action: 'assigned' },
+    ]);
+  });
+
+  it('"new_listing" is rejected with variant_duplicate when the changed device matches another model listing, and nothing is stored', async () => {
+    const { deviceId, miA, version } = await assignedToMiA();
+    const miB = (await listingFrom('626199', '4')).listingId;
+    const deviceBefore = deviceRow(deviceId);
+    const audits = count('audit_entry');
+
+    const response = await patch(deviceId, {
+      version,
+      visualGrade: '4',
+      confirmedKeys: [],
+      deviationDecision: 'new_listing',
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'variant_duplicate',
+      details: { listingId: miB },
+    });
+    expect(deviceRow(deviceId)).toEqual(deviceBefore);
+    expect(rows('SELECT id FROM listing ORDER BY id')).toEqual([{ id: miA }, { id: miB }]);
+    expect(count('audit_entry')).toBe(audits);
+  });
+
+  it('"new_listing" is rejected with article_number_taken as in UI-004 when the WI-Nr is the article number of MI-A, and nothing is stored', async () => {
+    const { deviceId, version } = await assignedToMiA();
+    const deviceBefore = deviceRow(deviceId);
+    const audits = count('audit_entry');
+
+    const response = await patch(deviceId, {
+      version,
+      values: { [attribute('RAM')]: '8' },
+      confirmedKeys: [],
+      deviationDecision: 'new_listing',
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'article_number_taken',
+      details: { path: 'articleNumber' },
+    });
+    expect(deviceRow(deviceId)).toEqual(deviceBefore);
+    expect(rows('SELECT id FROM listing')).toHaveLength(1);
+    expect(count('audit_entry')).toBe(audits);
+  });
+
+  it('R4 "new_listing" with articleNumber "626198-2" creates the model listing with RAM 8 GB and that article number when the WI-Nr is taken by MI-A, and MI-A has one piece less', async () => {
+    const { deviceId, miA, version } = await assignedToMiA();
+    const ram = String(attribute('RAM'));
+
+    const response = await patch(deviceId, {
+      version,
+      values: { [ram]: '8' },
+      confirmedKeys: [],
+      deviationDecision: 'new_listing',
+      articleNumber: '626198-2',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const created = response.json().listingId as number;
+    expect(created).not.toBe(miA);
+    expect(deviceRow(deviceId)).toMatchObject({ listing_id: created });
+    expect(listingRow(created)).toMatchObject({ article_number: '626198-2', quantity: 1 });
+    expect(JSON.parse(listingRow(created)?.variant_values as string)[ram]).toBe(8);
+    expect(listingRow(miA)).toMatchObject({ article_number: '626198', quantity: 0 });
+  });
+
+  it('R4 rejects articleNumber "626 198" with validation_failed at the path articleNumber, and nothing is stored', async () => {
+    const { deviceId, version } = await assignedToMiA();
+    const deviceBefore = deviceRow(deviceId);
+
+    const response = await patch(deviceId, {
+      version,
+      values: { [attribute('RAM')]: '8' },
+      confirmedKeys: [],
+      deviationDecision: 'new_listing',
+      articleNumber: '626 198',
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'validation_failed',
+      // The rule and text of `POST /api/listings` (R1).
+      fields: [
+        {
+          path: 'articleNumber',
+          message: 'Artikelnummer: 1 bis 30 Zeichen, nur Buchstaben, Ziffern und „-“',
+        },
+      ],
+    });
+    expect(deviceRow(deviceId)).toEqual(deviceBefore);
+    expect(rows('SELECT id FROM listing')).toHaveLength(1);
+  });
+
+  it('R4 rejects articleNumber with the decision "keep" as bad_request, and nothing is stored', async () => {
+    const { deviceId, version } = await assignedToMiA();
+    const deviceBefore = deviceRow(deviceId);
+
+    const response = await patch(deviceId, {
+      version,
+      values: { [attribute('RAM')]: '8' },
+      confirmedKeys: [],
+      deviationDecision: 'keep',
+      articleNumber: '626198-2',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('bad_request');
+    expect(deviceRow(deviceId)).toEqual(deviceBefore);
   });
 
   it('checks the field rules before the question (validation_failed for visual grade 9)', async () => {

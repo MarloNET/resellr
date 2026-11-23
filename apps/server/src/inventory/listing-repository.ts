@@ -62,6 +62,16 @@ export function createListingRepository(db: Kysely<DB>) {
         .execute();
     },
 
+    /** The number of model listings of a model template (2.4 "Löschen"; CU-295). */
+    async countByModelTemplate(modelTemplateId: number): Promise<number> {
+      const { count } = await db
+        .selectFrom('listing')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('model_template_id', '=', modelTemplateId)
+        .executeTakeFirstOrThrow();
+      return Number(count);
+    },
+
     /**
      * The display titles of the given model listings by `id` (2.5 `wi_nr_taken`, Nachtrag
      * MAR-965); unknown ids are left out. Without ids there is no query.

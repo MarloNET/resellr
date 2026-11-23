@@ -155,6 +155,72 @@ test.describe('UI-014 Modell-Inserat (CU-138, CU-292)', () => {
     await expect(values.getByText('eigene (4255867000014)')).toBeVisible();
   });
 
+  test('UI-014.validation AC-REQ-019-04 rejects the article number of another model listing with "Artikelnummer bereits vergeben" at the field and keeps the stored one', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const taken = await createListing(page, server.baseUrl, `${hash}a`);
+    const { id, wiNr, modelName, deviceTypeName } = await createListing(
+      page,
+      server.baseUrl,
+      `${hash}b`,
+    );
+
+    await page.goto(`/inserate/${id}`);
+    await expect(page.getByRole('heading', { level: 1, name: modelName })).toBeVisible();
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    const form = page.getByRole('form', { name: 'Inseratswerte bearbeiten' });
+    await expect(form.getByRole('combobox', { name: /^Zustand/ })).toHaveValue(/\d+/);
+    const articleNumber = form.getByRole('textbox', { name: /^Artikelnummer/ });
+    await articleNumber.fill(taken.wiNr);
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+
+    await expect(articleNumber).toHaveAccessibleDescription(/Artikelnummer bereits vergeben/);
+    await expect(articleNumber).toHaveAttribute('aria-invalid', 'true');
+    await expect(articleNumber).toBeFocused();
+    await expect(articleNumber).toHaveValue(taken.wiNr);
+    await expectReachable(page);
+
+    await page.getByRole('button', { name: 'Abbrechen' }).click();
+    await expect(
+      page.getByText(`${deviceTypeName} · Stückzahl 1 · Artikelnummer ${wiNr}`),
+    ).toBeVisible();
+  });
+
+  test('UI-014.abweichung-bestaetigen DER-64-03 names the deviating assigned device, stays reachable and stores the change only after "Änderung trotzdem speichern"', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const { id, wiNr, modelName } = await createListing(page, server.baseUrl, hash);
+
+    await page.goto(`/inserate/${id}`);
+    await expect(page.getByRole('heading', { level: 1, name: modelName })).toBeVisible();
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    const form = page.getByRole('form', { name: 'Inseratswerte bearbeiten' });
+    await form.getByRole('textbox', { name: /^Optik-Note/ }).fill('3');
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Zugeordnete Geräte weichen ab' });
+    await expect(
+      dialog.getByText('Nach dieser Änderung weichen 1 zugeordnete Geräte vom Modell-Inserat ab:'),
+    ).toBeVisible();
+    await expect(dialog.getByRole('row').filter({ hasText: wiNr })).toHaveText(
+      `${wiNr}Optik-Note: Gerät 2, Modell-Inserat 3`,
+    );
+    await expect(
+      dialog.getByText('Die Bestätigung wird im Änderungsprotokoll festgehalten.'),
+    ).toBeVisible();
+    await expectReachable(page);
+
+    await dialog.getByRole('button', { name: 'Änderung trotzdem speichern' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('Inseratswerte gespeichert')).toBeVisible();
+    const values = page.getByRole('region', { name: 'Inseratswerte' });
+    await expect(values.getByRole('definition').nth(1)).toHaveText('3');
+  });
+
   test('R-1 below 1366 px the listing values stack into one column and everything stays reachable (FM-3, FM-4)', async ({
     page,
     server,

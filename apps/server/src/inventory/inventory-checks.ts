@@ -5,7 +5,8 @@ import { createCatalogReader } from '../catalog/index.ts';
 import type { DB } from '../db/schema.ts';
 import type { EventHandlers, UnitOfWork } from '../db/unit-of-work.ts';
 import { RuleViolation } from '../shared/domain-error.ts';
-import type { VariantSetChanging } from '../shared/events.ts';
+import type { ModelTemplateDeviceTypeChanging, VariantSetChanging } from '../shared/events.ts';
+import { createDeviceRepository } from './device-repository.ts';
 import { createListingRepository } from './listing-repository.ts';
 
 /** Model listings of one model template that would have the same variant data (2.1). */
@@ -86,9 +87,23 @@ const groupLabel = ({ modelName, listings }: MergingGroup) =>
     .join(', ')}`;
 
 /**
+ * Changing the device type of a model template (REQ-010, AC-REQ-010-02; Technical Specification
+ * 2.4 "Ändern"): rejected with `device_type_in_use` while a device of any stock status refers to
+ * the model template. The devices are read through CU-122 with `tx.db`.
+ */
+async function checkModelTemplateDeviceTypeChanging(
+  { modelTemplateId }: ModelTemplateDeviceTypeChanging,
+  { db }: UnitOfWork<DB>,
+): Promise<void> {
+  if ((await createDeviceRepository(db).countByModelTemplate(modelTemplateId)) === 0) return;
+  throw new RuleViolation('device_type_in_use');
+}
+
+/**
  * Handlers of the check events of `inventory` (CU-290; Technical Specification 2.8.3, 4.5): one
  * entry per event, in alphabetical order. `app.ts` (CU-019) gives them to the unit of work.
  */
 export const inventoryChecks: NonNullable<EventHandlers<DB>['check']> = {
+  ModelTemplateDeviceTypeChanging: checkModelTemplateDeviceTypeChanging,
   VariantSetChanging: checkVariantSetChanging,
 };

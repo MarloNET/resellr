@@ -600,6 +600,125 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
   });
 });
 
+describe('GET /api/devices/unassigned (CU-130, CU-122, Technical Specification 2.5)', () => {
+  const update = (sql: string, ...params: unknown[]) =>
+    t.database.sqlite.prepare(sql).run(...params);
+  const capturedOn = (id: number, date: string) =>
+    update(
+      'UPDATE device SET captured_at = ?, captured_on = ? WHERE id = ?',
+      `${date}T09:00:00.000Z`,
+      date,
+      id,
+    );
+  const insertListing = () =>
+    Number(
+      update(
+        `INSERT INTO listing (model_template_id, condition_value_id, visual_grade,
+           condition_description, condition_description_key, variant_values, other_device_values,
+           article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
+           stock_hash, version, created_at, updated_at)
+         VALUES (?, ?, 3, '', '', '{}', '{}', 'MI-1', 'mi-1', 'original', 'iPhone 13, iOS', 0,
+           '{}', '', 1, ?, ?)`,
+        ids.mvA,
+        ids.used,
+        STAMP,
+        STAMP,
+      ).lastInsertRowid,
+    );
+
+  it('AC-REQ-094-01 lists exactly the two unassigned available devices, the one of 03.11.2026 first, each with WI-Nr, model template, capture status and capture date', async () => {
+    const later = (await post(body({ wiNr: '700005' }))).json();
+    const assigned = (await post(body({ wiNr: '700001' }))).json();
+    const earlier = (await post(body({ wiNr: '700003' }))).json();
+    update("UPDATE device SET capture_status = 'review_pending' WHERE id = ?", earlier.id);
+    capturedOn(later.id, '2026-11-05');
+    capturedOn(assigned.id, '2026-11-01');
+    capturedOn(earlier.id, '2026-11-03');
+    update('UPDATE device SET listing_id = ? WHERE id = ?', insertListing(), assigned.id);
+
+    const response = await get('/api/devices/unassigned');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        {
+          id: earlier.id,
+          wiNr: '700003',
+          modelTemplateLabel: 'iPhone 13',
+          captureStatus: 'review_pending',
+          capturedOn: '2026-11-03',
+        },
+        {
+          id: later.id,
+          wiNr: '700005',
+          modelTemplateLabel: 'iPhone 13',
+          captureStatus: 'checked',
+          capturedOn: '2026-11-05',
+        },
+      ],
+    });
+  });
+
+  it('AC-REQ-094-02 answers an empty list without an unassigned device', async () => {
+    const assigned = (await post(body({ wiNr: '700001' }))).json();
+    update('UPDATE device SET listing_id = ? WHERE id = ?', insertListing(), assigned.id);
+
+    const response = await get('/api/devices/unassigned');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ items: [] });
+  });
+
+  it('DER-88-02 lists neither a sold nor a cancelled device without model listing', async () => {
+    const available = (await post(body({ wiNr: '700001' }))).json();
+    const sold = (await post(body({ wiNr: '700002' }))).json();
+    const cancelled = (await post(body({ wiNr: '700003' }))).json();
+    update("UPDATE device SET stock_status = 'sold', sold_on = '2026-11-16' WHERE id = ?", sold.id);
+    update(
+      "UPDATE device SET stock_status = 'cancelled', cancel_reason = 'falsch', cancelled_at = ? WHERE id = ?",
+      STAMP,
+      cancelled.id,
+    );
+
+    const response = await get('/api/devices/unassigned');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().items.map((item: { id: number }) => item.id)).toEqual([available.id]);
+  });
+
+  it('orders devices of the same capture time by id and names their model templates with one query (Nachtrag MAR-1030)', async () => {
+    const mvB = insertModelTemplate(t.database.sqlite, {
+      deviceTypeId: t.database.sqlite
+        .prepare("SELECT id FROM device_type WHERE name = 'Smartphone'")
+        .pluck()
+        .get() as number,
+      manufacturerId: insertManufacturer(t.database.sqlite, 'Samsung'),
+      modelName: 'Galaxy S21',
+      mpn: 'SM-G991B',
+    });
+    const first = (await post(body({ wiNr: '700009' }))).json();
+    const second = (await post(body({ wiNr: '700002', modelTemplateId: mvB }))).json();
+    capturedOn(first.id, '2026-11-03');
+    capturedOn(second.id, '2026-11-03');
+    const prepare = vi.spyOn(t.database.sqlite, 'prepare');
+
+    const response = await get('/api/devices/unassigned');
+
+    const statements = prepare.mock.calls.map(([sql]) => sql);
+    prepare.mockRestore();
+    expect(
+      response
+        .json()
+        .items.map((item: Record<string, unknown>) => [item.id, item.modelTemplateLabel]),
+    ).toEqual([
+      [first.id, 'iPhone 13'],
+      [second.id, 'Galaxy S21'],
+    ]);
+    expect(statements.filter((sql) => sql.includes('from "model_template"'))).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes('join'))).toEqual([]);
+  });
+});
+
 describe('GET /api/devices/{id} (CU-130, Technical Specification 2.5)', () => {
   it('returns the device with the name of its model template and its model listing, null while unassigned', async () => {
     const created = (await post(body())).json();

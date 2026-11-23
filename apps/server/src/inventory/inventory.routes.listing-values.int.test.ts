@@ -224,22 +224,22 @@ describe('PATCH /api/listings/{id} (CU-124, Technical Specification 2.7)', () =>
 
     await patch(listingId, {
       version: 1,
-      visualGrade: '3',
       deliveryScopeTextBlockIds: [cable],
+      articleNumber: 'MBP13-A',
       eanMode: 'own',
       ownEan: '4255867000014',
     });
 
     const [entry] = auditEntries(listingId).filter(({ action }) => action === 'values_updated');
     expect(JSON.parse(entry?.old_value as string)).toEqual({
-      'Optik-Note': 2,
       Lieferumfang: null,
+      Artikelnummer: '626198',
       'EAN-Kennzeichnung': 'Original',
       'eigene EAN': null,
     });
     expect(JSON.parse(entry?.new_value as string)).toEqual({
-      'Optik-Note': 3,
       Lieferumfang: 'Netzkabel',
+      Artikelnummer: 'MBP13-A',
       'EAN-Kennzeichnung': 'eigene',
       'eigene EAN': '4255867000014',
     });
@@ -390,7 +390,7 @@ describe('PATCH /api/listings/{id} (CU-124, Technical Specification 2.7)', () =>
     const listingId = await createListing('626198');
 
     expect((await patch(999, { version: 1 })).statusCode).toBe(404);
-    await patch(listingId, { version: 1, visualGrade: '3' });
+    await patch(listingId, { version: 1, visualGrade: '3', confirmDeviatingDevices: true });
     const stale = await patch(listingId, { version: 1, visualGrade: '4' });
 
     expect(stale.statusCode).toBe(409);
@@ -447,6 +447,364 @@ describe('PATCH /api/listings/{id} (CU-124, Technical Specification 2.7)', () =>
       [ids.osVersion]: 'macOS 14',
       [ids.storageType]: ids.nvme,
     });
+  });
+});
+
+describe('PATCH /api/listings/{id} article number taken (CU-124, Technical Specification 2.7, #200)', () => {
+  it('AC-REQ-019-04 rejects changing the article number of a second model listing to the taken "626198" with "Artikelnummer bereits vergeben"; nothing is stored', async () => {
+    await createListing('626198', '2');
+    const second = await createListing('626199', '4');
+    const entries = auditEntries(second).length;
+
+    const response = await patch(second, { version: 1, articleNumber: '626198' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'article_number_taken',
+      message: 'Artikelnummer bereits vergeben',
+      details: { path: 'articleNumber' },
+    });
+    expect(listingRow(second)).toMatchObject({
+      article_number: '626199',
+      article_number_key: '626199',
+      version: 1,
+    });
+    expect(auditEntries(second)).toHaveLength(entries);
+  });
+
+  it('rejects an article number that differs only in case from another one (2.7)', async () => {
+    const miA = await createListing('626198', '2');
+    const second = await createListing('626199', '4');
+    expect((await patch(miA, { version: 1, articleNumber: 'MI-A' })).statusCode).toBe(200);
+
+    const response = await patch(second, { version: 1, articleNumber: 'mi-a' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('article_number_taken');
+    expect(listingRow(second)).toMatchObject({ article_number: '626199', version: 1 });
+  });
+
+  it('stores the own article number in another case and a free one', async () => {
+    const listingId = await createListing('626198');
+    expect((await patch(listingId, { version: 1, articleNumber: 'MI-A' })).statusCode).toBe(200);
+
+    const response = await patch(listingId, { version: 2, articleNumber: 'mi-a' });
+
+    expect(response.statusCode).toBe(200);
+    expect(listingRow(listingId)).toMatchObject({
+      article_number: 'mi-a',
+      article_number_key: 'mi-a',
+      version: 3,
+    });
+  });
+
+  it('reports a variant duplicate before a taken article number (2.0.11)', async () => {
+    const miA = await createListing('626198', '2');
+    const second = await createListing('626199', '4');
+
+    const response = await patch(second, { version: 1, visualGrade: '2', articleNumber: '626198' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('variant_duplicate');
+    expect(response.json().error.details).toEqual({ listingId: miA });
+  });
+
+  it('reports a taken article number before the question about deviating devices (2.5)', async () => {
+    const miA = await createListing('626198', '2');
+    await assign(await captureDevice('626200', '2'), miA);
+    await createListing('626199', '4');
+
+    const response = await patch(miA, { version: 1, visualGrade: '3', articleNumber: '626199' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('article_number_taken');
+    expect(listingRow(miA)).toMatchObject({ visual_grade: 2, version: 1 });
+  });
+});
+
+/** Assigns a captured device to a model listing through the API (#194, #196). */
+async function assign(deviceId: number, listingId: number, confirmDeviation = false) {
+  const response = await t.app.inject({
+    method: 'POST',
+    url: `/api/devices/${deviceId}/assignment`,
+    headers: SAME_ORIGIN_WRITE,
+    payload: { version: 1, listingId, confirmDeviation },
+  });
+  expect(response.statusCode).toBe(200);
+}
+
+/** MI-A of AC-REQ-088-03: two assigned, available devices with visual grade 2. */
+async function listingWithTwoDevices(): Promise<number> {
+  const miA = await createListing('626198', '2');
+  await assign(await captureDevice('626199', '2'), miA);
+  return miA;
+}
+
+const OPTIK_NOTE_2_TO_3 = {
+  key: 'visualGrade',
+  label: 'Optik-Note',
+  deviceValue: '2',
+  listingValue: '3',
+};
+
+describe('PATCH /api/listings/{id} deviating assigned devices (CU-124, Technical Specification 2.7, #207)', () => {
+  it('answers confirmation_required with assigned_devices_deviate and details.devices[] without confirmDeviatingDevices; nothing is stored', async () => {
+    const miA = await listingWithTwoDevices();
+
+    const response = await patch(miA, { version: 1, visualGrade: '3' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'confirmation_required',
+      message: 'Nach dieser Änderung weichen 2 zugeordnete Geräte vom Modell-Inserat ab:',
+      details: {
+        kind: 'assigned_devices_deviate',
+        devices: [
+          { wiNr: '626198', deviations: [OPTIK_NOTE_2_TO_3] },
+          { wiNr: '626199', deviations: [OPTIK_NOTE_2_TO_3] },
+        ],
+      },
+    });
+    expect(listingRow(miA)).toMatchObject({ visual_grade: 2, version: 1 });
+    expect(auditEntries(miA).map(({ action }) => action)).toEqual(['created']);
+  });
+
+  it('AC-REQ-088-03 names both devices with "Optik-Note: Gerät 2, Modell-Inserat 3", stores only after the confirmation and logs it', async () => {
+    const miA = await listingWithTwoDevices();
+
+    const asked = await patch(miA, { version: 1, visualGrade: '3' });
+    expect(asked.statusCode).toBe(422);
+    expect(
+      asked
+        .json<{ error: { details: { devices: { wiNr: string; deviations: unknown[] }[] } } }>()
+        .error.details.devices.map(({ wiNr }) => wiNr),
+    ).toEqual(['626198', '626199']);
+    expect(listingRow(miA)).toMatchObject({ visual_grade: 2, version: 1 });
+
+    const confirmed = await patch(miA, {
+      version: 1,
+      visualGrade: '3',
+      confirmDeviatingDevices: true,
+    });
+
+    expect(confirmed.statusCode).toBe(200);
+    expect(confirmed.json()).toMatchObject({ visualGrade: 3, version: 2 });
+    const entries = auditEntries(miA);
+    expect(entries.map(({ action }) => action)).toEqual(['created', 'deviation_confirmed']);
+    expect(JSON.parse(entries[1]?.old_value as string)).toEqual({ 'Optik-Note': 2 });
+    expect(JSON.parse(entries[1]?.new_value as string)).toEqual({
+      'Optik-Note': 3,
+      Abweichungen: {
+        'Gerät 626198': ['Optik-Note: Gerät 2, Modell-Inserat 3'],
+        'Gerät 626199': ['Optik-Note: Gerät 2, Modell-Inserat 3'],
+      },
+    });
+    expect(
+      rows("SELECT object_category FROM audit_entry WHERE action = 'deviation_confirmed'"),
+    ).toEqual([{ object_category: 'listing' }]);
+  });
+
+  it('names only the available devices that deviate afterwards, with all their deviations', async () => {
+    const miA = await createListing('626198', '2');
+    const matching = await captureDevice('626199', '3');
+    await assign(matching, miA, true);
+    const sold = await captureDevice('626200', '2');
+    await assign(sold, miA);
+    run("UPDATE device SET stock_status = 'sold', sold_on = '2026-11-17' WHERE id = ?", sold);
+
+    const response = await patch(miA, {
+      version: 1,
+      visualGrade: '3',
+      conditionDescription: 'Kratzer am Deckel',
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.details.devices).toEqual([
+      {
+        wiNr: '626198',
+        deviations: [
+          OPTIK_NOTE_2_TO_3,
+          {
+            key: 'conditionDescription',
+            label: 'Zustandsbeschreibung',
+            deviceValue: '–',
+            listingValue: 'Kratzer am Deckel',
+          },
+        ],
+      },
+      {
+        wiNr: '626199',
+        deviations: [
+          {
+            key: 'conditionDescription',
+            label: 'Zustandsbeschreibung',
+            deviceValue: '–',
+            listingValue: 'Kratzer am Deckel',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('asks nothing when the variant data stay, even with a device that already deviates', async () => {
+    const miA = await createListing('626198', '2');
+    await assign(await captureDevice('626199', '4'), miA, true);
+
+    const response = await patch(miA, { version: 1, articleNumber: 'MI-A' });
+
+    expect(response.statusCode).toBe(200);
+    expect(auditEntries(miA).map(({ action }) => action)).toEqual(['created', 'values_updated']);
+  });
+
+  it('asks nothing when no assigned device deviates after the change', async () => {
+    const miA = await createListing('626198', '2');
+    run("UPDATE device SET stock_status = 'sold', sold_on = '2026-11-17' WHERE wi_nr = '626198'");
+
+    const response = await patch(miA, { version: 1, visualGrade: '3' });
+
+    expect(response.statusCode).toBe(200);
+    expect(auditEntries(miA).map(({ action }) => action)).toEqual(['created', 'values_updated']);
+  });
+
+  it('reports a variant duplicate before the question (2.5)', async () => {
+    const miA = await listingWithTwoDevices();
+    await createListing('626300', '4');
+
+    const response = await patch(miA, { version: 1, visualGrade: '4' });
+
+    expect(response.json().error.code).toBe('variant_duplicate');
+  });
+
+  it('reports a field error before the question (2.5)', async () => {
+    const miA = await listingWithTwoDevices();
+
+    const response = await patch(miA, { version: 1, visualGrade: '3', articleNumber: 'MI A' });
+
+    expect(response.json().error.code).toBe('validation_failed');
+  });
+});
+
+describe('AC-REQ-005-12 listing values checked on the state after the change (CU-124, Technical Specification 2.5, 2.7)', () => {
+  const patchAttribute = async (id: number, payload: Record<string, unknown>) => {
+    const response = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/attributes/${id}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    return response.json<{ version: number }>().version;
+  };
+  const shopChannel = () => rows("SELECT id FROM channel WHERE code = 'shop'")[0]?.id as number;
+  const storedValues = (listingId: number) => {
+    const row = listingRow(listingId);
+    return {
+      ...JSON.parse(row?.other_device_values as string),
+      ...JSON.parse(row?.variant_values as string),
+    };
+  };
+
+  /** "MI-B": a model listing of MV-A created without RAM while RAM was deactivated. */
+  async function miBWithoutRamAfterReactivation(): Promise<number> {
+    const version = await patchAttribute(ids.ram, { version: 1, active: false });
+    const listingId = await createListing('626198');
+    const variantValues = JSON.parse(listingRow(listingId)?.variant_values as string);
+    delete variantValues[ids.ram];
+    // The device of the listing carries RAM 16; the listing values of MI-B have none, as in the
+    // example of AC-REQ-005-12. The other values come through the API.
+    run(
+      'UPDATE listing SET variant_values = ? WHERE id = ?',
+      JSON.stringify(variantValues),
+      listingId,
+    );
+    await patchAttribute(ids.ram, { version, active: true });
+    return listingId;
+  }
+
+  it('AC-REQ-005-12 saves the Shop price 499,00 € of "MI-B" without RAM value, asking for no RAM value', async () => {
+    const listingId = await miBWithoutRamAfterReactivation();
+
+    const response = await t.app.inject({
+      method: 'PUT',
+      url: `/api/listings/${listingId}/prices/${shopChannel()}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload: { version: 1, amountCents: 49900, vb: false },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      rows('SELECT channel_id, amount_cents FROM listing_price WHERE listing_id = ?', listingId),
+    ).toEqual([{ channel_id: shopChannel(), amount_cents: 49900 }]);
+    expect(storedValues(listingId)).not.toHaveProperty(String(ids.ram));
+  });
+
+  it('AC-REQ-005-12 rejects a change of the article number only of "MI-B" with "RAM fehlt" at variantValues.<id>, stores nothing', async () => {
+    const listingId = await miBWithoutRamAfterReactivation();
+    const audits = auditEntries(listingId).length;
+
+    const response = await patch(listingId, { version: 1, articleNumber: 'MI-B' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'validation_failed',
+      fields: [{ path: `variantValues.${ids.ram}`, code: 'value_missing', message: 'RAM fehlt' }],
+    });
+    expect(listingRow(listingId)).toMatchObject({ article_number: '626198', version: 1 });
+    expect(auditEntries(listingId)).toHaveLength(audits);
+
+    const saved = await patch(listingId, {
+      version: 1,
+      articleNumber: 'MI-B',
+      variantValues: { [ids.ram]: 16 },
+    });
+    expect(saved.statusCode).toBe(200);
+  });
+
+  it('AC-REQ-005-12 activating RAM writes no RAM value to "MI-B"', async () => {
+    const listingId = await miBWithoutRamAfterReactivation();
+
+    expect(storedValues(listingId)).not.toHaveProperty(String(ids.ram));
+    expect(listingRow(listingId)?.version).toBe(1);
+  });
+
+  it('AC-REQ-005-12 names a missing required value at otherValues.<id> together with the other field errors of the request', async () => {
+    const listingId = await createListing('626198');
+    const version = await patchAttribute(ids.osVersion, { version: 1, required: true });
+    expect(version).toBe(2);
+    const otherValues = JSON.parse(listingRow(listingId)?.other_device_values as string);
+    delete otherValues[ids.osVersion];
+    run(
+      'UPDATE listing SET other_device_values = ? WHERE id = ?',
+      JSON.stringify(otherValues),
+      listingId,
+    );
+
+    const response = await patch(listingId, { version: 1, articleNumber: '' });
+
+    expect(response.statusCode).toBe(422);
+    expect(
+      response
+        .json()
+        .error.fields.map(({ path, message }: { path: string; message: string }) => [
+          path,
+          message,
+        ]),
+    ).toEqual(
+      expect.arrayContaining([
+        [`otherValues.${ids.osVersion}`, 'Betriebssystem-Version fehlt'],
+        ['articleNumber', ARTICLE_NUMBER_RULE],
+      ]),
+    );
+  });
+
+  it('AC-REQ-005-12 keeps the stored value of a deactivated attribute the request does not name', async () => {
+    const listingId = await createListing('626198');
+    await patchAttribute(ids.ram, { version: 1, active: false });
+
+    const response = await patch(listingId, { version: 1, articleNumber: 'MI-B' });
+
+    expect(response.statusCode).toBe(200);
+    expect(storedValues(listingId)[ids.ram]).toBe(16);
   });
 });
 

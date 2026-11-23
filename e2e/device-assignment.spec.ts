@@ -39,13 +39,34 @@ function apiOf(page: Page, baseUrl: string) {
 
 /**
  * A model template of a device type without attributes, so a device needs only condition and
- * visual grade, and `capture` for its devices.
+ * visual grade, and `capture` for its devices; with `ram` the device type has the variant
+ * attribute RAM (integer, GB, level device, optional), whose ID is `ramId`.
  */
-async function setUpTemplate(api: ReturnType<typeof apiOf>, hash: string) {
+async function setUpTemplate(
+  api: ReturnType<typeof apiOf>,
+  hash: string,
+  { ram = false }: { ram?: boolean } = {},
+) {
   const deviceType = await api.write<{ id: number }>('/api/device-types', {
     name: `Zuordnung ${hash}`,
     active: true,
   });
+  const ramAttribute = ram
+    ? await api.write<{ id: number }>(`/api/device-types/${deviceType.id}/attributes`, {
+        label: 'RAM',
+        dataType: 'integer',
+        unit: 'GB',
+        unitSpacing: true,
+        minValue: null,
+        maxValue: null,
+        pickListId: null,
+        level: 'device',
+        variantForming: true,
+        required: false,
+        datasheetBlock: 'technical',
+        active: true,
+      })
+    : undefined;
   const manufacturer = await api.write<{ id: number }>('/api/manufacturers', {
     name: `Hersteller ${hash}`,
   });
@@ -70,7 +91,7 @@ async function setUpTemplate(api: ReturnType<typeof apiOf>, hash: string) {
   );
   const used = conditions.find(({ label }) => label === 'gebraucht');
   if (used === undefined) throw new Error('gebraucht is missing');
-  const capture = (wiNr: string, visualGrade = '2') =>
+  const capture = (wiNr: string, visualGrade = '2', values: Record<string, unknown> = {}) =>
     api.write<{ id: number; version: number }>('/api/devices', {
       wiNr,
       supplierId: null,
@@ -78,10 +99,10 @@ async function setUpTemplate(api: ReturnType<typeof apiOf>, hash: string) {
       conditionValueId: used.id,
       visualGrade,
       conditionDescription: '',
-      values: {},
+      values,
       confirmedKeys: [],
     });
-  return { template, capture };
+  return { template, capture, ramId: ramAttribute?.id };
 }
 
 test.describe('FLOW-02 Zuordnen ohne Abweichung (CU-123, CU-294; Technical Specification 2.6)', () => {
@@ -207,6 +228,87 @@ test.describe('FLOW-02 Zuordnen mit Abweichung (CU-123, CU-119, REQ-018; Technic
   });
 });
 
+test.describe('FLOW-02 Neues Modell-Inserat aus der Abweichungsanzeige (CU-123, CU-135, REQ-019; Technical Specification 2.6)', () => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires the destructuring pattern.
+  test.beforeEach(({}, testInfo) => {
+    // The flow runs through the API only and does not depend on the window size; UI-004 and
+    // UI-005 have no entry in a screen yet, their states are component tests.
+    test.skip(testInfo.project.name !== 'FM-1', 'API flow, checked once');
+  });
+
+  test('AC-REQ-019-05 a device with RAM 8 GB deviates from MI-A with RAM 16 GB; "Neues Modell-Inserat anlegen" in UI-005 creates a second model listing of MV-A with RAM 8 GB', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const api = apiOf(page, server.baseUrl);
+    const { template, capture, ramId } = await setUpTemplate(api, hash, { ram: true });
+    const ram = String(ramId);
+
+    // MI-A of MV-A with RAM 16 GB.
+    const first = await capture(`A${hash}`.slice(0, 20), '2', { [ram]: '16' });
+    const miA = await api.write<{ id: number; variantValues: Record<string, unknown> }>(
+      '/api/listings',
+      { fromDeviceId: first.id, deviceVersion: first.version },
+    );
+    expect(miA.variantValues).toEqual({ [ram]: 16 });
+
+    // UI-004 "Zuordnen" of a device with RAM 8 GB: UI-005 with the deviation, nothing is stored.
+    const second = await capture(`B${hash}`.slice(0, 20), '2', { [ram]: '8' });
+    const question = await page.request.post(
+      `${server.baseUrl}/api/devices/${second.id}/assignment`,
+      {
+        headers: { origin: server.baseUrl },
+        data: { version: second.version, listingId: miA.id, confirmDeviation: false },
+      },
+    );
+    expect(question.status()).toBe(422);
+    expect((await question.json()).error).toMatchObject({
+      code: 'confirmation_required',
+      details: {
+        kind: 'variant_deviation',
+        deviations: [{ key: ram, label: 'RAM', deviceValue: '8 GB', listingValue: '16 GB' }],
+      },
+    });
+    // The data of UI-005: the device deviates from every model listing, so "Neues
+    // Modell-Inserat anlegen" is available.
+    const targets = await api.read<{ items: { id: number; deviations: unknown[] }[] }>(
+      `/api/model-templates/${template.id}/listings?deviceId=${second.id}`,
+    );
+    expect(targets.items.every(({ deviations }) => deviations.length > 0)).toBe(true);
+
+    // UI-005 "Neues Modell-Inserat anlegen" sends the creation of UI-004.
+    const created = await api.write<{
+      id: number;
+      modelTemplateId: number;
+      variantValues: Record<string, unknown>;
+      quantity: number;
+    }>('/api/listings', { fromDeviceId: second.id, deviceVersion: second.version });
+
+    expect(created).toMatchObject({
+      modelTemplateId: template.id,
+      variantValues: { [ram]: 8 },
+      quantity: 1,
+    });
+    expect(created.id).not.toBe(miA.id);
+    const device = await api.read<{ listing: { id: number } | null }>(`/api/devices/${second.id}`);
+    expect(device.listing?.id).toBe(created.id);
+    const after = await api.read<{ items: { id: number; quantity: number }[] }>(
+      `/api/model-templates/${template.id}/listings`,
+    );
+    expect(after.items).toHaveLength(2);
+    expect(after.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: miA.id, quantity: 1 }),
+        expect.objectContaining({ id: created.id, quantity: 1 }),
+      ]),
+    );
+    // The unshortened shop title "Apple MacBook Pro 13 (A1989), intel Core i5-8279U, 8GB RAM,
+    // 512GB Space Gray" comes with the title formation per channel from S5 (#66, 2.8.2); until
+    // then the display title is the model name (MAR-1053) and this test checks the creation.
+  });
+});
+
 test.describe('UI-005 Kontext B: Variantenangabe eines zugeordneten Geräts ändern (CU-121, CU-135, CU-137; Technical Specification 2.5)', () => {
   test('UI-005.default DER-56-04 DER-56-05 the visual grade of a device assigned to MI-A changed from 2 to 4 in UI-010 opens UI-005; "Zuordnung behalten" saves it, MI-A keeps visual grade 2', async ({
     page,
@@ -257,5 +359,110 @@ test.describe('UI-005 Kontext B: Variantenangabe eines zugeordneten Geräts änd
         variantSummary: expect.objectContaining({ visualGrade: 2 }),
       }),
     ]);
+  });
+
+  test('AC-REQ-019-05 the visual grade of a device assigned to MI-A changed from 2 to 4 in UI-010 opens UI-005; "Neues Modell-Inserat anlegen" saves it, creates a second model listing with visual grade 4 and opens it in UI-014', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const api = apiOf(page, server.baseUrl);
+    const { template, capture } = await setUpTemplate(api, hash);
+    // MI-A comes from another device, so the WI-Nr of this one is free as article number.
+    const first = await capture(`A${hash}`.slice(0, 20));
+    const miA = await api.write<{ id: number }>('/api/listings', {
+      fromDeviceId: first.id,
+      deviceVersion: first.version,
+    });
+    const device = await capture(`B${hash}`.slice(0, 20));
+    await api.write(
+      `/api/devices/${device.id}/assignment`,
+      {
+        version: device.version,
+        listingId: miA.id,
+        confirmDeviation: false,
+      },
+      200,
+    );
+    await page.goto(`/geraete/${device.id}`);
+
+    const grade = page.getByRole('textbox', { name: 'Optik-Note' });
+    await expect(grade).toHaveValue('2');
+    await grade.fill('4');
+    await page.getByRole('button', { name: 'Gerätewerte speichern' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
+    await dialog.getByRole('button', { name: 'Neues Modell-Inserat anlegen' }).click();
+
+    await expect(page).toHaveURL(/\/inserate\/\d+$/);
+    const created = Number(new URL(page.url()).pathname.split('/').pop());
+    expect(created).not.toBe(miA.id);
+    const listings = await api.read<{
+      items: { id: number; quantity: number; variantSummary: { visualGrade: number } }[];
+    }>(`/api/model-templates/${template.id}/listings`);
+    expect(listings.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: miA.id, quantity: 1 }),
+        expect.objectContaining({
+          id: created,
+          quantity: 1,
+          variantSummary: expect.objectContaining({ visualGrade: 4 }),
+        }),
+      ]),
+    );
+  });
+  test('UI-005.validation the RAM of the device MI-A was created from changed from 16 to 8 GB in UI-010: "Neues Modell-Inserat anlegen" shows the field "Artikelnummer" with its WI-Nr as taken; with "<WI-Nr>-2" it creates the model listing with RAM 8 GB and MI-A has one piece less (Nachtrag MAR-1248)', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const api = apiOf(page, server.baseUrl);
+    const { template, capture, ramId } = await setUpTemplate(api, hash, { ram: true });
+    const ram = String(ramId);
+    // MI-A comes from this device, so its WI-Nr is the article number of MI-A.
+    const wiNr = `A${hash}`.slice(0, 20);
+    const device = await capture(wiNr, '2', { [ram]: '16' });
+    const miA = await api.write<{ id: number }>('/api/listings', {
+      fromDeviceId: device.id,
+      deviceVersion: device.version,
+    });
+    await page.goto(`/geraete/${device.id}`);
+
+    const ramField = page.getByRole('textbox', { name: /^RAM/ });
+    await expect(ramField).toHaveValue('16');
+    await ramField.fill('8');
+    await page.getByRole('button', { name: 'Gerätewerte speichern' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
+    await dialog.getByRole('button', { name: 'Neues Modell-Inserat anlegen' }).click();
+
+    const articleNumber = dialog.getByRole('textbox', { name: /^Artikelnummer/ });
+    await expect(articleNumber).toHaveValue(wiNr);
+    await expect(articleNumber).toBeFocused();
+    await expect(dialog.getByText('Artikelnummer bereits vergeben')).toBeVisible();
+    // Nothing is stored after article_number_taken (R3).
+    const unchanged = await api.read<{ values: Record<string, unknown>; version: number }>(
+      `/api/devices/${device.id}`,
+    );
+    expect(unchanged.values[ram]).toBe(16);
+
+    await articleNumber.fill(`${wiNr}-2`);
+    await dialog.getByRole('button', { name: 'Neues Modell-Inserat anlegen' }).click();
+
+    await expect(page).toHaveURL(/\/inserate\/\d+$/);
+    const created = Number(new URL(page.url()).pathname.split('/').pop());
+    expect(created).not.toBe(miA.id);
+    const listing = await api.read<{
+      articleNumber: string;
+      variantValues: Record<string, unknown>;
+    }>(`/api/listings/${created}`);
+    expect(listing).toMatchObject({ articleNumber: `${wiNr}-2`, variantValues: { [ram]: 8 } });
+    const listings = await api.read<{ items: { id: number; quantity: number }[] }>(
+      `/api/model-templates/${template.id}/listings`,
+    );
+    expect(listings.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: miA.id, quantity: 0 }),
+        expect.objectContaining({ id: created, quantity: 1 }),
+      ]),
+    );
   });
 });

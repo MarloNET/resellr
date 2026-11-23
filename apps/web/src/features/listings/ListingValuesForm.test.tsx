@@ -206,15 +206,17 @@ function delayedReload(delayedListId: number) {
 
 /**
  * `fetch` of UI-014 with lists the test can change in "another window": `listing` answers
- * `GET /api/listings/9`, `update` the `PATCH`, `reload` the reads of a list after the first save.
+ * `GET /api/listings/9`, `attributes` the attributes of the notebook, `update` the `PATCH`, `reload` the reads of a list after the first save.
  * Records the bodies of the `PATCH` and the number of reads per list.
  */
 function mockApi({
   listing = LISTING,
+  attributes = ATTRIBUTES,
   update = savedAnswer,
   reload,
 }: {
   listing?: Record<string, unknown>;
+  attributes?: readonly Record<string, unknown>[];
   update?: Route;
   reload?: (listId: number) => Response | Promise<Response> | undefined;
 } = {}) {
@@ -251,7 +253,7 @@ function mockApi({
           defaultDeviceValues: {},
         });
       }
-      if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
+      if (route === 'GET /api/device-types/1/attributes') return list([...attributes]);
       if (route === 'PATCH /api/listings/9') {
         sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
         return update(init);
@@ -445,6 +447,38 @@ describe('UI-014.edit Inseratswerte bearbeiten (CU-139, Story #64)', () => {
 
     await vi.waitFor(() => expect(errorOf(textbox('Artikelnummer'))).toBe(ARTICLE_NUMBER_RULE));
     expect(document.activeElement).toBe(textbox('Artikelnummer'));
+  });
+
+  it('UI-014.validation AC-REQ-019-04 shows "Artikelnummer bereits vergeben" of article_number_taken at the field, focus there, keeps the inputs', async () => {
+    const { sent } = mockApi({
+      update: () =>
+        Response.json(
+          errorBody('article_number_taken', {
+            message: 'Artikelnummer bereits vergeben',
+            details: { path: 'articleNumber' },
+          }),
+          { status: 422 },
+        ),
+    });
+    await openEdit();
+    fireEvent.change(textbox('Artikelnummer'), { target: { value: '626198' } });
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() =>
+      expect(errorOf(textbox('Artikelnummer'))).toBe('Artikelnummer bereits vergeben'),
+    );
+    expect(document.activeElement).toBe(textbox('Artikelnummer'));
+    expect(textbox('Artikelnummer').value).toBe('626198');
+    expect(sent).toHaveLength(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expectAccessibleForm();
+
+    fireEvent.blur(textbox('Artikelnummer'));
+    expect(errorOf(textbox('Artikelnummer'))).toBe('Artikelnummer bereits vergeben');
+
+    fireEvent.change(textbox('Artikelnummer'), { target: { value: '626198-2' } });
+    await vi.waitFor(() => expect(errorOf(textbox('Artikelnummer'))).toBeNull());
   });
 
   it('UI-014.validation AC-REQ-088-04 rejects the own EAN 4255867000015 at the field EAN and sends 4255867000014', async () => {
@@ -844,6 +878,89 @@ describe('UI-014.edit choice after pick_list_value_deactivated (2.0.11, design v
 });
 
 // Last in this file: P-08 locks the writes of the page until it is loaded again (CU-049).
+describe('UI-014.edit deactivated and reactivated required attribute (M-32, 2.5, Story #34)', () => {
+  /** The required attributes RAM (variant) and Displayfläche (other) of the level device. */
+  const RAM = attribute({
+    id: 20,
+    label: 'RAM',
+    dataType: 'integer',
+    unit: 'GB',
+    required: true,
+    variantForming: true,
+    sortOrder: 5,
+  });
+  const SURFACE = attribute({
+    id: 21,
+    label: 'Displayfläche',
+    dataType: 'text',
+    required: true,
+    sortOrder: 6,
+  });
+
+  it('UI-014.edit DER-34-22 shows no field for a deactivated attribute; PATCH sends no key for it, so its stored value stays', async () => {
+    const { sent } = mockApi({
+      attributes: [...ATTRIBUTES, { ...RAM, active: false }],
+      listing: { ...LISTING, variantValues: { ...LISTING.variantValues, '20': 16 } },
+    });
+    await openEdit();
+
+    expect(within(form()).queryByRole('textbox', { name: /^RAM/ })).toBeNull();
+    fireEvent.change(textbox('Optik-Note'), { target: { value: '3' } });
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.variantValues).not.toHaveProperty('20');
+    expect(await screen.findByText('Inseratswerte gespeichert')).toBeTruthy();
+  });
+
+  it('UI-014.validation DER-34-25 a reactivated required attribute without a value is an empty required field; changing only the delivery scope names "RAM fehlt" in the browser, nothing sent', async () => {
+    const { sent } = mockApi({ attributes: [...ATTRIBUTES, RAM] });
+    await openEdit();
+
+    expect(textbox('RAM').value).toBe('');
+    expect(textbox('RAM').getAttribute('aria-required')).toBe('true');
+    fireEvent.click(within(form()).getByRole('checkbox', { name: 'Originalverpackung' }));
+    fireEvent.click(saveButton());
+
+    expect(errorOf(textbox('RAM'))).toBe('RAM fehlt');
+    expect(document.activeElement).toBe(textbox('RAM'));
+    expect(sent).toEqual([]);
+    expectAccessibleForm();
+  });
+
+  it.each([
+    ['variantValues', RAM, 20, 'RAM'],
+    ['otherValues', SURFACE, 21, 'Displayfläche'],
+  ])(
+    'UI-014.validation DER-34-25 shows "<Merkmal> fehlt" of 422 validation_failed at %s.<id> at the field, focus there, nothing saved, the inputs stay',
+    async (object, definition, id, label) => {
+      // The attribute was made required in another window after UI-014 read the attributes, so
+      // the check in the browser lets the request pass and the server names the missing value.
+      const message = `${label} fehlt`;
+      mockApi({
+        attributes: [...ATTRIBUTES, { ...definition, required: false }],
+        update: () =>
+          Response.json(
+            errorBody('validation_failed', {
+              fields: [{ path: `${object}.${id}`, code: 'value_missing', message }],
+            }),
+            { status: 422 },
+          ),
+      });
+      await openEdit();
+      fireEvent.change(textbox('Optik-Note'), { target: { value: '3' } });
+
+      fireEvent.click(saveButton());
+
+      await vi.waitFor(() => expect(errorOf(textbox(label))).toBe(message));
+      expect(document.activeElement).toBe(textbox(label));
+      expect(textbox('Optik-Note').value).toBe('3');
+      expect(screen.queryByText('Inseratswerte gespeichert')).toBeNull();
+      expectAccessibleForm();
+    },
+  );
+});
+
 describe('UI-014.edit ausgang-unbekannt (P-08)', () => {
   it('UI-014.ausgang-unbekannt DER-64-06 (c) shows the permanent P-08 without button, keeps the inputs and locks the save', async () => {
     mockApi({

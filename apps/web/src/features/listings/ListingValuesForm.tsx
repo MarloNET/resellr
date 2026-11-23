@@ -6,6 +6,8 @@ import {
   mergeAttributeValues,
 } from '@resellr/domain/schemas/attribute-values.schema';
 import {
+  assignedDevicesDeviateDetailsSchema,
+  type DeviatingDeviceItem,
   EAN_MODES,
   type Listing,
   type ListingDetail,
@@ -62,6 +64,7 @@ import {
   TEXT_AREA_CLASS,
   TEXTS as VALUE_TEXTS,
 } from '../devices/DeviceIntakePage.tsx';
+import { DeviatingDevicesDialog } from './DeviatingDevicesDialog.tsx';
 
 // Texts of UI-014 `screen.md` (UI/UX design v0.6.1; v0.6.8 for the choice after a rejection for
 // deactivation). The fields of UI-003 use its texts (DER-64-01).
@@ -213,6 +216,13 @@ function checkAll(draft: ValuesDraft, attributes: readonly Attribute[], stored: 
   return errors;
 }
 
+/** The deviating assigned devices of a failed save (REQ-088); `null` for any other error. */
+function deviatingDevicesOf(error: ApiError): DeviatingDeviceItem[] | null {
+  if (error.kind !== 'confirmation-required') return null;
+  const details = assignedDevicesDeviateDetailsSchema.safeParse(error.error?.details);
+  return details.success ? details.data.devices : null;
+}
+
 const hasErrors = (errors: FieldErrors) => Object.values(errors).some(Boolean);
 
 /** The field errors of the attribute fields by attribute id, as CU-111 shows them. */
@@ -302,8 +312,11 @@ export interface ListingValuesFormProps {
  * A stored, deactivated condition or pick list value stays chosen and offered with
  * "(deaktiviert)"; after `pick_list_value_deactivated` every changed choice missing after the
  * reload is emptied with its text, without falling back to the stored value (2.0.11, design
- * v0.6.8, DER-64-10, DER-64-11). States: validation, speichert, error, conflict (P-05),
- * wird-beendet (P-07); ausgang-unbekannt (P-08) and success stand on the page.
+ * v0.6.8, DER-64-10, DER-64-11). A taken article number (`article_number_taken`) shows its text at
+ * the field until the article number changes (AC-REQ-019-04). If assigned devices deviate afterwards, the dialog
+ * `UI-014.abweichung-bestaetigen` (CU-140) opens with the request kept for its confirmation;
+ * "Abbrechen" there returns with the inputs (DER-64-03). States: validation, speichert, error,
+ * conflict (P-05), wird-beendet (P-07); ausgang-unbekannt (P-08) and success stand on the page.
  */
 export function ListingValuesForm({
   listing,
@@ -345,11 +358,17 @@ export function ListingValuesForm({
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
-  // Choices that show the text of a rejection until the next choice in the field (v0.6.8).
+  // Fields that show the text of a rejection until the next choice or input there (v0.6.8).
   const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
   // Pick list values rejected as deactivated whose list could not be read again (2.0.11).
   const [droppedValues, setDroppedValues] = useState<ReadonlySet<number>>(new Set());
   const [reloading, setReloading] = useState(false);
+  // The deviating devices of `assigned_devices_deviate` and the request they answer; the dialog
+  // is open while set (REQ-088).
+  const [deviating, setDeviating] = useState<{
+    devices: DeviatingDeviceItem[];
+    body: ListingUpdateInput;
+  } | null>(null);
 
   const formId = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -475,7 +494,12 @@ export function ListingValuesForm({
     setReloading(false);
   }
 
-  function onFailed(error: ApiError) {
+  function onFailed(error: ApiError, body?: ListingUpdateInput) {
+    const devices = deviatingDevicesOf(error);
+    if (devices !== null && body !== undefined) {
+      setDeviating({ devices, body });
+      return;
+    }
     if (error.kind === 'validation') {
       const next: FieldErrors = {};
       for (const { path, message } of error.error?.fields ?? []) next[path] ??= message;
@@ -492,6 +516,13 @@ export function ListingValuesForm({
       showFieldErrors({ [path]: error.error?.message });
       setRejectionShown({ [path]: true });
       if (typeof id === 'number') void reloadAfterRejection(path, id);
+      return;
+    }
+    // The article number belongs to another model listing (AC-REQ-019-04): its text stands at
+    // the field until the article number changes.
+    if (error.kind === 'rejected' && code === 'article_number_taken') {
+      showFieldErrors({ articleNumber: error.error?.message });
+      setRejectionShown({ articleNumber: true });
       return;
     }
     // The variant data match another model listing (AC-REQ-088-02): a rule of the whole form.
@@ -515,10 +546,35 @@ export function ListingValuesForm({
     }
     setErrors({});
     setNotice(null);
-    updateMutation.mutate(bodyOf(current, attributes, base.version), {
+    const body = bodyOf(current, attributes, base.version);
+    updateMutation.mutate(body, {
       onSuccess: onSaved,
-      onError: onFailed,
+      onError: (error) => onFailed(error, body),
     });
+  }
+
+  /** "Änderung trotzdem speichern" of CU-140: the same request with the confirmation. */
+  function confirmDeviatingDevices(onError: (error: ApiError) => void) {
+    if (deviating === null) return;
+    updateMutation.mutate(
+      { ...deviating.body, confirmDeviatingDevices: true },
+      {
+        onSuccess: () => {
+          setDeviating(null);
+          onSaved();
+        },
+        onError,
+      },
+    );
+  }
+
+  /** "Neu laden" of P-05: the form takes the model listing read again (T-1). */
+  function reloaded() {
+    setNotice(null);
+    setErrors({});
+    setRejectionShown({});
+    awaitingReload.current = true;
+    if (listingRef.current !== storedRef.current) takeReloaded(listingRef.current);
   }
 
   return (
@@ -526,15 +582,22 @@ export function ListingValuesForm({
       <SaveNoticeBanners
         notice={notice}
         onClose={() => setNotice(null)}
-        onReloaded={() => {
-          // "Neu laden" of P-05: the form takes the model listing read again (T-1).
-          setNotice(null);
-          setErrors({});
-          setRejectionShown({});
-          awaitingReload.current = true;
-          if (listingRef.current !== storedRef.current) takeReloaded(listingRef.current);
-        }}
+        onReloaded={reloaded}
         errorText={TEXTS.saveError}
+      />
+      <DeviatingDevicesDialog
+        devices={deviating?.devices ?? null}
+        saving={saving}
+        onConfirm={confirmDeviatingDevices}
+        onCancel={() => setDeviating(null)}
+        onRejected={(error) => {
+          setDeviating(null);
+          onFailed(error);
+        }}
+        onReloaded={() => {
+          setDeviating(null);
+          reloaded();
+        }}
       />
       {errors.form && (
         <div role="alert" className="text-body text-error">
@@ -641,7 +704,10 @@ export function ListingValuesForm({
                   {...control}
                   autoComplete="off"
                   value={draft.articleNumber}
-                  onChange={(event) => change({ articleNumber: event.target.value })}
+                  onChange={(event) => {
+                    change({ articleNumber: event.target.value });
+                    endRejection('articleNumber');
+                  }}
                   onBlur={() => checkOnBlur('articleNumber')}
                 />
               )}

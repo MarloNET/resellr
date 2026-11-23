@@ -289,3 +289,21 @@ describe('PriceFields (CU-141, UI-014 "Preis je Kanal")', () => {
     expect(api.reads()).toBe(1);
   });
 });
+
+describe('PriceFields of a model listing without the value of a reactivated required attribute (M-32, 2.5)', () => {
+  it('DER-34-25 "Preis speichern" saves the shop price 499,00 € with only the price, no attribute values, and shows no "<Merkmal> fehlt"', async () => {
+    const api = mockApi(
+      saved(3, [{ channelId: SHOP, amountCents: 49900, vb: false, source: 'manual' }]),
+    );
+    const field = renderFields({ price: null });
+
+    await enterAndLeave(field, '499,00');
+
+    expect(api.sent).toEqual([
+      { path: PRICE_PATH(SHOP), body: { version: 2, amountCents: 49900, vb: false } },
+    ]);
+    expect(field.value).toBe('499,00');
+    expect(errorOf(field)).toBeNull();
+    expect(screen.queryByText(/fehlt$/)).toBeNull();
+  });
+});

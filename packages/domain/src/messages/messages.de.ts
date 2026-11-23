@@ -36,6 +36,11 @@ export const MESSAGES = {
   'M-30': 'Name: 1 bis 100 Zeichen',
   /** UI-030 "Prüfende Stelle", longer than 100 characters after trimming; missing is M-24. */
   'M-31': 'Prüfende Stelle: höchstens 100 Zeichen',
+  /**
+   * An active required attribute without a value, also after it was activated again and when
+   * the change concerns another field (UI-003, UI-007, UI-010, UI-014; 2.5, AC-REQ-005-12).
+   */
+  'M-32': (label: string) => `${label} fehlt`,
 } as const;
 
 /**
@@ -53,7 +58,7 @@ export const FIELD_MESSAGES = {
    * je Datentyp", 8.2): `label` is the current label of the attribute, bounds are formatted with
    * a decimal comma and without thousands separators.
    */
-  attributeValueMissing: (label: string) => `${label} fehlt`,
+  attributeValueMissing: MESSAGES['M-32'],
   attributeValueNumber: (
     label: string,
     kind: 'integer' | 'decimal',
@@ -210,6 +215,12 @@ export const ERROR_MESSAGES = {
     'Datentyp kann nicht geändert werden, weil bereits Werte gespeichert sind.',
   'attribute_has_values.level':
     'Ebene kann nicht geändert werden, weil bereits Werte gespeichert sind.',
+  /**
+   * UI-014.abweichung-bestaetigen "Text" with the number of deviating devices (REQ-088, design
+   * v0.6.1); its title is in `CONFIRMATION_TITLES`.
+   */
+  'confirmation_required.assigned_devices_deviate': (count: string) =>
+    `Nach dieser Änderung weichen ${count} zugeordnete Geräte vom Modell-Inserat ab:`,
   /** UI-007.dublette: text of M-27, its title is in `CONFIRMATION_TITLES` (8.2). */
   'confirmation_required.possible_duplicate':
     'Es gibt bereits eine Modellvorlage mit gleichem Hersteller und gleicher Modellbezeichnung.',
@@ -229,6 +240,11 @@ export const ERROR_MESSAGES = {
   'device_not_available.new_listing': DEVICE_SOLD_OR_CANCELLED,
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
+  /**
+   * UI-007 "Geräteart" of a model template with devices (2.0.6, AC-REQ-010-02); also the reason
+   * at the locked field (`UI-007.disabled`, DER-52-03).
+   */
+  'device_type_in_use.default': 'Geräteart kann nicht geändert werden, weil Geräte erfasst sind',
   'file_too_large.logo': LOGO_FILE_RULE,
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   /** UI-007 "Hersteller", same text as in UI-008 (2.0.11, Nachtrag MAR-904). */
@@ -290,6 +306,8 @@ export const ERROR_MESSAGES = {
  * is the `message` of the answer from `ERROR_MESSAGES`.
  */
 export const CONFIRMATION_TITLES = {
+  /** UI-014.abweichung-bestaetigen (REQ-088, design v0.6.1). */
+  'confirmation_required.assigned_devices_deviate': 'Zugeordnete Geräte weichen ab',
   /** UI-007.dublette (M-27, REQ-011). */
   'confirmation_required.possible_duplicate': 'Mögliche Dublette',
   /** UI-005 "Abweichungen bei Zuordnung" (REQ-018, mockup `default.png`). */

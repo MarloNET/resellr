@@ -142,7 +142,8 @@ function checkArticleNumber(articleNumber: string): string | undefined {
  * validation (field "Artikelnummer" after `article_number_taken`, DER-60-04), error, success
  * (`onAssigned`, UI-014), conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
  * ausgang-unbekannt (P-08). If "Zuordnen" answers `variant_deviation`, the dialog UI-005 opens
- * over it (CU-135, #196); "Abbrechen" there returns here with the choice kept. The rejection with
+ * over it (CU-135, #196); "Abbrechen" there returns here with the choice kept, "Neues
+ * Modell-Inserat anlegen" there creates the model listing as here (#201). The rejection with
  * open review flags (#189) and the mode "umbuchen" (#202) follow.
  */
 export function AssignDialog({ open, onOpenChange, device, onAssigned }: AssignDialogProps) {
@@ -421,6 +422,12 @@ function AssignForm({
           onAssigned={(assignment) => {
             setDeviations(null);
             onAssigned(assignment);
+          }}
+          // "Neues Modell-Inserat anlegen" of UI-005 is the creation of UI-004 with its
+          // rejections (#201): UI-005 closes and this dialog creates and opens UI-014.
+          onCreateListing={() => {
+            setDeviations(null);
+            create();
           }}
         />
       )}
