@@ -166,7 +166,7 @@ Kap. 2.0 legt Regeln fest, die für alle Features gelten. Die Features F-01 bis 
 | --- | --- |
 | Basisadresse | `http://127.0.0.1:<port>`, Port aus `config.json` im Datenordner, Standard `4310` (Baseline 10.1). Die Bindeadresse `127.0.0.1` steht fest im Code (`apps/server/src/http/listen-address.ts`), sie ist kein Konfigurationswert (ADR-002). |
 | Pfade | JSON-API unter `/api/…`. Statische Oberfläche: `/assets/*` (gebündelte Dateien), jeder andere `GET`-Pfad ohne `/api`, `/media`, `/datasheets` oder `/downloads` liefert `index.html` (clientseitiges Routing, Baseline 6.1). Bilder: `/media/photos/{hash}`, `/media/thumbs/{hash}`, `/media/logo/{hash}`; `{hash}` muss `^[0-9a-f]{64}$` entsprechen, sonst `404` **vor** jedem Dateizugriff. Datenblatt: `/datasheets/{token}.pdf`. Foto-ZIP: `/downloads/{token}.zip`. Welche Code-Einheit welchen Pfad bedient, steht bei den Routen-Einheiten in Kap. 4.4 (Regel „ein Pfad, eine Routen-Einheit“ in Kap. 4.1). |
-| Kodierung | UTF-8, `Content-Type: application/json` für Anfragen und Antworten; Uploads `multipart/form-data` mit genau einer Datei je Anfrage. |
+| Kodierung | UTF-8, `Content-Type: application/json` für Anfragen und Antworten; Uploads `multipart/form-data` mit genau einer Datei je Anfrage. Der Server nimmt den ersten Datei-Teil (Feld `file`) und überspringt jeden weiteren Datei-Teil ohne Meldung und ohne Fehlercode (Nachtrag MAR-1333). |
 | Feldnamen | camelCase, englisch. |
 | Kennungen | Ganzzahlen (SQLite `INTEGER PRIMARY KEY`). Fotos und Logo zusätzlich über den SHA-256-Hash (64 Hex-Zeichen, klein). |
 | Zeitpunkte | ISO 8601 in UTC mit Millisekunden, z. B. `2026-11-07T16:05:12.345Z`. Die Oberfläche zeigt sie in Europe/Berlin, Format `TT.MM.JJJJ HH:MM` (REQ-078). |
@@ -598,7 +598,7 @@ Kein Zustandsdiagramm: `batteryPresent` hat zwei Werte, und beide Übergänge la
 | --- | --- | --- | --- |
 | `GET /api/merchant-profile` | – | `brandName, contactText, logo: { hash, url } \| null, version` | – |
 | `PUT /api/merchant-profile` | `version, brandName, contactText` | Profil | `validation_failed`, `version_conflict` |
-| `PUT /api/merchant-profile/logo` | multipart `file` (PNG/JPEG ≤ 5 MB), Feld `version` | Profil | `file_too_large`, `unsupported_media_type` („Logo: nur PNG oder JPEG bis 5 MB“, AC-REQ-028-02) |
+| `PUT /api/merchant-profile/logo` | multipart `file` (PNG/JPEG ≤ 5 MB), Feld `version`; weitere Datei-Teile übersprungen (Kap. 2.0.1, Nachtrag MAR-1333) | Profil | `file_too_large`, `unsupported_media_type` („Logo: nur PNG oder JPEG bis 5 MB“, AC-REQ-028-02) |
 | `DELETE /api/merchant-profile/logo?version=` | – | Profil ohne Logo | `version_conflict` |
 | `GET /api/manufacturers?includeInactive=true` | – | `items[]`: `id, name, active, gpsrComplete, gpsrMissing[], gpsr, version` | – |
 | `POST /api/manufacturers` | `name` | `201` neu, oder `200` mit `existing: true` und dem vorhandenen Hersteller (REQ-100, AC-REQ-100-02) | `manufacturer_deactivated`, `validation_failed` |
@@ -1535,7 +1535,7 @@ sequenceDiagram
 | Methode, Pfad | Anfrage | Antwort | Fehler |
 | --- | --- | --- | --- |
 | `GET /api/listings/{id}/photos` | – | `items[]`: `id, hash, position, originalName, byteSize, url, thumbUrl`; `listingVersion` (v0.5.6) | `not_found` |
-| `POST /api/listings/{id}/photos` | multipart, **eine** Datei je Anfrage, ohne `version` (T-2) | `201 { photo, listingVersion, count }` | `413 file_too_large`, `415 unsupported_media_type` (je „<Datei>: nur JPEG oder PNG bis 20 MB“), `not_found` (Nachtrag MAR-1280), `photo_limit_reached`, `shutting_down` |
+| `POST /api/listings/{id}/photos` | multipart, **eine** Datei je Anfrage (Feld `file`; weitere Datei-Teile übersprungen, Kap. 2.0.1, Nachtrag MAR-1333), ohne `version` (T-2) | `201 { photo, listingVersion, count }` | `413 file_too_large`, `415 unsupported_media_type` (je „<Datei>: nur JPEG oder PNG bis 20 MB“), `not_found` (Nachtrag MAR-1280), `photo_limit_reached`, `shutting_down` |
 | `PUT /api/listings/{id}/photos/order` | `version` (des Modell-Inserats), `photoIds[]` vollständig | `{ items[], listingVersion }` | `validation_failed` (Menge stimmt nicht), `version_conflict` |
 | `DELETE /api/listings/{id}/photos/{photoId}?version=` | – | `{ items[], listingVersion }` | `not_found`, `version_conflict` |
 | `GET /media/photos/{hash}`, `GET /media/thumbs/{hash}` | – | Bilddatei, `Cache-Control: private, max-age=31536000, immutable`; `{hash}` wird vor jedem Dateizugriff gegen `^[0-9a-f]{64}$` geprüft (FIND-218); geliefert, wenn zum Hash eine Zeile in `media_file` besteht und die Datei im Ordner des Pfads liegt, gleich welche `kind` die Zeile trägt (Nachtrag MAR-1294) | `404` |
@@ -5960,9 +5960,20 @@ Unverändert und bewusst nicht in v0.5.2 (Auftrag MAR-218: „Es ändert sich nu
 - **Prüfkriterien Code Review:** (R1) Fall (2) prüft nach jeder Messung jedes Modell-Inserat über `GET /api/listings/{id}`, außerhalb der Messzeit; eine Abweichung ergibt Exit-Code 1. (R2) CU-174 und CU-175 lesen und senden keine Version eines Modell-Inserats.
 - **Keine Owner-Freigabe nötig (Kap. 4.7):** Prüfweg innerhalb eines Tests; Schwellen, Messfälle, Komponenten, Endpunkte und Verhalten bleiben. **Keine Auswirkung auf das Design.**
 
+**Spezifikations-Nachtrag 23.11.2026 (MAR-1333, Hinweis H-1 der QA zu GitHub-Issue #238 in MAR-1298, PR #464):** Upload mit mehr als einem Datei-Teil festgelegt (Kap. 2.0.1, 2.2, 2.11). Keine neue Einheit, kein neuer Endpunkt, kein neuer Fehlercode, keine Migration, kein Diagramm.
+
+- **Ausgangslage:** Kap. 2.0.1 und 2.11 sagen „eine Datei je Anfrage“, nennen aber kein Verhalten für eine Anfrage mit zwei Teilen `file`. `POST /api/listings/{id}/photos` antwortet darauf mit `201` und speichert nur die erste Datei. `PUT /api/merchant-profile/logo` verhält sich seit #167 genauso und hat dafür einen Test („takes exactly one file per upload and skips a second one (2.0.1)“ in `settings.routes.int.test.ts`).
+- **Festlegung:** Bei beiden Upload-Endpunkten nimmt der Server den ersten Datei-Teil, prüft ihn wie bisher und überspringt jeden weiteren Datei-Teil ohne Meldung. Die Antwort beschreibt nur die erste Datei (`201` mit `count` + 1 bzw. `200` mit dem Logo der ersten Datei); die übersprungene Datei wird nicht abgelegt und erzeugt keine Zeile und keinen Protokolleintrag. Heißt der erste Datei-Teil nicht `file`, bleibt es bei `400 bad_request` (Stand des Codes, Kap. 2.0.5 (Nachtrag MAR-240)).
+- **Warum kein Fehlercode:** `web-ui` sendet je Anfrage genau eine Datei (Kap. 2.11 „Mehrere Dateien“, CU-215; beim Logo die eine gewählte Datei, Kap. 2.2); ein zweiter Datei-Teil entsteht also nie durch eine Eingabe des Nutzers. `422 validation_failed` ist für Feldregeln, die der Nutzer verletzen kann, und bräuchte Feld und Text aus dem Meldungskatalog (Kap. 2.0.5). Nur `400 bad_request` käme in Frage. Dafür müsste der Server aber den Rest der Anfrage vor der Transaktion vollständig lesen, nur um einen Fall abzulehnen, den die eigene Oberfläche nicht erzeugen kann; die Anfrage kommt ohnehin nur aus dem eigenen Fenster (`local-guard`, Kap. 2.0.2). Verworfen: (a) `422 validation_failed` (keine Eingabe des Nutzers, kein Feld); (b) `400 bad_request` (Mehraufwand ohne Nutzen, bricht den Logo-Test aus #167); (c) alle Datei-Teile speichern (widerspricht „eine Datei je Anfrage“ und T-2: Fortschritt und Ablehnung je Datei).
+- **Folge für den Backlog (Product Owner):** keine neue Task. (T1) Wer `apps/server/src/media/media.routes.photos.int.test.ts` als Nächstes ändert (voraussichtlich #239), ergänzt den Test analog zum Logo: zwei Teile `file` → `201`, `count` 1, `photo.hash` = Hash der ersten Datei, nur ihre Dateien unter `media/photos` und `media/thumbs`, eine Zeile `media_file`, ein Protokolleintrag `photo_added`.
+- **Prüfkriterium Code Review:** (R1) Kein Upload-Endpunkt speichert mehr als eine Datei je Anfrage oder meldet für weitere Datei-Teile einen Fehler.
+- **Keine Owner-Freigabe nötig (Kap. 4.7):** Festlegung eines nicht beschriebenen Randfalls innerhalb des freigegebenen Verhaltens („eine Datei je Anfrage“, T-2), wie umgesetzt; Komponenten, Endpunkte, Antworten und Fehlercodes bleiben. **Keine Auswirkung auf das Design.**
+
 Weitere Code-Struktur-Nachträge (Kap. 4.7) werden hier mit Datum, Einheit und Grund ergänzt.
 
 ### 10.3 Mermaid-Prüfung
+
+Mermaid-Prüfung Nachtrag MAR-1333: **28/28 Diagramme gültig** (`validate-mermaid.mjs`, ausgeführt am 23.11.2026). Kein Diagramm geändert.
 
 Mermaid-Prüfung Architekturänderung v0.5.6 (MAR-1287): **28/28 Diagramme gültig** (`validate-mermaid.mjs`, ausgeführt am 23.11.2026 über das ganze Dokument). Geändert ist das Diagramm „Foto hochladen“ (Kap. 2.11), neu das Diagramm „Fotos ordnen in zwei Fenstern“ (Kap. 2.11).
 
