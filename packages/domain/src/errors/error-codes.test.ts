@@ -27,6 +27,7 @@ const DOMAIN_CODES: [string, number][] = [
   ['attribute_has_values', 422],
   ['device_not_available', 422],
   ['device_type_deactivated', 422],
+  ['device_type_in_use', 422],
   ['name_taken', 422],
   ['manufacturer_deactivated', 422],
   ['other_model_template', 422],

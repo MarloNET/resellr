@@ -119,6 +119,11 @@ const T14 = {
 
 const PATCH = 'PATCH /api/model-templates/7';
 
+/** `GET /api/model-templates/7/usage` without devices and model listings (CU-295). */
+const UNUSED = { deviceCount: 0, listingCount: 0, deleteBlockedReason: null };
+/** The use with captured devices and model listings: "Geräteart" is locked (#182). */
+const USED = { deviceCount: 2, listingCount: 3, deleteBlockedReason: 'listings_reference' };
+
 const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
   error: { code, message: '', fields: [], details: {}, referenceNumber: null, ...extra },
 });
@@ -127,13 +132,14 @@ type Route = () => Promise<Response> | Response;
 
 /**
  * `fetch` of the page: the frame, the choices, the attributes of the notebook, the values of the
- * keyboard layouts, `GET` and `PATCH /api/model-templates/7` and the list of UI-006 after the
+ * keyboard layouts, `GET` and `PATCH /api/model-templates/7`, its use and the list of UI-006 after the
  * return. The lists can change between reads (`state`). Records the bodies of the writes.
  */
 function mockApi({
   template = () => Response.json(T14),
   update = () => Response.json({ ...T14, version: 4 }),
-}: { template?: Route; update?: Route } = {}) {
+  usage = () => Response.json(UNUSED),
+}: { template?: Route; update?: Route; usage?: Route } = {}) {
   const state = {
     deviceTypes: [NOTEBOOK, TABLET],
     manufacturers: [LENOVO, FUJITSU, APPLE],
@@ -166,6 +172,7 @@ function mockApi({
         return Response.json({ items: state.keyboards, total: state.keyboards.length });
       }
       if (method === 'GET' && url.pathname === '/api/model-templates/7') return template();
+      if (method === 'GET' && url.pathname === '/api/model-templates/7/usage') return usage();
       if (method === 'GET' && url.pathname === '/api/model-templates') {
         return Response.json({ items: [], total: 0 });
       }
@@ -647,5 +654,112 @@ describe('UI-007 changing a model template (CU-114, #181)', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Dieser Eintrag ist nicht mehr vorhanden.',
     );
+  });
+});
+
+describe('UI-007 device type locked by captured devices (CU-114, #182)', () => {
+  const LOCKED_REASON = 'Geräteart kann nicht geändert werden, weil Geräte erfasst sind';
+
+  /** The texts linked to a control with `aria-describedby`. */
+  const descriptionsOf = (control: HTMLElement) =>
+    (control.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent ?? null);
+
+  it('UI-007.disabled DER-52-03 locks "Geräteart" of a model template with devices and names the reason', async () => {
+    mockApi({ usage: () => Response.json(USED) });
+    await openPage();
+
+    const deviceTypeSelect = select('Geräteart');
+    expect(deviceTypeSelect.disabled).toBe(true);
+    expect(shownText(deviceTypeSelect)).toBe('Notebook');
+    expect(descriptionsOf(deviceTypeSelect)).toEqual([LOCKED_REASON]);
+    // The other fields stay open for changes (2.4 "Ändern").
+    expect(select('Hersteller').disabled).toBe(false);
+    expect(textbox('Modellbezeichnung').disabled).toBe(false);
+    expect(saveButton().disabled).toBe(false);
+    expectAccessiblePage();
+  });
+
+  it('UI-007.disabled DER-52-04 reads …/usage and shows neither a row "Verwendung" nor its counts', async () => {
+    const { reads } = mockApi({ usage: () => Response.json(USED) });
+    await openPage();
+
+    expect(reads).toContain('GET /api/model-templates/7/usage');
+    expect(select('Geräteart').disabled).toBe(true);
+    expect(screen.queryByText(/Verwendung/)).toBeNull();
+    // `deviceCount` 2 and `listingCount` 3 are not shown, neither alone nor in a text.
+    expect(screen.queryByText(/^\s*[23]\s*$/)).toBeNull();
+    expect(screen.queryByText(/Geräte: |Modell-Inserate: /)).toBeNull();
+    expect(screen.getByRole('note').textContent).toBe(
+      'Änderungen an Modelldaten wirken auf alle Modell-Inserate und Datenblätter dieser Modellvorlage.',
+    );
+  });
+
+  it('UI-007.default DER-52-04 leaves "Geräteart" open without devices (deviceCount 0)', async () => {
+    const { reads } = mockApi();
+    await openPage();
+
+    expect(reads).toContain('GET /api/model-templates/7/usage');
+    expect(select('Geräteart').disabled).toBe(false);
+    expect(descriptionsOf(select('Geräteart'))).toEqual([]);
+    expect(screen.queryByText(LOCKED_REASON)).toBeNull();
+    expectAccessiblePage();
+  });
+
+  it('UI-007.loading DER-52-04 opens the form only after …/usage has arrived', async () => {
+    mockApi({ usage: pending });
+    renderPage();
+
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', 'Lade Modellvorlage …');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.queryByRole('form')).toBeNull();
+  });
+
+  it('UI-007.disabled a locked "Geräteart" sends the stored device type on saving another change', async () => {
+    const { sent } = mockApi({ usage: () => Response.json(USED) });
+    await openPage();
+
+    fireEvent.change(textbox('Typbezeichnung'), { target: { value: '20W2' } });
+    await save();
+
+    expect(sent).toEqual([expect.objectContaining({ deviceTypeId: 1, typeDesignation: '20W2' })]);
+  });
+
+  it('UI-007.validation AC-REQ-010-02 a device captured meanwhile rejects the new device type with the text at "Geräteart"', async () => {
+    const { sent } = mockApi({
+      update: () =>
+        Response.json(errorBody('device_type_in_use', { message: LOCKED_REASON }), {
+          status: 422,
+        }),
+    });
+    await openPage();
+
+    fireEvent.change(select('Geräteart'), { target: { value: '3' } });
+    // The attributes of the tablet come before the save is possible (2.4, #178).
+    await vi.waitFor(() => expect(saveButton().disabled).toBe(false));
+    await save();
+
+    expect(sent).toEqual([expect.objectContaining({ deviceTypeId: 3 })]);
+    await vi.waitFor(() => expect(errorOf(select('Geräteart'))).toBe(LOCKED_REASON));
+    expect(document.activeElement).toBe(select('Geräteart'));
+    expect(screen.queryByText(/Modellvorlage konnte nicht gespeichert werden/)).toBeNull();
+    expectAccessiblePage();
+  });
+
+  it('UI-007.error shows the error banner when …/usage cannot be read', async () => {
+    mockApi({
+      usage: () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+          status: 500,
+        }),
+    });
+    renderPage();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Referenz: R-7K2M-9QX4');
+    expect(screen.queryByRole('form')).toBeNull();
   });
 });
