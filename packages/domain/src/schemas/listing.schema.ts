@@ -13,8 +13,8 @@ import {
 } from './device.schema.ts';
 
 // Model listing (REQ-017, REQ-019, REQ-032, REQ-088; Technical Specification 2.6, 2.7, 3.3), with
-// #204 the price per channel. Changing the listing values with #206; the uniqueness of a changed
-// article number follows with #200.
+// #204 the price per channel. Changing the listing values with #206, the uniqueness of a changed
+// article number with #200.
 
 /** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
 const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;

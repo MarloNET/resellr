@@ -447,6 +447,38 @@ describe('UI-014.edit Inseratswerte bearbeiten (CU-139, Story #64)', () => {
     expect(document.activeElement).toBe(textbox('Artikelnummer'));
   });
 
+  it('UI-014.validation AC-REQ-019-04 shows "Artikelnummer bereits vergeben" of article_number_taken at the field, focus there, keeps the inputs', async () => {
+    const { sent } = mockApi({
+      update: () =>
+        Response.json(
+          errorBody('article_number_taken', {
+            message: 'Artikelnummer bereits vergeben',
+            details: { path: 'articleNumber' },
+          }),
+          { status: 422 },
+        ),
+    });
+    await openEdit();
+    fireEvent.change(textbox('Artikelnummer'), { target: { value: '626198' } });
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() =>
+      expect(errorOf(textbox('Artikelnummer'))).toBe('Artikelnummer bereits vergeben'),
+    );
+    expect(document.activeElement).toBe(textbox('Artikelnummer'));
+    expect(textbox('Artikelnummer').value).toBe('626198');
+    expect(sent).toHaveLength(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expectAccessibleForm();
+
+    fireEvent.blur(textbox('Artikelnummer'));
+    expect(errorOf(textbox('Artikelnummer'))).toBe('Artikelnummer bereits vergeben');
+
+    fireEvent.change(textbox('Artikelnummer'), { target: { value: '626198-2' } });
+    await vi.waitFor(() => expect(errorOf(textbox('Artikelnummer'))).toBeNull());
+  });
+
   it('UI-014.validation AC-REQ-088-04 rejects the own EAN 4255867000015 at the field EAN and sends 4255867000014', async () => {
     const { sent } = mockApi();
     await openEdit();

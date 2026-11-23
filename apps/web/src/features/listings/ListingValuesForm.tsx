@@ -312,7 +312,8 @@ export interface ListingValuesFormProps {
  * A stored, deactivated condition or pick list value stays chosen and offered with
  * "(deaktiviert)"; after `pick_list_value_deactivated` every changed choice missing after the
  * reload is emptied with its text, without falling back to the stored value (2.0.11, design
- * v0.6.8, DER-64-10, DER-64-11). If assigned devices deviate afterwards, the dialog
+ * v0.6.8, DER-64-10, DER-64-11). A taken article number (`article_number_taken`) shows its text at
+ * the field until the article number changes (AC-REQ-019-04). If assigned devices deviate afterwards, the dialog
  * `UI-014.abweichung-bestaetigen` (CU-140) opens with the request kept for its confirmation;
  * "Abbrechen" there returns with the inputs (DER-64-03). States: validation, speichert, error,
  * conflict (P-05), wird-beendet (P-07); ausgang-unbekannt (P-08) and success stand on the page.
@@ -357,7 +358,7 @@ export function ListingValuesForm({
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState<SaveNotice | null>(null);
-  // Choices that show the text of a rejection until the next choice in the field (v0.6.8).
+  // Fields that show the text of a rejection until the next choice or input there (v0.6.8).
   const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
   // Pick list values rejected as deactivated whose list could not be read again (2.0.11).
   const [droppedValues, setDroppedValues] = useState<ReadonlySet<number>>(new Set());
@@ -515,6 +516,13 @@ export function ListingValuesForm({
       showFieldErrors({ [path]: error.error?.message });
       setRejectionShown({ [path]: true });
       if (typeof id === 'number') void reloadAfterRejection(path, id);
+      return;
+    }
+    // The article number belongs to another model listing (AC-REQ-019-04): its text stands at
+    // the field until the article number changes.
+    if (error.kind === 'rejected' && code === 'article_number_taken') {
+      showFieldErrors({ articleNumber: error.error?.message });
+      setRejectionShown({ articleNumber: true });
       return;
     }
     // The variant data match another model listing (AC-REQ-088-02): a rule of the whole form.
@@ -696,7 +704,10 @@ export function ListingValuesForm({
                   {...control}
                   autoComplete="off"
                   value={draft.articleNumber}
-                  onChange={(event) => change({ articleNumber: event.target.value })}
+                  onChange={(event) => {
+                    change({ articleNumber: event.target.value });
+                    endRejection('articleNumber');
+                  }}
                   onBlur={() => checkOnBlur('articleNumber')}
                 />
               )}
