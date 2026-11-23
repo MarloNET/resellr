@@ -572,9 +572,13 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
      * writes one audit entry `values_updated` with the changed fields (3.6), `keep` in addition
      * `assigned_despite_deviation` with the deviations. `new_listing` stores the values and has
      * CU-123 create the model listing from the stored device in the same transaction (2.6, its
-     * checks and audit entries); the device answered is assigned to the new model listing.
+     * checks and audit entries), with `articleNumber` when set; a rejection rolls all back; the device answered is assigned to the new model listing.
      */
     async update(id: number, input: DeviceUpdateInput): Promise<Device> {
+      // The user interface sends an article number only for "Neues Modell-Inserat anlegen" (2.5).
+      if (input.articleNumber !== undefined && input.deviationDecision !== 'new_listing') {
+        throw new BadRequestError('articleNumber: only with deviationDecision new_listing');
+      }
       const { result } = await uow.run(async (tx) => {
         const settings = createSettingsReader(tx.db);
         const devices = createDeviceRepository(tx.db);
@@ -675,6 +679,8 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           await createListingFromDevice(tx, clock, {
             fromDeviceId: id,
             deviceVersion: stored.version + 1,
+            // CU-123 alone checks whether it is taken (2.6, Nachtrag MAR-1248).
+            articleNumber: input.articleNumber,
           });
         }
         // "Zuordnung behalten": an entry like "trotzdem zuordnen" with its time (the entry's) and

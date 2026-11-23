@@ -410,4 +410,59 @@ test.describe('UI-005 Kontext B: Variantenangabe eines zugeordneten Geräts änd
       ]),
     );
   });
+  test('UI-005.validation the RAM of the device MI-A was created from changed from 16 to 8 GB in UI-010: "Neues Modell-Inserat anlegen" shows the field "Artikelnummer" with its WI-Nr as taken; with "<WI-Nr>-2" it creates the model listing with RAM 8 GB and MI-A has one piece less (Nachtrag MAR-1248)', async ({
+    page,
+    server,
+  }, testInfo) => {
+    const hash = uniqueHash(testInfo.title, testInfo.project.name);
+    const api = apiOf(page, server.baseUrl);
+    const { template, capture, ramId } = await setUpTemplate(api, hash, { ram: true });
+    const ram = String(ramId);
+    // MI-A comes from this device, so its WI-Nr is the article number of MI-A.
+    const wiNr = `A${hash}`.slice(0, 20);
+    const device = await capture(wiNr, '2', { [ram]: '16' });
+    const miA = await api.write<{ id: number }>('/api/listings', {
+      fromDeviceId: device.id,
+      deviceVersion: device.version,
+    });
+    await page.goto(`/geraete/${device.id}`);
+
+    const ramField = page.getByRole('textbox', { name: /^RAM/ });
+    await expect(ramField).toHaveValue('16');
+    await ramField.fill('8');
+    await page.getByRole('button', { name: 'Gerätewerte speichern' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Abweichungen bei Zuordnung' });
+    await dialog.getByRole('button', { name: 'Neues Modell-Inserat anlegen' }).click();
+
+    const articleNumber = dialog.getByRole('textbox', { name: /^Artikelnummer/ });
+    await expect(articleNumber).toHaveValue(wiNr);
+    await expect(articleNumber).toBeFocused();
+    await expect(dialog.getByText('Artikelnummer bereits vergeben')).toBeVisible();
+    // Nothing is stored after article_number_taken (R3).
+    const unchanged = await api.read<{ values: Record<string, unknown>; version: number }>(
+      `/api/devices/${device.id}`,
+    );
+    expect(unchanged.values[ram]).toBe(16);
+
+    await articleNumber.fill(`${wiNr}-2`);
+    await dialog.getByRole('button', { name: 'Neues Modell-Inserat anlegen' }).click();
+
+    await expect(page).toHaveURL(/\/inserate\/\d+$/);
+    const created = Number(new URL(page.url()).pathname.split('/').pop());
+    expect(created).not.toBe(miA.id);
+    const listing = await api.read<{
+      articleNumber: string;
+      variantValues: Record<string, unknown>;
+    }>(`/api/listings/${created}`);
+    expect(listing).toMatchObject({ articleNumber: `${wiNr}-2`, variantValues: { [ram]: 8 } });
+    const listings = await api.read<{ items: { id: number; quantity: number }[] }>(
+      `/api/model-templates/${template.id}/listings`,
+    );
+    expect(listings.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: miA.id, quantity: 0 }),
+        expect.objectContaining({ id: created, quantity: 1 }),
+      ]),
+    );
+  });
 });

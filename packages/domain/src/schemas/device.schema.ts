@@ -135,13 +135,25 @@ export function deviceCreateSchema(
 }
 export type DeviceCreate = z.output<ReturnType<typeof deviceCreateSchema>>;
 
+/** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
+const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
+
+/**
+ * Article number as entered in UI-004 and UI-005 Kontext B (2.5, 2.6, 2.7); `listing.schema.ts`
+ * exports it for the model listing.
+ */
+export const articleNumberSchema = z
+  .string()
+  .regex(ARTICLE_NUMBER_PATTERN, { message: FIELD_MESSAGES.articleNumber });
+
 /**
  * Shape of `PATCH /api/devices/{id}` for the device values of UI-010 (2.5) as the route checks
  * it: a missing field stays unchanged, `values` holds changes (a key overwrites, `null` removes;
  * `mergeAttributeValues`). The rules apply to the state after the change (`deviceValuesSchema`).
  * `deviationDecision` decides on the deviation of an assigned device from its model listing (2.5,
  * UI-005 Kontext B): `keep` stores the values and keeps the assignment, `new_listing` stores them
- * and creates a model listing from the device (2.6); `rebook` with `targetListingId` and
+ * and creates a model listing from the device (2.6), with `articleNumber` instead of the WI-Nr
+ * when set (the rule of `POST /api/listings`); `rebook` with `targetListingId` and
  * `confirmTargetDeviation` (#202) follows.
  */
 export const deviceUpdateBodySchema = z.strictObject({
@@ -152,6 +164,11 @@ export const deviceUpdateBodySchema = z.strictObject({
   values: anyValuesSchema.optional(),
   confirmedKeys: z.array(z.string()),
   deviationDecision: z.enum(['keep', 'new_listing']).optional(),
+  /**
+   * Article number of the new model listing, only with `new_listing` (2.5, Nachtrag MAR-1248),
+   * with the rule and text of `POST /api/listings`.
+   */
+  articleNumber: articleNumberSchema.optional(),
 });
 export type DeviceUpdateInput = z.input<typeof deviceUpdateBodySchema>;
 
