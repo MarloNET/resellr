@@ -6,6 +6,7 @@ import {
   insertModelTemplate,
 } from '../../test/model-templates.ts';
 import { insertPickLists, pickListId } from '../../test/pick-lists.ts';
+import { syncStockColumns } from '../../test/stock.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { initialSchema } from '../db/migrations/20261110_0001_initial_schema.ts';
 import { runMigrations } from '../db/migrator.ts';
@@ -136,6 +137,7 @@ describe('GET /api/model-templates/{id}/usage (CU-295, Technical Specification 2
     const listing = insertListing('626198', { [ids.ram]: 16 });
     insertDevice('626198', { [ids.ram]: 16 }, { listingId: listing });
     insertDevice('626199', { [ids.ram]: 16 });
+    await syncStockColumns(t.database.db);
 
     const response = await get(`/api/model-templates/${ids.mvA}/usage`);
 
@@ -243,6 +245,7 @@ describe('device defaults changed after devices were captured (REQ-010)', () => 
   it('AC-REQ-010-05 after RAM 16 GB → 8 GB in MV-A the captured device keeps 16 GB, MI-A stays unchanged and a device captured afterwards is prefilled with 8 GB', async () => {
     const miA = insertListing('626198', { [ids.ram]: 16 });
     insertDevice('626198', { [ids.ram]: 16 }, { listingId: miA });
+    await syncStockColumns(t.database.db);
     const before = inventoryRows();
     const prefillBefore = (await get(`/api/model-templates/${ids.mvA}/device-prefill`)).json();
     expect(prefillBefore.values).toEqual({ [ids.ram]: 16 });

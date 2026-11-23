@@ -635,6 +635,7 @@ describe('GET /api/devices/unassigned (CU-130, CU-122, Technical Specification 2
     capturedOn(assigned.id, '2026-11-01');
     capturedOn(earlier.id, '2026-11-03');
     update('UPDATE device SET listing_id = ? WHERE id = ?', insertListing(), assigned.id);
+    await syncStockColumns(t.database.db);
 
     const response = await get('/api/devices/unassigned');
 
@@ -662,6 +663,7 @@ describe('GET /api/devices/unassigned (CU-130, CU-122, Technical Specification 2
   it('AC-REQ-094-02 answers an empty list without an unassigned device', async () => {
     const assigned = (await post(body({ wiNr: '700001' }))).json();
     update('UPDATE device SET listing_id = ? WHERE id = ?', insertListing(), assigned.id);
+    await syncStockColumns(t.database.db);
 
     const response = await get('/api/devices/unassigned');
 

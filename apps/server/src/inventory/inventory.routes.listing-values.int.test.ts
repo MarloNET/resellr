@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
+import { syncStockColumns } from '../../test/stock.ts';
 import { createTestApp, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { migrations } from '../db/migrations/index.ts';
 import { runMigrations } from '../db/migrator.ts';
@@ -611,6 +612,7 @@ describe('PATCH /api/listings/{id} deviating assigned devices (CU-124, Technical
     const sold = await captureDevice('626200', '2');
     await assign(sold, miA);
     run("UPDATE device SET stock_status = 'sold', sold_on = '2026-11-17' WHERE id = ?", sold);
+    await syncStockColumns(t.database.db);
 
     const response = await patch(miA, {
       version: 1,
@@ -659,6 +661,7 @@ describe('PATCH /api/listings/{id} deviating assigned devices (CU-124, Technical
   it('asks nothing when no assigned device deviates after the change', async () => {
     const miA = await createListing('626198', '2');
     run("UPDATE device SET stock_status = 'sold', sold_on = '2026-11-17' WHERE wi_nr = '626198'");
+    await syncStockColumns(t.database.db);
 
     const response = await patch(miA, { version: 1, visualGrade: '3' });
 
