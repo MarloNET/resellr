@@ -5,6 +5,7 @@ import { isValidEan } from '../validation/ean.ts';
 import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
 import { centsSchema, dateSchema, idSchema, versionSchema } from './common.schema.ts';
 import {
+  articleNumberSchema,
   conditionDescriptionSchema,
   deviceSchema,
   requiredChoice,
@@ -16,13 +17,11 @@ import {
 // #204 the price per channel. Changing the listing values with #206, the uniqueness of a changed
 // article number with #200.
 
-/** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
-const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
-
-/** Article number as entered in UI-004 (2.6, 2.7). */
-export const articleNumberSchema = z
-  .string()
-  .regex(ARTICLE_NUMBER_PATTERN, { message: FIELD_MESSAGES.articleNumber });
+/**
+ * Article number as entered in UI-004 (2.6, 2.7). Defined beside `deviceUpdateBodySchema`, which
+ * uses it too (UI-005 Kontext B, Nachtrag MAR-1248), as this module imports that one.
+ */
+export { articleNumberSchema };
 
 /** `listing.article_number_key` (3.3): the article number in lower case, unique without case. */
 export const toArticleNumberKey = (articleNumber: string) => articleNumber.toLowerCase();

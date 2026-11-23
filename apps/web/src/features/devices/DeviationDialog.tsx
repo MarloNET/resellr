@@ -1,11 +1,15 @@
 import { CONFIRMATION_TITLES, ERROR_MESSAGES } from '@resellr/domain/messages/messages.de';
-import type { Device, DeviceUpdateInput } from '@resellr/domain/schemas/device.schema';
+import {
+  articleNumberSchema,
+  type Device,
+  type DeviceUpdateInput,
+} from '@resellr/domain/schemas/device.schema';
 import type {
   DeviceAssignment,
   VariantDeviationDetails,
   VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import type { ApiError } from '../../api/api-client.ts';
 import {
@@ -15,6 +19,7 @@ import {
 } from '../../api/inventory.api.ts';
 import { useOpsStatusQuery } from '../../api/ops.api.ts';
 import { useWritesLocked } from '../../api/write-outcome-store.ts';
+import { FormField, useFocusFirstError } from '../../components/forms/FormField.tsx';
 import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
 import { bannerClassName, PageBanner } from '../../components/patterns/PageBanner.tsx';
 import {
@@ -33,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/Dialog.tsx';
+import { Input } from '../../components/ui/Input.tsx';
 import {
   Table,
   TableBody,
@@ -58,6 +64,7 @@ const TEXTS = {
   keepAssignment: 'Zuordnung behalten',
   rebook: 'Umbuchen',
   newListing: 'Neues Modell-Inserat anlegen',
+  articleNumber: 'Artikelnummer',
   cancel: 'Abbrechen',
   error: (referenceNumber: string | null) =>
     `Zuordnung fehlgeschlagen. Referenz: ${referenceNumber ?? '–'}`,
@@ -78,6 +85,8 @@ const DIALOG_REJECTIONS = new Set([
 /** The device of UI-004 the dialog assigns. */
 export interface DeviationDialogDevice {
   id: number;
+  /** First value of the field "Artikelnummer" after `article_number_taken` (Kontext B, 2.5). */
+  wiNr: string;
   /** Version the user saw (2.0.3). */
   version: number;
   modelTemplateId: number;
@@ -87,11 +96,6 @@ interface CommonProps {
   device: DeviationDialogDevice;
   /** "Abbrechen" and Esc: back to the calling screen, nothing is stored (DER-59-02). */
   onClose: () => void;
-  /**
-   * "Neues Modell-Inserat anlegen" (#201); without it the action is shown but not available.
-   * Available only when the device deviates from every model listing of the model template.
-   */
-  onCreateListing?: () => void;
 }
 
 /** Kontext A: "Zuordnen" of UI-004 answered `variant_deviation` (REQ-018). */
@@ -102,6 +106,13 @@ interface AssignmentProps extends CommonProps {
   listingId: number;
   /** After "Trotzdem zuordnen" (`200`): the calling screen closes UI-004 and shows the banner. */
   onAssigned: (assignment: DeviceAssignment) => void;
+  /**
+   * "Neues Modell-Inserat anlegen" (#201): the calling dialog closes UI-005 and creates the model
+   * listing as UI-004, with its rejections, and opens it in UI-014 (UI-005 "wie UI-004"). Without
+   * it the action is shown but not available; available only when the device deviates from every
+   * model listing of the model template (`variant_duplicate` otherwise, AC-REQ-019-02).
+   */
+  onCreateListing?: () => void;
   keep?: never;
 }
 
@@ -116,6 +127,11 @@ export interface KeepAssignment {
   body: DeviceUpdateInput;
   /** After "Zuordnung behalten" (`200`): the calling screen takes the stored device. */
   onKept: (device: Device) => void;
+  /**
+   * After "Neues Modell-Inserat anlegen" (`200`, `deviationDecision: new_listing`): the device is
+   * assigned to the new model listing, which the calling screen opens in UI-014 (#201).
+   */
+  onListingCreated: (device: Device) => void;
   /**
    * A rejection the form of the calling screen shows (field rules, deactivated values, sold
    * meanwhile): the dialog closes and hands it over.
@@ -133,6 +149,7 @@ interface KeepProps extends CommonProps {
   deviations?: never;
   listingId?: never;
   onAssigned?: never;
+  onCreateListing?: never;
 }
 
 export type DeviationDialogProps = AssignmentProps | KeepProps;
@@ -142,6 +159,12 @@ export type DeviationDialogProps = AssignmentProps | KeepProps;
  * dialog as in Kontext A.
  */
 const FORM_ERRORS = new Set<ApiError['kind']>(['validation', 'rejected']);
+
+/** First message of the Zod check in the browser, the same schema as on the server (2.0.7). */
+function checkArticleNumber(articleNumber: string): string | undefined {
+  const result = articleNumberSchema.safeParse(articleNumber);
+  return result.success ? undefined : result.error.issues[0]?.message;
+}
 
 /**
  * Dialog UI-005 "Abweichungen bei Zuordnung" (CU-135, REQ-018, REQ-014; Technical Specification
@@ -155,9 +178,12 @@ const FORM_ERRORS = new Set<ApiError['kind']>(['validation', 'rejected']);
  * so: "Zuordnung behalten" sends the same request with `deviationDecision: keep`, a technical
  * error shows "Speichern nicht möglich. Referenz: <Nr>" (DER-56-05); the data for "Neues
  * Modell-Inserat anlegen" and "Umbuchen" are the rebook targets of the answer, as the stored
- * device differs from the changed one. "Abbrechen" and Esc return to the calling screen. States:
- * default, error, conflict (P-05), unreachable (P-06), wird-beendet (P-07) and ausgang-unbekannt
- * (P-08). "Umbuchen" (#202, #203) and the action "Neues Modell-Inserat anlegen" (#201) follow.
+ * device differs from the changed one; "Neues Modell-Inserat anlegen" sends the same request with
+ * `deviationDecision: new_listing` and hands the device assigned to the new model listing over
+ * (#201); after `article_number_taken` the field "Artikelnummer" shows below the table as in
+ * UI-004 and the action sends `articleNumber` with it (2.5, DG-22, Nachtrag MAR-1248). In Kontext A that action goes to `onCreateListing` of UI-004. "Abbrechen" and Esc return
+ * to the calling screen. States: default, error, conflict (P-05), unreachable (P-06),
+ * wird-beendet (P-07) and ausgang-unbekannt (P-08). "Umbuchen" (#202, #203) follows.
  */
 export function DeviationDialog(props: DeviationDialogProps) {
   const writesLocked = useWritesLocked();
@@ -191,13 +217,43 @@ export function DeviationDialog(props: DeviationDialogProps) {
       );
       return;
     }
+    decide('keep', callbacks);
+  }
+
+  /**
+   * Kontext B: the second `PATCH` with the decision of UI-005 (2.5). For `new_listing` UI-005 shows
+   * the rejections of the creation as UI-004 (2.6, UI-005 "Ablehnung wie UI-004"):
+   * `variant_duplicate` with its text, `article_number_taken` and a field error of the server at
+   * `articleNumber` at the field "Artikelnummer" (Nachtrag MAR-1248); the other errors go as for
+   * "Zuordnung behalten".
+   */
+  function decide(decision: 'keep' | 'new_listing', callbacks: Callbacks, articleNumber?: string) {
     const keep = props.keep;
-    if (keep === null) return;
+    if (keep === null || keep === undefined) return;
     updateMutation.mutate(
-      { ...keep.body, deviationDecision: 'keep' },
       {
-        onSuccess: keep.onKept,
+        ...keep.body,
+        deviationDecision: decision,
+        ...(articleNumber !== undefined && { articleNumber }),
+      },
+      {
+        onSuccess: decision === 'keep' ? keep.onKept : keep.onListingCreated,
         onError: (error) => {
+          if (decision === 'new_listing') {
+            const code = error.kind === 'rejected' ? error.error?.code : undefined;
+            if (code === 'variant_duplicate') {
+              callbacks.onRejection(error.error?.message ?? '');
+              return;
+            }
+            const field =
+              error.kind === 'validation'
+                ? error.error?.fields.find((entry) => entry.path === 'articleNumber')
+                : undefined;
+            if (code === 'article_number_taken' || field) {
+              callbacks.onArticleNumberError?.(field?.message ?? error.error?.message ?? '');
+              return;
+            }
+          }
           if (FORM_ERRORS.has(error.kind)) {
             keep.onRejected(error);
             return;
@@ -218,7 +274,8 @@ export function DeviationDialog(props: DeviationDialogProps) {
               deviations={deviations}
               device={props.device}
               onClose={props.onClose}
-              onCreateListing={props.onCreateListing}
+              onCreateListing={props.onCreateListing && (() => props.onCreateListing?.())}
+              wiNr={props.device.wiNr}
               busy={locked}
               onConfirm={confirm}
             />
@@ -227,7 +284,10 @@ export function DeviationDialog(props: DeviationDialogProps) {
               context="device_values"
               deviations={deviations}
               onClose={props.onClose}
-              onCreateListing={props.onCreateListing}
+              onCreateListing={(callbacks, articleNumber) =>
+                decide('new_listing', callbacks, articleNumber)
+              }
+              wiNr={props.device.wiNr}
               // The changed device against every model listing: the assigned one deviates.
               differsFromAll={(props.keep?.details.rebookTargets ?? []).every(
                 (target) => target.deviations.length > 0,
@@ -247,6 +307,8 @@ interface Callbacks {
   onRejection: (message: string) => void;
   /** Any other error: the banners of P-05 to P-07 or `.error`. */
   onError: (error: ApiError) => void;
+  /** `article_number_taken` or a field error at `articleNumber` (Kontext B, Nachtrag MAR-1248). */
+  onArticleNumberError?: (message: string) => void;
 }
 
 /** Kontext A: the deviations and the model listings with their deviations to the stored device. */
@@ -274,7 +336,13 @@ interface DeviationContentProps {
   context: 'assignment' | 'device_values';
   deviations: VariantDeviationItem[];
   onClose: () => void;
-  onCreateListing?: () => void;
+  /**
+   * "Neues Modell-Inserat anlegen" with the article number of the field, once shown; without it
+   * the action is shown but not available.
+   */
+  onCreateListing?: (callbacks: Callbacks, articleNumber?: string) => void;
+  /** The WI-Nr of the device, the article number sent first. */
+  wiNr: string;
   /** The list read for Kontext A (loading, error, P-06); none in Kontext B. */
   readState?: Pick<ReturnType<typeof useListingDeviationsQuery>, 'isPending' | 'error'>;
   differsFromAll: boolean;
@@ -290,6 +358,7 @@ function DeviationContent({
   deviations,
   onClose,
   onCreateListing,
+  wiNr,
   readState,
   differsFromAll,
   busy,
@@ -298,6 +367,12 @@ function DeviationContent({
 }: DeviationContentProps) {
   const [rejection, setRejection] = useState<string | null>(null);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
+  // `null` until the article number sent is taken (Kontext B); then UI-005 shows the field
+  // "Artikelnummer" as UI-004 until it closes (2.5, DG-22, Nachtrag MAR-1248).
+  const [articleNumber, setArticleNumber] = useState<string | null>(null);
+  const [articleNumberError, setArticleNumberError] = useState<string | undefined>();
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const focusFirstError = useFocusFirstError(fieldRef);
   // The overlay hides the banners of the frame and of the calling screen, so P-06 stands in this
   // dialog as well (Nachtrag MAR-395): for the status of the frame, which it only reads, and its
   // own list.
@@ -309,11 +384,40 @@ function DeviationContent({
   const description = deviations.find(({ key }) => key === 'conditionDescription');
   const rows = deviations.filter(({ key }) => key !== 'conditionDescription');
 
-  function confirm() {
+  /** Sends an action of the dialog; its rejection or error replaces the previous banner. */
+  function send(action: (callbacks: Callbacks) => void) {
     if (busy) return;
     setRejection(null);
     setNotice(null);
-    onConfirm({ onRejection: setRejection, onError: (error) => setNotice(noticeOf(error)) });
+    action({ onRejection: setRejection, onError: (error) => setNotice(noticeOf(error)) });
+  }
+
+  /** "Neues Modell-Inserat anlegen": with the field, its rule is checked before sending. */
+  function create() {
+    if (busy || onCreateListing === undefined || !differsFromAll) return;
+    if (articleNumber !== null) {
+      const message = checkArticleNumber(articleNumber);
+      if (message) {
+        setArticleNumberError(message);
+        focusFirstError();
+        return;
+      }
+    }
+    const sent = articleNumber ?? wiNr;
+    setArticleNumberError(undefined);
+    send((callbacks) =>
+      onCreateListing(
+        {
+          ...callbacks,
+          onArticleNumberError: (message) => {
+            setArticleNumber(sent);
+            setArticleNumberError(message);
+            focusFirstError();
+          },
+        },
+        articleNumber ?? undefined,
+      ),
+    );
   }
 
   return (
@@ -396,6 +500,29 @@ function DeviationContent({
             </div>
           </section>
         )}
+        {articleNumber !== null && (
+          <div ref={fieldRef}>
+            <FormField label={TEXTS.articleNumber} required error={articleNumberError}>
+              {(control) => (
+                <Input
+                  {...control}
+                  value={articleNumber}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setArticleNumber(event.target.value);
+                    setArticleNumberError(undefined);
+                  }}
+                  // Enter = "Neues Modell-Inserat anlegen" (2.5); the field is in no form of its own.
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    create();
+                  }}
+                />
+              )}
+            </FormField>
+          </div>
+        )}
       </DialogBody>
       <DialogFooter>
         <Button type="button" disabled={busy} onClick={onClose}>
@@ -410,11 +537,11 @@ function DeviationContent({
         <Button
           type="button"
           disabled={busy || onCreateListing === undefined || !differsFromAll}
-          onClick={onCreateListing}
+          onClick={create}
         >
           {TEXTS.newListing}
         </Button>
-        <Button type="button" variant="primary" disabled={busy} onClick={confirm}>
+        <Button type="button" variant="primary" disabled={busy} onClick={() => send(onConfirm)}>
           {context === 'assignment' ? TEXTS.assignAnyway : TEXTS.keepAssignment}
         </Button>
       </DialogFooter>

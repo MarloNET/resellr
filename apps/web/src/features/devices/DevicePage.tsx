@@ -13,7 +13,7 @@ import {
 } from '@resellr/domain/schemas/device.schema';
 import { useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import type { ApiError } from '../../api/api-client.ts';
 import { useModelTemplateQuery } from '../../api/catalog.api.ts';
@@ -267,6 +267,7 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
     null;
   const batteryValuesQuery = usePickListValuesQuery(batteryListId);
   const updateMutation = useUpdateDeviceMutation(device.id);
+  const navigate = useNavigate();
   const writesLocked = useWritesLocked();
 
   const attributesDevice: DeviceAttributes | null =
@@ -674,6 +675,8 @@ function DeviceValuesCard({ device }: { device: DeviceDetail }) {
                 setDeviation(null);
                 onSaved(saved);
               },
+              // "Neues Modell-Inserat anlegen" (#201): UI-014 of the new model listing.
+              onListingCreated: ({ listingId }) => void navigate(`/inserate/${listingId}`),
               onRejected: (error) => {
                 setDeviation(null);
                 onFailed(error);
