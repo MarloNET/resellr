@@ -684,6 +684,130 @@ describe('PATCH /api/listings/{id} deviating assigned devices (CU-124, Technical
   });
 });
 
+describe('AC-REQ-005-12 listing values checked on the state after the change (CU-124, Technical Specification 2.5, 2.7)', () => {
+  const patchAttribute = async (id: number, payload: Record<string, unknown>) => {
+    const response = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/attributes/${id}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    return response.json<{ version: number }>().version;
+  };
+  const shopChannel = () => rows("SELECT id FROM channel WHERE code = 'shop'")[0]?.id as number;
+  const storedValues = (listingId: number) => {
+    const row = listingRow(listingId);
+    return {
+      ...JSON.parse(row?.other_device_values as string),
+      ...JSON.parse(row?.variant_values as string),
+    };
+  };
+
+  /** "MI-B": a model listing of MV-A created without RAM while RAM was deactivated. */
+  async function miBWithoutRamAfterReactivation(): Promise<number> {
+    const version = await patchAttribute(ids.ram, { version: 1, active: false });
+    const listingId = await createListing('626198');
+    const variantValues = JSON.parse(listingRow(listingId)?.variant_values as string);
+    delete variantValues[ids.ram];
+    // The device of the listing carries RAM 16; the listing values of MI-B have none, as in the
+    // example of AC-REQ-005-12. The other values come through the API.
+    run(
+      'UPDATE listing SET variant_values = ? WHERE id = ?',
+      JSON.stringify(variantValues),
+      listingId,
+    );
+    await patchAttribute(ids.ram, { version, active: true });
+    return listingId;
+  }
+
+  it('AC-REQ-005-12 saves the Shop price 499,00 € of "MI-B" without RAM value, asking for no RAM value', async () => {
+    const listingId = await miBWithoutRamAfterReactivation();
+
+    const response = await t.app.inject({
+      method: 'PUT',
+      url: `/api/listings/${listingId}/prices/${shopChannel()}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload: { version: 1, amountCents: 49900, vb: false },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      rows('SELECT channel_id, amount_cents FROM listing_price WHERE listing_id = ?', listingId),
+    ).toEqual([{ channel_id: shopChannel(), amount_cents: 49900 }]);
+    expect(storedValues(listingId)).not.toHaveProperty(String(ids.ram));
+  });
+
+  it('AC-REQ-005-12 rejects a change of the article number only of "MI-B" with "RAM fehlt" at variantValues.<id>, stores nothing', async () => {
+    const listingId = await miBWithoutRamAfterReactivation();
+    const audits = auditEntries(listingId).length;
+
+    const response = await patch(listingId, { version: 1, articleNumber: 'MI-B' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toMatchObject({
+      code: 'validation_failed',
+      fields: [{ path: `variantValues.${ids.ram}`, code: 'value_missing', message: 'RAM fehlt' }],
+    });
+    expect(listingRow(listingId)).toMatchObject({ article_number: '626198', version: 1 });
+    expect(auditEntries(listingId)).toHaveLength(audits);
+
+    const saved = await patch(listingId, {
+      version: 1,
+      articleNumber: 'MI-B',
+      variantValues: { [ids.ram]: 16 },
+    });
+    expect(saved.statusCode).toBe(200);
+  });
+
+  it('AC-REQ-005-12 activating RAM writes no RAM value to "MI-B"', async () => {
+    const listingId = await miBWithoutRamAfterReactivation();
+
+    expect(storedValues(listingId)).not.toHaveProperty(String(ids.ram));
+    expect(listingRow(listingId)?.version).toBe(1);
+  });
+
+  it('AC-REQ-005-12 names a missing required value at otherValues.<id> together with the other field errors of the request', async () => {
+    const listingId = await createListing('626198');
+    const version = await patchAttribute(ids.osVersion, { version: 1, required: true });
+    expect(version).toBe(2);
+    const otherValues = JSON.parse(listingRow(listingId)?.other_device_values as string);
+    delete otherValues[ids.osVersion];
+    run(
+      'UPDATE listing SET other_device_values = ? WHERE id = ?',
+      JSON.stringify(otherValues),
+      listingId,
+    );
+
+    const response = await patch(listingId, { version: 1, articleNumber: '' });
+
+    expect(response.statusCode).toBe(422);
+    expect(
+      response
+        .json()
+        .error.fields.map(({ path, message }: { path: string; message: string }) => [
+          path,
+          message,
+        ]),
+    ).toEqual(
+      expect.arrayContaining([
+        [`otherValues.${ids.osVersion}`, 'Betriebssystem-Version fehlt'],
+        ['articleNumber', ARTICLE_NUMBER_RULE],
+      ]),
+    );
+  });
+
+  it('AC-REQ-005-12 keeps the stored value of a deactivated attribute the request does not name', async () => {
+    const listingId = await createListing('626198');
+    await patchAttribute(ids.ram, { version: 1, active: false });
+
+    const response = await patch(listingId, { version: 1, articleNumber: 'MI-B' });
+
+    expect(response.statusCode).toBe(200);
+    expect(storedValues(listingId)[ids.ram]).toBe(16);
+  });
+});
+
 describe('PATCH /api/listings/{id} active entries (CU-124, Technical Specification 2.0.11, T6)', () => {
   it('DER-64-10 rejects a condition changed to a deactivated one with pick_list_value_deactivated at conditionValueId', async () => {
     const listingId = await createListing('626198');

@@ -47,6 +47,7 @@ const EXPECTED_KEYS = [
   'M-26',
   'M-30',
   'M-31',
+  'M-32',
 ];
 
 describe('message catalog (E1)', () => {
@@ -60,7 +61,12 @@ describe('message catalog (E1)', () => {
     );
   });
 
-  it('has exactly the keys M-01 to M-22, M-24 to M-26, M-30 and M-31', () => {
+  it('M-32 names the attribute without a value (AC-REQ-005-12)', () => {
+    expect(MESSAGES['M-32']('RAM')).toBe('RAM fehlt');
+    expect(FIELD_MESSAGES.attributeValueMissing).toBe(MESSAGES['M-32']);
+  });
+
+  it('has exactly the keys M-01 to M-22, M-24 to M-26 and M-30 to M-32', () => {
     expect(Object.keys(MESSAGES)).toEqual(EXPECTED_KEYS);
   });
 
