@@ -104,7 +104,9 @@ export function useUploadPhoto(listingId: number) {
       list === undefined ? list : { items: [...list.items, result.photo], total: result.count },
     );
     void queryClient.invalidateQueries({ queryKey: queryKeys.media.photos(listingId) });
-    void queryClient.invalidateQueries({ queryKey: ['inventory', 'listing', listingId] });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.inventory.listing(listingId, { includeCancelled: false }).slice(0, 3),
+    });
     return result;
   };
 }

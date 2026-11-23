@@ -24,8 +24,6 @@ export interface PhotoUploadQueue {
   add(files: readonly File[]): void;
   /** A file is waiting or uploading. */
   busy: boolean;
-  /** The error that stopped the queue, `null` while it runs or after it has ended normally. */
-  stoppedBy: ApiError | null;
 }
 
 /**
@@ -37,7 +35,6 @@ export interface PhotoUploadQueue {
 export function usePhotoUploadQueue(listingId: number): PhotoUploadQueue {
   const upload = useUploadPhoto(listingId);
   const [entries, setEntries] = useState<UploadEntry[]>([]);
-  const [stoppedBy, setStoppedBy] = useState<ApiError | null>(null);
   const pending = useRef<{ key: number; file: File }[]>([]);
   const running = useRef(false);
   const nextKey = useRef(1);
@@ -62,7 +59,6 @@ export function usePhotoUploadQueue(listingId: number): PhotoUploadQueue {
         if (STOPPING.has(error.kind)) {
           remove(new Set([key, ...pending.current.map((entry) => entry.key)]));
           pending.current = [];
-          setStoppedBy(error);
           break;
         }
         update(key, ({ fileName }) => ({ key, fileName, status: 'failed', error }));
@@ -74,7 +70,6 @@ export function usePhotoUploadQueue(listingId: number): PhotoUploadQueue {
   function add(files: readonly File[]) {
     const added = files.map((file) => ({ key: nextKey.current++, file }));
     pending.current.push(...added);
-    setStoppedBy(null);
     // The rejections of an earlier choice give way to the new files.
     setEntries((list) => [
       ...list.filter((entry) => entry.status !== 'failed'),
@@ -87,6 +82,5 @@ export function usePhotoUploadQueue(listingId: number): PhotoUploadQueue {
     entries,
     add,
     busy: entries.some((entry) => entry.status !== 'failed'),
-    stoppedBy,
   };
 }

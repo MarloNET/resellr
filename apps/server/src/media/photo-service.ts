@@ -44,10 +44,14 @@ export interface PhotoServiceDeps {
  * (CU-129, Nachtrag MAR-1280). Ordering and removing follow with #239.
  */
 export function createPhotoService({ db, fileStore }: PhotoServiceDeps) {
-  /** The row of a photo whose original is stored, or `undefined`. */
+  /**
+   * The row of a photo whose original is stored, or `undefined`. Not bound to `media_file.kind`:
+   * a file stored as the logo first keeps that kind when it is uploaded as a photo (like
+   * `findLogo`).
+   */
   async function findStoredPhoto(hash: string) {
     const row = await createMediaFileRepository(db).findByHash(hash);
-    if (row?.kind !== 'photo') return undefined;
+    if (row === undefined) return undefined;
     const ext = row.ext as MediaExt;
     return (await fileStore.has('photo', hash, ext)) ? { ...row, ext } : undefined;
   }

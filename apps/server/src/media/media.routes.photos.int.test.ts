@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { multipart, sha256, testImages } from '../../test/images.ts';
+import { logoUpload, multipart, sha256, testImages } from '../../test/images.ts';
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { migrations } from '../db/migrations/index.ts';
@@ -287,6 +287,31 @@ describe('POST /api/listings/{id}/photos (CU-204, Technical Specification 2.11)'
       { unreferenced_since: null },
     ]);
     expect(rows('SELECT COUNT(*) AS n FROM media_file WHERE hash = ?', hash)).toEqual([{ n: 1 }]);
+  });
+
+  it('DER-80-07 serves photo and thumbnail of a file that was stored as the logo before', async () => {
+    const listingId = await createListing();
+    const file = await testImages.png();
+    const hash = sha256(file);
+    const logo = logoUpload(1, file);
+    const logoResponse = await t.app.inject({
+      method: 'PUT',
+      url: '/api/merchant-profile/logo',
+      headers: { ...SAME_ORIGIN_WRITE, 'content-type': logo.contentType },
+      payload: logo.payload,
+    });
+    expect(logoResponse.statusCode).toBe(200);
+
+    expect((await upload(listingId, file, 'logo-als-foto.png', 'image/png')).statusCode).toBe(201);
+
+    const get = (url: string) => t.app.inject({ method: 'GET', url, headers: { host: HOST } });
+    const photo = await get(`/media/photos/${hash}`);
+    const thumbnail = await get(`/media/thumbs/${hash}`);
+    expect(photo.statusCode).toBe(200);
+    expect(photo.headers['content-type']).toBe('image/png');
+    expect(photo.rawPayload.equals(file)).toBe(true);
+    expect(thumbnail.statusCode).toBe(200);
+    expect(thumbnail.headers['content-type']).toBe('image/jpeg');
   });
 
   it('answers 404 not_found for an unknown model listing with a valid file; no row and no audit entry (Nachtrag MAR-1280)', async () => {
