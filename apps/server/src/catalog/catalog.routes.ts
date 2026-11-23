@@ -5,6 +5,7 @@ import {
   modelTemplateListSchema,
   modelTemplateSchema,
   modelTemplateSearchTermSchema,
+  modelTemplateUpdateSchema,
 } from '@resellr/domain/schemas/model-template.schema';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Kysely } from 'kysely';
@@ -65,7 +66,8 @@ function toListItem(row: ListRow): ModelTemplateListItem {
 
 /**
  * Catalog routes (CU-109, Technical Specification 2.4): `GET /api/model-templates`,
- * `GET /api/model-templates/{id}` and `POST /api/model-templates`; changing follows with #181.
+ * `GET /api/model-templates/{id}`, `POST /api/model-templates` and
+ * `PATCH /api/model-templates/{id}`.
  * The paths `…/{id}/listings`, `…/{id}/device-prefill` and `…/{id}/usage` belong to CU-130. The
  * reading routes read through the repository CU-106 with the outer `db`, the writing one goes
  * through the service CU-105 and its unit of work (2.0.4).
@@ -104,5 +106,19 @@ export const catalogRoutes: FastifyPluginAsyncZod<CatalogRoutesOptions> = async 
     '/api/model-templates',
     { schema: { body: modelTemplateCreateSchema, response: { 201: modelTemplateSchema } } },
     async (request, reply) => reply.code(201).send(await modelTemplateService.create(request.body)),
+  );
+
+  // The changed model template (REQ-010); the field rules of CU-104 give `422 validation_failed`
+  // before `not_found` and `version_conflict` (2.0.11 order), the service the rest (CU-105).
+  app.patch(
+    '/api/model-templates/:id',
+    {
+      schema: {
+        params: idParams,
+        body: modelTemplateUpdateSchema,
+        response: { 200: modelTemplateSchema },
+      },
+    },
+    async (request) => modelTemplateService.update(request.params.id, request.body),
   );
 };

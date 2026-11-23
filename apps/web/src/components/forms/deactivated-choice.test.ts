@@ -59,6 +59,60 @@ describe('choiceOptions (CU-319, T9)', () => {
   });
 });
 
+describe('choiceOptions with chosenId (CU-319, T14, Nachtrag MAR-1058)', () => {
+  it('offers a chosen, deactivated entry that is not stored without "(deaktiviert)", also with markDeactivated', () => {
+    expect(
+      choiceOptions([WEST, NORD], { storedId: null, chosenId: 3, markDeactivated: true }),
+    ).toEqual([
+      { id: 1, label: 'Lieferant West' },
+      { id: 3, label: 'Lieferant Nord' },
+    ]);
+  });
+
+  it('marks a chosen entry equal to storedId with "(deaktiviert)"', () => {
+    expect(
+      choiceOptions([WEST, NORD], { storedId: 3, chosenId: 3, markDeactivated: true }),
+    ).toEqual([
+      { id: 1, label: 'Lieferant West' },
+      { id: 3, label: 'Lieferant Nord (deaktiviert)' },
+    ]);
+  });
+
+  it('marks a chosen entry held by storedIds with "(deaktiviert)"', () => {
+    expect(
+      choiceOptions([WEST, NORD], {
+        storedId: null,
+        storedIds: [3],
+        chosenId: 3,
+        markDeactivated: true,
+      }),
+    ).toEqual([
+      { id: 1, label: 'Lieferant West' },
+      { id: 3, label: 'Lieferant Nord (deaktiviert)' },
+    ]);
+  });
+
+  it('marks a stored, deactivated entry while another, deactivated entry is chosen', () => {
+    const SUED = { id: 4, label: 'Lieferant Süd', active: false };
+    expect(
+      choiceOptions([WEST, NORD, SUED], { storedId: 3, chosenId: 4, markDeactivated: true }),
+    ).toEqual([
+      { id: 1, label: 'Lieferant West' },
+      { id: 3, label: 'Lieferant Nord (deaktiviert)' },
+      { id: 4, label: 'Lieferant Süd' },
+    ]);
+  });
+
+  it('gives the same result as before without chosenId or with chosenId null', () => {
+    const items = [WEST, NORD, OST];
+    const before = choiceOptions(items, { storedId: 3, markDeactivated: true });
+
+    expect(choiceOptions(items, { storedId: 3, chosenId: null, markDeactivated: true })).toEqual(
+      before,
+    );
+  });
+});
+
 describe('findMissingChoices (CU-319, T9)', () => {
   const field = (overrides: Partial<ChoiceField>): ChoiceField => ({
     path: 'supplierId',

@@ -6,8 +6,7 @@ import { isValidEan } from '../validation/ean.ts';
 import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
 import { idSchema, listResponseSchema, timestampSchema, versionSchema } from './common.schema.ts';
 
-// Model template (REQ-008 to REQ-010; Technical Specification 2.4, 3.3). The field rules for
-// changing follow with #181.
+// Model template (REQ-008 to REQ-010; Technical Specification 2.4, 3.3).
 
 /** Shortest search term of UI-006 after trimming (REQ-009, AC-REQ-009-04). */
 export const MODEL_TEMPLATE_SEARCH_MIN = 2;
@@ -205,6 +204,28 @@ export const modelTemplateCreateSchema = z
   );
 export type ModelTemplateCreateInput = z.input<typeof modelTemplateCreateSchema>;
 export type ModelTemplateCreate = z.output<typeof modelTemplateCreateSchema>;
+
+/**
+ * `PATCH /api/model-templates/{id}` (2.4): the `version` last read and the changes, with the
+ * field rules of `POST`. A missing field stays unchanged, `null` for device type or manufacturer
+ * is a field error (Nachtrag MAR-925); `modelValues` and `defaultDeviceValues` hold changes (a
+ * key overwrites, `null` removes; `mergeAttributeValues`, 2.5). "unbekannt" and the MPN are
+ * checked by CU-105 on the state after the change, as one of them may be missing.
+ */
+export const modelTemplateUpdateSchema = z.strictObject({
+  version: versionSchema,
+  deviceTypeId: modelTemplateCreateSchema.shape.deviceTypeId.optional(),
+  manufacturerId: modelTemplateCreateSchema.shape.manufacturerId.optional(),
+  modelName: modelNameSchema.optional(),
+  typeDesignation: typeDesignationSchema.optional(),
+  mpn: mpnSchema.nullable().optional(),
+  mpnUnknown: z.boolean().optional(),
+  originalEan: originalEanSchema.optional(),
+  modelValues: storedAttributeValuesSchema.optional(),
+  defaultDeviceValues: storedAttributeValuesSchema.optional(),
+});
+export type ModelTemplateUpdateInput = z.input<typeof modelTemplateUpdateSchema>;
+export type ModelTemplateUpdate = z.output<typeof modelTemplateUpdateSchema>;
 
 /**
  * Attribute values of a model template built at run time from the attributes of its device type
