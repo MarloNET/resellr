@@ -28,7 +28,7 @@ import {
   NotFoundError,
   RuleViolation,
 } from '../shared/domain-error.ts';
-import { createDeviceRepository } from './device-repository.ts';
+import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
 import { readableValues, toDevice } from './device-service.ts';
 import { listingDeviations, listVariantAttributes } from './listing-choice-query.ts';
 import { createListingRepository, type ListingRow } from './listing-repository.ts';
@@ -80,12 +80,24 @@ export function splitDeviceValues(attributes: readonly AttributeEntry[], values:
 }
 
 /**
+ * Assigning a device and creating a model listing from it require all review flags lifted
+ * (`captureStatus = checked`, REQ-013, AC-REQ-013-03): else `review_pending` with the flagged
+ * keys in `details.keys`, which UI-004 names.
+ */
+function checkReviewed(device: Pick<DeviceRow, 'capture_status' | 'review_keys'>) {
+  if (device.capture_status === 'checked') return;
+  throw new RuleViolation('review_pending', {
+    details: { keys: JSON.parse(device.review_keys) as string[] },
+  });
+}
+
+/**
  * Assignment service (CU-123, REQ-017 to REQ-020; Technical Specification 2.6): the only place
  * that assigns devices, creates a model listing from a device and rebooks. With #197 creating a
  * model listing from a checked, available device, with #194 assigning a device to an existing
  * model listing of its model template, with #199 leaving the previous model listing on creating,
- * with #196 the deviation check of the assignment; rebooking (#202) and the check of the review
- * flags (#189) follow.
+ * with #196 the deviation check of the assignment, with #189 both only for a checked device;
+ * rebooking (#202) follows.
  */
 export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
   return {
@@ -95,13 +107,13 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
      * writes the audit entry. Order of the checks: the device (`not_found`), the model listing
      * (`400`, a program error of the user interface), the version (`version_conflict`), then the
      * preconditions of 2.6: available (`device_not_available`), not assigned
-     * (`already_assigned`), the same model template (`other_model_template`), then the variant
-     * data (REQ-018): if they deviate after the comparison rule and `confirmDeviation` is not
-     * `true`, `confirmation_required` with `details.kind = variant_deviation` and the deviations;
-     * the first matching stage wins and nothing is stored. Confirmed, the audit entry is
-     * `assigned_despite_deviation` with the deviations (AC-REQ-018-02); the values of the model
-     * listing stay unchanged. `review_pending` (#189) follows. `adjustStockChannels` is the report
-     * of the `StockChanged` handlers, empty until S5.
+     * (`already_assigned`), checked (`review_pending`), the same model template
+     * (`other_model_template`), then the variant data (REQ-018): if they deviate after the
+     * comparison rule and `confirmDeviation` is not `true`, `confirmation_required` with
+     * `details.kind = variant_deviation` and the deviations; the first matching stage wins and
+     * nothing is stored. Confirmed, the audit entry is `assigned_despite_deviation` with the
+     * deviations (AC-REQ-018-02); the values of the model listing stay unchanged.
+     * `adjustStockChannels` is the report of the `StockChanged` handlers, empty until S5.
      */
     async assign(deviceId: number, input: DeviceAssignmentInput): Promise<DeviceAssignment> {
       const request = deviceAssignmentBodySchema.parse(input);
@@ -118,6 +130,7 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
           throw new RuleViolation('device_not_available', { usage: 'assignment' });
         }
         if (device.listing_id !== null) throw new RuleViolation('already_assigned');
+        checkReviewed(device);
         if (device.model_template_id !== listing.model_template_id) {
           throw new RuleViolation('other_model_template');
         }
@@ -173,10 +186,10 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
      * marking `original`, without delivery scope, prices and photos, and the device assigned to it
      * (quantity 1). An assigned device leaves its previous model listing, whose stock is formed
      * anew with `StockChanged` as well (AC-REQ-019-07). Order of the checks (2.0.11): the device
-     * and its version, available, then the variant data against every model listing of the model
-     * template (`variant_duplicate`, AC-REQ-019-02) and the article number
-     * (`article_number_taken`). `ListingCreated` and `StockChanged` have no handler until S5
-     * (4.4.0).
+     * and its version, available, checked (`review_pending`), then the variant data against every
+     * model listing of the model template (`variant_duplicate`, AC-REQ-019-02) and the article
+     * number (`article_number_taken`). `ListingCreated` and `StockChanged` have no handler until
+     * S5 (4.4.0).
      */
     async createFromDevice(input: ListingCreateInput): Promise<Listing> {
       const request = listingCreateBodySchema.parse(input);
@@ -192,6 +205,8 @@ export function createAssignmentService({ uow, clock }: AssignmentServiceDeps) {
         if (device.stock_status !== 'available') {
           throw new RuleViolation('device_not_available', { usage: 'new_listing' });
         }
+        checkReviewed(device);
+
         // A device always has its model template (`NOT NULL`, `ON DELETE RESTRICT`).
         const template = await catalog.findModelTemplate(device.model_template_id);
         if (template === undefined) {

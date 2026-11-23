@@ -260,6 +260,11 @@ export const ERROR_MESSAGES = {
   'placeholder_not_allowed.text_block': '{Baustein:Name} ist im Textbaustein nicht zulässig',
   'placeholder_not_allowed.unknown': (placeholder: string) =>
     `Unbekannter Platzhalter ${placeholder}`,
+  /**
+   * UI-004 "Zuordnen" and "Neues Modell-Inserat anlegen" of a device with open review flags; the
+   * dialog names the flagged values from `details.keys` (2.0.6, 7.3, AC-REQ-013-03).
+   */
+  'review_pending.default': 'Erst Werte prüfen',
   /** UI-033 "Lieferant", a new or changed supplier is deactivated (2.0.11, Nachtrag MAR-904). */
   'supplier_deactivated.condition_code': (name: string) => `Lieferant ${name} ist deaktiviert`,
   /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */

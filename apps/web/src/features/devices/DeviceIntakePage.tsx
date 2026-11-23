@@ -80,6 +80,7 @@ import { cn } from '../../components/ui/cn.ts';
 import { Input } from '../../components/ui/Input.tsx';
 import { Select } from '../../components/ui/Select.tsx';
 import type { SavedNoticeState } from '../models/ModelTemplatePage.tsx';
+import { AssignDialog, type AssignDialogDevice } from './AssignDialog.tsx';
 import {
   clearDeviceIntakeDraft,
   FROM_DEVICE_INTAKE,
@@ -866,6 +867,10 @@ export function DeviceIntakePage() {
   const [summaryShown, setSummaryShown] = useState(false);
   const [notice, setNotice] = useState<SaveNotice | null>(null);
   const [savedWiNr, setSavedWiNr] = useState<string | null>(null);
+  // The device saved with "Speichern und zuordnen" while UI-004 is open for it (DER-55-05).
+  const [assigning, setAssigning] = useState<AssignDialogDevice | null>(null);
+  // Element that triggered "Speichern und zuordnen": the button, or a field for Ctrl+Enter.
+  const assignTriggerRef = useRef<HTMLElement | null>(null);
   // Choices that show the text of a rejection until the next choice in the field (v0.6.8).
   const [rejectionShown, setRejectionShown] = useState<Partial<Record<string, boolean>>>({});
   // A rejected entry whose list could not be read again counts as missing (2.0.11).
@@ -1194,7 +1199,7 @@ export function DeviceIntakePage() {
     setReloading(false);
   }
 
-  /** "Gerät speichern", or with `assign` "Speichern und zuordnen" (UI-004 follows with #189). */
+  /** "Gerät speichern", or with `assign` "Speichern und zuordnen", which then opens UI-004. */
   function save({ assign = false } = {}) {
     // The save checks the fields itself; a later check on leaving must not hide its result.
     blurCheck.cancel();
@@ -1210,6 +1215,12 @@ export function DeviceIntakePage() {
     setErrors({});
     setSummaryShown(false);
     setNotice(null);
+    // The save locks the button and the fields, so the browser moves their focus to `<body>`
+    // before UI-004 opens; closing UI-004 returns it to the trigger instead (CU-058).
+    if (assign) {
+      assignTriggerRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     createMutation.mutate(bodyOf(current, deviceRef.current), {
       onSuccess: (device) => {
         setSavedWiNr(device.wiNr);
@@ -1218,6 +1229,17 @@ export function DeviceIntakePage() {
         // counts, as the server builds the review flags again (DER-54-08, 2.0.11, 2.5).
         if (!assign && nextDeviceRef.current && device.captureStatus === 'checked') {
           emptyForNextDevice();
+        }
+        // UI-004 for the saved device (DER-55-05, 7.3); it rejects a device the server still
+        // flags with "Erst Werte prüfen" (AC-REQ-013-03).
+        if (assign && current.modelTemplate !== null) {
+          setAssigning({
+            id: device.id,
+            version: device.version,
+            wiNr: device.wiNr,
+            modelTemplateId: device.modelTemplateId,
+            modelTemplateLabel: current.modelTemplate.modelName,
+          });
         }
       },
       onError: onFailed,
@@ -1265,11 +1287,15 @@ export function DeviceIntakePage() {
   // Ctrl+S saves the device, Ctrl+Enter saves and assigns (UI-003 "Aktionen").
   const saveRef = useRef(save);
   saveRef.current = save;
+  const assigningRef = useRef(assigning);
+  assigningRef.current = assigning;
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       const ctrl = event.ctrlKey || event.metaKey;
       if (!ctrl || (event.key.toLowerCase() !== 's' && event.key !== 'Enter')) return;
       event.preventDefault();
+      // The device is saved once UI-004 is open; the shortcuts of UI-003 wait (DER-55-05).
+      if (assigningRef.current !== null) return;
       // "Speichern und zuordnen" waits while values are to be reviewed (UI-003.disabled).
       if (event.key === 'Enter' && openReviewKeys(draftRef.current).length > 0) return;
       saveRef.current({ assign: event.key === 'Enter' });
@@ -1706,6 +1732,20 @@ export function DeviceIntakePage() {
           </Button>
         </span>
       </div>
+      {assigning !== null && (
+        <AssignDialog
+          open
+          device={assigning}
+          fieldLabel={fieldOf}
+          returnFocusRef={assignTriggerRef}
+          onOpenChange={(open) => {
+            if (!open) setAssigning(null);
+          }}
+          // The banner "Gerät <WI-Nr> zugeordnet (Stückzahl n)" and the form for the next device
+          // follow with #433 (DER-58-04).
+          onAssigned={() => {}}
+        />
+      )}
     </div>
   );
 }

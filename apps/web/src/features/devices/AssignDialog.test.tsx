@@ -92,6 +92,9 @@ const ASSIGNMENT = {
   adjustStockChannels: [],
 };
 
+/** Labels of the review keys as the calling screen names its fields. */
+const FIELD_LABELS: Record<string, string> = { condition: 'Zustand', '12': 'RAM' };
+
 const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
   error: { code, message: '', fields: [], details: {}, referenceNumber: null, ...extra },
 });
@@ -147,6 +150,7 @@ function renderDialog() {
         <AssignDialog
           open
           device={DEVICE}
+          fieldLabel={(key) => FIELD_LABELS[key] ?? key}
           onOpenChange={onOpenChange}
           onAssigned={({ device, listing }) =>
             setAssigned(assignedText(device.wiNr, listing.quantity))
@@ -367,6 +371,50 @@ describe('UI-004 "Neues Modell-Inserat anlegen" (CU-134, #197)', () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(sent).toEqual([]);
+  });
+});
+
+describe('UI-004 rejection of a device with open review flags (CU-134, #189, REQ-013)', () => {
+  const reviewPending = () =>
+    Response.json(
+      errorBody('review_pending', {
+        message: 'Erst Werte prüfen',
+        details: { keys: ['condition', '12'] },
+      }),
+      { status: 422 },
+    );
+
+  it('AC-REQ-013-03 "Zuordnen" shows "Erst Werte prüfen" naming the flagged values in the dialog; nothing is assigned', async () => {
+    const { sent } = mockApi(withChoice, reviewPending);
+    renderDialog();
+    await choose(0);
+
+    fireEvent.click(assignButton());
+
+    const alert = await within(dialog()).findByRole('alert');
+    expect(alert.textContent).toBe('Erst Werte prüfen: Zustand, RAM');
+    expect(sent).toEqual([{ version: 1, listingId: 9, confirmDeviation: false }]);
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    // UI-004.default: the choice and the actions stay for another try once the values are checked.
+    expect(radios()[0]!.checked).toBe(true);
+    expect(assignButton().disabled).toBe(false);
+    expectAccessibleDialog();
+  });
+
+  it('AC-REQ-013-03 "Neues Modell-Inserat anlegen" shows "Erst Werte prüfen" naming the flagged values in the dialog; nothing is created', async () => {
+    const { sent } = mockApi({}, reviewPending);
+    const router = renderDialog();
+
+    fireEvent.click(createButton());
+
+    const alert = await within(dialog()).findByRole('alert');
+    expect(alert.textContent).toBe('Erst Werte prüfen: Zustand, RAM');
+    expect(sent).toEqual([{ fromDeviceId: 41, deviceVersion: 1 }]);
+    expect(router.state.location.pathname).toBe('/geraete/41');
+    expect(articleNumberInput()).toBeNull();
+    expect(createButton().disabled).toBe(false);
+    expectAccessibleDialog();
   });
 });
 
