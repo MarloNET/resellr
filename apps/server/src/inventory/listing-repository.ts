@@ -147,6 +147,12 @@ export function createListingRepository(db: Kysely<DB>) {
         .executeTakeFirst();
     },
 
+    /** The ids of all model listings in ascending order (CU-129). */
+    async listIds(): Promise<number[]> {
+      const rows = await db.selectFrom('listing').select('id').orderBy('id').execute();
+      return rows.map((row) => row.id);
+    },
+
     /** Writes the listing values of a model listing with its new version (2.7, CU-124). */
     async updateValues(id: number, columns: ListingValueColumns): Promise<void> {
       await db.updateTable('listing').set(columns).where('id', '=', id).executeTakeFirstOrThrow();

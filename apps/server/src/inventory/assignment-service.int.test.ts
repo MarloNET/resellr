@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
+import { syncStockColumns } from '../../test/stock.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { migrations } from '../db/migrations/index.ts';
 import { runMigrations } from '../db/migrator.ts';
@@ -217,8 +218,8 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
     expect(stored).toMatchObject({ quantity: 1, article_number_key: '626198' });
     expect(JSON.parse(stored?.stock_json ?? '')).toEqual({
       quantity: 1,
-      wiNrs: [],
-      batteryText: '',
+      wiNrs: ['626198'],
+      batteryText: '85 %',
     });
     expect(stored?.stock_hash).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -910,6 +911,7 @@ describe('POST /api/devices/{id}/assignment (CU-123, Technical Specification 2.6
       t.database.sqlite
         .prepare("UPDATE device SET stock_status = 'sold' WHERE id = ?")
         .run(device?.id);
+      await syncStockColumns(t.database.db);
 
       const response = await assign(device?.id ?? 0, { version: 2, listingId: miA });
 

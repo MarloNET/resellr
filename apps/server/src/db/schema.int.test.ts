@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { Insertable, Selectable } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { syncStockColumns } from '../../test/stock.ts';
 import { openDatabase, type Database } from './database.ts';
 import { runMigrations } from './migrator.ts';
 import { initialSchema } from './migrations/20261110_0001_initial_schema.ts';
@@ -502,8 +503,9 @@ const ROWS: { [T in keyof DB]: Insertable<DB[T]> } = {
     ean_mode: 'original',
     display_title: 'Lenovo ThinkPad T14',
     quantity: 1,
+    // The stock data of its one available device as CU-128 forms them (DER-65-03).
     stock_json: '{"quantity":1,"wiNrs":["626198"],"batteryText":""}',
-    stock_hash: HASH,
+    stock_hash: '24ffbc7306b213b5d65464e978a416c7672b2bf33463f64034996b4833c3f5b8',
     version: 1,
     created_at: NOW,
     updated_at: NOW,
@@ -671,6 +673,7 @@ describe('constraints of the initial migration (CU-030)', () => {
       .where('id', '=', 1)
       .execute();
     await database.db.insertInto('device').values(second).execute();
+    await syncStockColumns(database.db);
   });
 
   it('treats NULL like 0 in the unique condition code of supplier and no supplier', async () => {

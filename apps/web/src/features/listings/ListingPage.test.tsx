@@ -1,13 +1,15 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { createQueryClient } from '../../app/query-client.ts';
+import { queryKeys } from '../../api/query-keys.ts';
 import { routes } from '../../app/router.tsx';
 
 // Component tests of UI-014 (CU-138) with a mocked `fetch` (Technical Specification 6.1, 6.2):
-// head, listing values, devices and the states of opening a model listing (#198).
+// head, listing values, devices and the states of opening a model listing (#198); the stock data
+// in head and devices on opening and after the answer of an own action (#209).
 
 const OPS_STATUS = {
   dataDirPath: 'C:\\Users\\Beispiel\\AppData\\Local\\resellr\\Daten',
@@ -85,7 +87,7 @@ const LISTING = {
   displayTitle: 'MacBook Pro 13',
   quantity: 1,
   version: 1,
-  stock: { quantity: 1, wiNrs: [], batteryText: '', stockHash: 'ab12' },
+  stock: { quantity: 1, wiNrs: ['626198'], batteryText: '85 %', stockHash: 'ab12' },
   prices: [],
   devices: [
     DEVICE,
@@ -186,9 +188,9 @@ function mockApi(listing: ListingHandler) {
   return { requests };
 }
 
-function renderPage(path = '/inserate/9') {
+function renderPage(path = '/inserate/9', client = createQueryClient()) {
   render(
-    <QueryClientProvider client={createQueryClient()}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />
     </QueryClientProvider>,
   );
@@ -268,6 +270,72 @@ describe('UI-014 Modell-Inserat (CU-138)', () => {
     ]);
     expect(screen.getByRole('link', { name: '626198' }).getAttribute('href')).toBe('/geraete/41');
     expectAccessiblePage('MacBook Pro 13');
+  });
+
+  it('UI-014.loading UI-014.default DER-65-02 shows "Stückzahl n" of the stock data and the devices from GET /api/listings/{id} on opening', async () => {
+    let answer: (response: Response) => void = () => {};
+    mockApi(() => new Promise<Response>((resolve) => (answer = resolve)));
+
+    renderPage();
+
+    expect(await screen.findByRole('status')).toHaveProperty(
+      'textContent',
+      'Lade Modell-Inserat …',
+    );
+    answer(
+      Response.json({
+        ...LISTING,
+        quantity: 2,
+        stock: {
+          quantity: 2,
+          wiNrs: ['626198', '626201'],
+          batteryText: '85–90 %',
+          stockHash: 'cd34',
+        },
+        devices: [
+          ...LISTING.devices,
+          { ...DEVICE, id: 44, wiNr: '626201', batteryCapacity: { percent: 90 } },
+        ],
+      }),
+    );
+
+    expect(await screen.findByText('Notebook · Stückzahl 2 · Artikelnummer 626198')).toBeTruthy();
+    expect(await screen.findByText('verkauft (Shop, 17.11.2026)')).toBeTruthy();
+    expect(deviceRows()).toEqual([
+      ['626198', 'verfügbar', '85 %', '16.11.2026'],
+      ['626199', 'verkauft (Shop, 17.11.2026)', 'nicht ermittelbar', '16.11.2026'],
+      ['626201', 'verfügbar', '90 %', '16.11.2026'],
+    ]);
+    expectAccessiblePage('MacBook Pro 13');
+  });
+
+  it('UI-014.default DER-65-02 shows the new stock data in head and devices after the answer of an own action', async () => {
+    const sold = {
+      ...LISTING,
+      quantity: 0,
+      stock: { quantity: 0, wiNrs: [], batteryText: '', stockHash: 'ef56' },
+      devices: [
+        { ...DEVICE, stockStatus: 'sold', soldChannelId: 1, soldOn: '2026-11-19' },
+        LISTING.devices[1],
+      ],
+    };
+    let current: unknown = LISTING;
+    const { requests } = mockApi(() => Response.json(current));
+    const client = createQueryClient();
+
+    renderPage('/inserate/9', client);
+
+    expect(await screen.findByText('Notebook · Stückzahl 1 · Artikelnummer 626198')).toBeTruthy();
+    // A write action reads the model listing again with its answer (2.0.8, `inventory`).
+    current = sold;
+    await act(() => client.invalidateQueries({ queryKey: queryKeys.inventory.all }));
+
+    expect(await screen.findByText('Notebook · Stückzahl 0 · Artikelnummer 626198')).toBeTruthy();
+    expect(deviceRows()).toEqual([
+      ['626198', 'verkauft (Shop, 19.11.2026)', '85 %', '16.11.2026'],
+      ['626199', 'verkauft (Shop, 17.11.2026)', 'nicht ermittelbar', '16.11.2026'],
+    ]);
+    expect(requests).toEqual(['/api/listings/9', '/api/listings/9']);
   });
 
   it('UI-014.default shows an own EAN as "eigene (Nr)" and the delivery scope by its names', async () => {

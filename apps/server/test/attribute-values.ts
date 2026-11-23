@@ -1,6 +1,7 @@
-import type BetterSqlite3 from 'better-sqlite3';
-
+import type { Database } from '../src/db/database.ts';
+import type { DB } from '../src/db/schema.ts';
 import { pickListId } from './pick-lists.ts';
+import { syncStockColumns } from './stock.ts';
 
 /** Attribute values by column (Technical Specification 3.4); a missing column holds `{}`. */
 export interface StoredValues {
@@ -17,10 +18,11 @@ const STAMP = '2026-11-12T09:00:00.000Z';
  * One model template of `deviceTypeId` with one model listing and one device, holding the given
  * attribute values in their JSON columns (3.4). Model templates, devices and model listings get
  * their services in later build steps (Technical Specification 4.4, S3 and S4); until then tests
- * insert them directly. Needs the pick lists of `insertPickLists`.
+ * insert them directly, the stock columns of the model listing as CU-128 forms them (DER-65-03).
+ * Needs the pick lists of `insertPickLists`.
  */
-export function insertAttributeValueRecords(
-  sqlite: BetterSqlite3.Database,
+export async function insertAttributeValueRecords(
+  { sqlite, db }: Pick<Database<DB>, 'sqlite' | 'db'>,
   values: StoredValues,
   deviceTypeId = 1,
 ) {
@@ -68,4 +70,5 @@ export function insertAttributeValueRecords(
     STAMP,
     STAMP,
   );
+  await syncStockColumns(db);
 }

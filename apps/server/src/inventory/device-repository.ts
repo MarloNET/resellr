@@ -81,12 +81,12 @@ export function createDeviceRepository(db: Kysely<DB>) {
 
     /**
      * The devices assigned to a model listing with what its stock data need (2.8.2, CU-128), by
-     * `assigned_at` and `id`; WI-Nrs and battery capacity follow with #209.
+     * `assigned_at` and `id`.
      */
     async listByListing(listingId: number) {
       return db
         .selectFrom('device')
-        .select(['id', 'stock_status'])
+        .select(['id', 'wi_nr', 'stock_status', 'assigned_at', 'device_values'])
         .where('listing_id', '=', listingId)
         .orderBy('assigned_at')
         .orderBy('id')

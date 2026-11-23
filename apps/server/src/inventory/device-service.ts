@@ -50,6 +50,7 @@ import { readDevicePrefill } from './device-prefill-query.ts';
 import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
 import { listingDeviations, listVariantAttributes } from './listing-choice-query.ts';
 import { createListingRepository } from './listing-repository.ts';
+import { createListingStockUpdater } from './listing-stock-updater.ts';
 
 export interface DeviceServiceDeps {
   uow: UnitOfWorkRunner<DB>;
@@ -569,7 +570,8 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
      * `deviationDecision`, nothing stored. The review flags follow the rule of `POST` against the
      * stored ones (2.5, CU-118). An unchanged request keeps the version; a change of a value
      * writes one audit entry `values_updated` with the changed fields (3.6), `keep` in addition
-     * `assigned_despite_deviation` with the deviations.
+     * `assigned_despite_deviation` with the deviations, and, for an assigned device, forms the
+     * stock columns of its model listing anew, also for `keep` (CU-128; 2.5, Nachtrag MAR-1204).
      */
     async update(id: number, input: DeviceUpdateInput): Promise<Device> {
       const { result } = await uow.run(async (tx) => {
@@ -666,6 +668,9 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
             oldValue: pick(oldFields),
             newValue: pick(newFields),
           });
+          if (stored.listingId !== null) {
+            await createListingStockUpdater(tx).update(stored.listingId);
+          }
         }
         // "Zuordnung behalten": an entry like "trotzdem zuordnen" with its time (the entry's) and
         // the deviations (DER-56-05); the values of the model listing stay unchanged.

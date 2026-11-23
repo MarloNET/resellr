@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insertManufacturer, insertModelTemplate } from '../../test/model-templates.ts';
+import { EMPTY_STOCK_COLUMNS, syncStockColumns } from '../../test/stock.ts';
 import { createTestApp, HOST, SAME_ORIGIN_WRITE } from '../../test/test-app.ts';
 import { migrations } from '../db/migrations/index.ts';
 import { runMigrations } from '../db/migrator.ts';
@@ -167,14 +168,23 @@ describe('POST /api/devices (CU-121, Technical Specification 2.5)', () => {
              condition_description, condition_description_key, variant_values, other_device_values,
              article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
              stock_hash, version, created_at, updated_at)
-           VALUES (?, ?, 3, '', '', '{}', '{}', 'MI-1', 'mi-1', 'original', 'iPhone 13, iOS', 0,
-             '{}', '', 1, ?, ?)`,
+           VALUES (?, ?, 3, '', '', '{}', '{}', 'MI-1', 'mi-1', 'original', 'iPhone 13, iOS', ?,
+             ?, ?, 1, ?, ?)`,
         )
-        .run(ids.mvA, ids.used, STAMP, STAMP).lastInsertRowid,
+        .run(
+          ids.mvA,
+          ids.used,
+          EMPTY_STOCK_COLUMNS.quantity,
+          EMPTY_STOCK_COLUMNS.stock_json,
+          EMPTY_STOCK_COLUMNS.stock_hash,
+          STAMP,
+          STAMP,
+        ).lastInsertRowid,
     );
     sqlite
       .prepare("UPDATE device SET listing_id = ?, stock_status = 'sold', sold_on = ? WHERE id = ?")
       .run(listingId, '2026-11-16', first.id);
+    await syncStockColumns(t.database.db);
 
     const response = await post(body({ wiNr: 'a637607' }));
 
@@ -353,7 +363,7 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
              condition_description, condition_description_key, variant_values, other_device_values,
              article_number, article_number_key, ean_mode, display_title, quantity, stock_json,
              stock_hash, version, created_at, updated_at)
-           VALUES (?, ?, 3, '', '', '{}', '{}', ?, ?, 'original', ?, 0, '{}', '', 1, ?, ?)`,
+           VALUES (?, ?, 3, '', '', '{}', '{}', ?, ?, 'original', ?, ?, ?, ?, 1, ?, ?)`,
         )
         .run(
           modelTemplateId,
@@ -361,6 +371,9 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
           articleNumber,
           articleNumber.toLowerCase(),
           title,
+          EMPTY_STOCK_COLUMNS.quantity,
+          EMPTY_STOCK_COLUMNS.stock_json,
+          EMPTY_STOCK_COLUMNS.stock_hash,
           STAMP,
           STAMP,
         ).lastInsertRowid,
@@ -406,6 +419,7 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
     t.database.sqlite
       .prepare('UPDATE device SET listing_id = ? WHERE id = ?')
       .run(listingId, assigned.id);
+    await syncStockColumns(t.database.db);
 
     const response = await get('/api/devices?wiNr=a6376');
 
@@ -452,6 +466,7 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
     assign.run(listingA, a1.id);
     assign.run(listingB, b1.id);
     assign.run(listingA, a2.id);
+    await syncStockColumns(t.database.db);
 
     const { response, statements } = await getCounted('/api/devices?wiNr=7000');
 
@@ -523,6 +538,7 @@ describe('GET /api/devices?wiNr= (CU-130, CU-122, CU-125, Technical Specificatio
     t.database.sqlite
       .prepare('UPDATE device SET listing_id = ? WHERE id = ?')
       .run(listingId, device.id);
+    await syncStockColumns(t.database.db);
 
     const response = await get('/api/devices?wiNr=6160');
 
