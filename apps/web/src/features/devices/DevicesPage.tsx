@@ -1,8 +1,10 @@
+import { formatDate } from '@resellr/domain/format/format-value';
 import type { DeviceSearchItem } from '@resellr/domain/schemas/device.schema';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 
-import { useDeviceSearchQuery } from '../../api/inventory.api.ts';
+import { type ApiError } from '../../api/api-client.ts';
+import { useDeviceSearchQuery, useUnassignedDevicesQuery } from '../../api/inventory.api.ts';
 import { FormField } from '../../components/forms/FormField.tsx';
 import { PageBanner } from '../../components/patterns/PageBanner.tsx';
 import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.tsx';
@@ -45,24 +47,63 @@ const TEXTS = {
   listing: 'Modell-Inserat',
   stockStatus: 'Bestandsstatus',
   captureStatus: 'Erfassungsstatus',
+  capturedOn: 'Erfassungsdatum',
   intake: 'Gerät einbuchen',
   loading: 'Suche …',
   empty: 'Kein Gerät mit dieser WI-Nr',
+  emptyUnassigned: 'Keine nicht zugeordneten Geräte',
   error: (referenceNumber: string | null) =>
     `Suche fehlgeschlagen. Referenz: ${referenceNumber ?? '–'}`,
 } as const;
 
 /**
  * Tabs of UI-009 by their value of `?reiter=` (Technical Specification 4.2, 7.3); the first one
- * is shown without the parameter. "Nicht zugeordnet" follows with #258.
+ * is shown without the parameter.
  */
-const TABS = [{ key: 'suche', label: 'Suche', search: '' }] as const;
+const TABS = [
+  { key: 'suche', label: 'Suche', search: '' },
+  { key: 'nicht-zugeordnet', label: 'Nicht zugeordnet', search: '?reiter=nicht-zugeordnet' },
+] as const;
 
 /** Wait after the last keystroke before the hits are asked for ("während der Eingabe", C-10). */
 const SEARCH_DELAY_MS = 300;
 
 /** The search term: a part of the WI-Nr from 1 character, none for an empty field (2.5). */
 const searchTermOf = (input: string) => (input.trim() === '' ? undefined : input.trim());
+
+/** The banners of a failed load of a tab: unreachable (P-06) or the error state of UI-009. */
+function LoadErrorBanner({ error }: { error: ApiError | null }) {
+  if (error === null) return null;
+  if (error.kind === 'unreachable') return <UnreachableBanner />;
+  return (
+    <PageBanner variant="error" error={error}>
+      {TEXTS.error}
+    </PageBanner>
+  );
+}
+
+/** A device row that opens UI-010 by its WI-Nr link or a click elsewhere in the row. */
+function DeviceRow({ id, wiNr, children }: { id: number; wiNr: string; children: ReactNode }) {
+  const navigate = useNavigate();
+  const path = `/geraete/${id}`;
+  return (
+    <TableRow
+      className="cursor-pointer focus-within:bg-bg"
+      onClick={(event) => {
+        // The link navigates itself; a click elsewhere in the row opens it too.
+        if ((event.target as HTMLElement).closest('a')) return;
+        void navigate(path);
+      }}
+    >
+      <TableCell>
+        <Link to={path} className="font-semibold text-primary">
+          {wiNr}
+        </Link>
+      </TableCell>
+      {children}
+    </TableRow>
+  );
+}
 
 /** Tab "Suche" of UI-009: search field and hit list with the states of the search. */
 function SearchTab() {
@@ -95,17 +136,9 @@ function SearchTab() {
     if (only && others.length === 0) void navigate(`/geraete/${only.id}`);
   }, [openTerm, searchTerm, data, query.isFetching, query.isError, navigate]);
 
-  const unreachable = query.isError && query.error.kind === 'unreachable';
-  const failed = query.isError && !unreachable ? query.error : null;
-
   return (
     <div role="tabpanel" aria-label="Suche" className="flex flex-col gap-4">
-      {unreachable && <UnreachableBanner />}
-      {failed && (
-        <PageBanner variant="error" error={failed}>
-          {TEXTS.error}
-        </PageBanner>
-      )}
+      <LoadErrorBanner error={query.error} />
 
       <form
         role="search"
@@ -152,30 +185,14 @@ function SearchTab() {
             </tr>
           </TableHeader>
           <TableBody>
-            {data.items.map((item) => {
-              const path = `/geraete/${item.id}`;
-              return (
-                <TableRow
-                  key={item.id}
-                  className="cursor-pointer focus-within:bg-bg"
-                  onClick={(event) => {
-                    // The link navigates itself; a click elsewhere in the row opens it too.
-                    if ((event.target as HTMLElement).closest('a')) return;
-                    void navigate(path);
-                  }}
-                >
-                  <TableCell>
-                    <Link to={path} className="font-semibold text-primary">
-                      {item.wiNr}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{item.modelTemplateLabel}</TableCell>
-                  <TableCell>{item.listing?.title ?? UNASSIGNED_TEXT}</TableCell>
-                  <TableCell>{STOCK_STATUS_LABELS[item.stockStatus]}</TableCell>
-                  <TableCell>{CAPTURE_STATUS_LABELS[item.captureStatus]}</TableCell>
-                </TableRow>
-              );
-            })}
+            {data.items.map((item) => (
+              <DeviceRow key={item.id} id={item.id} wiNr={item.wiNr}>
+                <TableCell>{item.modelTemplateLabel}</TableCell>
+                <TableCell>{item.listing?.title ?? UNASSIGNED_TEXT}</TableCell>
+                <TableCell>{STOCK_STATUS_LABELS[item.stockStatus]}</TableCell>
+                <TableCell>{CAPTURE_STATUS_LABELS[item.captureStatus]}</TableCell>
+              </DeviceRow>
+            ))}
           </TableBody>
         </Table>
       )}
@@ -184,13 +201,57 @@ function SearchTab() {
 }
 
 /**
- * Devices UI-009 (CU-136, REQ-016; Technical Specification 2.5, 7.3): tabs by `?reiter=`, open
+ * Tab "Nicht zugeordnet" of UI-009 (REQ-094): the available devices without model listing with
+ * WI-Nr, model template, capture status and capture date, the oldest first; states loading,
+ * empty (nicht zugeordnet) and error (DER-88-01).
+ */
+function UnassignedTab() {
+  const query = useUnassignedDevicesQuery();
+  const { data } = query;
+
+  return (
+    <div role="tabpanel" aria-label="Nicht zugeordnet" className="flex flex-col gap-4">
+      <LoadErrorBanner error={query.error} />
+
+      {query.isPending && (
+        <p role="status" className="m-0 text-body text-text-secondary">
+          {TEXTS.loading}
+        </p>
+      )}
+      {data && data.items.length === 0 && <p className="m-0 text-body">{TEXTS.emptyUnassigned}</p>}
+      {data && data.items.length > 0 && (
+        <Table aria-label="Nicht zugeordnet">
+          <TableHeader>
+            <tr>
+              <TableHead scope="col">{TEXTS.wiNr}</TableHead>
+              <TableHead scope="col">{TEXTS.modelTemplate}</TableHead>
+              <TableHead scope="col">{TEXTS.captureStatus}</TableHead>
+              <TableHead scope="col">{TEXTS.capturedOn}</TableHead>
+            </tr>
+          </TableHeader>
+          <TableBody>
+            {data.items.map((item) => (
+              <DeviceRow key={item.id} id={item.id} wiNr={item.wiNr}>
+                <TableCell>{item.modelTemplateLabel}</TableCell>
+                <TableCell>{CAPTURE_STATUS_LABELS[item.captureStatus]}</TableCell>
+                <TableCell>{formatDate(item.capturedOn)}</TableCell>
+              </DeviceRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Devices UI-009 (CU-136, REQ-016, REQ-094; Technical Specification 2.5, 7.3): tabs by `?reiter=`, open
  * for more tabs, and "Gerät einbuchen". Tab "Suche": search by a part of the WI-Nr while typing,
  * hits with WI-Nr, model template, model listing or "nicht zugeordnet", inventory and capture
  * status; a row click or Enter on its link opens UI-010, Enter in the search field with exactly
  * one hit opens it too (DER-87-02). States default (focus in the search field), loading,
- * empty (Suche), error and unreachable (P-06, DER-87-04); the tab "Nicht zugeordnet" follows
- * with #258.
+ * empty (Suche), error and unreachable (P-06, DER-87-04). Tab "Nicht zugeordnet" (REQ-094,
+ * #258): the unassigned devices, the oldest first, a row opens UI-010.
  */
 export function DevicesPage() {
   // Read without `useSearchParams`, whose bundled hint names a URL of another host (REQ-079).
@@ -230,6 +291,7 @@ export function DevicesPage() {
       </nav>
 
       {tab.key === 'suche' && <SearchTab />}
+      {tab.key === 'nicht-zugeordnet' && <UnassignedTab />}
     </div>
   );
 }
