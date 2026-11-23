@@ -1,5 +1,11 @@
 import type { FieldError } from '@resellr/domain/errors/error-response';
 import { formatNumber, formatYesNo } from '@resellr/domain/format/format-value';
+import {
+  deviationLine,
+  type VariantDeviation,
+  variantsMatch,
+  type VariantSpec,
+} from '@resellr/domain/inventory/compare-variants';
 import type { ReviewKey } from '@resellr/domain/inventory/device-prefill';
 import { captureStatusOf, remainingReviewKeys } from '@resellr/domain/inventory/review-flags';
 import {
@@ -18,6 +24,7 @@ import {
   toWiNrKey,
 } from '@resellr/domain/schemas/device.schema';
 import type { PickListKey } from '@resellr/domain/schemas/pick-list.schema';
+import type { Kysely } from 'kysely';
 import type { z } from 'zod';
 
 import { createAuditWriter } from '../audit/index.ts';
@@ -33,6 +40,7 @@ import {
 import type { Clock } from '../shared/clock.ts';
 import {
   BadRequestError,
+  ConfirmationRequired,
   ConflictError,
   NotFoundError,
   RuleViolation,
@@ -40,6 +48,7 @@ import {
 } from '../shared/domain-error.ts';
 import { readDevicePrefill } from './device-prefill-query.ts';
 import { createDeviceRepository, type DeviceRow } from './device-repository.ts';
+import { listingDeviations, listVariantAttributes } from './listing-choice-query.ts';
 import { createListingRepository } from './listing-repository.ts';
 
 export interface DeviceServiceDeps {
@@ -86,7 +95,7 @@ const STRUCTURE_CODES = new Set([
  * (`400`, e.g. a value for an attribute of another level), a violated rule a field error, the
  * first one per field, all fields in one answer (`422 validation_failed`).
  */
-function checkedRequest<T>(schema: z.ZodType<T>, input: unknown): T {
+export function checkedRequest<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (result.success) return result.data;
   const issues: z.core.$ZodIssue[] = result.error.issues;
@@ -106,7 +115,7 @@ function checkedRequest<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 
 /** A pick list value in the request and the list it has to come from (2.0.11). */
-interface PickListValueReference {
+export interface PickListValueReference {
   /** Field path like `fields[].path`, e.g. `conditionValueId`, `values.14` (2.0.11). */
   path: string;
   id: number;
@@ -122,14 +131,16 @@ interface PickListValueReference {
  * `positionId`. With `stored` (`PATCH`) only a changed value counts: a condition or choice whose
  * id differs from the stored one, an id of a port entry the stored value of the same attribute
  * does not hold (Nachtrag MAR-904). A value of another shape is left to the schema of CU-067.
+ * The values are at `<prefix>.<id>`, for a model listing `variantValues` and `otherValues` (CU-124).
  */
-function pickListValueReferences(
+export function pickListValueReferences(
   attributes: readonly AttributeEntry[],
   request: { conditionValueId: number | null; values: Readonly<Record<string, unknown>> },
   stored: { conditionValueId: number | null; values: Readonly<Record<string, unknown>> } = {
     conditionValueId: null,
     values: {},
   },
+  prefix = 'values',
 ): PickListValueReference[] {
   const references: PickListValueReference[] = [];
   const { conditionValueId } = request;
@@ -143,7 +154,7 @@ function pickListValueReferences(
   }
   for (const attribute of attributes.filter(({ level }) => level === 'device')) {
     const key = String(attribute.id);
-    const path = `values.${key}`;
+    const path = `${prefix}.${key}`;
     const value = request.values[key];
     const before = stored.values[key];
     if (attribute.dataType === 'pick' && typeof value === 'number' && value !== before) {
@@ -182,7 +193,7 @@ function pickListValueReferences(
  * The referenced pick list values (2.0.11 stage (3)): each must exist in the expected list,
  * otherwise the user interface sent a wrong id (`400 bad_request`; none is ever deleted).
  */
-async function findPickListValues(
+export async function findPickListValues(
   settings: SettingsReader,
   references: readonly PickListValueReference[],
 ): Promise<Map<number, PickListValueEntry>> {
@@ -209,7 +220,7 @@ async function findPickListValues(
  * the usage `.condition` ("Zustand <Wert> ist deaktiviert") or `.attribute` ("<Merkmal>: <Wert>
  * ist deaktiviert") and `details: { path, id }`.
  */
-function checkActivePickListValues(
+export function checkActivePickListValues(
   references: readonly PickListValueReference[],
   values: ReadonlyMap<number, PickListValueEntry>,
 ) {
@@ -369,6 +380,55 @@ export async function readableValues(
 }
 
 /**
+ * The deviation of an assigned device from its model listing after a changed variant value (2.5
+ * "Variantenangabe eines zugeordneten Geräts ändern", UI-005 Kontext B): `undefined` for an
+ * unassigned device, when no variant value changed after the comparison rule (CU-119) or when
+ * the changed device matches its model listing. Otherwise the model listing, the deviations and
+ * the rebook targets: the other model listings of the model template, each with its deviations to
+ * the changed device (empty = matches). The readable texts come from CU-294 (Nachtrag MAR-1136).
+ */
+async function assignedDeviation(
+  db: Kysely<DB>,
+  settings: SettingsReader,
+  deviceTypeId: number,
+  stored: Device,
+  after: VariantSpec,
+) {
+  if (stored.listingId === null) return undefined;
+  const variantAttributes = await listVariantAttributes(settings, deviceTypeId);
+  const before: VariantSpec = { ...stored, values: stored.values as AttributeValues };
+  const ids = variantAttributes.map(({ id }) => id);
+  if (variantsMatch(before, after, ids)) return undefined;
+
+  const rows = await createListingRepository(db).listVariantData([stored.modelTemplateId]);
+  const listing = rows.find(({ id }) => id === stored.listingId);
+  if (listing === undefined) throw new Error(`model listing of device ${stored.id} is missing`);
+  const changed = {
+    condition_value_id: after.conditionValueId,
+    visual_grade: after.visualGrade,
+    condition_description: after.conditionDescription,
+    device_values: JSON.stringify(after.values),
+  };
+  const deviations = await listingDeviations(settings, variantAttributes, changed, listing);
+  if (deviations.length === 0) return undefined;
+  return {
+    listing,
+    deviations,
+    rebookTargets: async () => {
+      const targets: { listingId: number; title: string; deviations: VariantDeviation[] }[] = [];
+      for (const row of rows.filter(({ id }) => id !== listing.id)) {
+        targets.push({
+          listingId: row.id,
+          title: row.display_title,
+          deviations: await listingDeviations(settings, variantAttributes, changed, row),
+        });
+      }
+      return targets;
+    },
+  };
+}
+
+/**
  * Device service (CU-121, REQ-012 to REQ-014; Technical Specification 2.5): creates a device as
  * available, unassigned and with its capture date, together with its audit entry in one
  * transaction (2.0.4). Order of the checks when creating (2.0.11): the model template, the active
@@ -378,7 +438,9 @@ export async function readableValues(
  * review flags neither confirmed nor changed (CU-118), so the capture status is `checked` only
  * without one (AC-REQ-013-04). A known condition code is stored as its entry spells it ("dgs" →
  * "DGS", AC-REQ-015-01), an unknown one as entered. Changing the device values checks the state
- * after the change (2.5); the deviation from the model listing follows with #191.
+ * after the change (2.5) and, for an assigned device, the deviation from its model listing with
+ * the decision `keep` (UI-005 Kontext B, #191); `new_listing` (#201) and `rebook` (#202) follow
+ * and go to CU-123 (FIND-203).
  */
 export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
   return {
@@ -501,9 +563,13 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
      * or cancelled device is read only, `device_not_available`; then `version_conflict`), then
      * the changed pick list values (2.0.11: unknown `400`, deactivated `422`; a stored,
      * deactivated value stays valid), then the rules on the complete state after the change
-     * (CU-067 with the values of the list battery, FIND-362). The review flags follow the rule of
-     * `POST` against the stored ones (2.5, CU-118). An unchanged request keeps the version; a
-     * change of a value writes one audit entry `values_updated` with the changed fields (3.6).
+     * (CU-067 with the values of the list battery, FIND-362), then the question on a changed
+     * variant value of an assigned device that deviates from its model listing (2.5):
+     * `confirmation_required`/`variant_deviation` with `deviations` and `rebookTargets` without
+     * `deviationDecision`, nothing stored. The review flags follow the rule of `POST` against the
+     * stored ones (2.5, CU-118). An unchanged request keeps the version; a change of a value
+     * writes one audit entry `values_updated` with the changed fields (3.6), `keep` in addition
+     * `assigned_despite_deviation` with the deviations.
      */
     async update(id: number, input: DeviceUpdateInput): Promise<Device> {
       const { result } = await uow.run(async (tx) => {
@@ -537,6 +603,25 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
         });
         const after = checkedRequest(schema, changed);
 
+        // After the field rules the question on a deviation from the model listing (2.5): without
+        // a decision nothing is stored; `keep` stores and keeps the assignment (AC-REQ-014-07).
+        const deviation = await assignedDeviation(
+          tx.db,
+          settings,
+          template.deviceTypeId,
+          stored,
+          after,
+        );
+        if (deviation !== undefined && input.deviationDecision === undefined) {
+          throw new ConfirmationRequired('variant_deviation', {
+            usage: 'variant_deviation',
+            details: {
+              deviations: deviation.deviations,
+              rebookTargets: await deviation.rebookTargets(),
+            },
+          });
+        }
+
         const reviewKeys = remainingReviewKeys(
           stored.reviewKeys as ReviewKey[],
           input.confirmedKeys,
@@ -569,16 +654,32 @@ export function createDeviceService({ uow, clock }: DeviceServiceDeps) {
           version: stored.version + 1,
           updated_at: clock.now().toISOString(),
         });
+        const audit = createAuditWriter({ db: tx.db, clock });
         if (changedFields.length > 0) {
           const pick = (fields: Record<string, string | number>) =>
             Object.fromEntries(changedFields.map((field) => [field, fields[field] ?? null]));
-          await createAuditWriter({ db: tx.db, clock }).write({
+          await audit.write({
             objectType: 'device',
             objectId: id,
             objectLabel: objectLabel(stored.wiNr),
             action: 'values_updated',
             oldValue: pick(oldFields),
             newValue: pick(newFields),
+          });
+        }
+        // "Zuordnung behalten": an entry like "trotzdem zuordnen" with its time (the entry's) and
+        // the deviations (DER-56-05); the values of the model listing stay unchanged.
+        if (deviation !== undefined) {
+          await audit.write({
+            objectType: 'device',
+            objectId: id,
+            objectLabel: objectLabel(stored.wiNr),
+            action: 'assigned_despite_deviation',
+            oldValue: null,
+            newValue: {
+              'Modell-Inserat': deviation.listing.display_title,
+              Abweichungen: deviation.deviations.map(deviationLine),
+            },
           });
         }
 

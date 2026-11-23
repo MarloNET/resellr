@@ -40,14 +40,14 @@ export const wiNrSchema = z.string().superRefine((wiNr, context) => {
 export const toWiNrKey = (wiNr: string) => wiNr.toLowerCase();
 
 /** A required choice: `null` is "nothing chosen" and fails with the text of the field (2.0.5). */
-const requiredChoice = (message: string) =>
+export const requiredChoice = (message: string) =>
   idSchema.nullable().refine((id): id is number => id !== null, message);
 
 /**
  * Visual grade (2.5): a whole number 1–5, entered as text or sent as number; one text for
  * missing and wrong (UI-003 `screen.md`). Stored as number.
  */
-const visualGradeSchema = z
+export const visualGradeSchema = z
   .union([z.number(), z.string()])
   .nullable()
   .transform((input, context) => {
@@ -61,7 +61,7 @@ const visualGradeSchema = z
   });
 
 /** Condition description: 0–1,000 characters after trimming (3.3). */
-const conditionDescriptionSchema = z
+export const conditionDescriptionSchema = z
   .string()
   .trim()
   .max(CONDITION_DESCRIPTION_MAX, FIELD_MESSAGES.conditionDescription);
@@ -139,7 +139,9 @@ export type DeviceCreate = z.output<ReturnType<typeof deviceCreateSchema>>;
  * Shape of `PATCH /api/devices/{id}` for the device values of UI-010 (2.5) as the route checks
  * it: a missing field stays unchanged, `values` holds changes (a key overwrites, `null` removes;
  * `mergeAttributeValues`). The rules apply to the state after the change (`deviceValuesSchema`).
- * The decisions on a deviation follow with #191.
+ * `deviationDecision` decides on the deviation of an assigned device from its model listing (2.5,
+ * UI-005 Kontext B): `keep` stores the values and keeps the assignment; `new_listing` (#201) and
+ * `rebook` with `targetListingId` and `confirmTargetDeviation` (#202) follow.
  */
 export const deviceUpdateBodySchema = z.strictObject({
   version: versionSchema,
@@ -148,6 +150,7 @@ export const deviceUpdateBodySchema = z.strictObject({
   conditionDescription: z.string().optional(),
   values: anyValuesSchema.optional(),
   confirmedKeys: z.array(z.string()),
+  deviationDecision: z.enum(['keep']).optional(),
 });
 export type DeviceUpdateInput = z.input<typeof deviceUpdateBodySchema>;
 

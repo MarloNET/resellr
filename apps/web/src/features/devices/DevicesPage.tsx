@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { useDeviceSearchQuery } from '../../api/inventory.api.ts';
 import { FormField } from '../../components/forms/FormField.tsx';
 import { PageBanner } from '../../components/patterns/PageBanner.tsx';
+import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.tsx';
 import { buttonClassName } from '../../components/ui/Button.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import {
@@ -68,6 +69,9 @@ function SearchTab() {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [searchTerm, setSearchTerm] = useState<string | undefined>(undefined);
+  // The term of the last Enter: its hits open the device when there is exactly one (DER-87-02).
+  // A changed input drops it; an error keeps it until "Erneut versuchen" brings an answer.
+  const [openTerm, setOpenTerm] = useState<string | undefined>(undefined);
   const query = useDeviceSearchQuery(searchTerm);
 
   // `Input` passes no ref on, so the page finds the field in a wrapping element.
@@ -81,12 +85,22 @@ function SearchTab() {
     return () => clearTimeout(timer);
   }, [input]);
 
-  // P-06 of the search belongs to the story #87 (DER-87-04, #257).
-  const failed = query.isError && query.error.kind !== 'unreachable' ? query.error : null;
   const data = searchTerm === undefined ? undefined : query.data;
+
+  useEffect(() => {
+    if (openTerm === undefined || openTerm !== searchTerm) return;
+    if (query.isFetching || query.isError || !data) return;
+    setOpenTerm(undefined);
+    const [only, ...others] = data.items;
+    if (only && others.length === 0) void navigate(`/geraete/${only.id}`);
+  }, [openTerm, searchTerm, data, query.isFetching, query.isError, navigate]);
+
+  const unreachable = query.isError && query.error.kind === 'unreachable';
+  const failed = query.isError && !unreachable ? query.error : null;
 
   return (
     <div role="tabpanel" aria-label="Suche" className="flex flex-col gap-4">
+      {unreachable && <UnreachableBanner />}
       {failed && (
         <PageBanner variant="error" error={failed}>
           {TEXTS.error}
@@ -98,7 +112,9 @@ function SearchTab() {
         aria-label={TEXTS.title}
         onSubmit={(event) => {
           event.preventDefault();
-          setSearchTerm(searchTermOf(input));
+          const term = searchTermOf(input);
+          setSearchTerm(term);
+          setOpenTerm(term);
         }}
       >
         <div ref={searchAreaRef} className="w-80 min-w-0">
@@ -108,7 +124,10 @@ function SearchTab() {
                 {...control}
                 type="search"
                 value={input}
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) => {
+                  setInput(event.target.value);
+                  setOpenTerm(undefined);
+                }}
               />
             )}
           </FormField>
@@ -168,9 +187,10 @@ function SearchTab() {
  * Devices UI-009 (CU-136, REQ-016; Technical Specification 2.5, 7.3): tabs by `?reiter=`, open
  * for more tabs, and "Gerät einbuchen". Tab "Suche": search by a part of the WI-Nr while typing,
  * hits with WI-Nr, model template, model listing or "nicht zugeordnet", inventory and capture
- * status; a row click or Enter on its link opens UI-010. States default (focus in the search
- * field), loading, empty (Suche) and error. Enter with exactly one hit and P-06 of the search
- * follow with #257, the tab "Nicht zugeordnet" with #258.
+ * status; a row click or Enter on its link opens UI-010, Enter in the search field with exactly
+ * one hit opens it too (DER-87-02). States default (focus in the search field), loading,
+ * empty (Suche), error and unreachable (P-06, DER-87-04); the tab "Nicht zugeordnet" follows
+ * with #258.
  */
 export function DevicesPage() {
   // Read without `useSearchParams`, whose bundled hint names a URL of another host (REQ-079).

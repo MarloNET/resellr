@@ -1,11 +1,20 @@
 import { z } from 'zod';
 
 import { FIELD_MESSAGES } from '../messages/messages.de.ts';
+import { isValidEan } from '../validation/ean.ts';
+import { type AttributeValueDefinition, attributeValuesSchema } from './attribute-values.schema.ts';
 import { centsSchema, dateSchema, idSchema, versionSchema } from './common.schema.ts';
-import { deviceSchema, STOCK_STATUSES } from './device.schema.ts';
+import {
+  conditionDescriptionSchema,
+  deviceSchema,
+  requiredChoice,
+  STOCK_STATUSES,
+  visualGradeSchema,
+} from './device.schema.ts';
 
-// Model listing (REQ-017, REQ-019, REQ-088; Technical Specification 2.6, 2.7, 3.3). Changing
-// follows with #200 and #206.
+// Model listing (REQ-017, REQ-019, REQ-032, REQ-088; Technical Specification 2.6, 2.7, 3.3), with
+// #204 the price per channel. Changing the listing values with #206; the uniqueness of a changed
+// article number follows with #200.
 
 /** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
 const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
@@ -59,6 +68,75 @@ export const listingSchema = z.object({
   version: versionSchema,
 });
 export type Listing = z.infer<typeof listingSchema>;
+
+/**
+ * Shape of `PATCH /api/listings/{id}` for the listing values of UI-014 (2.7) as the route checks
+ * it: only types, missing and unknown fields (`400 bad_request`); the model data are not part of
+ * it (AC-REQ-088-06). A missing field stays unchanged, `variantValues` and `otherValues` hold
+ * changes (a key overwrites, `null` removes; `mergeAttributeValues`). The rules apply to the
+ * state after the change (`listingValuesSchema`). `confirmDeviatingDevices` takes effect with #207.
+ */
+export const listingUpdateBodySchema = z.strictObject({
+  version: versionSchema,
+  conditionValueId: idSchema.nullable().optional(),
+  visualGrade: z.union([z.number(), z.string()]).nullable().optional(),
+  conditionDescription: z.string().optional(),
+  variantValues: valuesSchema.optional(),
+  otherValues: valuesSchema.optional(),
+  deliveryScopeTextBlockIds: z.array(idSchema).optional(),
+  articleNumber: z.string().optional(),
+  eanMode: z.enum(EAN_MODES).optional(),
+  ownEan: z.string().nullable().optional(),
+  confirmDeviatingDevices: z.boolean().optional(),
+});
+export type ListingUpdateInput = z.input<typeof listingUpdateBodySchema>;
+
+/**
+ * Rules of the listing values (2.7, REQ-088) on the complete state of a model listing after a
+ * change: condition, visual grade and condition description as at the device (2.5), the variant
+ * values by the variant attributes and the other values by the other attributes of the level
+ * device without the battery capacity (CU-067, 2.5 "Geprüft wird der vollständige Stand"), the
+ * article number with the text of `POST /api/listings` and the own EAN, required with the marking
+ * "eigene" and checked with its GS1 check digit (AC-REQ-088-04); with "Original" it becomes `null`.
+ * UI-014 checks its form with it, CU-124 the state after `PATCH /api/listings/{id}`.
+ */
+export function listingValuesSchema({
+  variantAttributes,
+  otherAttributes,
+}: {
+  variantAttributes: readonly AttributeValueDefinition[];
+  otherAttributes: readonly AttributeValueDefinition[];
+}) {
+  return (
+    z
+      .strictObject({
+        conditionValueId: requiredChoice(FIELD_MESSAGES.conditionMissing),
+        visualGrade: visualGradeSchema,
+        conditionDescription: conditionDescriptionSchema,
+        variantValues: attributeValuesSchema(variantAttributes, 'device'),
+        otherValues: attributeValuesSchema(otherAttributes, 'device'),
+        deliveryScopeTextBlockIds: z.array(idSchema),
+        articleNumber: articleNumberSchema,
+        eanMode: z.enum(EAN_MODES),
+        ownEan: z.string().nullable(),
+      })
+      // Beside the field errors of the other fields, so all come in one answer (2.5 "Ablehnung").
+      .superRefine(
+        ({ eanMode, ownEan }, context) => {
+          if (eanMode === 'own' && (typeof ownEan !== 'string' || !isValidEan(ownEan))) {
+            context.addIssue({ code: 'custom', path: ['ownEan'], message: FIELD_MESSAGES.ownEan });
+          }
+        },
+        { when: () => true },
+      )
+      .transform((values) => ({
+        ...values,
+        ownEan: values.eanMode === 'own' ? values.ownEan : null,
+      }))
+  );
+}
+export type ListingValues = z.output<ReturnType<typeof listingValuesSchema>>;
+export type ListingValuesInput = z.input<ReturnType<typeof listingValuesSchema>>;
 
 /**
  * The variant data of a model listing as UI-004 lists them (2.6, 2.14 `variantSummary`):
@@ -122,12 +200,24 @@ export type DeviceAssignmentInput = z.input<typeof deviceAssignmentBodySchema>;
 
 /**
  * `details` of `422 confirmation_required` with `kind: variant_deviation` (2.6, REQ-018): the
- * deviations of the device from the chosen model listing that UI-005 shows.
+ * deviations of the device from the chosen model listing that UI-005 shows. `PATCH
+ * /api/devices/{id}` (2.5, Kontext B) adds `rebookTargets`: the other model listings of the model
+ * template, each with its deviations to the changed device (empty = matches).
  */
 export const variantDeviationDetailsSchema = z.object({
   kind: z.literal('variant_deviation'),
   deviations: z.array(variantDeviationSchema),
+  rebookTargets: z
+    .array(
+      z.object({
+        listingId: idSchema,
+        title: z.string(),
+        deviations: z.array(variantDeviationSchema),
+      }),
+    )
+    .optional(),
 });
+export type VariantDeviationDetails = z.infer<typeof variantDeviationDetailsSchema>;
 
 /**
  * The answer of an assignment (2.6): the device, the new quantity of its model listing and the
@@ -150,6 +240,44 @@ export const listingDetailQuerySchema = z.strictObject({
 
 /** Source of a price (2.7): entered by the user or derived by a price rule (from S5). */
 export const PRICE_SOURCES = ['manual', 'rule'] as const;
+
+/** A price of a model listing for one channel (2.7, 3.3 `listing_price`). */
+export const listingPriceSchema = z.object({
+  channelId: idSchema,
+  amountCents: centsSchema,
+  vb: z.boolean(),
+  source: z.enum(PRICE_SOURCES),
+});
+export type ListingPrice = z.infer<typeof listingPriceSchema>;
+
+/**
+ * A price in whole cents above 0 (2.7, AC-REQ-032-03): "12,345" arrives as `1234.5` and breaks
+ * the rule like 0, so the check is a field rule (`422`) and not a type check (`400`).
+ */
+export const priceAmountSchema = z
+  .number()
+  .refine((cents) => Number.isSafeInteger(cents) && cents > 0, { message: FIELD_MESSAGES.price });
+
+/**
+ * `PUT /api/listings/{id}/prices/{channelId}` (2.7, REQ-032): the version of the model listing
+ * the user saw, the price in cents and the flag VB, only for channels with `vbAllowed`.
+ */
+export const listingPriceBodySchema = z.strictObject({
+  version: versionSchema,
+  amountCents: priceAmountSchema,
+  vb: z.boolean(),
+});
+export type ListingPriceInput = z.input<typeof listingPriceBodySchema>;
+
+/**
+ * The answer of `PUT /api/listings/{id}/prices/{channelId}` (2.7): the new version of the model
+ * listing and the prices of all channels, as price rules can change several (from S5).
+ */
+export const listingPricesSchema = z.object({
+  listing: z.object({ version: versionSchema }),
+  prices: z.array(listingPriceSchema),
+});
+export type ListingPrices = z.infer<typeof listingPricesSchema>;
 
 /** The stored battery capacity of a device (3.4): a percentage or "nicht ermittelbar". */
 const batteryCapacitySchema = z.union([
@@ -185,14 +313,7 @@ export const listingDetailSchema = listingSchema.extend({
     batteryText: z.string(),
     stockHash: z.string(),
   }),
-  prices: z.array(
-    z.object({
-      channelId: idSchema,
-      amountCents: centsSchema,
-      vb: z.boolean(),
-      source: z.enum(PRICE_SOURCES),
-    }),
-  ),
+  prices: z.array(listingPriceSchema),
   devices: z.array(listingDeviceSchema),
   deliveryScope: z.array(z.object({ id: idSchema, name: z.string() })),
 });

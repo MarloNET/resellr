@@ -13,6 +13,10 @@ import {
   type ListingChoice,
   type ListingCreateInput,
   type ListingDetail,
+  type ListingUpdateInput,
+  type ListingPriceInput,
+  type ListingPrices,
+  type VariantDeviationDetails,
   variantDeviationDetailsSchema,
   type VariantDeviationItem,
 } from '@resellr/domain/schemas/listing.schema';
@@ -22,8 +26,8 @@ import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
 
 // Hooks of the devices of F-05 and the model listings of F-06 and F-07 (CU-131, Technical
-// Specification 2.5 to 2.7). The unassigned devices (#258) and the other model listing hooks
-// follow.
+// Specification 2.5 to 2.7), with #204 the price per channel. The unassigned devices (#258) and
+// the other model listing hooks follow.
 
 /**
  * Hits of the device search of UI-009 (`GET /api/devices?wiNr=`, REQ-016): the first page of
@@ -106,8 +110,9 @@ export function useCreateListingMutation() {
 }
 
 /**
- * "Gerätewerte speichern" of UI-010 (`PATCH /api/devices/{id}`, 2.5): on success the device of
- * the page takes the answer, and the hit lists of the search are read again (capture status).
+ * "Gerätewerte speichern" of UI-010 (`PATCH /api/devices/{id}`, 2.5) and "Zuordnung behalten" of
+ * UI-005 Kontext B (`deviationDecision: keep`): on success the device of the page takes the
+ * answer, and the hit lists of the search are read again (capture status).
  */
 export function useUpdateDeviceMutation(id: number) {
   const queryClient = useQueryClient();
@@ -155,6 +160,19 @@ export function useListingQuery(id: number | null, { includeCancelled = false } 
 }
 
 /**
+ * "Speichern" of the listing values in `UI-014.edit` (`PATCH /api/listings/{id}`, 2.7): on success
+ * the model listing is read again, with the names of its delivery scope, and the model listings
+ * to choose from in UI-004 with their variant data.
+ */
+export function useUpdateListingMutation(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation<Listing, ApiError, ListingUpdateInput>({
+    mutationFn: (body) => apiClient.patch<Listing>(`/api/listings/${id}`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
+  });
+}
+
+/**
  * The model listings of a model template with their deviations to a device for UI-005
  * (`GET /api/model-templates/{id}/listings?deviceId=`, 2.6).
  */
@@ -174,9 +192,18 @@ export function useListingDeviationsQuery(modelTemplateId: number, deviceId: num
  * variant_deviation`, REQ-018; 2.6) from a failed assignment; `null` for any other error.
  */
 export function variantDeviationsOf(error: ApiError): VariantDeviationItem[] | null {
+  return variantDeviationDetailsOf(error)?.deviations ?? null;
+}
+
+/**
+ * `details` of deviating variant data (`422 confirmation_required`, `details.kind:
+ * variant_deviation`): with "Gerätewerte speichern" also the rebook targets (2.5, UI-005
+ * Kontext B); `null` for any other error.
+ */
+export function variantDeviationDetailsOf(error: ApiError): VariantDeviationDetails | null {
   if (error.kind !== 'confirmation-required') return null;
   const details = variantDeviationDetailsSchema.safeParse(error.error?.details);
-  return details.success ? details.data.deviations : null;
+  return details.success ? details.data : null;
 }
 
 /**
@@ -193,4 +220,26 @@ export function useAssignDeviceMutation() {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all }),
     },
   );
+}
+
+/**
+ * "Preis speichern" of a channel in UI-014 (`PUT /api/listings/{id}/prices/{channelId}`, 2.7): the
+ * answer holds the prices of all channels and the new version, which the cached model listing
+ * takes over without reading it again (DER-62-04).
+ */
+export function useSaveListingPriceMutation(listingId: number) {
+  const queryClient = useQueryClient();
+  return useMutation<ListingPrices, ApiError, { channelId: number; body: ListingPriceInput }>({
+    mutationFn: ({ channelId, body }) =>
+      apiClient.put<ListingPrices>(`/api/listings/${listingId}/prices/${channelId}`, body),
+    onSuccess: ({ listing, prices }) => {
+      queryClient.setQueriesData<ListingDetail>(
+        {
+          queryKey: queryKeys.inventory.listing(listingId, { includeCancelled: false }).slice(0, 3),
+        },
+        (previous) =>
+          previous === undefined ? previous : { ...previous, version: listing.version, prices },
+      );
+    },
+  });
 }
