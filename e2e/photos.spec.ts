@@ -119,7 +119,7 @@ test.describe('UI-015 Fotos verwalten (CU-214, CU-215)', () => {
     test.skip(!FRAME_ROWS.includes(testInfo.project.name), 'full frame only');
   });
 
-  test('UI-015.empty UI-015.default DER-80-01 DER-80-02 AC-REQ-042-02 "Fotos verwalten" opens UI-015; chosen files are uploaded one after the other, a GIF is rejected at its file; "Fertig" leads back to UI-014', async ({
+  test('AC-REQ-042-02 UI-015.empty UI-015.default DER-80-01 DER-80-02 "Fotos verwalten" opens UI-015; chosen files are uploaded one after the other, a GIF is rejected at its file; "Fertig" leads back to UI-014', async ({
     page,
     server,
   }, testInfo) => {

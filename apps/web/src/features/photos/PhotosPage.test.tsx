@@ -279,7 +279,7 @@ describe('UI-015 Fotos verwalten (CU-214, CU-215)', () => {
       'Höchstens 20 Fotos je Modell-Inserat',
     ],
   ])(
-    'UI-015.validation %s shows the reason at the file and adds nothing',
+    '%s: UI-015.validation shows the reason at the file and adds nothing',
     async (_, name, status, code, message) => {
       mockApi(listOf(TWO_PHOTOS));
       await renderPage();
