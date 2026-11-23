@@ -11,6 +11,7 @@ export const ERROR_CODES = {
   confirmation_required: 422,
   device_not_available: 422,
   device_type_deactivated: 422,
+  device_type_in_use: 422,
   file_too_large: 413,
   forbidden_host: 403,
   forbidden_origin: 403,

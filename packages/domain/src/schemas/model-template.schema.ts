@@ -98,6 +98,18 @@ export const modelTemplateSchema = z.object({
 });
 export type ModelTemplate = z.infer<typeof modelTemplateSchema>;
 
+/**
+ * `GET /api/model-templates/{id}/usage` (2.4, CU-295): the devices of any stock status and the
+ * model listings of the model template, and the reason a deletion is refused, model listings
+ * before devices, `null` without one (2.4 "Rangfolge der Gründe").
+ */
+export const modelTemplateUsageSchema = z.object({
+  deviceCount: z.number().int().nonnegative(),
+  listingCount: z.number().int().nonnegative(),
+  deleteBlockedReason: z.enum(['listings_reference', 'devices_reference']).nullable(),
+});
+export type ModelTemplateUsage = z.infer<typeof modelTemplateUsageSchema>;
+
 /** Longest model name after trimming (3.3, REQ-008). */
 export const MODEL_NAME_MAX = 100;
 /** Longest type designation after trimming (3.3, REQ-008). */
