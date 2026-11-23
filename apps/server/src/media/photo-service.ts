@@ -47,7 +47,7 @@ export function createPhotoService({ db, fileStore }: PhotoServiceDeps) {
   /**
    * The row of a photo whose original is stored, or `undefined`. Not bound to `media_file.kind`:
    * a file stored as the logo first keeps that kind when it is uploaded as a photo (like
-   * `findLogo`).
+   * `findLogo`; Nachtrag MAR-1294).
    */
   async function findStoredPhoto(hash: string) {
     const row = await createMediaFileRepository(db).findByHash(hash);

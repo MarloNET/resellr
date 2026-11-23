@@ -289,30 +289,45 @@ describe('POST /api/listings/{id}/photos (CU-204, Technical Specification 2.11)'
     expect(rows('SELECT COUNT(*) AS n FROM media_file WHERE hash = ?', hash)).toEqual([{ n: 1 }]);
   });
 
-  it('DER-80-07 serves photo and thumbnail of a file that was stored as the logo before', async () => {
-    const listingId = await createListing();
-    const file = await testImages.png();
-    const hash = sha256(file);
-    const logo = logoUpload(1, file);
-    const logoResponse = await t.app.inject({
-      method: 'PUT',
-      url: '/api/merchant-profile/logo',
-      headers: { ...SAME_ORIGIN_WRITE, 'content-type': logo.contentType },
-      payload: logo.payload,
-    });
-    expect(logoResponse.statusCode).toBe(200);
+  // The same content used as logo and as photo has one row whose kind stays the first use; the
+  // files lie in the folder of each use and are served regardless of kind (Nachtrag MAR-1294).
+  it.each([
+    ['logo', 'photo'],
+    ['photo', 'logo'],
+  ] as const)(
+    'DER-80-07 serves photo, thumbnail and logo of the same JPEG uploaded first as %s, then as %s',
+    async (first, second) => {
+      const listingId = await createListing();
+      const file = await testImages.jpeg();
+      const hash = sha256(file);
+      const uploads = {
+        logo: () => {
+          const logo = logoUpload(1, file, 'logo.jpg');
+          return t.app.inject({
+            method: 'PUT',
+            url: '/api/merchant-profile/logo',
+            headers: { ...SAME_ORIGIN_WRITE, 'content-type': logo.contentType },
+            payload: logo.payload,
+          });
+        },
+        photo: () => upload(listingId, file, 'front.jpg'),
+      };
+      const created = { logo: 200, photo: 201 };
 
-    expect((await upload(listingId, file, 'logo-als-foto.png', 'image/png')).statusCode).toBe(201);
+      expect((await uploads[first]()).statusCode).toBe(created[first]);
+      expect((await uploads[second]()).statusCode).toBe(created[second]);
 
-    const get = (url: string) => t.app.inject({ method: 'GET', url, headers: { host: HOST } });
-    const photo = await get(`/media/photos/${hash}`);
-    const thumbnail = await get(`/media/thumbs/${hash}`);
-    expect(photo.statusCode).toBe(200);
-    expect(photo.headers['content-type']).toBe('image/png');
-    expect(photo.rawPayload.equals(file)).toBe(true);
-    expect(thumbnail.statusCode).toBe(200);
-    expect(thumbnail.headers['content-type']).toBe('image/jpeg');
-  });
+      const get = (url: string) => t.app.inject({ method: 'GET', url, headers: { host: HOST } });
+      for (const path of ['photos', 'thumbs', 'logo']) {
+        const response = await get(`/media/${path}/${hash}`);
+        expect(response.statusCode, path).toBe(200);
+        expect(response.headers['content-type'], path).toBe('image/jpeg');
+      }
+      expect((await get(`/media/photos/${hash}`)).rawPayload.equals(file)).toBe(true);
+      expect((await get(`/media/logo/${hash}`)).rawPayload.equals(file)).toBe(true);
+      expect(rows('SELECT kind FROM media_file WHERE hash = ?', hash)).toEqual([{ kind: first }]);
+    },
+  );
 
   it('answers 404 not_found for an unknown model listing with a valid file; no row and no audit entry (Nachtrag MAR-1280)', async () => {
     const response = await upload(404, await testImages.jpeg(), 'front.jpg');
