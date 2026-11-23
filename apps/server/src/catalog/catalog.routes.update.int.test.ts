@@ -286,6 +286,88 @@ describe('PATCH /api/model-templates/{id} (CU-109, CU-105, Technical Specificati
     });
   });
 
+  describe('AC-REQ-005-12 values checked on the state after the change (2.5)', () => {
+    const patchAttribute = (id: number, body: Record<string, unknown>) =>
+      t.app.inject({
+        method: 'PATCH',
+        url: `/api/attributes/${id}`,
+        headers: SAME_ORIGIN_WRITE,
+        payload: body,
+      });
+
+    /** "ThinkPad T14" saved without processor while the processor was deactivated. */
+    async function withoutProcessorAfterReactivation() {
+      expect((await patchAttribute(A.processor, { version: 1, active: false })).statusCode).toBe(
+        200,
+      );
+      const saved = await patch({ version: 1, modelValues: { [A.processor]: null } });
+      expect(saved.statusCode).toBe(200);
+      expect((await patchAttribute(A.processor, { version: 2, active: true })).statusCode).toBe(
+        200,
+      );
+    }
+
+    it('AC-REQ-005-12 rejects a change of the type designation only with "Prozessor fehlt" at modelValues.<id>, stores nothing, and stores it with the processor', async () => {
+      await withoutProcessorAfterReactivation();
+      const auditBefore = auditCount();
+
+      const fields = fieldsOf(await patch({ version: 2, typeDesignation: '20W2' }));
+
+      expect(fields).toEqual([
+        { path: `modelValues.${A.processor}`, code: 'value_missing', message: 'Prozessor fehlt' },
+      ]);
+      expect(stored()).toMatchObject({ type_designation: '20W1', version: 2 });
+      expect(auditCount()).toBe(auditBefore);
+
+      const response = await patch({
+        version: 2,
+        typeDesignation: '20W2',
+        modelValues: { [A.processor]: 'Intel Core i5-1135G7' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        typeDesignation: '20W2',
+        modelValues: { [A.processor]: 'Intel Core i5-1135G7' },
+        version: 3,
+      });
+    });
+
+    it('AC-REQ-005-12 activating the processor writes no value to "ThinkPad T14"', async () => {
+      await withoutProcessorAfterReactivation();
+
+      const { model_values, version } = stored();
+      expect(JSON.parse(model_values)).not.toHaveProperty(String(A.processor));
+      expect(version).toBe(2);
+    });
+
+    it('AC-REQ-005-12 names the missing processor together with the other field errors of the attribute values', async () => {
+      await withoutProcessorAfterReactivation();
+
+      const fields = fieldsOf(
+        await patch({
+          version: 2,
+          modelValues: { [A.ports]: [{ count: 0, typeId: V.usbC, positionId: V.back }] },
+        }),
+      );
+
+      expect(fields.map(({ path, message }) => [path, message])).toEqual([
+        [`modelValues.${A.processor}`, 'Prozessor fehlt'],
+        [`modelValues.${A.ports}`, expect.stringContaining('Anschlüsse')],
+      ]);
+      expect(stored().version).toBe(2);
+    });
+
+    it('AC-REQ-005-12 keeps the stored value of a deactivated attribute the request does not name', async () => {
+      expect((await patchAttribute(A.ports, { version: 1, active: false })).statusCode).toBe(200);
+
+      const response = await patch({ version: 1, typeDesignation: '20W2' });
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(stored().model_values)).toEqual(STORED_VALUES().modelValues);
+    });
+  });
+
   it('DER-52-05 answers 409 version_conflict for an outdated version and stores nothing', async () => {
     await patch({ version: 1, typeDesignation: '20W2' });
 
