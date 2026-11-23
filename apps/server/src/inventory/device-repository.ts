@@ -80,6 +80,19 @@ export function createDeviceRepository(db: Kysely<DB>) {
     },
 
     /**
+     * The number of devices of a model template in any stock status (2.4 "Ändern", "Löschen";
+     * CU-290, CU-295).
+     */
+    async countByModelTemplate(modelTemplateId: number): Promise<number> {
+      const { count } = await db
+        .selectFrom('device')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('model_template_id', '=', modelTemplateId)
+        .executeTakeFirstOrThrow();
+      return Number(count);
+    },
+
+    /**
      * The devices assigned to a model listing with what its stock data need (2.8.2, CU-128), by
      * `assigned_at` and `id`; WI-Nrs and battery capacity follow with #209.
      */

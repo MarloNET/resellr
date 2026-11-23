@@ -236,6 +236,11 @@ export const ERROR_MESSAGES = {
     'Ein verkauftes oder storniertes Gerät kann nicht umgebucht werden',
   /** UI-007 "Geräteart", a new device type of a model template is deactivated (2.0.11). */
   'device_type_deactivated.model_template': (name: string) => `Geräteart ${name} ist deaktiviert`,
+  /**
+   * UI-007 "Geräteart" of a model template with devices (2.0.6, AC-REQ-010-02); also the reason
+   * at the locked field (`UI-007.disabled`, DER-52-03).
+   */
+  'device_type_in_use.default': 'Geräteart kann nicht geändert werden, weil Geräte erfasst sind',
   'file_too_large.logo': LOGO_FILE_RULE,
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   /** UI-007 "Hersteller", same text as in UI-008 (2.0.11, Nachtrag MAR-904). */
