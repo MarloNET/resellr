@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import type { MediaExt } from './file-store.ts';
 
 /** Largest image sharp reads, in pixels (Technical Specification 2.11). */
-const LIMIT_INPUT_PIXELS = 100_000_000;
+export const LIMIT_INPUT_PIXELS = 100_000_000;
 
 const SIGNATURES: { ext: MediaExt; mime: ImageMime; format: string; bytes: number[] }[] = [
   { ext: 'jpg', mime: 'image/jpeg', format: 'jpeg', bytes: [0xff, 0xd8, 0xff] },

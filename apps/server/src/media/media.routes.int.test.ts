@@ -90,3 +90,77 @@ describe('media routes (CU-091, Technical Specification 2.0.1)', () => {
     expect((await get(`/media/logo/${'0'.repeat(64)}`)).statusCode).toBe(404);
   });
 });
+
+/** A photo as the file intake leaves it: original and thumbnail under the hash, and its row. */
+function storePhoto(hash: string, file: Buffer, ext: 'png' | 'jpg', thumb: Buffer) {
+  const folder = join(t.dataDir, 'media', 'photos', hash.slice(0, 2));
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, `${hash}.${ext}`), file);
+  mkdirSync(join(t.dataDir, 'media', 'thumbs'), { recursive: true });
+  writeFileSync(join(t.dataDir, 'media', 'thumbs', `${hash}.jpg`), thumb);
+  t.database.sqlite
+    .prepare(
+      "INSERT INTO media_file (hash, kind, ext, mime, byte_size, width, height, created_at) VALUES (?, 'photo', ?, ?, ?, 120, 40, '2026-11-13T09:00:00.000Z')",
+    )
+    .run(hash, ext, ext === 'png' ? 'image/png' : 'image/jpeg', file.length);
+}
+
+describe('photo and thumbnail routes (CU-091, Technical Specification 2.0.1, 2.11)', () => {
+  it.each([
+    ['png', 'image/png', () => testImages.png()],
+    ['jpg', 'image/jpeg', () => testImages.jpeg()],
+  ] as const)(
+    'DER-80-07 serves a %s photo with the fixed content type %s and its thumbnail as JPEG',
+    async (ext, contentType, image) => {
+      const file = await image();
+      const thumb = await testImages.jpeg('#000000');
+      const hash = sha256(file);
+      storePhoto(hash, file, ext, thumb);
+
+      const photo = await get(`/media/photos/${hash}`);
+      const thumbnail = await get(`/media/thumbs/${hash}`);
+
+      for (const response of [photo, thumbnail]) {
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['x-content-type-options']).toBe('nosniff');
+        expect(response.headers['cache-control']).toBe('private, max-age=31536000, immutable');
+      }
+      expect(photo.headers['content-type']).toBe(contentType);
+      expect(photo.rawPayload.equals(file)).toBe(true);
+      expect(thumbnail.headers['content-type']).toBe('image/jpeg');
+      expect(thumbnail.rawPayload.equals(thumb)).toBe(true);
+    },
+  );
+
+  it('DER-80-07 answers 404 for a hash that is not 64 lower-case hex characters, before any file access', async () => {
+    // Files and a row exist under the upper-case name, so only the check before the file
+    // access can lead to 404.
+    const file = await testImages.png();
+    const upperCase = sha256(file).toUpperCase();
+    storePhoto(upperCase, file, 'png', file);
+
+    for (const path of ['photos', 'thumbs']) {
+      for (const hash of [
+        upperCase,
+        sha256(file).slice(0, 63),
+        `${sha256(file)}0`,
+        '..%2F..%2Fresellr.db',
+      ]) {
+        const response = await get(`/media/${path}/${hash}`);
+
+        expect(response.statusCode).toBe(404);
+        expect(response.json().error.code).toBe('not_found');
+      }
+    }
+  });
+
+  it('answers 404 for a valid hash without file or row, and for the hash of a logo', async () => {
+    const logo = await testImages.png();
+    storeLogo(sha256(logo), logo, 'png');
+
+    for (const path of ['photos', 'thumbs']) {
+      expect((await get(`/media/${path}/${sha256(logo)}`)).statusCode).toBe(404);
+      expect((await get(`/media/${path}/${'0'.repeat(64)}`)).statusCode).toBe(404);
+    }
+  });
+});

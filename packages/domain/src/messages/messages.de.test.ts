@@ -98,6 +98,21 @@ describe('message catalog (E1)', () => {
     expect(ERROR_MESSAGES['unsupported_media_type.logo']).toBe('Logo: nur PNG oder JPEG bis 5 MB');
   });
 
+  it('AC-REQ-042-02 names the file for a too large photo and a wrong type (2.11, UI-015)', () => {
+    expect(ERROR_MESSAGES['file_too_large.photo']('Foto 1.gif')).toBe(
+      'Foto 1.gif: nur JPEG oder PNG bis 20 MB',
+    );
+    expect(ERROR_MESSAGES['unsupported_media_type.photo']('Foto 1.gif')).toBe(
+      'Foto 1.gif: nur JPEG oder PNG bis 20 MB',
+    );
+  });
+
+  it('AC-REQ-042-03 names the highest number of photos (2.0.6, UI-015)', () => {
+    expect(ERROR_MESSAGES['photo_limit_reached.default']).toBe(
+      'Höchstens 20 Fotos je Modell-Inserat',
+    );
+  });
+
   it('has the text of name_taken for device types (2.0.6, UI-027)', () => {
     expect(ERROR_MESSAGES['name_taken.device_type']).toBe('Name ist bereits vergeben');
   });
