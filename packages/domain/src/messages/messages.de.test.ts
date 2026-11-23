@@ -47,6 +47,7 @@ const EXPECTED_KEYS = [
   'M-26',
   'M-30',
   'M-31',
+  'M-32',
 ];
 
 describe('message catalog (E1)', () => {
@@ -60,7 +61,12 @@ describe('message catalog (E1)', () => {
     );
   });
 
-  it('has exactly the keys M-01 to M-22, M-24 to M-26, M-30 and M-31', () => {
+  it('M-32 names the attribute without a value (AC-REQ-005-12)', () => {
+    expect(MESSAGES['M-32']('RAM')).toBe('RAM fehlt');
+    expect(FIELD_MESSAGES.attributeValueMissing).toBe(MESSAGES['M-32']);
+  });
+
+  it('has exactly the keys M-01 to M-22, M-24 to M-26 and M-30 to M-32', () => {
     expect(Object.keys(MESSAGES)).toEqual(EXPECTED_KEYS);
   });
 
@@ -90,6 +96,21 @@ describe('message catalog (E1)', () => {
   it('has one text of the logo for a too large file and a wrong type (2.2, UI-026)', () => {
     expect(ERROR_MESSAGES['file_too_large.logo']).toBe('Logo: nur PNG oder JPEG bis 5 MB');
     expect(ERROR_MESSAGES['unsupported_media_type.logo']).toBe('Logo: nur PNG oder JPEG bis 5 MB');
+  });
+
+  it('AC-REQ-042-02 names the file for a too large photo and a wrong type (2.11, UI-015)', () => {
+    expect(ERROR_MESSAGES['file_too_large.photo']('Foto 1.gif')).toBe(
+      'Foto 1.gif: nur JPEG oder PNG bis 20 MB',
+    );
+    expect(ERROR_MESSAGES['unsupported_media_type.photo']('Foto 1.gif')).toBe(
+      'Foto 1.gif: nur JPEG oder PNG bis 20 MB',
+    );
+  });
+
+  it('AC-REQ-042-03 names the highest number of photos (2.0.6, UI-015)', () => {
+    expect(ERROR_MESSAGES['photo_limit_reached.default']).toBe(
+      'Höchstens 20 Fotos je Modell-Inserat',
+    );
   });
 
   it('has the text of name_taken for device types (2.0.6, UI-027)', () => {

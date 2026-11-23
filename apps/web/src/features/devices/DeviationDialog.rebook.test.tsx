@@ -13,7 +13,7 @@ import { DeviationDialog } from './DeviationDialog.tsx';
 // Specification 2.6 "Zustände") for an already assigned device, with a mocked `fetch` (6.1, 6.2).
 
 /** "626199" of MV-A (3), assigned to MI-X (9). */
-const DEVICE = { id: 41, version: 2, modelTemplateId: 3 };
+const DEVICE = { id: 41, wiNr: '626199', version: 2, modelTemplateId: 3 };
 
 const choice = (id: number, displayTitle: string, visualGrade: number, quantity: number) => ({
   id,

@@ -131,7 +131,7 @@ const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
 type Route = () => Promise<Response> | Response;
 
 /**
- * `fetch` of the page: the frame, the choices, the attributes of the notebook, the values of the
+ * `fetch` of the page: the frame, the choices, the attributes of the notebook (`attributes`), the values of the
  * keyboard layouts, `GET` and `PATCH /api/model-templates/7`, its use and the list of UI-006 after the
  * return. The lists can change between reads (`state`). Records the bodies of the writes.
  */
@@ -139,7 +139,13 @@ function mockApi({
   template = () => Response.json(T14),
   update = () => Response.json({ ...T14, version: 4 }),
   usage = () => Response.json(UNUSED),
-}: { template?: Route; update?: Route; usage?: Route } = {}) {
+  attributes = [PROCESSOR, KEYBOARD, DEVICE_KEYBOARD],
+}: {
+  template?: Route;
+  update?: Route;
+  usage?: Route;
+  attributes?: readonly ReturnType<typeof attribute>[];
+} = {}) {
   const state = {
     deviceTypes: [NOTEBOOK, TABLET],
     manufacturers: [LENOVO, FUJITSU, APPLE],
@@ -162,7 +168,7 @@ function mockApi({
         return Response.json({ items: state.manufacturers, total: state.manufacturers.length });
       }
       if (url.pathname === '/api/device-types/1/attributes') {
-        return Response.json({ items: [PROCESSOR, KEYBOARD, DEVICE_KEYBOARD], total: 3 });
+        return Response.json({ items: attributes, total: attributes.length });
       }
       if (url.pathname === '/api/device-types/3/attributes') {
         return Response.json({ items: [], total: 0 });
@@ -761,5 +767,81 @@ describe('UI-007 device type locked by captured devices (CU-114, #182)', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('Referenz: R-7K2M-9QX4');
     expect(screen.queryByRole('form')).toBeNull();
+  });
+});
+
+describe('UI-007 deactivated and reactivated required attribute (M-32, 2.5, Story #34)', () => {
+  /** "ThinkPad T14" saved while "Prozessor" was deactivated: without a value for it. */
+  const WITHOUT_PROCESSOR = { ...T14, modelValues: { 2: 31 } };
+  const PROCESSOR_MISSING = 'Prozessor fehlt';
+
+  it('UI-007.default DER-34-22 shows no field for a deactivated attribute; PATCH sends no key for it, so its stored value stays', async () => {
+    const { sent } = mockApi({
+      attributes: [{ ...PROCESSOR, active: false }, KEYBOARD, DEVICE_KEYBOARD],
+    });
+    await openPage();
+
+    expect(within(form()).queryByRole('textbox', { name: /^Prozessor/ })).toBeNull();
+    fireEvent.change(textbox('Typbezeichnung'), { target: { value: '20W2' } });
+    await save();
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ modelValues: { 2: 31 } });
+    expect((sent[0] as { modelValues: object }).modelValues).not.toHaveProperty('1');
+  });
+
+  it('UI-007.default UI-007.validation DER-34-23 shows a reactivated required attribute without a value as an empty required field "*"; changing only the type designation names "Prozessor fehlt" in the browser, nothing sent; with the processor entered it saves', async () => {
+    const { sent } = mockApi({ template: () => Response.json(WITHOUT_PROCESSOR) });
+    await openPage();
+
+    expect(textbox('Prozessor').value).toBe('');
+    expect(textbox('Prozessor').getAttribute('aria-required')).toBe('true');
+    expect(document.querySelector(`label[for="${textbox('Prozessor').id}"]`)?.textContent).toBe(
+      'Prozessor*',
+    );
+    fireEvent.change(textbox('Typbezeichnung'), { target: { value: '20W2' } });
+    await save();
+
+    expect(errorOf(textbox('Prozessor'))).toBe(PROCESSOR_MISSING);
+    expect(document.activeElement).toBe(textbox('Prozessor'));
+    expect(textbox('Typbezeichnung').value).toBe('20W2');
+    expect(sent).toEqual([]);
+    expectAccessiblePage();
+
+    fireEvent.change(textbox('Prozessor'), { target: { value: 'Intel Core i5-1135G7' } });
+    await save();
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      typeDesignation: '20W2',
+      modelValues: { 1: 'Intel Core i5-1135G7', 2: 31 },
+    });
+  });
+
+  it('UI-007.validation DER-34-23 shows "Prozessor fehlt" of 422 validation_failed at modelValues.<id> at the field, focus there, nothing saved, the inputs stay', async () => {
+    // "Prozessor" was made required in another window after UI-007 read the attributes, so the
+    // check in the browser lets the request pass and the server names the missing value.
+    const { sent } = mockApi({
+      template: () => Response.json(WITHOUT_PROCESSOR),
+      attributes: [{ ...PROCESSOR, required: false }, KEYBOARD, DEVICE_KEYBOARD],
+      update: () =>
+        Response.json(
+          errorBody('validation_failed', {
+            fields: [{ path: 'modelValues.1', code: 'value_missing', message: PROCESSOR_MISSING }],
+          }),
+          { status: 422 },
+        ),
+    });
+    const router = await openPage();
+    fireEvent.change(textbox('Typbezeichnung'), { target: { value: '20W2' } });
+
+    await save();
+
+    await vi.waitFor(() => expect(errorOf(textbox('Prozessor'))).toBe(PROCESSOR_MISSING));
+    expect(document.activeElement).toBe(textbox('Prozessor'));
+    expect(textbox('Typbezeichnung').value).toBe('20W2');
+    expect(sent).toHaveLength(1);
+    expect(router.state.location.pathname).toBe('/modelle/7');
+    expectAccessiblePage();
   });
 });

@@ -1,4 +1,5 @@
 import type { Attribute } from '@resellr/domain/schemas/attribute.schema';
+import { attributeValuesSchema } from '@resellr/domain/schemas/attribute-values.schema';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -131,5 +132,56 @@ describe('attribute values of a request (CU-111, CU-112, 2.5)', () => {
     expect(
       attributeRequestValues(ATTRIBUTES, 'device', { 7: { notDeterminable: true } })[7],
     ).toEqual({ notDeterminable: true });
+  });
+});
+
+describe('deactivated and reactivated attributes (CU-111, 2.5, REQ-005)', () => {
+  /** RAM deactivated (`active: false`) or reactivated (`active: true`), required either way. */
+  const withRam = (active: boolean) =>
+    ATTRIBUTES.map((definition) => (definition.id === 5 ? { ...definition, active } : definition));
+
+  function renderDevice(attributes: readonly Attribute[], errors = {}) {
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <AttributeFieldsForm
+          attributes={attributes}
+          level="device"
+          inputs={{}}
+          errors={errors}
+          withRequired
+          dropped={new Set()}
+          onChange={() => {}}
+          onBlur={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    return Array.from(document.querySelectorAll('label[for]'), (label) => label.textContent);
+  }
+
+  it('DER-34-22 shows no field for a deactivated attribute, and the request sends no key for it, so its stored value stays', () => {
+    expect(renderDevice(withRam(false))).toEqual(['Akkukapazität']);
+    expect(screen.queryByRole('textbox', { name: 'RAM' })).toBeNull();
+
+    // Not even `null`, which would remove the stored value (2.5 "Merkmalswerte bei PATCH").
+    expect(attributeRequestValues(withRam(false), 'device', { 5: '16' })).toEqual({ 7: null });
+  });
+
+  it('DER-34-22 shows a reactivated required attribute as an empty required field "*", and the check in the browser names "RAM fehlt" before sending', () => {
+    const attributes = withRam(true);
+    const values = attributeRequestValues(attributes, 'device', {});
+    const issues = attributeValuesSchema(attributes, 'device').safeParse(values).error?.issues;
+
+    expect(issues?.map(({ path, message }) => [path.join('.'), message])).toEqual([
+      ['5', 'RAM fehlt'],
+    ]);
+    expect(renderDevice(attributes, { 5: issues?.[0]?.message })).toEqual([
+      'RAM*',
+      'Akkukapazität',
+    ]);
+    const ram = screen.getByRole<HTMLInputElement>('textbox', { name: 'RAM' });
+    expect(ram.value).toBe('');
+    expect(ram.getAttribute('aria-required')).toBe('true');
+    expect(ram.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText('RAM fehlt')).toBeTruthy();
   });
 });

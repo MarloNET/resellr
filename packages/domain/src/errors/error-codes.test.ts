@@ -32,6 +32,7 @@ const DOMAIN_CODES: [string, number][] = [
   ['name_taken', 422],
   ['manufacturer_deactivated', 422],
   ['other_model_template', 422],
+  ['photo_limit_reached', 422],
   ['pick_list_value_deactivated', 422],
   ['placeholder_not_allowed', 422],
   ['supplier_deactivated', 422],

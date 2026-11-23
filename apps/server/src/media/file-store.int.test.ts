@@ -25,6 +25,30 @@ describe('file store (CU-088)', () => {
     expect(store.pathOf('logo', HASH, 'png')).toBe(join(root, 'media', 'logo', `${HASH}.png`));
   });
 
+  it('names a stored photo after its hash in the folder of its first two characters, its thumbnail under media/thumbs (2.11)', () => {
+    const store = createFileStore({ mediaDir: join(root, 'media') });
+    const hash = `3f${'0'.repeat(62)}`;
+
+    expect(store.pathOf('photo', hash, 'jpg')).toBe(
+      join(root, 'media', 'photos', '3f', `${hash}.jpg`),
+    );
+    expect(store.pathOf('thumb', hash, 'jpg')).toBe(join(root, 'media', 'thumbs', `${hash}.jpg`));
+  });
+
+  it('DER-80-06 moves a photo into its folder, and drops the temporary file when the same photo is already there', async () => {
+    const store = createFileStore({ mediaDir: join(root, 'media') });
+    const first = await store.createIncomingPath();
+    writeFileSync(first, 'photo');
+    const second = await store.createIncomingPath();
+    writeFileSync(second, 'photo');
+
+    await store.place(first, 'photo', HASH, 'png');
+    await store.place(second, 'photo', HASH, 'png');
+
+    expect(readFileSync(join(root, 'media', 'photos', 'aa', `${HASH}.png`), 'utf8')).toBe('photo');
+    expect(readdirSync(join(root, 'media', '.incoming'))).toEqual([]);
+  });
+
   it('creates temporary files under media/.incoming and removes them', async () => {
     const store = createFileStore({ mediaDir: join(root, 'media') });
 

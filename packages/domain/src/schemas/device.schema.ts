@@ -135,13 +135,26 @@ export function deviceCreateSchema(
 }
 export type DeviceCreate = z.output<ReturnType<typeof deviceCreateSchema>>;
 
+/** Article number: 1–30 letters, digits and "-" (2.7, 3.3). */
+const ARTICLE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,30}$/;
+
+/**
+ * Article number as entered in UI-004 and UI-005 Kontext B (2.5, 2.6, 2.7); `listing.schema.ts`
+ * exports it for the model listing.
+ */
+export const articleNumberSchema = z
+  .string()
+  .regex(ARTICLE_NUMBER_PATTERN, { message: FIELD_MESSAGES.articleNumber });
+
 /**
  * Shape of `PATCH /api/devices/{id}` for the device values of UI-010 (2.5) as the route checks
  * it: a missing field stays unchanged, `values` holds changes (a key overwrites, `null` removes;
  * `mergeAttributeValues`). The rules apply to the state after the change (`deviceValuesSchema`).
  * `deviationDecision` decides on the deviation of an assigned device from its model listing (2.5,
- * UI-005 Kontext B): `keep` stores the values and keeps the assignment; `new_listing` (#201) and
- * `rebook` with `targetListingId` and `confirmTargetDeviation` (#202) follow.
+ * UI-005 Kontext B): `keep` stores the values and keeps the assignment, `new_listing` stores them
+ * and creates a model listing from the device (2.6), with `articleNumber` instead of the WI-Nr
+ * when set (the rule of `POST /api/listings`); `rebook` with `targetListingId` and
+ * `confirmTargetDeviation` (#202) follows.
  */
 export const deviceUpdateBodySchema = z.strictObject({
   version: versionSchema,
@@ -150,7 +163,12 @@ export const deviceUpdateBodySchema = z.strictObject({
   conditionDescription: z.string().optional(),
   values: anyValuesSchema.optional(),
   confirmedKeys: z.array(z.string()),
-  deviationDecision: z.enum(['keep']).optional(),
+  deviationDecision: z.enum(['keep', 'new_listing']).optional(),
+  /**
+   * Article number of the new model listing, only with `new_listing` (2.5, Nachtrag MAR-1248),
+   * with the rule and text of `POST /api/listings`.
+   */
+  articleNumber: articleNumberSchema.optional(),
 });
 export type DeviceUpdateInput = z.input<typeof deviceUpdateBodySchema>;
 
@@ -257,3 +275,20 @@ export type DeviceSearchItem = z.infer<typeof deviceSearchItemSchema>;
 /** Answer of the device search (2.5): the hits of the page, without `total` (Nachtrag MAR-1030). */
 export const deviceSearchResultSchema = z.object({ items: z.array(deviceSearchItemSchema) });
 export type DeviceSearchResult = z.infer<typeof deviceSearchResultSchema>;
+
+/**
+ * An unassigned device of `GET /api/devices/unassigned` (2.5, REQ-094): available and without
+ * model listing, with its capture date.
+ */
+export const unassignedDeviceItemSchema = z.object({
+  id: idSchema,
+  wiNr: z.string(),
+  modelTemplateLabel: z.string(),
+  captureStatus: z.enum(CAPTURE_STATUSES),
+  capturedOn: dateSchema,
+});
+export type UnassignedDeviceItem = z.infer<typeof unassignedDeviceItemSchema>;
+
+/** Answer of `GET /api/devices/unassigned` (2.5): all unassigned devices, the oldest first. */
+export const unassignedDevicesSchema = z.object({ items: z.array(unassignedDeviceItemSchema) });
+export type UnassignedDevices = z.infer<typeof unassignedDevicesSchema>;

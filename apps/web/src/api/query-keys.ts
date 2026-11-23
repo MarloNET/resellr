@@ -43,6 +43,7 @@ export const queryKeys = {
       code: { conditionCode: string | null; supplierId: number | null },
     ) => ['inventory', 'device-prefill', modelTemplateId, code] as const,
     deviceSearch: (wiNr: string) => ['inventory', 'devices', { wiNr }] as const,
+    unassignedDevices: () => ['inventory', 'unassigned-devices'] as const,
     listing: (id: number, filter: { includeCancelled: boolean }) =>
       ['inventory', 'listing', id, filter] as const,
     listingChoice: (modelTemplateId: number) =>
@@ -51,6 +52,10 @@ export const queryKeys = {
       ['inventory', 'listing-choice', modelTemplateId, { deviceId }] as const,
     modelTemplateUsage: (modelTemplateId: number) =>
       ['inventory', 'model-template-usage', modelTemplateId] as const,
+  },
+  media: {
+    all: ['media'] as const,
+    photos: (listingId: number) => ['media', 'photos', listingId] as const,
   },
 } as const;
 

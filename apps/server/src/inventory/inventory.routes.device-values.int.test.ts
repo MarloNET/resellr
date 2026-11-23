@@ -256,6 +256,152 @@ describe('field rules of the device values (CU-116, CU-067, Technical Specificat
   });
 });
 
+describe('AC-REQ-005-12 device values checked on the state after the change (CU-121, Technical Specification 2.5)', () => {
+  const patchAttribute = (id: number, payload: Record<string, unknown>) =>
+    t.app.inject({
+      method: 'PATCH',
+      url: `/api/attributes/${id}`,
+      headers: SAME_ORIGIN_WRITE,
+      payload,
+    });
+  /** Changes the attribute RAM to the given fields; returns its new version. */
+  async function changeRam(version: number, change: Record<string, unknown>): Promise<number> {
+    const response = await patchAttribute(attribute('RAM'), { version, ...change });
+    expect(response.statusCode).toBe(200);
+    return response.json().version as number;
+  }
+  const storedValues = (id: number) => JSON.parse(deviceRow(id).device_values as string);
+
+  /** A notebook not assigned to a model listing, captured without RAM while RAM was deactivated. */
+  async function withoutRamAfterReactivation(): Promise<number> {
+    const version = await changeRam(1, { active: false });
+    const withoutRam: Record<string, unknown> = values();
+    delete withoutRam[attribute('RAM')];
+    const id = await storedDevice({ values: withoutRam });
+    await changeRam(version, { active: true });
+    return id;
+  }
+
+  it('AC-REQ-005-12 rejects a change of the visual grade only with "RAM fehlt" at values.<id>, stores nothing, and stores it with the RAM value', async () => {
+    const id = await withoutRamAfterReactivation();
+    const audits = count('audit_entry');
+
+    const rejected = await patch(id, { version: 1, visualGrade: '2', confirmedKeys: [] });
+
+    expect(rejected.statusCode).toBe(422);
+    expect(rejected.json().error).toMatchObject({
+      code: 'validation_failed',
+      fields: [{ path: `values.${attribute('RAM')}`, code: 'value_missing', message: 'RAM fehlt' }],
+    });
+    expect(deviceRow(id)).toMatchObject({ visual_grade: 3, version: 1 });
+    expect(count('audit_entry')).toBe(audits);
+
+    const saved = await patch(id, {
+      version: 1,
+      visualGrade: '2',
+      values: { [attribute('RAM')]: '16' },
+      confirmedKeys: [],
+    });
+
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({
+      visualGrade: 2,
+      values: { [attribute('RAM')]: 16 },
+      version: 2,
+    });
+  });
+
+  it('AC-REQ-005-12 activating RAM writes no RAM value to the notebook', async () => {
+    const id = await withoutRamAfterReactivation();
+
+    expect(storedValues(id)).not.toHaveProperty(String(attribute('RAM')));
+    expect(deviceRow(id).version).toBe(1);
+  });
+
+  it('AC-REQ-005-12 keeps the stored value of a deactivated attribute the request does not name', async () => {
+    const id = await storedDevice();
+    await changeRam(1, { active: false });
+
+    const response = await patch(id, {
+      version: 1,
+      values: { [attribute('Speicherkapazität')]: '1024' },
+      confirmedKeys: [],
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(storedValues(id)[attribute('RAM')]).toBe(16);
+  });
+
+  it('AC-REQ-005-12 stores a change of the visual grade of a device with RAM 2048 while RAM is deactivated with the range 1 to 1024; RAM stays 2048', async () => {
+    const id = await storedDevice({ values: values({ [attribute('RAM')]: '2048' }) });
+    await changeRam(1, { minValue: '1', maxValue: '1024', active: false });
+
+    const response = await patch(id, { version: 1, visualGrade: '2', confirmedKeys: [] });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ visualGrade: 2, version: 2 });
+    expect(storedValues(id)[attribute('RAM')]).toBe(2048);
+  });
+
+  it('AC-REQ-005-12 rejects an unchanged RAM 2048 after the range was narrowed to 1 to 1024 with the rule of its data type (RQ-22)', async () => {
+    const id = await storedDevice({ values: values({ [attribute('RAM')]: '2048' }) });
+    await changeRam(1, { minValue: '1', maxValue: '1024' });
+
+    const response = await patch(id, { version: 1, visualGrade: '2', confirmedKeys: [] });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
+      {
+        path: `values.${attribute('RAM')}`,
+        code: expect.any(String),
+        message: 'RAM: ganze Zahl von 1 bis 1024',
+      },
+    ]);
+    expect(storedValues(id)[attribute('RAM')]).toBe(2048);
+    expect(deviceRow(id).version).toBe(1);
+  });
+
+  it('AC-REQ-005-12 removing only the battery capacity of a device with the stored battery "mit Akku" is rejected with the text of the design (FIND-362)', async () => {
+    const id = await storedDevice();
+
+    const response = await patch(id, {
+      version: 1,
+      values: { [attribute('Akkukapazität')]: null },
+      confirmedKeys: [],
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
+      {
+        path: `values.${attribute('Akkukapazität')}`,
+        code: 'value_missing',
+        message: CAPACITY_RULE,
+      },
+    ]);
+    expect(storedValues(id)[attribute('Akkukapazität')]).toEqual({ percent: 77 });
+  });
+
+  it('AC-REQ-005-12 a stored battery "mit Akku" deactivated since still requires the battery capacity (FIND-362)', async () => {
+    const id = await storedDevice();
+    deactivate(value('mit Akku'));
+
+    const response = await patch(id, {
+      version: 1,
+      values: { [attribute('Akkukapazität')]: null },
+      confirmedKeys: [],
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.fields).toEqual([
+      {
+        path: `values.${attribute('Akkukapazität')}`,
+        code: 'value_missing',
+        message: CAPACITY_RULE,
+      },
+    ]);
+  });
+});
+
 describe('PATCH /api/devices/{id} (CU-121, CU-130, Technical Specification 2.5)', () => {
   it('DER-56-01 stores a changed visual grade with a new version and the audit entry "values_updated" of the changed field', async () => {
     const id = await storedDevice();

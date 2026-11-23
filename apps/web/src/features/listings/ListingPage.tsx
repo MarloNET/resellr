@@ -16,7 +16,7 @@ import {
 import { OutcomeUnknownBanner } from '../../components/patterns/OutcomeUnknownBanner.tsx';
 import { bannerClassName, PageBanner } from '../../components/patterns/PageBanner.tsx';
 import { UnreachableBanner } from '../../components/patterns/UnreachableBanner.tsx';
-import { Button } from '../../components/ui/Button.tsx';
+import { Button, buttonClassName } from '../../components/ui/Button.tsx';
 import { Checkbox } from '../../components/ui/Checkbox.tsx';
 import {
   Table,
@@ -59,6 +59,8 @@ const TEXTS = {
   eanOriginal: (ean: string | null) => `Original (${ean ?? '–'})`,
   eanOwn: (ean: string | null) => `eigene (${ean ?? '–'})`,
   empty: '–',
+  photos: 'Fotos',
+  managePhotos: 'Fotos verwalten',
   devices: 'Geräte',
   includeCancelled: 'auch stornierte',
   wiNr: 'WI-Nr',
@@ -199,6 +201,26 @@ function ListingValueList({
 }
 
 /**
+ * Area "Fotos" with "Fotos verwalten", which opens UI-015 (secondary button, UI-014 `screen.md`);
+ * the number and the thumbnails follow with #239.
+ */
+function ListingPhotos({ listingId }: { listingId: number }) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className={CARD}>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 id={headingId} className={CARD_HEADING}>
+          {TEXTS.photos}
+        </h2>
+        <Link to={`/inserate/${listingId}/fotos`} className={buttonClassName('secondary')}>
+          {TEXTS.managePhotos}
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/**
  * Area "Geräte": WI-Nr as link to UI-010, inventory status (sold with channel and date), battery
  * capacity and capture date; the cancelled devices only with the filter "auch stornierte"
  * (DER-60-03).
@@ -262,8 +284,8 @@ function ListingDevices({
  * stornierte"; the states loading, error ("geladen", DER-60-02) and P-06 above the page
  * (DER-60-06); with #206 the edit view of the listing values (`UI-014.edit`, CU-139), the banner
  * "Inseratswerte gespeichert" after saving (DER-64-02) and P-08 (DER-64-06); with #202 the banner
- * of the calling dialog, "Gerät umgebucht" after "Umbuchen" (DER-61-06). Channel cards follow
- * with S5, photos with S7, prices with #204.
+ * of the calling dialog, "Gerät umgebucht" after "Umbuchen" (DER-61-06). With #238 the area
+ * "Fotos" with "Fotos verwalten" (UI-015). Channel cards follow with S5, prices with #204.
  */
 export function ListingPage() {
   const id = listingIdOf(useParams().listingId);
@@ -382,6 +404,7 @@ export function ListingPage() {
                   }
             }
           />
+          <ListingPhotos listingId={listing.id} />
           <ListingDevices
             devices={listing.devices}
             includeCancelled={includeCancelled}

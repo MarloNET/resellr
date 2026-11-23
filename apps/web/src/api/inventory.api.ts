@@ -5,6 +5,7 @@ import type {
   DevicePrefillAnswer,
   DeviceSearchResult,
   DeviceUpdateInput,
+  UnassignedDevices,
 } from '@resellr/domain/schemas/device.schema';
 import {
   type DeviceAssignment,
@@ -28,8 +29,8 @@ import { apiClient, type ApiError } from './api-client.ts';
 import { queryKeys } from './query-keys.ts';
 
 // Hooks of the devices of F-05 and the model listings of F-06 and F-07 (CU-131, Technical
-// Specification 2.5 to 2.7), with #204 the price per channel. The unassigned devices (#258) and
-// the other model listing hooks follow.
+// Specification 2.5 to 2.7), with #204 the price per channel and with #258 the unassigned devices.
+// The other model listing hooks follow.
 
 /**
  * Hits of the device search of UI-009 (`GET /api/devices?wiNr=`, REQ-016): the first page of
@@ -46,6 +47,15 @@ export function useDeviceSearchQuery(wiNr: string | undefined) {
         },
       ),
     enabled: wiNr !== undefined,
+  });
+}
+
+/** The unassigned devices of UI-009 (`GET /api/devices/unassigned`, REQ-094), the oldest first. */
+export function useUnassignedDevicesQuery() {
+  return useQuery<UnassignedDevices, ApiError>({
+    queryKey: queryKeys.inventory.unassignedDevices(),
+    queryFn: ({ signal }) =>
+      apiClient.get<UnassignedDevices>('/api/devices/unassigned', { signal }),
   });
 }
 

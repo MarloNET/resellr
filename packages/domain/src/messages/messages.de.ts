@@ -36,6 +36,11 @@ export const MESSAGES = {
   'M-30': 'Name: 1 bis 100 Zeichen',
   /** UI-030 "Prüfende Stelle", longer than 100 characters after trimming; missing is M-24. */
   'M-31': 'Prüfende Stelle: höchstens 100 Zeichen',
+  /**
+   * An active required attribute without a value, also after it was activated again and when
+   * the change concerns another field (UI-003, UI-007, UI-010, UI-014; 2.5, AC-REQ-005-12).
+   */
+  'M-32': (label: string) => `${label} fehlt`,
 } as const;
 
 /**
@@ -53,7 +58,7 @@ export const FIELD_MESSAGES = {
    * je Datentyp", 8.2): `label` is the current label of the attribute, bounds are formatted with
    * a decimal comma and without thousands separators.
    */
-  attributeValueMissing: (label: string) => `${label} fehlt`,
+  attributeValueMissing: MESSAGES['M-32'],
   attributeValueNumber: (
     label: string,
     kind: 'integer' | 'decimal',
@@ -196,6 +201,9 @@ const DEVICE_SOLD_OR_CANCELLED = 'Gerät ist bereits verkauft oder storniert';
 /** UI-026 "Logo": one text for a too large file and a wrong type (AC-REQ-028-02). */
 const LOGO_FILE_RULE = 'Logo: nur PNG oder JPEG bis 5 MB';
 
+/** UI-015 "Fotodateien": one text per file for a too large file and a wrong type (2.11). */
+const PHOTO_FILE_RULE = (fileName: string) => `${fileName}: nur JPEG oder PNG bis 20 MB`;
+
 /**
  * Rejection texts by `<code>.<usage>` (Technical Specification 2.0.5, FIND-209): the service
  * sets the usage, `error-mapper` picks the text. `default` is the usage of a code with one
@@ -248,6 +256,7 @@ export const ERROR_MESSAGES = {
    */
   'device_type_in_use.default': 'Geräteart kann nicht geändert werden, weil Geräte erfasst sind',
   'file_too_large.logo': LOGO_FILE_RULE,
+  'file_too_large.photo': PHOTO_FILE_RULE,
   'manufacturer_deactivated.default': (name: string) => `Hersteller ${name} ist deaktiviert`,
   /** UI-007 "Hersteller", same text as in UI-008 (2.0.11, Nachtrag MAR-904). */
   'manufacturer_deactivated.model_template': (name: string) => `Hersteller ${name} ist deaktiviert`,
@@ -261,6 +270,8 @@ export const ERROR_MESSAGES = {
   'not_found.default': MESSAGES['M-15'],
   /** UI-004 "Zuordnen" to a model listing of another model template (2.0.6, AC-REQ-017-02). */
   'other_model_template.default': 'Gerät gehört zu anderer Modellvorlage',
+  /** UI-015 "Fotos hinzufügen" with 20 photos (2.0.6, AC-REQ-042-03). */
+  'photo_limit_reached.default': 'Höchstens 20 Fotos je Modell-Inserat',
   /** UI-007, UI-003, UI-010, UI-014 at the field of the attribute (2.0.6, Nachtrag MAR-904). */
   'pick_list_value_deactivated.attribute': (label: string, value: string) =>
     `${label}: ${value} ist deaktiviert`,
@@ -283,6 +294,7 @@ export const ERROR_MESSAGES = {
   /** UI-003 "Lieferant", the supplier of a new device is deactivated (2.0.11, Nachtrag MAR-904). */
   'supplier_deactivated.device': (name: string) => `Lieferant ${name} ist deaktiviert`,
   'unsupported_media_type.logo': LOGO_FILE_RULE,
+  'unsupported_media_type.photo': PHOTO_FILE_RULE,
   /** UI-014 "Inseratswerte bearbeiten" (2.0.6, AC-REQ-088-02): the display title of it. */
   'variant_duplicate.listing_values': (listingTitle: string) =>
     `Variantenangaben stimmen mit Modell-Inserat ${listingTitle} überein`,

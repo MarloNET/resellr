@@ -206,15 +206,17 @@ function savedAnswer(init: RequestInit | undefined) {
 
 /**
  * `fetch` of UI-010 with lists the test can change in "another window": `device` answers
- * `GET /api/devices/5`, `update` the `PATCH`, `reload` the reads of a list after its first one.
+ * `GET /api/devices/5`, `attributes` the attributes of the notebook, `update` the `PATCH`, `reload` the reads of a list after its first one.
  * Records the bodies of the `PATCH` and the number of reads per list.
  */
 function mockApi({
   device = DEVICE,
+  attributes = ATTRIBUTES,
   update = savedAnswer,
   reload,
 }: {
   device?: Record<string, unknown> | (() => Record<string, unknown>);
+  attributes?: readonly Record<string, unknown>[];
   update?: Route;
   reload?: (listId: number) => Response | Promise<Response> | undefined;
 } = {}) {
@@ -240,7 +242,7 @@ function mockApi({
       }
       if (route === 'GET /api/pick-lists') return list(PICK_LISTS);
       if (route === 'GET /api/model-templates/7') return Response.json(MODEL_TEMPLATE);
-      if (route === 'GET /api/device-types/1/attributes') return list(ATTRIBUTES);
+      if (route === 'GET /api/device-types/1/attributes') return list([...attributes]);
       if (route === 'PATCH /api/devices/5') {
         sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
         return update(init);
@@ -800,6 +802,86 @@ describe('UI-010 choice after pick_list_value_deactivated (2.0.11, design v0.6.8
 });
 
 // Last in this file: P-08 locks the writes of the page until it is loaded again (CU-049).
+describe('UI-010 deactivated and reactivated required attribute (M-32, 2.5, Story #34)', () => {
+  /** The required attribute RAM of the level device, deactivated or reactivated. */
+  const ram = (active: boolean) =>
+    attribute({
+      id: 20,
+      label: 'RAM',
+      dataType: 'integer',
+      unit: 'GB',
+      required: true,
+      sortOrder: 6,
+      active,
+    });
+  const RAM_MISSING = 'RAM fehlt';
+
+  it('UI-010.default DER-34-22 shows no field for a deactivated attribute; PATCH sends no key for it, so its stored value stays', async () => {
+    const { sent } = mockApi({
+      attributes: [...ATTRIBUTES, ram(false)],
+      device: { ...DEVICE, values: { ...STORED_VALUES, 20: 16 } },
+    });
+    await openDevice();
+
+    expect(queryTextbox('RAM')).toBeNull();
+    fireEvent.change(textbox('Optik-Note'), { target: { value: '4' } });
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.values).not.toHaveProperty('20');
+    expect(await screen.findByText('Gerät gespeichert')).toBeTruthy();
+  });
+
+  it('UI-010.default UI-010.validation DER-34-22 shows a reactivated required attribute without a value as an empty required field "*"; changing only the visual grade names "RAM fehlt" in the browser, nothing sent; with RAM entered it saves', async () => {
+    const { sent } = mockApi({ attributes: [...ATTRIBUTES, ram(true)] });
+    await openDevice();
+
+    expect(textbox('RAM').value).toBe('');
+    expect(textbox('RAM').getAttribute('aria-required')).toBe('true');
+    expect(document.querySelector(`label[for="${textbox('RAM').id}"]`)?.textContent).toBe('RAM*');
+    fireEvent.change(textbox('Optik-Note'), { target: { value: '4' } });
+    fireEvent.click(saveButton());
+
+    expect(errorOf(textbox('RAM'))).toBe(RAM_MISSING);
+    expect(document.activeElement).toBe(textbox('RAM'));
+    expect(textbox('Optik-Note').value).toBe('4');
+    expect(sent).toEqual([]);
+    expectAccessibleCard();
+
+    fireEvent.change(textbox('RAM'), { target: { value: '16' } });
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ visualGrade: '4', values: { 20: '16' } });
+    expect(await screen.findByText('Gerät gespeichert')).toBeTruthy();
+  });
+
+  it('UI-010.validation DER-34-24 shows "RAM fehlt" of 422 validation_failed at values.<id> at the field of RAM, focus there, nothing saved, the inputs stay', async () => {
+    // RAM was made required in another window after UI-010 read the attributes, so the check
+    // in the browser lets the request pass and the server names the missing value.
+    mockApi({
+      attributes: [...ATTRIBUTES, { ...ram(true), required: false }],
+      update: () =>
+        Response.json(
+          errorBody('validation_failed', {
+            fields: [{ path: 'values.20', code: 'value_missing', message: RAM_MISSING }],
+          }),
+          { status: 422 },
+        ),
+    });
+    await openDevice();
+    fireEvent.change(textbox('Optik-Note'), { target: { value: '4' } });
+
+    fireEvent.click(saveButton());
+
+    await vi.waitFor(() => expect(errorOf(textbox('RAM'))).toBe(RAM_MISSING));
+    expect(document.activeElement).toBe(textbox('RAM'));
+    expect(textbox('Optik-Note').value).toBe('4');
+    expect(screen.queryByText('Gerät gespeichert')).toBeNull();
+    expectAccessibleCard();
+  });
+});
+
 describe('UI-010 ausgang-unbekannt (P-08)', () => {
   it('UI-010.ausgang-unbekannt DER-56-07 (c) shows the permanent P-08 without button, keeps the inputs and locks the save', async () => {
     mockApi({

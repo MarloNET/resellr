@@ -6,12 +6,12 @@
 | --- | --- |
 | Projekt | resellr (Arbeitstitel), Pilotkunde notebookers.de |
 | Dokumenttyp | Architecture Baseline (Prozessschritt 6a), Paperclip-Dokument `architecture-baseline` an [MAR-125](/MAR/issues/MAR-125#document-architecture-baseline) |
-| Version | 0.3.2 |
-| Status | approved (Owner-Freigabe 2026-11-07, Revision `2876806d-48b2-4ec3-b961-2f4d370d9b2e`, Freigabeanfrage [MAR-142](/MAR/issues/MAR-142#document-owner-freigabeanfrage), mit OD-02 Variante A, OD-09 Aus). Vorheriger Status: draft (Delta-Revision von v0.3.1 nach Architecture Review Runde 2 mit Verdikt `pass` und nach dem Cross-Check des Designs `92e018e`; über ein Delta-Review entscheidet der CEOrchestrator) |
+| Version | 0.3.5 (Architekturänderung MAR-1287). 0.3.4 (Architekturänderung MAR-1208). 0.3.3 |
+| Status | v0.3.5: approved (Owner-Freigabe 2026-11-23, Revision `99b65dcc-b71a-4413-8c20-2c4e4968c741` des Dokuments `baseline-delta-mar-1287` an MAR-1287 (Teil A; Teil B: Revision `f264741e-73b2-4211-ab73-47a5b772fabc` des Dokuments `ts-nachtrag-mar-1287`), Freigabekarte an Gate [MAR-1284](/MAR/issues/MAR-1284), kritische Annahme 1 bestätigt). v0.3.4: approved (Owner-Freigabe 2026-11-23, Revision `2a179619-41e4-4d35-a34f-8d84c88cb7e3` des Dokuments `baseline-delta-mar-1208` an MAR-1208, Freigabekarte an Gate MAR-1205). **v0.3.3: approved** (Owner-Freigabe 2026-11-23, Revision `793976c6-d9b1-42d2-b075-f187a80c3f58` des Dokuments `architekturaenderung-mar-1061`, Gate [MAR-1060](/MAR/issues/MAR-1060), beide kritischen Annahmen bestätigt; Baseline-Delta der Architekturänderung MAR-1061, Basis v0.3.2). v0.3.2: approved (Owner-Freigabe 2026-11-07, Revision `2876806d-48b2-4ec3-b961-2f4d370d9b2e`, Freigabeanfrage [MAR-142](/MAR/issues/MAR-142#document-owner-freigabeanfrage), mit OD-02 Variante A, OD-09 Aus). Vorheriger Status: draft (Delta-Revision von v0.3.1 nach Architecture Review Runde 2 mit Verdikt `pass` und nach dem Cross-Check des Designs `92e018e`; über ein Delta-Review entscheidet der CEOrchestrator) |
 | Autor | Software Architect (MarloNET) |
-| Datum | 06.11.2026 |
+| Datum | 23.11.2026 (v0.3.5); 20.11.2026 (v0.3.4); 23.11.2026 (v0.3.3, veröffentlicht; Entwurf vom 18.11.2026; v0.3.2: 06.11.2026) |
 | Vorgängerfassung | v0.3.1, Revision `a1b9ea85-c28a-49db-9fc7-768c214e743a` (Basis dieser Delta-Revision, Gegenstand von Architecture Review Runde 2, Verdikt `pass`); davor v0.3, Revision `0aca5c84-860d-47fa-bfe8-755b03dc22b1` (nicht reviewt); v0.2, Revision `8b2a682e-2cc8-44c8-973b-41d20b31bd30` (Gegenstand von Review Runde 1, Verdikt `changes_requested`); v0.1, Revision `ae51c8cc-8691-41f5-b1f9-f8ed58134604` (nie reviewt) |
-| Auftrag dieser Fassung | v0.3.2: [MAR-141](/MAR/issues/MAR-141), Folgen des Cross-Checks gegen das Design `92e018e`, FIND-110 und FIND-111 aus Architecture Review Runde 2, dazu die Hinweise H-7 bis H-10 an denselben Stellen (Änderungsliste Ä-28 bis Ä-36). v0.3.1: [MAR-139](/MAR/issues/MAR-139), Delta-Prüfung gegen Requirements v0.3.3 (Rev. `ce76d962`), nur das durch v0.3.3 Nötige (Änderungsliste Ä-22 bis Ä-27). v0.3: [MAR-136](/MAR/issues/MAR-136), Findings FIND-101 bis FIND-109 aus dem Architecture Review Runde 1 einarbeiten; Ausrichtung auf Requirements-Kandidat v0.3.2 |
+| Auftrag dieser Fassung | v0.3.5: [MAR-1287](/MAR/issues/MAR-1287), Architekturänderung „Version des Modell-Inserats bei Foto-Änderungen“ (Kap. 2.4, 14.1). v0.3.3: [MAR-1208](/MAR/issues/MAR-1208), Architekturänderung „Bestandsangaben bei geändertem Kennzeichen „Akku vorhanden““ (Kap. 2.4, 4.3, 14.1). v0.3.3: [MAR-1061](/MAR/issues/MAR-1061), Architekturänderung „Nachführen des Anzeigetitels ab S5“ (Kap. 2.4, 4.3, 14.1). v0.3.2: [MAR-141](/MAR/issues/MAR-141), Folgen des Cross-Checks gegen das Design `92e018e`, FIND-110 und FIND-111 aus Architecture Review Runde 2, dazu die Hinweise H-7 bis H-10 an denselben Stellen (Änderungsliste Ä-28 bis Ä-36). v0.3.1: [MAR-139](/MAR/issues/MAR-139), Delta-Prüfung gegen Requirements v0.3.3 (Rev. `ce76d962`), nur das durch v0.3.3 Nötige (Änderungsliste Ä-22 bis Ä-27). v0.3: [MAR-136](/MAR/issues/MAR-136), Findings FIND-101 bis FIND-109 aus dem Architecture Review Runde 1 einarbeiten; Ausrichtung auf Requirements-Kandidat v0.3.2 |
 | Bindende Requirements | Requirements Specification v0.3, Dokument `requirements` an [MAR-114](/MAR/issues/MAR-114#document-requirements), **Revision `170ca77f-9e3e-4ffc-b0ae-d8ffa0f0c9e4`** |
 | Freigabenachweis Requirements | Interaktion `4b838947-abf0-4c1b-b4f7-8de52c248386` („Freigabe Requirements v0.3 und UI/UX-Klassifikation“) an [MAR-111](/MAR/issues/MAR-111), Ergebnis `accepted` am 06.11.2026 18:09 UTC durch den Owner (Board). Gebunden an Revision `170ca77f`. Mit dieser Freigabe gelten die Standardannahmen zu OP-17, OP-18, OP-29 und OP-30 (REQ-090 bleibt Must). |
 | **Ausrichtung dieser Fassung** | **Kandidat v0.3.3, Revision `ce76d962-cc37-46e1-9086-b2be8e08e752`** (enthält v0.3.1 und v0.3.2; Änderungsliste [v033-aenderungsliste](/MAR/issues/MAR-137#document-v033-aenderungsliste) an MAR-137, Requirements Kap. 15.12). Delta-Review zu v0.3.3: [requirements-review-v033-r2](/MAR/issues/MAR-138#document-requirements-review-v033-r2) an MAR-138, Revision `13dde053`, Verdikt `pass` (nachgeführt in v0.3.2, Hinweis H-9). v0.3.1 und v0.3.2: [requirements-review-v032-r1](/MAR/issues/MAR-133#document-requirements-review-v032-r1) an MAR-133, Revision `b119fea9`, Verdikt `pass` (FIND-030 bis FIND-034 minor, in v0.3.3 korrigiert). **Owner-Freigabe pending.** Die Baseline folgt dem Kandidaten auf Anweisung des CEOrchestrators (MAR-136, MAR-139). Der Kandidat wird damit **nicht** als bindend behandelt: Die Baseline ist erst widerspruchsfrei, wenn der Owner v0.3.3 freigibt. Bedingung und Rückfall: Kap. 13.4 (KF-01). v0.3 dieser Baseline war auf v0.3.2 (Rev. `e4b94794`) ausgerichtet. |
@@ -23,7 +23,7 @@
 | ADRs | ADR-001 bis ADR-007 in Kapitel 15, alle mit Status **proposed**; ADR-006 in v0.3 um den Hosting-Mechanismus unter Windows ergänzt, in v0.3.1 um die Trennung von Owner-Wortlaut und Ableitung bei E-7 und um OP-32/A-37 (Kopie vor Updates), in v0.3.2 um den Lebenszyklus der Überwachung (FIND-110); ADR-001 und ADR-002 in v0.3.2 an Kap. 8.1 und ADR-006 angeglichen (FIND-111) |
 | Architecture Review | Runde 1: [architecture-review-v02-r1](/MAR/issues/MAR-134#document-architecture-review-v02-r1), Revision `1b16f458-cfa2-4b6d-beb5-3cdc6e263ee0`, auf v0.2 (Revision `8b2a682e`), Verdikt `changes_requested` (FIND-101 major, FIND-102 bis FIND-109 minor). Runde 2: [architecture-review-v03-r2](/MAR/issues/MAR-140#document-architecture-review-v03-r2), Revision `d915d35f-599f-4a3f-b6ea-2fce78ee0404`, auf v0.3.1 (Revision `a1b9ea85`), Verdikt **`pass`** (FIND-110, FIND-111 minor; Hinweise H-5 bis H-11). FIND-110 und FIND-111 sind in v0.3.2 behoben (Kap. 14.5). Ob die geänderten Teile ein Delta-Review brauchen, entscheidet der CEOrchestrator. |
 | Human Approval | pending. Wegen Klassifikation „Material“ gemeinsam mit dem UI/UX-Design nach Cross-Check. Setzt die Owner-Freigabe von Requirements v0.3.3 voraus, einschließlich der Bestätigung von REQ-105 und REQ-106 nach OP-17 (Kap. 13.4). **Für die Freigabeanfrage:** Die Änderungen aus dem Cross-Check sind Ä-28 bis Ä-33 (Änderungsliste unten), die offenen Punkte an das Design stehen in Kap. 6.3 und 6.4. |
-| Mermaid-Prüfung | 12/12 Diagramme gültig (`validate-mermaid.mjs`, mermaid 11), Kapitel 14.3; in v0.3.2 ist genau ein Diagramm geändert (Ablauf 4b, FIND-110) |
+| Mermaid-Prüfung | 13/13 Diagramme gültig (`validate-mermaid.mjs`, mermaid 11), Kapitel 14.3; in v0.3.3 ist das Komponentendiagramm (Kap. 2.4) geändert, in v0.3.4 das Diagramm „Ereignisse zwischen den Fachkomponenten“ (Kap. 2.4) neu, in v0.3.5 ist es um die Meldung „Fotos geändert“ ergänzt |
 
 **Lesehilfe.** Alle Entscheidungen in diesem Dokument sind **Vorschläge des Software Architect (proposed)**. Verbindlich werden sie erst mit der Owner-Freigabe der Baseline. Ausgenommen sind die Punkte, die der Owner bereits beantwortet hat (OD-03 = E-7, OD-04); sie sind als „vom Owner entschieden“ gekennzeichnet und werden mit der Baseline-Freigabe formal bestätigt. Bei OD-03 gilt das nur für den Owner-Wortlaut von E-7; der eine Datenordner (REQ-106) und die Aktion „resellr beenden“ in resellr (REQ-105) sind daraus abgeleitet und stehen zur Owner-Bestätigung (Kap. 13.3, 13.4). Offene Owner-Entscheidungen heißen **OD-01** usw. und sind in Kapitel 13.3 gebündelt, Architekturrisiken heißen **AR-01** usw., Konflikte mit bindenden Requirements **KF-01** usw. (Kap. 13.4). Die Bezeichner RI-xx, A-xx, OP-xx, E-x, RB-xx, LP-x, REQ-xxx und AC-REQ-xxx stammen aus den Requirements, C-x, V-x, P-xx, FLOW-xx und UI-xxx aus dem UI/UX-Design, FIND-1xx aus dem Architecture Review, H-x aus dessen Hinweisen, K-x aus dem Cross-Check des Architekten (Kap. 6.4). Komponenten-, Entitäts- und Technologienamen sind englisch, alle Beschreibungen deutsch.
 
@@ -86,6 +86,186 @@ Basis ist v0.3, Revision `0aca5c84-860d-47fa-bfe8-755b03dc22b1`. Geändert ist n
 | Ä-09 | **Redaktionelle Nachführung auf v0.3.1:** REQ-103 in der Traceability, AC-REQ-001-07 als Test der Nicht-Erreichbarkeit, FIND-026 und FIND-027 als in v0.3.1 adressiert vermerkt | Lesestand v0.3.1 | 1.5, 11.2, 14.1 |
 | Ä-10 | **OD-06 entfällt** (keine Sicherungen in resellr). **OD-07 entfällt in dieser Form**, der neue Hinweis ist Gestaltungsfrage des UI/UX-Designs (über den Product Owner). | Folge aus Ä-02 | 10.5, 13.3 |
 | Ä-11 | Risiken angepasst: AR-01, AR-02 neu bewertet, AR-08 erledigt, AR-05 und AR-10 auf Windows/Chrome eingeengt, neu AR-13 (unsigniertes Installationspaket) und AR-14 (Kopie bei laufendem resellr) | Folge aus Ä-01, Ä-02 | 13.1 |
+
+---
+
+## Freigabe-Briefing v0.3.5 (Architekturänderung MAR-1287)
+
+Dieses Briefing gilt für das Baseline-Delta v0.3.5. Die kritische Annahme dieser Änderung steht im Briefing des Specification-Nachtrags v0.5.6 (Teil B), weil sie dort wirkt; sie wird hier nicht wiederholt.
+
+### Kurzfassung
+
+resellr besteht im Server aus fachlichen Bausteinen, unter anderem „Fotos“ und „Bestand“. Die Fotos eines Modell-Inserats gehören dem Baustein „Fotos“, das Modell-Inserat selbst mit seiner Versionsnummer und „zuletzt geändert“ dem Baustein „Bestand“. Neu meldet „Fotos“ jede Foto-Änderung an „Bestand“, und der Bestand erhöht die Versionsnummer, in derselben Speicherung. Die Übersicht der Meldungen zwischen den Bausteinen bekommt dafür eine Kante. Keine neue Technologie, keine Datenbankänderung, kein ADR und keine Änderung an den Randbedingungen für die Oberfläche.
+
+### So haben wir dich verstanden
+
+| Deine Vorgabe (Quelle) | Unsere Auslegung | Beispiel |
+| --- | --- | --- |
+| „Bearbeitbare Datensätze tragen eine Versionsnummer … Ist der Datensatz … inzwischen geändert, lehnt der Server mit ‚Konflikt‘ ab“ (Baseline Kap. 9.3) | Die Fotos sind ein Teil des Modell-Inserats. Eine Foto-Änderung ist eine Änderung des Modell-Inserats und erhöht seine Versionsnummer. | Fenster 1 ordnet die Fotos von MI-A neu; Fenster 2 zeigt noch den alten Stand und entfernt ein Foto: „Neu laden“, nichts wird überschrieben. (Kap. 2.4; Teil B, kritische Annahme 1) |
+
+### Kritische Annahmen – bitte einzeln bestätigen
+
+Keine in diesem Teil. Die kritische Annahme dieser Änderung steht im Briefing von Teil B.
+
+### Weitere Annahmen
+
+Keine.
+
+### Entscheidungen der Agenten
+
+| Entscheidung | Verworfene Alternative | Warum | Umkehrbar |
+| --- | --- | --- | --- |
+| „Fotos“ meldet die Änderung an „Bestand“; nur der Bestand schreibt das Modell-Inserat (Variante A, Teil B Kap. 2). *Beispiel:* Foto hochladen → Meldung an den Bestand → MI-A Versionsnummer 7 → 8, alles in einer Speicherung. | Variante B: „Bestand“ stellt „Fotos“ eine Schreibfunktion für die Versionsnummer bereit. Sie wäre gleich sicher und gleich aufwendig; du kannst sie mit „Änderungen anfordern“ verlangen | Die freigegebene Regel ist: Bausteine melden Änderungen, statt fremde Daten direkt zu schreiben. Eine Schreibfunktion wäre ein zweiter Weg, auf dem ein anderer Baustein das Modell-Inserat schreibt, und eine weitere Ausnahme in den Abhängigkeitsregeln. | leicht vor dem Bau, mittel danach |
+| Die Übersicht der Meldungen zeigt jetzt auch die schon bestehende Meldung „Fotos“ → „Kanal-Inhalte“ | weiter nur in der Technical Specification | Mit der neuen Kante wäre die Übersicht sonst unvollständig; am Verhalten ändert sich nichts | leicht |
+| Kein ADR | ADR-009 | keine neue Technologie, keine Datenbankänderung, keine neue Komponente | – |
+
+### Bewusst nicht enthalten
+
+- **Keine eigene Versionsnummer für die Fotos** (Teil B, kritische Annahme 1). *Beispiel:* Fotos und Preise von MI-A teilen sich eine Versionsnummer.
+- **Keine Änderung** an Stack, Datenmodell, Randbedingungen für die Oberfläche, Sicherheit, Betrieb und Teststrategie.
+
+### Was sich geändert hat
+
+Gegenüber der von dir am 07.11.2026 freigegebenen Baseline v0.3.2:
+- Kap. 2.4, Absatz „Ereignisse zwischen den Fachkomponenten“: neue Meldung „Fotos geändert“ von `media` an `inventory`; die bestehende Meldung von `media` an `listing-content` ist jetzt sichtbar.
+- Kap. 14.1 bis 14.3: Nachweis, Änderungshistorie, Mermaid-Prüfung.
+- Den Absatz „Ereignisse zwischen den Fachkomponenten“ bringt die Änderung „Akku vorhanden“ (v0.3.4) mit, die noch auf deine Freigabe wartet. Gibst du sie nicht frei, bringt diese Änderung den Absatz ohne die Akku-Meldung mit (Kap. 5).
+- Du siehst diese Änderung zum ersten Mal.
+
+### Deine Entscheidungen
+
+Keine. Die Wahl zwischen Meldung (A) und Schreibfunktion (B) haben wir getroffen (oben); du musst nicht zwischen beiden wählen.
+
+### Lesetipps
+
+- **Kap. 3, A.2 (Kap. 2.4):** die neue Meldung und das Diagramm aller Meldungen zwischen den Bausteinen.
+- **Teil B, Kap. 2:** warum eine Meldung und keine Schreibfunktion.
+
+## Freigabe-Briefing v0.3.4 (Architekturänderung MAR-1208)
+
+Dieses Briefing gilt für das Baseline-Delta v0.3.4. Das Briefing des Specification-Nachtrags v0.5.5 (Teil B) enthält die kritischen Annahmen und deine Entscheidung; es wird hier nicht wiederholt.
+
+### Kurzfassung
+
+resellr besteht im Server aus fachlichen Bausteinen, unter anderem „Einstellungen“, „Bestand“ und „Kanal-Inhalte“. Bisher beschreibt die Baseline nur Meldungen an den Baustein „Kanal-Inhalte“: Wenn sich Daten ändern, bildet er die Inhalte neu. Neu meldet der Baustein „Einstellungen“ auch etwas an den Baustein „Bestand“: dass sich das Kennzeichen „Akku vorhanden“ eines Akku-Werts geändert hat. Der Bestand bildet daraufhin die Akku-Angabe der betroffenen Modell-Inserate neu. Eine kleine Übersicht zeigt jetzt alle Meldungen zwischen den Bausteinen. Keine neue Technologie, keine Datenbankänderung, kein ADR und keine Änderung an den Randbedingungen für die Oberfläche.
+
+### So haben wir dich verstanden
+
+| Deine Vorgabe (Quelle) | Unsere Auslegung | Beispiel |
+| --- | --- | --- |
+| Bestandsangaben „stets mit dem aktuellen Wert“ (REQ-091); Geräte zählen nur mit Kennzeichen „Akku vorhanden“ (Requirements Kap. 9.7 Regel 1) | Die Bestandsangaben eines Modell-Inserats hängen außer von seinen Geräten von genau einer Einstellung ab, dem Kennzeichen „Akku vorhanden“. Ändert es sich, bildet der Bestand die Angaben in derselben Speicherung neu. | Du setzt bei „mit Akku (defekt)“ das Kennzeichen auf „Nein“. MI-A mit 85 %, 40 % („mit Akku (defekt)“) und 90 % zeigt sofort „85–90 %“ statt „40–90 %“. (Kap. 2.4, 4.3) |
+
+### Kritische Annahmen – bitte einzeln bestätigen
+
+Keine in diesem Teil. Beide kritischen Annahmen dieser Änderung stehen im Briefing von Teil B, weil sie dort wirken.
+
+### Weitere Annahmen
+
+Keine.
+
+### Entscheidungen der Agenten
+
+| Entscheidung | Verworfene Alternative | Warum | Umkehrbar |
+| --- | --- | --- | --- |
+| Die Einstellungen melden die Änderung des Kennzeichens an den Bestand; nur der Bestand schreibt seine Bestandsangaben. *Beispiel:* Speichern in „Auswahllisten“ → Meldung an den Bestand → MI-A neu gebildet, alles in einer Speicherung. | (a) Die Einstellungen rufen den Bestand direkt auf; (b) der Bestand reagiert auf die allgemeine Meldung „Einstellung geändert“; (c) der Bestand bildet die Angabe bei jeder Anzeige neu | (a) Die Einstellungen hingen vom Bestand ab, der Bestand liest schon Einstellungen: ein Kreis. (b) Diese Meldung hat schon genau einen Empfänger (Kanal-Inhalte). (c) Übersicht und Filter nutzen die gespeicherte Angabe; jede Liste müsste bis zu 3.000 Angaben neu bilden. | leicht vor dem Bau, mittel danach |
+| Die bestehenden Prüfmeldungen zwischen den Bausteinen (z. B. „darf diese Modellvorlage gelöscht werden?“) stehen jetzt auch in der Baseline | weiter nur in der Technical Specification | Mit der neuen Meldung ist die Baseline sonst unvollständig; am Verhalten ändert sich nichts | leicht |
+| Kein ADR | ADR-009 | keine neue Technologie, keine Datenbankänderung, keine neue Komponente | – |
+
+### Bewusst nicht enthalten
+
+- **Keine weitere Einstellung** wirkt auf die Bestandsangaben. *Beispiel:* Das Deaktivieren des Merkmals „Akku“ ändert die Akku-Angabe nicht (Teil B, kritische Annahme 1).
+- **Keine Änderung** an Stack, Datenmodell, Oberfläche, Sicherheit, Betrieb und Teststrategie.
+
+### Was sich geändert hat
+
+Gegenüber der von dir am 07.11.2026 freigegebenen Baseline v0.3.2:
+- Kap. 2.4: neuer Absatz „Ereignisse zwischen den Fachkomponenten“ mit Diagramm; neu darin ist nur die Meldung „Kennzeichen „Akku vorhanden“ geändert“ von `settings` an `inventory`.
+- Kap. 4.3: Absatz „Bestandsangaben und Einstellungen“.
+- Kap. 14.1 bis 14.3: Nachweis, Änderungshistorie, Mermaid-Prüfung.
+- Die Architekturänderung MAR-1061 (v0.3.3, Anzeigetitel) wartet getrennt auf deine Freigabe; beide berühren sich nicht inhaltlich.
+- Du siehst diese Änderung zum ersten Mal.
+
+**Neu gegenüber der ersten Prüfrunde** (nach der Architecture Review Runde 1, MAR-1212; an der Lösung ändert sich nichts):
+- Kap. 2.4: Der Satz zum Schreiben lautet jetzt „Der Empfänger schreibt seine eigenen Daten; Daten einer anderen Komponente nur über deren Schreibfunktion nach den Abhängigkeitsregeln“. So passt er auch neben der Änderung MAR-1061, nach der „Kanal-Inhalte“ den Anzeigetitel über den Bestand schreibt (FIND-422).
+- Kap. 4.3: Der neue Absatz nennt jetzt den gespeicherten Zwischenstand der Bestandsangaben. *Beispiel:* „40–90 %“ steht für Filter und Sortierung am Modell-Inserat und wird aus den Geräten gebildet; diesen Zwischenstand bildet der Bestand nach dem Kennzeichen neu (FIND-423).
+- Mermaid-Prüfung: genaue Zahl der Diagramme (13), auch wenn MAR-1061 vor oder nach dieser Änderung veröffentlicht wird (FIND-426).
+
+### Deine Entscheidungen
+
+Keine eigene. Ob resellr neu bildet (dieses Delta) oder das Kennzeichen sperrt, entscheidest du im Briefing von Teil B; wählst du „sperren“, entfällt dieses Delta.
+
+### Lesetipps
+
+- **Kap. 3, A.2 (Kap. 2.4):** der neue Absatz mit dem Diagramm aller Meldungen zwischen den Bausteinen.
+- **Teil B, Kap. 2:** warum eine eigene Meldung und nicht eine der vorhandenen.
+
+---
+
+## Freigabe-Briefing v0.3.3 (Architekturänderung MAR-1061)
+
+Dieses Briefing gilt für beide Teile dieser Änderung (Baseline-Delta v0.3.3 und Specification-Nachtrag v0.5.4). Es nennt nur, was gegenüber der von dir freigegebenen Baseline v0.3.2 und Specification v0.5.3 neu ist.
+
+### Kurzfassung
+
+Jedes Modell-Inserat hat einen Anzeigetitel, den resellr in der Inserat-Übersicht, beim Zuordnen, in der Gerätesuche und auf der Seite des Modell-Inserats zeigt. Er soll der ungekürzte Titel nach dem Titelmuster der Geräteart sein (REQ-052). Bis zur Kanal-Engine (Bauschritt S5) steht dort nur die Modellbezeichnung. Diese Änderung legt fest, wie resellr den Titel ab S5 bildet und bei jeder Änderung sofort nachführt: beim Speichern von Modellvorlage, Inseratswerten, Herstellername, Merkmalen, Listenwerten oder Titelmuster. Dazu bildet der Baustein für die Kanal-Inhalte den Titel mit, und der Bestand speichert ihn über eine eigene, eng begrenzte Schreibfunktion. Beim ersten Start mit S5 bildet resellr die Titel aller bis dahin angelegten Modell-Inserate einmal neu. Es gibt keine Datenbankänderung, keine Änderung an der Oberfläche und keine neue Architekturentscheidung mit eigenem ADR.
+
+### So haben wir dich verstanden
+
+| Deine Vorgabe (Quelle) | Unsere Auslegung | Beispiel |
+| --- | --- | --- |
+| Übersicht zeigt je Modell-Inserat „den ungekürzten Titel nach dem Titelmuster der Geräteart“ (REQ-052) | Der Anzeigetitel folgt **immer** dem Titelmuster der Geräteart, auch wenn ein Kanal ein eigenes Muster hat, und wird nie gekürzt. Er nutzt dieselben Regeln wie der Kanal-Titel: leere Werte lassen den ganzen Bestandteil weg. | MI-A heißt „Apple MacBook Pro 13 (A1989), intel Core i5-8279U, 16GB RAM, 512GB Space Gray“ (77 Zeichen), obwohl der Kleinanzeigen-Titel auf 65 Zeichen gekürzt ist. Fehlt die Typbezeichnung: „Apple MacBook Pro 13, intel Core i5-8279U, 16GB RAM, 512GB Space Gray“ ohne „()“. (Teil B, Kap. 2.8.6) |
+| Änderungen an Modelldaten und Einstellungen wirken sofort auf die Inhalte (REQ-034, REQ-053, Requirements Kap. 6.0) | Der Anzeigetitel ändert sich in **derselben** Speicherung wie die Kanal-Inhalte. Es gibt keinen Zeitpunkt, an dem Kanal-Inhalt und Anzeigetitel verschiedene Daten zeigen. | Du änderst bei MV-A die Farbe von „Space Gray“ auf „Silber“. Direkt nach dem Speichern zeigt die Übersicht „… 512GB Silber“, und der Shop-Entwurf hat denselben neuen Titel. (Teil B, Kap. 2.8.6) |
+
+### Kritische Annahmen – bitte einzeln bestätigen
+
+1. **Annahme:** Wenn resellr einen Anzeigetitel wegen einer anderen Änderung nachführt, ist das **keine Änderung des Modell-Inserats**. Seine Versionsnummer bleibt gleich, der neue Titel allein lässt es in der Übersicht nicht nach oben rücken (Sortierung „zuletzt geändert“), und im Änderungsprotokoll steht nur die auslösende Änderung, nicht 300 Titeländerungen.
+   *Beispiel:* Du benennst den Hersteller „Apple“ in „Apple Inc.“ um. 300 Modell-Inserate heißen danach „Apple Inc. MacBook …“. Hast du in einem zweiten Fenster gerade die Inseratswerte von MI-A geöffnet, speicherst du sie ohne „Neu laden“. Das Protokoll zeigt einen Eintrag „Hersteller geändert“. In der Übersicht bleibt die Reihenfolge gleich: Weder der neue Anzeigetitel noch die automatisch neu gebildeten Kanal-Inhalte zählen als Änderung durch dich (Regel des Product Owners, MAR-1073). Nach oben rückt ein Modell-Inserat erst, wenn du an ihm selbst etwas tust, z. B. Inseratswerte speicherst oder einen Kanal-Inhalt freigibst. Die technische Umsetzung dieser Regel folgt in einem eigenen Nachtrag (siehe „Bewusst nicht enthalten“).
+   **Wenn falsch:** Soll jede Titeländerung als Änderung des Modell-Inserats zählen, würde jede Einstellungsänderung offene Formulare mit „Neu laden“ unterbrechen und das Protokoll mit Einträgen füllen. Vor dem Bau ist das eine kleine Änderung an einer Stelle, danach ein Update. (Teil B, Kap. 2.8.6 „Schreiben“, RQ-24)
+2. **Annahme:** Beim **ersten Start mit S5** bildet resellr die Anzeigetitel aller vorher angelegten Modell-Inserate einmal neu. Das geschieht im selben Startschritt, der auch die fehlenden Kanal-Inhalte anlegt. Der Start dauert dadurch etwas länger. **Eine automatische Kopie vor diesem Schritt gibt es erst ab Bauschritt S10** (dort kommt die Kopie vor Updates). Wir halten das für vertretbar: Der Schritt schreibt nur abgeleitete Werte (Kanal-Inhalte und Anzeigetitel), nichts, was du erfasst hast; er läuft in einer einzigen Speicherung und nimmt bei einem Fehler alles zurück, dann startet resellr nicht und der Datenstand von S4 bleibt unverändert; mit einer neuen Programmversion lässt er sich wiederholen. Die Abnahme startet ohnehin mit frischen Beispieldaten (`npm run demo`). Wer S4 mit eigenen, dauerhaften Daten betrieben hat, kopiert den Datenordner (`%LOCALAPPDATA%\resellr\Daten` bzw. den Ordner aus `RESELLR_DATA_DIR`) vor dem ersten Start mit S5 selbst. Den Hinweis dazu bekommst du in der Abnahmeanfrage von S5 (CEOrchestrator) und, falls du vor Release 0.1 ein Paket aus einem manuellen Build (`workflow_dispatch`) bekommst, in dessen Begleittext; ein eigenes Release je Bauschritt gibt es nicht. Das erste Release v0.1.0 enthält die automatische Kopie schon (CU-248); Installationen aus GitHub Releases sind nicht betroffen.
+   *Beispiel:* Du hast S4 mit einem eigenen Datenordner betrieben und dort 40 Modell-Inserate angelegt. Bis zum Update heißt MI-A in der Übersicht „MacBook Pro 13“. Nach dem ersten Start mit S5 heißt es „Apple MacBook Pro 13 (A1989), intel Core i5-8279U, 16GB RAM, 512GB Space Gray“. Vorher hast du den Datenordner nach dem Hinweis in der Abnahmeanfrage von S5 kopiert; resellr selbst hat keine Kopie angelegt.
+   **Wenn falsch:** Ohne Neubildung blieben alte Titel stehen, bis jemand das Modell-Inserat oder seine Einstellungen ändert. Eine Korrektur nach dem Update wäre ein weiteres Update mit erneuter Neubildung. Willst du schon vor S10 eine automatische Kopie, müsste die Kopie vor Updates (CU-248) aus S10 nach S5 vorgezogen werden; das ist eine Änderung der Bauschritte, keine dieser Architekturänderung. (Teil B, Kap. 2.8.6 „Erster Start mit S5“)
+
+### Weitere Annahmen
+
+- **Geräteart ohne Titelmuster:** Hat eine Geräteart noch kein eigenes Titelmuster, ist der Anzeigetitel die Modellbezeichnung, wie bis S5. *Beispiel:* Du legst die Geräteart „Monitor“ an und noch kein Titelmuster. Das Modell-Inserat von „Dell P2422H“ heißt „P2422H“, bis du ein Muster speicherst; dann sofort „Dell P2422H …“. (RQ-25)
+- **Antwort nach dem Speichern:** Nach „Modell-Inserat anlegen“ und „Inseratswerte speichern“ zeigt resellr schon den neuen Titel, ohne Neuladen. *Beispiel:* Du änderst bei MI-A RAM von 16 auf 8 GB; der Kopf von UI-014 zeigt sofort „… 8GB RAM …“.
+- **Zahlen nach dem Speichern:** Die drei Zahlen nach REQ-053 („aktualisiert“, „zur erneuten Freigabe“, „manuell angepasst“) zählen weiter nur Kanal-Inhalte, keine Anzeigetitel. *Beispiel:* Umbenennen des Textbausteins „Abholung“ ändert keinen Titel und zeigt dieselben Zahlen wie bisher.
+- **Fehler:** Scheitert das Bilden eines Titels, wird die ganze Speicherung zurückgenommen, wie bei den Kanal-Inhalten. *Beispiel:* Ein technischer Fehler beim Umbenennen des Herstellers: nichts ist gespeichert, du siehst die Fehlermeldung mit Referenznummer.
+
+### Entscheidungen der Agenten
+
+| Entscheidung | Verworfene Alternative | Warum | Umkehrbar |
+| --- | --- | --- | --- |
+| Der Baustein für Kanal-Inhalte (`listing-content`) bildet den Anzeigetitel bei jeder Neuberechnung mit; der Bestand (`inventory`) speichert ihn über eine Schreibfunktion, die nur diesen einen Wert ändert | (a) Der Bestand bildet den Titel selbst und reagiert dafür auf dieselben Änderungsmeldungen; (b) Titel bei jedem Anzeigen neu bilden, nicht speichern; (c) Titel aus dem Modell-Inserat in eine Tabelle des Kanal-Bausteins verschieben | (a) bräuchte einen zweiten Empfänger je Meldung und einen zweiten Weg zu Titelmuster, Hersteller und Merkmalen; Titel und Kanal-Inhalte könnten auseinanderlaufen. (b) Gerätesuche, Zuordnen und Übersicht müssten Titelmuster und Merkmale selbst laden; die Übersicht bildete bei jedem Aufruf bis 200 Titel. (c) braucht eine Datenbankänderung, und der Bestand müsste beim Kanal-Baustein lesen, der seinerseits beim Bestand liest. | leicht vor dem Bau, mittel danach |
+| Neubildung beim ersten Start über den vorhandenen Startschritt „alles neu bilden“ (CU-173) | eigene Datenmigration nur für die Titel | Der Startschritt läuft beim ersten Start mit S5 ohnehin (bis S10 ohne automatische Kopie vorab, kritische Annahme 2); eine zweite Stelle für dieselbe Bildung entfällt | leicht |
+| Die Antworten auf „Anlegen“ und „Inseratswerte speichern“ lesen den Titel nach dem Speichern noch einmal | Bericht der Speicherung um Titel erweitern | Der Bericht ist eine gemeinsame Stelle aller Dienste; ein zusätzliches Lesen betrifft nur zwei Dienste | leicht |
+| Kein eigenes ADR; die Regel steht in der Baseline (Kap. 2.4, 4.3) | ADR-009 | keine neue Technologie, keine Datenbankänderung, keine neue Komponente; die Abhängigkeitsrichtung bleibt dieselbe. Die Ausnahme ist eng (ein abgeleiteter Wert) und vor dem Bau leicht änderbar | – |
+
+### Bewusst nicht enthalten
+
+- **Keine Änderung an der Oberfläche und am Design.** Die Screens zeigen den Titel schon heute; sie bekommen ab S5 nur den richtigen Wert. *Beispiel:* UI-002 sieht gleich aus, nur „MacBook Pro 13“ wird zu „Apple MacBook Pro 13 (A1989), …“.
+- **Keine Datenbankänderung, keine neue Änderungsmeldung**, kein neuer Endpunkt.
+- **Nicht hier gelöst** (zwei Lücken, die ich dabei gefunden habe, an den CEOrchestrator gemeldet, Kap. 9): wer den Zeitstempel „zuletzt geändert“ des Modell-Inserats setzt, wenn sich nur ein Kanal-Inhalt ändert; und wie ein Kanal-Titel aussieht, wenn die Geräteart kein Titelmuster hat. *Beispiel:* Freigabe eines Shop-Inhalts von MI-A: Ob MI-A dadurch in der Übersicht nach oben rückt, ist schon heute vorgesehen, aber keinem Baustein zugewiesen.
+  **Stand:** Die Regel zum Zeitstempel hat der Product Owner entschieden (MAR-1073: nur deine Aktionen zählen, automatische Neubildungen nicht). Die technische Umsetzung folgt in einem eigenen Nachtrag vor dem Ready der S5-Issues zu CU-322 und CU-323. Die Regel zum Kanal-Titel ohne Titelmuster ist ebenfalls entschieden (MAR-1072) und folgt in der Specification vor dem Bau von CU-145.
+
+### Was sich geändert hat
+
+Gegenüber Baseline v0.3.2 und Specification v0.5.3 mit den Code-Struktur-Nachträgen bis MAR-1053:
+- **Baseline:** Abhängigkeitsregel um eine eng begrenzte schreibende Ausnahme ergänzt (`listing-content` schreibt den Anzeigetitel über `inventory`), Komponentendiagramm um diese Kante; Anzeigetitel als abgeleiteter, gespeicherter Wert des Modell-Inserats (Kap. 2.4, 4.3, 14.1).
+- **Specification:** neues Kap. 2.8.6 „Anzeigetitel des Modell-Inserats“ mit Ablaufdiagramm; Antwort „Modell-Inserat“ ab S5 (Kap. 2.6); Meldung beim Speichern des Titelmusters einer Geräteart präzisiert (Kap. 2.3); Kopie vor der Neubildung erst ab S10 klargestellt (Kap. 2.8.3, 4.4.0 Zeile S5); Lasttest um einen Fall mit Titeln erweitert (Kap. 2.8.5, CU-174, CU-175); Ausnahme (5) in Kap. 4.1; Zwischenstand S4 und Code-Einheiten CU-123, CU-124, CU-125, CU-145, CU-164, CU-165, CU-166, CU-173, CU-175 angepasst, neu CU-322 und CU-323 (Kap. 4.4); Tests (Kap. 6.2); Auslegungen RQ-24 und RQ-25 (Kap. 9.3).
+- **Aus der Architecture Review (Runde 1) korrigiert:** Die frühere Aussage, vor der Neubildung beim ersten Start mit S5 lege resellr eine Kopie an, war falsch; die Kopie kommt erst in S10 (kritische Annahme 2 neu gefasst). Außerdem: Beispiel zur Sortierung in kritischer Annahme 1 ausdrücklich gemacht, zusätzliche Messung der Neuberechnung mit Titeln, Namen und Formulierungen geschärft.
+- **Aus der Architecture Review (Runde 2) korrigiert:** Das Beispiel zu kritischer Annahme 1 sagte, die 300 Modell-Inserate rückten nach der Herstellerumbenennung trotzdem nach oben. Das widersprach der inzwischen entschiedenen Regel des Product Owners (MAR-1073); jetzt bleibt die Reihenfolge gleich. Kritische Annahme 2 nennt jetzt, wo du den Hinweis zum Kopieren findest (Abnahmeanfrage von S5 statt einer „Release-Notiz von S5“, die es nicht gibt), den genauen Datenordner und dass sich die Neubildung nur mit einer neuen Programmversion wiederholt. Der zweite Messfall des Lasttests ändert jetzt wirklich alle 3.000 Titel.
+- Bezug zu deiner letzten Vorlage: Der Nachtrag MAR-1053 hatte diesen Punkt als „Architekturänderung vor S5“ offen gelassen; das hier ist die Lösung dazu.
+
+### Deine Entscheidungen
+
+Keine neue. Du bestätigst die beiden kritischen Annahmen und gibst die Änderung frei.
+
+### Lesetipps
+
+- **Teil B, Kap. 2.8.6:** wann der Titel nachgeführt wird und wann nicht (Tabelle der Auslöser), mit Ablaufdiagramm.
+- **Kap. 2 „Varianten“:** warum der Kanal-Baustein den Titel bildet und nicht der Bestand.
+- **Teil A, Kap. 2.4:** die geänderte Abhängigkeitsregel der Baseline.
 
 ---
 
@@ -249,7 +429,7 @@ Die Konfigurationsdatei und die Ende-Markierung liegen ebenfalls im Datenordner 
 
 ### 2.4 Komponenten von `resellr-server`
 
-**Welche fachlichen Module hat der Server und wie hängen sie voneinander ab?** Vereinfacht: Alle schreibenden Komponenten rufen `audit` auf und greifen über eine gemeinsame Datenzugriffsschicht auf `resellr-db` zu. Beides ist als je eine Kante dargestellt. `content-engine` greift nicht auf die Datenbank zu.
+**Welche fachlichen Module hat der Server und wie hängen sie voneinander ab?** Vereinfacht: Alle schreibenden Komponenten rufen `audit` auf und greifen über eine gemeinsame Datenzugriffsschicht auf `resellr-db` zu. Beides ist als je eine Kante dargestellt. `content-engine` greift nicht auf die Datenbank zu. Lesezugriffe über Reader sind nur für `datasheet` dargestellt; `listing-content` liest die anderen Fachkomponenten zusätzlich über deren Reader (für `inventory` u. a. CU-129), ohne eigene Kante. Neu in v0.3.3: `listing-content` schreibt den Anzeigetitel des Modell-Inserats über die Schreibfunktion von `inventory`; dieselbe Richtung besteht schon für das Lesen.
 
 ```mermaid
 flowchart TB
@@ -280,7 +460,8 @@ flowchart TB
   webui -->|"JSON über HTTP"| api
   api -->|"ruft Anwendungsfälle auf"| settings & catalog & inventory & channels & lc & mediaC & sheet & audit & ops
   settings & catalog & inventory & channels -.->|"Ereignis: Inhalts- oder Bestandsangabe geändert (synchron, gleiche Transaktion)"| lc
-  lc -->|"bildet Stände"| engine
+  lc -->|"bildet Stände und Anzeigetitel"| engine
+  lc -->|"schreibt Anzeigetitel des Modell-Inserats (abgeleitet, gleiche Transaktion)"| inventory
   sheet -->|"liest Gerät, Modellvorlage, Layout, Logo"| inventory & settings & mediaC
   mediaC -->|"Dateien"| mstore
   srv -->|"SQL in Transaktionen"| db
@@ -294,7 +475,7 @@ flowchart TB
 | `inventory` | Geräte (Erfassung, Vorbelegung, Prüfmarkierungen, Zustandscode), Modell-Inserate (Inseratswerte, Preise je Kanal, Lieferumfang), Vergleichsregel für Variantenangaben, Zuordnen und Umbuchen, Verkauf und Rücknahme, Storno, WI-Nr-Korrektur, Bestandsangaben | REQ-012 bis REQ-021, REQ-032, REQ-033, REQ-084, REQ-088, REQ-091 bis REQ-095 |
 | `channels` | Kanal-Registry, Kanal-Einstellungen: Titel-Höchstlänge, VB, Titelmuster, Beschreibungsvorlage, Merkmals-, Zustands- und Kategoriezuordnung, Preisregel, Feldreihenfolge; Prüfung der Platzhalter beim Speichern | REQ-023 bis REQ-025, REQ-029 bis REQ-031, REQ-085 |
 | `content-engine` | reine, deterministische Funktionen: Titel nach Muster und Kürzung, Beschreibung nach Vorlage, Merkmalsfelder, Kategorie- und Zustandsvorschlag, Kennungen, GPSR-Angaben, Produktidentifikation, Auflösung der Bestandsplatzhalter | REQ-034 bis REQ-041, REQ-091 |
-| `listing-content` | Lebenszyklus der Kanal-Inhalte: materialisierter aktueller Stand, freigegebener Stand, Änderungsentwurf, Kanal-Status, Kennzeichnungen, manuelle Anpassungen, Freigabe und Freigabebedingungen, Abgleich, Neuberechnung nach Änderungen mit Meldung der Anzahlen, Daten für Kopier-Assistent und Inserat-Übersicht | REQ-043 bis REQ-047, REQ-049, REQ-052, REQ-053, REQ-059, REQ-086, REQ-087, REQ-089, REQ-090 |
+| `listing-content` | Lebenszyklus der Kanal-Inhalte: materialisierter aktueller Stand, freigegebener Stand, Änderungsentwurf, Kanal-Status, Kennzeichnungen, manuelle Anpassungen, Freigabe und Freigabebedingungen, Abgleich, Neuberechnung nach Änderungen mit Meldung der Anzahlen, Daten für Kopier-Assistent und Inserat-Übersicht; Bildung des Anzeigetitels der Modell-Inserate (REQ-052) bei jeder Neuberechnung | REQ-043 bis REQ-047, REQ-049, REQ-052, REQ-053, REQ-059, REQ-086, REQ-087, REQ-089, REQ-090 |
 | `media` | Foto-Upload mit Typ- und Größenprüfung, Ablage, Reihenfolge, Vorschaubilder, Foto-Übergabe (Ordner und ZIP), Logo | REQ-028, REQ-042, REQ-048 |
 | `datasheet` | Datenblatt als A4-PDF je Gerät | REQ-050, REQ-051, REQ-081 |
 | `audit` | Protokolleinträge in derselben Transaktion wie die Änderung, Abfrage mit Filter, tägliche Löschung nach 24 Monaten | REQ-055, REQ-072 |
@@ -304,7 +485,39 @@ flowchart TB
 
 Die beiden optionalen Komponenten fehlen im Diagramm. Sie sind Could-Anforderungen und hängen nur lesend von `listing-content` (Export) bzw. schreibend von `catalog` (Import) ab.
 
-**Abhängigkeitsregeln:** `content-engine` hängt von keiner anderen Komponente ab und ist vollständig ohne Datenbank testbar. `listing-content` liest Modelldaten, Inseratswerte und Einstellungen über Lese-Schnittstellen der anderen Komponenten. Die anderen Komponenten rufen `listing-content` nicht direkt auf, sondern melden Änderungen über In-Process-Ereignisse in derselben Transaktion. So entsteht kein Abhängigkeitskreis.
+**Abhängigkeitsregeln:** `content-engine` hängt von keiner anderen Komponente ab und ist vollständig ohne Datenbank testbar. `listing-content` liest Modelldaten, Inseratswerte und Einstellungen über Lese-Schnittstellen der anderen Komponenten. Die anderen Komponenten rufen `listing-content` nicht direkt auf, sondern melden Änderungen über In-Process-Ereignisse in derselben Transaktion. So entsteht kein Abhängigkeitskreis. **Ausnahme beim Schreiben (v0.3.3, MAR-1061):** Den Anzeigetitel des Modell-Inserats (ungekürzter Titel nach dem Titelmuster der Geräteart, REQ-052) bildet `listing-content` mit `content-engine` bei jeder Neuberechnung, die ihn betreffen kann, und schreibt ihn über eine Schreibfunktion, die `inventory` nur dafür anbietet. Der Anzeigetitel bleibt Teil des Modell-Inserats und gehört zu `inventory`; die Schreibfunktion ändert keinen anderen Wert, keine Version und erzeugt keinen Protokolleintrag. Das ist die einzige Stelle, an der `listing-content` über eine andere Fachkomponente schreibt. Wie bei den übrigen schreibenden Exporten der Technical Specification (Kap. 4.1, Ausnahmen (1), (2) und (4)) schreibt die aufgerufene Komponente dabei nur ihre eigene Tabelle. Die Abhängigkeitsrichtung `listing-content` → `inventory` besteht schon für das Lesen; es entsteht kein Kreis. Grund: Die Ereignisse, die den Titel ändern können, verarbeitet nur `listing-content`, und nur `listing-content` stellt die Eingaben der Bildung zusammen (Abwägung in der Technical Specification, Kap. 2.8.6).
+
+**Ereignisse zwischen den Fachkomponenten (v0.3.4 und v0.3.5, Architekturänderungen MAR-1208 und MAR-1287).** Alle Ereignisse laufen synchron in der Transaktion der auslösenden Aktion (Kap. 9.3). Jedes Ereignis hat genau einen Empfänger. Der Empfänger schreibt seine eigenen Daten; Daten einer anderen Komponente schreibt er nur über deren Schreibfunktion, soweit die Abhängigkeitsregeln oben das erlauben. Es gibt vier Arten:
+
+- **Inhalts- oder Bestandsangabe geändert:** `settings`, `catalog`, `inventory` und `channels` melden an `listing-content`, das die betroffenen Kanal-Inhalte neu bildet bzw. ihre Kennzeichnungen setzt (Diagramm oben) und den Anzeigetitel des Modell-Inserats über die Schreibfunktion von `inventory` nachführt (Ausnahme beim Schreiben, v0.3.3).
+- **Prüfung vor einer Änderung:** Die Komponente, der die betroffenen Daten gehören, kann eine Änderung einer anderen Komponente ablehnen: `settings` → `inventory` (Menge der Variantenmerkmale), `catalog` → `inventory` (Geräteart einer Modellvorlage ändern, Modellvorlage löschen), `inventory` → `listing-content` (Modell-Inserat löschen). Diese Prüfungen bestehen seit der Technical Specification v0.1 (Kap. 2.0.4) und sind hier nur sichtbar gemacht.
+- **Kennzeichen „Akku vorhanden“ geändert (neu in v0.3.4):** `settings` meldet an `inventory`. Das Kennzeichen eines Akku-Werts geht in die Bestandsangaben der Modell-Inserate ein (Requirements Kap. 9.7 Regel 1). `inventory` bildet sie für die betroffenen Modell-Inserate neu, schreibt dabei nur eigene Daten und meldet geänderte Bestandsangaben wie bei einer Geräteänderung an `listing-content`.
+- **Fotos eines Modell-Inserats geändert (neu in v0.3.5):** `media` meldet jede Foto-Änderung (Hinzufügen, Ordnen, Entfernen) zweimal: wie bisher als Inhaltsangabe an `listing-content`, das die Kanal-Inhalte neu bildet, und an `inventory`. Die Fotos gehören `media`, das Modell-Inserat mit Versionsnummer und Zeitpunkt der letzten Änderung gehört `inventory`. `inventory` erhöht die Versionsnummer des Modell-Inserats und setzt den Zeitpunkt; es schreibt dabei nur eigene Daten. So erkennt die Versionsprüfung (Kap. 9.3) auch Foto-Änderungen aus einem anderen Fenster.
+
+Die Punkte „Kennzeichen …“ und „Fotos …“ sind die einzigen Änderungsereignisse, die nicht `listing-content` empfängt. `settings` hängt dabei nicht von `inventory` ab und `media` nur lesend: Beide melden nur, die Ereignistypen liegen in der gemeinsamen Serverschicht. `inventory` liest Einstellungen wie bisher über die Lese-Schnittstelle von `settings`; `media` liest das Modell-Inserat über die Lese-Schnittstelle von `inventory` und schreibt es nicht. Es entsteht kein Abhängigkeitskreis. Einzelheiten: Technical Specification Kap. 2.0.4, 2.1 und 2.11.
+
+**Welche Ereignisse laufen zwischen den Fachkomponenten, und wer empfängt sie?** Gestrichelt: Ereignis in der Transaktion der auslösenden Aktion; Pfeil vom Melder zum einzigen Empfänger. Vereinfacht: Lesezugriffe über Reader, `audit` und die Datenbank nicht dargestellt.
+
+```mermaid
+flowchart LR
+  classDef container fill:#438dd5,stroke:#2e6295,color:#ffffff
+
+  settings["settings<br/>[Component]<br/>Einstellungen"]:::container
+  catalog["catalog<br/>[Component]<br/>Modellvorlagen"]:::container
+  channels["channels<br/>[Component]<br/>Kanal-Einstellungen"]:::container
+  mediaC["media<br/>[Component]<br/>Fotos"]:::container
+  inventory["inventory<br/>[Component]<br/>Geräte, Modell-Inserate, Bestand"]:::container
+  lc["listing-content<br/>[Component]<br/>Kanal-Inhalte"]:::container
+
+  settings & catalog & channels -.->|"Inhaltsangabe geändert"| lc
+  inventory -.->|"Inhalts- oder Bestandsangabe geändert"| lc
+  mediaC -.->|"Inhaltsangabe geändert (Fotos)"| lc
+  settings -.->|"Prüfung: Variantenmerkmale"| inventory
+  catalog -.->|"Prüfung: Modellvorlage ändern oder löschen"| inventory
+  inventory -.->|"Prüfung: Modell-Inserat löschen"| lc
+  settings -.->|"v0.3.4: Kennzeichen Akku vorhanden geändert"| inventory
+  mediaC -.->|"neu v0.3.5: Fotos geändert"| inventory
+```
 
 ### 2.5 Wichtige Abläufe
 
@@ -685,7 +898,7 @@ classDiagram
 | `DatasheetLayout` | Datenblatt-Layout | `settings` | genau ein Datensatz |
 | `ModelTemplate` | Modellvorlage | `catalog` | Modelldaten und Vorbelegungswerte; Löschen nur ohne Verweise (REQ-095) |
 | `Device` | Gerät | `inventory` | Bestandsstatus *verfügbar*, *verkauft*, *storniert*; Erfassungsstatus aus Prüfmarkierungen; **wird nie gelöscht** (REQ-093) |
-| `Listing` | Modell-Inserat | `inventory` | Inseratswerte, Preise je Kanal, Lieferumfang; Bestandsangaben werden **nicht** gespeichert, sondern aus den verfügbaren Geräten abgeleitet (REQ-091) |
+| `Listing` | Modell-Inserat | `inventory` | Inseratswerte, Preise je Kanal, Lieferumfang; Bestandsangaben werden **nicht** gespeichert, sondern aus den verfügbaren Geräten abgeleitet (REQ-091). Der **Anzeigetitel** (ungekürzter Titel nach dem Titelmuster der Geräteart, REQ-052) ist ein abgeleiteter, gespeicherter Wert: gebildet von `listing-content` mit `content-engine`, geschrieben nur über die Schreibfunktion von `inventory`, in derselben Transaktion wie die auslösende Änderung (Kap. 2.4, v0.3.3). |
 | `ListingPhoto` | Foto | `media` | Reihenfolge je Modell-Inserat; die Datei bleibt erhalten, solange ein freigegebener Stand auf sie verweist (Kap. 9.4) |
 | `Channel` | Kanal | `channels` | aktiv oder deaktiviert; Kanäle sind Daten, kein Code (ADR-005) |
 | `TitlePattern`, `DescriptionTemplate`, `AttributeMapping`, `ConditionMapping`, `CategoryMapping`, `PriceRule` | Titelmuster, Beschreibungsvorlage, Merkmals-, Zustands-, Kategoriezuordnung, Preisregel | `channels` | Einstellungen; Platzhalter werden beim Speichern gegen die Liste in Requirements Kap. 9.7 geprüft |
@@ -694,6 +907,8 @@ classDiagram
 | `AuditEntry` | Protokolleintrag | `audit` | nur anhängen, kein Ändern; verweist über Objektart und ID auf das Objekt, ohne Fremdschlüssel; Löschung nach 24 Monaten (REQ-072) |
 
 Der Änderungsentwurf ist kein eigenes Objekt. Er ist der aktuelle Stand eines Kanal-Inhalts im Status *Veröffentlicht* oder *Beendet*, wenn dieser vom freigegebenen Stand abweicht.
+
+**Bestandsangaben und Einstellungen (v0.3.4, Architekturänderung MAR-1208).** Die Bestandsangaben eines Modell-Inserats hängen außer von seinen verfügbaren Geräten von genau einer Einstellung ab: dem Kennzeichen „Akku vorhanden“ des am Gerät gespeicherten Akku-Werts (Requirements Kap. 9.7 Regel 1). Sie sind keine eigene Wahrheit (Zeile `Listing`: „nicht gespeichert, sondern … abgeleitet“). `inventory` hält aber am Modell-Inserat einen **abgeleiteten Zwischenspeicher** der Bestandsangaben für Filter und Sortierung, immer aus den Geräten gebildet (Technical Specification Kap. 3.3). Ändert sich das Kennzeichen, bildet `inventory` diesen Zwischenspeicher der betroffenen Modell-Inserate in derselben Transaktion neu (Kap. 2.4). Der Status von Merkmalen geht nicht ein (Technical Specification, Auslegung RQ-27). Das Domänenmodell (Kap. 4.1, 4.2) ändert sich nicht.
 
 ### 4.4 Persistenz-Grundsätze
 
@@ -1375,7 +1590,7 @@ Offene Punkte sind Vorschläge. Der Owner entscheidet sie mit der Freigabe der B
 | Anforderungen | Komponenten | Entscheidungen, Kapitel |
 | --- | --- | --- |
 | REQ-001, REQ-067, REQ-097 (Zugang) | `http-api` (`local-guard`), Server-Bindung | ADR-002, Kap. 8.1, OD-02 (Kap. 13.3.1); bei Variante A REQ-097 nicht vorhanden und von REQ-067 nur die Nicht-Erreichbarkeit (AC-REQ-001-07) |
-| REQ-004 bis REQ-007, REQ-099 bis REQ-101 (Gerätearten, Merkmale, Auswahllisten, Hersteller, Lieferanten) | `settings` | ADR-004, Kap. 4 |
+| REQ-004 bis REQ-007, REQ-099 bis REQ-101 (Gerätearten, Merkmale, Auswahllisten, Hersteller, Lieferanten) | `settings`; das Kennzeichen „Akku vorhanden“ wirkt über ein Ereignis an `inventory` auf die Bestandsangaben (REQ-007, REQ-091; Kap. 2.4, 4.3, v0.3.4) | ADR-004, Kap. 4 |
 | REQ-006 (Startbelegung) | `ops`, `settings` | Kap. 10.2 |
 | REQ-008 bis REQ-011, REQ-058 (Modell-Bibliothek, Warnung) | `catalog` | Kap. 4.4 (Normalisierung, Suche) |
 | REQ-012 bis REQ-021, REQ-084, REQ-088, REQ-092 bis REQ-094 (Geräte, Modell-Inserat, Zuordnung, Verkauf, Korrekturen) | `inventory`, `listing-content` | ADR-005, Kap. 2.5 Ablauf 1, Kap. 9.3 |
@@ -1383,9 +1598,9 @@ Offene Punkte sind Vorschläge. Der Owner entscheidet sie mit der Freigabe der B
 | REQ-022, REQ-026 bis REQ-028, REQ-054 (Code-Tabelle, Textbausteine, GPSR, Händlerangaben, Prüfstatus) | `settings`, `media` (Logo) | Kap. 4 |
 | REQ-023 bis REQ-025, REQ-029 bis REQ-031, REQ-033, REQ-085 (Kanal-Einstellungen, Preisregel) | `channels`, `inventory` (Preise) | ADR-005 |
 | REQ-032, REQ-034 bis REQ-041, REQ-086 (Preis, Bildung der Kanal-Inhalte, Kategorie) | `content-engine`, `listing-content`, `inventory` | ADR-005 |
-| REQ-043 bis REQ-046, REQ-049, REQ-052, REQ-053, REQ-059, REQ-087, REQ-089 bis REQ-091 (Lebenszyklus, Kennzeichnungen, Übersicht, Wirkung zentraler Pflege) | `listing-content` | ADR-005, Kap. 2.5 Abläufe 2 und 3, Kap. 9.3 |
+| REQ-043 bis REQ-046, REQ-049, REQ-052, REQ-053, REQ-059, REQ-087, REQ-089 bis REQ-091 (Lebenszyklus, Kennzeichnungen, Übersicht, Wirkung zentraler Pflege) | `listing-content`; Anzeigetitel für REQ-052: `listing-content` bildet, `inventory` speichert (Kap. 2.4, v0.3.3) | ADR-005, Kap. 2.5 Abläufe 2 und 3, Kap. 9.3 |
 | REQ-047 (Kopier-Assistent Felder) | `listing-content`, `web-ui` (Clipboard API) | ADR-001, Kap. 5, Kap. 6; leere Merkmalsfelder nicht in der Feldliste und nicht im Übernahmefortschritt (REQ-037, REQ-047, REQ-049, v0.3.2/v0.3.3): ohne Architekturwirkung, Verhalten in der Technical Specification |
-| REQ-042, REQ-048 (Fotos) | `media` | ADR-004, Kap. 5, Kap. 6, Kap. 9.4 |
+| REQ-042, REQ-048 (Fotos) | `media`; jede Foto-Änderung erhöht über ein Ereignis an `inventory` die Version des Modell-Inserats (REQ-042; Kap. 2.4, 9.3, v0.3.5) | ADR-004, Kap. 2.4, Kap. 5, Kap. 6, Kap. 9.4 |
 | REQ-050, REQ-051, REQ-081 (Datenblatt) | `datasheet`, `settings` | ADR-007 |
 | REQ-055, REQ-072 (Protokoll) | `audit` | Kap. 9.3, Kap. 10.5 |
 | REQ-056 (Excel-Übernahme, Could) | optional `excel-import` | Kap. 2.4 |
@@ -1418,10 +1633,13 @@ Zurückgezogene Anforderungen (REQ-002, REQ-003, REQ-070, REQ-071, REQ-082, REQ-
 | 0.3 | 06.11.2026 | Korrekturrunde 1 nach Architecture Review Runde 1 ([architecture-review-v02-r1](/MAR/issues/MAR-134#document-architecture-review-v02-r1), Rev. `1b16f458`, auf v0.2 Rev. `8b2a682e`), Auftrag MAR-136. Ausrichtung auf Requirements-Kandidat v0.3.2 (Rev. `e4b94794`); Einzelheiten: Änderungsliste Ä-12 bis Ä-21 am Dokumentanfang und Tabelle 14.4. Revision `0aca5c84`, nicht reviewt. | FIND-101 bis FIND-109 (alle behoben, Tabelle 14.4) |
 | 0.3.1 | 06.11.2026 | Delta-Revision von v0.3 (Rev. `0aca5c84`) zu Requirements-Kandidat v0.3.3 (Rev. `ce76d962`), Auftrag MAR-139: Verweisstände, Kennzeichnung von REQ-105 und REQ-106 als Ableitung aus E-7, REQ-065-Regel für Zeiten nach einem Beenden, AC-REQ-106-01 für beide Betriebsmodelle, Stellungnahme zu OP-32/A-37; leere Merkmalsfelder geprüft ohne Änderung. Kein Diagramm geändert. Einzelheiten: Änderungsliste Ä-22 bis Ä-27 am Dokumentanfang. Gegenstand von Architecture Review Runde 2. | keine Architecture-Review-Findings; Folgen der Requirements-Findings FIND-030 bis FIND-034 (MAR-133) |
 | 0.3.2 | 06.11.2026 | Delta-Revision von v0.3.1 (Rev. `a1b9ea85`) nach Architecture Review Runde 2 (`pass`) und Cross-Check gegen das Design `92e018e`, Auftrag MAR-141: Folgen des Cross-Checks (nutzbare Fensterfläche, keine feste Zeitgrenze beim Speichern, Kopier-Assistent, Konfliktprüfung beim Abgleich, Datenblatt und Einstellungen, Ergebnis in Kap. 6.4, X-8); Lebenszyklus der Überwachung; ADR-001 und ADR-002 angeglichen; Hinweise H-7 bis H-10. Geändert ist ein Diagramm (Ablauf 4b). Einzelheiten: Änderungsliste Ä-28 bis Ä-36 am Dokumentanfang. | FIND-110, FIND-111 (Kap. 14.5); Hinweise H-7, H-8, H-9, H-10 |
+| 0.3.3 | 23.11.2026 | Architekturänderung „Nachführen des Anzeigetitels ab S5“, Auftrag MAR-1061 (Ursprung Nachtrag MAR-1053): Abhängigkeitsregel um eine eng begrenzte Ausnahme beim Schreiben ergänzt (`listing-content` schreibt den Anzeigetitel über die Schreibfunktion von `inventory`; einzige Stelle, an der `listing-content` über eine andere Fachkomponente schreibt; die aufgerufene Komponente schreibt nur ihre eigene Tabelle), Komponentendiagramm um diese Kante und Bildunterschrift ersetzt, Anzeigetitel als abgeleiteter gespeicherter Wert in Kap. 4.3, Kap. 14.1. Kein ADR, keine Änderung an Stack, Datenmodell, Kap. 6 (UI-relevante Randbedingungen), Sicherheit, Betrieb und Teststrategie. Geändert ist ein Diagramm (Komponenten). Klarstellung zu Kap. 10.6 ohne Textänderung: Die automatische Kopie vor Updates gibt es erst ab Bauschritt S10 (CU-248); die Neubildung beim ersten Start mit S5 läuft ohne sie (Technical Specification Kap. 2.8.3, 2.8.6). | Runde 1 (MAR-1066): FIND-410 (Aussage zur Kopie in Teil A.7), FIND-411 (Regeltext), FIND-412 (Bildunterschrift); Runde 2 (MAR-1074): FIND-418 (Hinweis zum Kopieren, Datenordner und Wiederholbarkeit in Teil A.7) |
+| 0.3.4 | 20.11.2026 | Architekturänderung „Bestandsangaben bei geändertem Kennzeichen „Akku vorhanden““, Aufträge MAR-1208 und MAR-1217 (Ursprung Nachtrag MAR-1204, FIND-446-02 aus dem Code Review von PR #446): Kap. 2.4 um den Absatz „Ereignisse zwischen den Fachkomponenten“ mit neuem Diagramm ergänzt (neu: Änderungsereignis von `settings` an `inventory` für das Kennzeichen „Akku vorhanden“; die bestehenden Prüfereignisse sichtbar gemacht; Schreiben über Komponentengrenzen nur nach den Abhängigkeitsregeln), Kap. 4.3 um „Bestandsangaben und Einstellungen“ (abgeleiteter Zwischenspeicher, Zeile `Listing` unverändert), Kap. 14.1. Kein ADR, keine Änderung an Stack, Datenmodell, Kap. 6 (UI-relevante Randbedingungen), Sicherheit, Betrieb und Teststrategie. Ein Diagramm neu, keines geändert. | Runde 1 (MAR-1212, Überarbeitung MAR-1217): FIND-422 (Satz zum Schreiben in Kap. 2.4 an die Abhängigkeitsregeln gebunden), FIND-423 (Zwischenspeicher in Kap. 4.3 genannt), FIND-426 (Zahl der Diagramme in Metadaten und Kap. 14.3 in beiden Reihenfolgen mit MAR-1061) |
+| 0.3.5 | 23.11.2026 | Architekturänderung „Version des Modell-Inserats bei Foto-Änderungen“, Auftrag MAR-1287 (Ursprung Nachtrag MAR-1280, Punkt (a); GitHub-Issues #238, #239): Kap. 2.4, Absatz „Ereignisse zwischen den Fachkomponenten“, um die Meldung „Fotos geändert“ von `media` an `inventory` ergänzt (`inventory` erhöht Version und Zeitpunkt der letzten Änderung des Modell-Inserats, schreibt nur eigene Daten); die bestehende Meldung von `media` an `listing-content` im Diagramm sichtbar gemacht; ohne v0.3.4 bringt diese Fassung den Absatz selbst mit (Fassung F). Kap. 14.1. Kein ADR, keine Änderung an Stack, Datenmodell, Kap. 6 (UI-relevante Randbedingungen), Kap. 9.3, Sicherheit, Betrieb und Teststrategie. Mit v0.3.4 ein Diagramm geändert, ohne v0.3.4 ein Diagramm neu. | – |
 
 ### 14.3 Mermaid-Prüfung
 
-Mermaid-Prüfung: 12/12 Diagramme gültig (`validate-mermaid.mjs` aus dem Skill `architecture-diagrams`, mermaid 11, 06.11.2026, Fassung v0.3.2; geändert gegenüber v0.3.1 ist nur Ablauf 4b, die Prüfung lief über das ganze Dokument). Ablauf 4b habe ich zusätzlich gegen Kap. 2.3 und 9.6 geprüft: Die neuen Fälle (Sperre belegt, „Neustart aufgegeben“, Zeitüberschreitung) und die Sperre stehen dort im Text. Geprüft sind Systemkontext, Container, Komponenten, fünf Abläufe (1, 2, 3, 4a, 4b), zwei Domänenmodelle, Vertrauensgrenzen und Deployment. Geändert gegenüber v0.2: Container (ohne `health-probe`, neu `launcher-pages`, Autostart), Ablauf 4 aufgeteilt in 4a und 4b, Deployment (ohne Aufgabenplanung, mit Programmordner). Die Prüfung umfasst nur die Syntax. Die inhaltliche Übereinstimmung mit Text und Tabellen habe ich nach der Selbstprüfliste des Skills geprüft.
+Mermaid-Prüfung: 13/13 Diagramme gültig (`validate-mermaid.mjs` aus dem Skill `architecture-diagrams`, mermaid 11.17.2, 23.11.2026, Fassung mit v0.3.3, v0.3.4 und v0.3.5; gegenüber v0.3.4 geändert ist in v0.3.5 das Diagramm „Ereignisse zwischen den Fachkomponenten“ in Kap. 2.4 (neue Kante `media` → `inventory`, Kante `media` → `listing-content` sichtbar gemacht); die Prüfung lief über das ganze Dokument). Davor: 13/13 Diagramme gültig (`validate-mermaid.mjs` aus dem Skill `architecture-diagrams`, mermaid 11, 23.11.2026, Fassung mit v0.3.3 und v0.3.4; gegenüber v0.3.2 geändert ist das Komponentendiagramm in Kap. 2.4 (neue Kante `listing-content` → `inventory`, v0.3.3), neu ist das Diagramm „Ereignisse zwischen den Fachkomponenten“ in Kap. 2.4 (v0.3.4); die Prüfung lief über das ganze Dokument). Davor: 12/12 Diagramme gültig (`validate-mermaid.mjs` aus dem Skill `architecture-diagrams`, mermaid 11, 06.11.2026, Fassung v0.3.2; geändert gegenüber v0.3.1 ist nur Ablauf 4b, die Prüfung lief über das ganze Dokument). Ablauf 4b habe ich zusätzlich gegen Kap. 2.3 und 9.6 geprüft: Die neuen Fälle (Sperre belegt, „Neustart aufgegeben“, Zeitüberschreitung) und die Sperre stehen dort im Text. Geprüft sind Systemkontext, Container, Komponenten, fünf Abläufe (1, 2, 3, 4a, 4b), zwei Domänenmodelle, Vertrauensgrenzen und Deployment, ab v0.3.4 auch die Ereignisse zwischen den Fachkomponenten (Kap. 2.4). Geändert gegenüber v0.2: Container (ohne `health-probe`, neu `launcher-pages`, Autostart), Ablauf 4 aufgeteilt in 4a und 4b, Deployment (ohne Aufgabenplanung, mit Programmordner). Die Prüfung umfasst nur die Syntax. Die inhaltliche Übereinstimmung mit Text und Tabellen habe ich nach der Selbstprüfliste des Skills geprüft.
 
 ### 14.4 Behandlung der Findings aus Architecture Review Runde 1
 

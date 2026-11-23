@@ -22,6 +22,7 @@ export const ERROR_CODES = {
   name_taken: 422,
   not_found: 404,
   other_model_template: 422,
+  photo_limit_reached: 422,
   pick_list_value_deactivated: 422,
   placeholder_not_allowed: 422,
   shutting_down: 503,

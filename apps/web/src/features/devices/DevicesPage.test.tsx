@@ -6,7 +6,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { createQueryClient } from '../../app/query-client.ts';
 import { routes } from '../../app/router.tsx';
 
-// Component tests of UI-009, tab "Suche" (CU-136) with a mocked `fetch` (Technical
+// Component tests of UI-009, tabs "Suche" and "Nicht zugeordnet" (CU-136) with a mocked `fetch` (Technical
 // Specification 6.1, 6.2).
 
 const OPS_STATUS = {
@@ -39,6 +39,21 @@ const SOLD = {
   captureStatus: 'checked',
 };
 
+const EARLIER = {
+  id: 7,
+  wiNr: '700003',
+  modelTemplateLabel: 'ThinkPad T14',
+  captureStatus: 'review_pending',
+  capturedOn: '2026-11-03',
+};
+const LATER = {
+  id: 8,
+  wiNr: '700005',
+  modelTemplateLabel: 'iPhone 13',
+  captureStatus: 'checked',
+  capturedOn: '2026-11-05',
+};
+
 const errorBody = (code: string, extra: Record<string, unknown> = {}) => ({
   error: { code, message: '', fields: [], details: {}, referenceNumber: null, ...extra },
 });
@@ -48,11 +63,16 @@ type SearchHandler = (
   init: RequestInit | undefined,
 ) => Promise<Response> | Response;
 
-/** `fetch` of the page: the frame's status and the device search; records the searches. */
+/**
+ * `fetch` of the page: the frame's status, the device search and the unassigned devices; records
+ * the searches and the loads of the unassigned devices.
+ */
 function mockApi({
   search = () => Response.json({ items: [CANCELLED, AVAILABLE, SOLD] }),
-}: { search?: SearchHandler } = {}) {
+  unassigned = () => Response.json({ items: [EARLIER, LATER] }),
+}: { search?: SearchHandler; unassigned?: () => Promise<Response> | Response } = {}) {
   const searches: string[] = [];
+  let unassignedLoads = 0;
   vi.stubGlobal(
     'fetch',
     vi.fn<typeof fetch>(async (input, init) => {
@@ -63,11 +83,15 @@ function mockApi({
         searches.push(url.search);
         return search(url.searchParams, init);
       }
+      if (url.pathname === '/api/devices/unassigned') {
+        unassignedLoads += 1;
+        return unassigned();
+      }
       if (url.pathname.startsWith('/api/devices/')) return new Promise<Response>(() => {});
       throw new Error(`unexpected request ${init?.method ?? 'GET'} ${url.pathname}`);
     }),
   );
-  return { searches };
+  return { searches, unassignedLoads: () => unassignedLoads };
 }
 
 function renderPage(path = '/geraete') {
@@ -396,5 +420,131 @@ describe('UI-009 Geräte, tab "Suche" (CU-136)', () => {
     );
 
     expect(router.state.location.pathname).toBe('/geraete/neu');
+  });
+});
+
+const UNASSIGNED_PATH = '/geraete?reiter=nicht-zugeordnet';
+
+async function openUnassigned() {
+  const router = renderPage(UNASSIGNED_PATH);
+  await screen.findByRole('tabpanel', { name: 'Nicht zugeordnet' });
+  return router;
+}
+
+/** Accessibility assertion of a state of the tab "Nicht zugeordnet". */
+function expectAccessibleUnassignedTab() {
+  expect(screen.getByRole('heading', { level: 1, name: 'Geräte' })).toBeTruthy();
+  expect(screen.getByRole('tab', { name: 'Nicht zugeordnet' }).getAttribute('aria-selected')).toBe(
+    'true',
+  );
+  expect(screen.getByRole('tab', { name: 'Suche' }).getAttribute('aria-selected')).toBe('false');
+  expect(screen.queryByRole('searchbox')).toBeNull();
+  for (const control of [...screen.getAllByRole('button'), ...screen.getAllByRole('link')]) {
+    expect(control.textContent?.trim() || control.getAttribute('aria-label')).toBeTruthy();
+  }
+}
+
+describe('UI-009 Geräte, tab "Nicht zugeordnet" (CU-136)', () => {
+  it('UI-009.default AC-REQ-094-01 lists WI-Nr, model template, capture status and capture date of each unassigned device in the order of the answer', async () => {
+    mockApi();
+
+    await openUnassigned();
+
+    const table = await screen.findByRole('table', { name: 'Nicht zugeordnet' });
+    const rows = within(table)
+      .getAllByRole('row')
+      .map((row) => [...row.querySelectorAll('th, td')].map((cell) => cell.textContent));
+    expect(rows).toEqual([
+      ['WI-Nr', 'Modellvorlage', 'Erfassungsstatus', 'Erfassungsdatum'],
+      ['700003', 'ThinkPad T14', 'unvollständig geprüft', '03.11.2026'],
+      ['700005', 'iPhone 13', 'geprüft', '05.11.2026'],
+    ]);
+    expectAccessibleUnassignedTab();
+  });
+
+  it('the tab "Nicht zugeordnet" links to ?reiter=nicht-zugeordnet and loads the list only there', async () => {
+    const { unassignedLoads } = mockApi();
+    const router = await openPage();
+    expect(unassignedLoads()).toBe(0);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Nicht zugeordnet' }));
+
+    expect(router.state.location.search).toBe('?reiter=nicht-zugeordnet');
+    await screen.findByRole('table', { name: 'Nicht zugeordnet' });
+    expect(unassignedLoads()).toBe(1);
+    expectAccessibleUnassignedTab();
+  });
+
+  it('UI-009.loading DER-88-01 shows "Suche …" while the list loads', async () => {
+    mockApi({ unassigned: pending });
+
+    await openUnassigned();
+
+    expect((await screen.findByRole('status')).textContent).toBe('Suche …');
+    expect(screen.queryByRole('table')).toBeNull();
+    expectAccessibleUnassignedTab();
+  });
+
+  it('AC-REQ-094-02 UI-009.empty (nicht zugeordnet) shows "Keine nicht zugeordneten Geräte" without an unassigned device', async () => {
+    mockApi({ unassigned: () => Response.json({ items: [] }) });
+
+    await openUnassigned();
+
+    expect(await screen.findByText('Keine nicht zugeordneten Geräte')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expectAccessibleUnassignedTab();
+  });
+
+  it('UI-009.error DER-88-01 shows "Suche fehlgeschlagen. Referenz: <Nr>" on 500 internal_error', async () => {
+    mockApi({
+      unassigned: () =>
+        Response.json(errorBody('internal_error', { referenceNumber: 'R-7K2M-9QX4' }), {
+          status: 500,
+        }),
+    });
+
+    await openUnassigned();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toBe('Suche fehlgeschlagen. Referenz: R-7K2M-9QX4');
+    expect(screen.queryByRole('table')).toBeNull();
+    expectAccessibleUnassignedTab();
+  });
+
+  it('UI-009.unreachable shows P-06 with "Erneut versuchen" when the list gets no answer; it disappears after an answer', async () => {
+    let reachable = false;
+    mockApi({
+      unassigned: () => {
+        if (!reachable) throw new TypeError('Failed to fetch');
+        return Response.json({ items: [EARLIER] });
+      },
+    });
+    await openUnassigned();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner.textContent).toContain('resellr ist nicht erreichbar.');
+    expect(banner.textContent).not.toContain('Suche fehlgeschlagen');
+
+    reachable = true;
+    fireEvent.click(within(banner).getByRole('button', { name: 'Erneut versuchen' }));
+
+    await screen.findByRole('table', { name: 'Nicht zugeordnet' });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('a click on a row and the WI-Nr link open UI-010 with this device', async () => {
+    mockApi();
+    const router = await openUnassigned();
+    const table = await screen.findByRole('table', { name: 'Nicht zugeordnet' });
+
+    expect(
+      within(table)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/geraete/7', '/geraete/8']);
+
+    fireEvent.click(within(table).getByRole('cell', { name: 'iPhone 13' }));
+
+    expect(router.state.location.pathname).toBe('/geraete/8');
   });
 });

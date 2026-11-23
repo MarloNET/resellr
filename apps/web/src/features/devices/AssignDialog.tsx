@@ -174,7 +174,8 @@ function checkArticleNumber(articleNumber: string): string | undefined {
  * validation (field "Artikelnummer" after `article_number_taken`, DER-60-04), error, success
  * (`onAssigned`, UI-014), conflict (P-05), unreachable (P-06), wird-beendet (P-07) and
  * ausgang-unbekannt (P-08). If "Zuordnen" answers `variant_deviation`, the dialog UI-005 opens
- * over it (CU-135, #196); "Abbrechen" there returns here with the choice kept. In the mode
+ * over it (CU-135, #196); "Abbrechen" there returns here with the choice kept, "Neues
+ * Modell-Inserat anlegen" there creates the model listing as here (#201). In the mode
  * "umbuchen" (#202, REQ-020) the dialog offers the other model listings of the model template of
  * the assigned device ("Kein anderes Modell-Inserat dieser Modellvorlage" without one), and
  * "Umbuchen" sends `POST /api/devices/{id}/rebooking` without confirmation; on success UI-014 of
@@ -503,6 +504,12 @@ function AssignForm({
           }}
           assignedListingId={device.listingId ?? undefined}
           onRebooked={onRebooked}
+          // "Neues Modell-Inserat anlegen" of UI-005 is the creation of UI-004 with its
+          // rejections (#201): UI-005 closes and this dialog creates and opens UI-014.
+          onCreateListing={() => {
+            setDeviations(null);
+            create();
+          }}
         />
       )}
     </form>
