@@ -200,12 +200,24 @@ export type DeviceAssignmentInput = z.input<typeof deviceAssignmentBodySchema>;
 
 /**
  * `details` of `422 confirmation_required` with `kind: variant_deviation` (2.6, REQ-018): the
- * deviations of the device from the chosen model listing that UI-005 shows.
+ * deviations of the device from the chosen model listing that UI-005 shows. `PATCH
+ * /api/devices/{id}` (2.5, Kontext B) adds `rebookTargets`: the other model listings of the model
+ * template, each with its deviations to the changed device (empty = matches).
  */
 export const variantDeviationDetailsSchema = z.object({
   kind: z.literal('variant_deviation'),
   deviations: z.array(variantDeviationSchema),
+  rebookTargets: z
+    .array(
+      z.object({
+        listingId: idSchema,
+        title: z.string(),
+        deviations: z.array(variantDeviationSchema),
+      }),
+    )
+    .optional(),
 });
+export type VariantDeviationDetails = z.infer<typeof variantDeviationDetailsSchema>;
 
 /**
  * The answer of an assignment (2.6): the device, the new quantity of its model listing and the

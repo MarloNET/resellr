@@ -441,7 +441,10 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
   it('AC-REQ-019-07 creates a model listing from a device of MI-A (quantity 3) whose visual grade changed to 4; MI-A has quantity 2 and the new model listing quantity 1', async () => {
     const { miA, deviceId } = await miAWithThreeDevices();
     expect(quantityOf(miA)).toBe(3);
-    expect((await patchDevice(deviceId, { version: 2, visualGrade: '4' })).statusCode).toBe(200);
+    expect(
+      (await patchDevice(deviceId, { version: 2, visualGrade: '4', deviationDecision: 'keep' }))
+        .statusCode,
+    ).toBe(200);
 
     const response = await createListing({ fromDeviceId: deviceId, deviceVersion: 3 });
 
@@ -469,7 +472,7 @@ describe('POST /api/listings (CU-123, Technical Specification 2.6)', () => {
 
   it('AC-REQ-019-07 writes the audit entries for the creation and the change of the assignment from MI-A', async () => {
     const { deviceId } = await miAWithThreeDevices();
-    await patchDevice(deviceId, { version: 2, visualGrade: '4' });
+    await patchDevice(deviceId, { version: 2, visualGrade: '4', deviationDecision: 'keep' });
     const before = rows<{ id: number }>('SELECT MAX(id) AS id FROM audit_entry')[0]?.id ?? 0;
 
     const { id } = (await createListing({ fromDeviceId: deviceId, deviceVersion: 3 })).json<{
@@ -596,7 +599,7 @@ describe('createFromDevice events (CU-123, CU-128; Technical Specification 2.0.4
 
   it('AC-REQ-019-07 reports StockChanged of the new model listing and of MI-A, which the device left', async () => {
     const { miA, deviceId } = await miAWithThreeDevices();
-    await patchDevice(deviceId, { version: 2, visualGrade: '4' });
+    await patchDevice(deviceId, { version: 2, visualGrade: '4', deviationDecision: 'keep' });
     const seen: ChangeEvent[] = [];
     const record = vi.fn(async (event: ChangeEvent): Promise<ChangeReport> => {
       seen.push(event);
