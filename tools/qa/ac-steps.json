@@ -1,6 +1,20 @@
 {
   "steps": {
-    "S1": ["AC-REQ-001-05", "AC-REQ-001-07"]
+    "S1": ["AC-REQ-001-05", "AC-REQ-001-07"],
+    "S3": [
+      "AC-REQ-008-01",
+      "AC-REQ-008-02",
+      "AC-REQ-008-03",
+      "AC-REQ-008-04",
+      "AC-REQ-008-05",
+      "AC-REQ-009-01",
+      "AC-REQ-009-02",
+      "AC-REQ-009-03",
+      "AC-REQ-009-04",
+      "AC-REQ-010-03",
+      "AC-REQ-011-01",
+      "AC-REQ-011-02"
+    ]
   },
-  "completedSteps": ["S1"]
+  "completedSteps": ["S1", "S3"]
 }

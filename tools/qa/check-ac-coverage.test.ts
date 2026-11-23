@@ -248,10 +248,26 @@ describe('check-ac-coverage.mjs in the repository', () => {
     JSON.parse(readFileSync(new URL('./ac-steps.json', import.meta.url), 'utf8')),
   );
 
-  it('lists the ACs of S1 in the step list and S1 as completed (CU-299, Nachtrag MAR-305)', () => {
+  it('lists the ACs of S1 and S3 in the step list and both as completed (CU-299, Nachtrag MAR-305)', () => {
     expect(acSteps).toEqual({
-      steps: { S1: ['AC-REQ-001-05', 'AC-REQ-001-07'] },
-      completedSteps: ['S1'],
+      steps: {
+        S1: ['AC-REQ-001-05', 'AC-REQ-001-07'],
+        S3: [
+          'AC-REQ-008-01',
+          'AC-REQ-008-02',
+          'AC-REQ-008-03',
+          'AC-REQ-008-04',
+          'AC-REQ-008-05',
+          'AC-REQ-009-01',
+          'AC-REQ-009-02',
+          'AC-REQ-009-03',
+          'AC-REQ-009-04',
+          'AC-REQ-010-03',
+          'AC-REQ-011-01',
+          'AC-REQ-011-02',
+        ],
+      },
+      completedSteps: ['S1', 'S3'],
     });
   });
 
@@ -260,6 +276,6 @@ describe('check-ac-coverage.mjs in the repository', () => {
 
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('AC coverage: completed steps S1; all 2 ACs have a test.');
+    expect(result.stdout).toContain('AC coverage: completed steps S1, S3; all 14 ACs have a test.');
   });
 });
