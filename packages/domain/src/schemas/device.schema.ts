@@ -257,3 +257,20 @@ export type DeviceSearchItem = z.infer<typeof deviceSearchItemSchema>;
 /** Answer of the device search (2.5): the hits of the page, without `total` (Nachtrag MAR-1030). */
 export const deviceSearchResultSchema = z.object({ items: z.array(deviceSearchItemSchema) });
 export type DeviceSearchResult = z.infer<typeof deviceSearchResultSchema>;
+
+/**
+ * An unassigned device of `GET /api/devices/unassigned` (2.5, REQ-094): available and without
+ * model listing, with its capture date.
+ */
+export const unassignedDeviceItemSchema = z.object({
+  id: idSchema,
+  wiNr: z.string(),
+  modelTemplateLabel: z.string(),
+  captureStatus: z.enum(CAPTURE_STATUSES),
+  capturedOn: dateSchema,
+});
+export type UnassignedDeviceItem = z.infer<typeof unassignedDeviceItemSchema>;
+
+/** Answer of `GET /api/devices/unassigned` (2.5): all unassigned devices, the oldest first. */
+export const unassignedDevicesSchema = z.object({ items: z.array(unassignedDeviceItemSchema) });
+export type UnassignedDevices = z.infer<typeof unassignedDevicesSchema>;
