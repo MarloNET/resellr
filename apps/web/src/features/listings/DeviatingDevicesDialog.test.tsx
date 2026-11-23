@@ -96,7 +96,9 @@ function mockApi({
       if (url.pathname === '/api/ops/health') return Response.json({ state: 'ready' });
       if (route === 'GET /api/listings/9') return Response.json(listing);
       if (route === 'GET /api/pick-lists') {
-        return list([{ id: 1, key: 'condition', name: 'Zustand', isBatteryList: false, version: 1 }]);
+        return list([
+          { id: 1, key: 'condition', name: 'Zustand', isBatteryList: false, version: 1 },
+        ]);
       }
       if (route === 'GET /api/pick-lists/1/values') return list(CONDITIONS);
       if (route === 'GET /api/text-blocks') return list([]);
@@ -145,9 +147,9 @@ async function openDialog() {
   fireEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
   await screen.findByRole('form', { name: 'Inseratswerte bearbeiten' });
   await vi.waitFor(() =>
-    expect(within(form()).getByRole<HTMLSelectElement>('combobox', { name: /^Zustand/ }).value).toBe(
-      String(USED),
-    ),
+    expect(
+      within(form()).getByRole<HTMLSelectElement>('combobox', { name: /^Zustand/ }).value,
+    ).toBe(String(USED)),
   );
   fireEvent.change(visualGrade(), { target: { value: '3' } });
   fireEvent.click(within(form()).getByRole('button', { name: 'Speichern' }));
@@ -184,10 +186,11 @@ describe('UI-014.abweichung-bestaetigen "Zugeordnete Geräte weichen ab" (CU-140
       'Nach dieser Änderung weichen 2 zugeordnete Geräte vom Modell-Inserat ab:',
     );
     const table = within(dialog()).getByRole('table');
-    expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
-      'WI-Nr',
-      'Merkmal',
-    ]);
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['WI-Nr', 'Merkmal']);
     expect(
       within(table)
         .getAllByRole('row')
