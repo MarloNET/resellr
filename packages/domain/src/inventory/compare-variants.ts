@@ -152,5 +152,9 @@ export function variantDeviations(
  * A deviation in one line (UI-005 "Zeilenformat", AC-REQ-018-01), e.g. "Optik-Note: Gerät 4,
  * Modell-Inserat 2"; the audit entry of "trotzdem zuordnen" names the deviations so.
  */
-export const deviationLine = ({ label, deviceValue, listingValue }: VariantDeviation) =>
+export const deviationLine = ({
+  label,
+  deviceValue,
+  listingValue,
+}: Pick<VariantDeviation, 'label' | 'deviceValue' | 'listingValue'>) =>
   `${label}: Gerät ${deviceValue}, Modell-Inserat ${listingValue}`;

@@ -209,6 +209,19 @@ export const variantDeviationDetailsSchema = z.object({
 });
 
 /**
+ * `details` of `422 confirmation_required` with `kind: assigned_devices_deviate` (2.7, REQ-088):
+ * the assigned, available devices that deviate after the change of the listing values with their
+ * deviations, which `UI-014.abweichung-bestaetigen` shows.
+ */
+export const assignedDevicesDeviateDetailsSchema = z.object({
+  kind: z.literal('assigned_devices_deviate'),
+  devices: z.array(z.object({ wiNr: z.string(), deviations: z.array(variantDeviationSchema) })),
+});
+export type DeviatingDeviceItem = z.infer<
+  typeof assignedDevicesDeviateDetailsSchema
+>['devices'][number];
+
+/**
  * The answer of an assignment (2.6): the device, the new quantity of its model listing and the
  * channels whose published content now carries "Bestand auf Kanal anpassen" (channel ids,
  * Nachtrag MAR-263; empty until S5).
